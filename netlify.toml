@@ -1,9 +1,9 @@
-netlify.toml
+netlify.toml - Archivo de configuración para el despliegue
 [build]
   # Carpeta de tu aplicación React
   base = "client"
   command = "npm run build"
-  # CORRECCIÓN: El directorio de publicación DEBE ser solo "build"
+  # CORRECCIÓN ANTERIOR: La carpeta compilada está DENTRO de la base
   publish = "build" 
   
   # Carpeta de tus funciones
