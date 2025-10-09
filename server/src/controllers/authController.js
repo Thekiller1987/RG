@@ -1,96 +1,78 @@
-const { pool } = require('../config/db.js'); // Importamos el pool desestructurado
-const bcrypt = require('../../node_modules/bcryptjs/umd/index.js');
+// ==========================================================
+// ARCHIVO: server/src/controllers/authController.js
+// VERSIÓN CORREGIDA PARA SUPABASE (PostgreSQL)
+// ==========================================================
+
+const db = require('../config/db');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// Función para registrar un nuevo usuario
-const register = async (req, res) => {
-  const { nombre_usuario, password, rol } = req.body;
-
-  if (!nombre_usuario || !password || !rol) {
-    return res.status(400).json({ msg: 'Por favor, envía todos los campos' });
-  }
-
-  try {
-    // 1. Verificar si el usuario ya existe
-    // CAMBIO: Usar pool.query() y $1
-    const resultExisting = await pool.query('SELECT * FROM usuarios WHERE nombre_usuario = $1', [nombre_usuario]);
-    const existingUsers = resultExisting.rows; // CAMBIO: Obtener resultados de .rows
-
-    if (existingUsers.length > 0) {
-      return res.status(400).json({ msg: 'El nombre de usuario ya está en uso' });
-    }
-
-    // 2. Encriptar la contraseña
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // 3. Insertar el nuevo usuario
-    // CAMBIO: Usar $1, $2, $3 para los parámetros
-    await pool.query('INSERT INTO usuarios (nombre_usuario, password, rol) VALUES ($1, $2, $3)', [nombre_usuario, hashedPassword, rol]);
-
-    res.status(201).json({ msg: 'Usuario creado exitosamente' });
-
-  } catch (error) {
-    // Mantenemos el console.error para debugging en Netlify Logs
-    console.error('Error en el servidor durante el registro:', error); 
-    res.status(500).send('Error en el servidor');
-  }
-};
-
-
-// Función para el login de un usuario
-const login = async (req, res) => {
+exports.login = async (req, res) => {
   const { nombre_usuario, password } = req.body;
 
-  // Validar que se recibieron los datos
   if (!nombre_usuario || !password) {
-    return res.status(400).json({ msg: 'Por favor, envía usuario y contraseña' });
+    return res.status(400).json({ msg: 'Por favor, ingrese todos los campos' });
   }
 
   try {
-    // 1. Buscar al usuario en la base de datos
-    // CAMBIO: Usar pool.query() y $1
-    const resultUsers = await pool.query('SELECT * FROM usuarios WHERE nombre_usuario = $1', [nombre_usuario]);
-    const users = resultUsers.rows; // CAMBIO: Obtener resultados de .rows
-    
-    if (users.length === 0) {
-      return res.status(400).json({ msg: 'Usuario no encontrado' });
-    }
-    const user = users[0];
+    // CORRECCIÓN: Se usa $1 en lugar de ? para la consulta de PostgreSQL
+    const userQuery = 'SELECT * FROM usuarios WHERE nombre_usuario = $1';
+    const { rows } = await db.query(userQuery, [nombre_usuario]);
+    const user = rows[0];
 
-    // 2. Comparar la contraseña enviada con la encriptada en la BD
+    if (!user) {
+      return res.status(400).json({ msg: 'Credenciales inválidas' });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return res.status(400).json({ msg: 'Contraseña incorrecta' });
+      return res.status(400).json({ msg: 'Credenciales inválidas' });
     }
 
-    // 3. Si todo es correcto, crear el token
     const payload = {
-      id: user.id_usuario,
-      rol: user.rol,
-    };
-
-    const token = jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: '8h', 
-    });
-
-    // 4. Enviar el token al cliente
-    res.json({
-      msg: 'Login exitoso',
-      token,
       user: {
         id: user.id_usuario,
-        nombre: user.nombre_usuario,
         rol: user.rol,
-      }
-    });
+      },
+    };
 
-  } catch (error) {
-    // Mantenemos el console.error para debugging en Netlify Logs
-    console.error('Error en el servidor durante el login:', error);
+    jwt.sign(
+      payload,
+      process.env.JWT_SECRET,
+      { expiresIn: '5h' },
+      (err, token) => {
+        if (err) throw err;
+        // Se devuelve el token y los datos del usuario para el frontend
+        res.json({
+          token,
+          user: {
+            id: user.id_usuario,
+            nombre: user.nombre_usuario,
+            rol: user.rol,
+          },
+        });
+      }
+    );
+  } catch (err) {
+    console.error('Error en el controlador de login:', err.message);
     res.status(500).send('Error en el servidor');
   }
 };
 
-module.exports = { login, register };
+exports.getMe = async (req, res) => {
+    try {
+        // CORRECCIÓN: Se usa $1 en lugar de ?
+        const userQuery = 'SELECT id_usuario, nombre_usuario, rol FROM usuarios WHERE id_usuario = $1';
+        const { rows } = await db.query(userQuery, [req.user.id]);
+        const user = rows[0];
+
+        if (!user) {
+            return res.status(404).json({ msg: 'Usuario no encontrado' });
+        }
+        res.json(user);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Error en el Servidor');
+    }
+};
