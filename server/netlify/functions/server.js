@@ -26,22 +26,22 @@ const router = express.Router(); // Usamos un Router para enrutar dentro de la f
 // 3. Configurar Middlewares
 // Reemplaza [TU-DOMINIO-DE-NETLIFY] con https://rg11.netlify.app
 const allowedOrigins = [
-    'http://localhost:3000', 
-    'http://localhost:3001',
-    'https://rg11.netlify.app', 
-    'https://qfytudzenhpqvoxclmat.supabase.co'
+    'http://localhost:3000', 
+    'http://localhost:3001',
+    'https://rg11.netlify.app', 
+    'https://qfytudzenhpqvoxclmat.supabase.co'
 ];
 
 const corsOptions = {
-    origin: (origin, callback) => {
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            // Este log se mantiene para debugging de CORS en los logs de Netlify
-            console.error('Bloqueado por CORS:', origin);
-            callback(new Error('No permitido por CORS'));
-        }
-    }
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            // Este log se mantiene para debugging de CORS en los logs de Netlify
+            console.error('Bloqueado por CORS:', origin);
+            callback(new Error('No permitido por CORS'));
+        }
+    }
 };
 
 app.use(cors(corsOptions));
@@ -64,11 +64,12 @@ router.use('/reports', reportRoutes);
 
 // Ruta de prueba
 router.get('/', (req, res) => {
-    res.send('¡API de MultirepuestosRG funcionando en Netlify Functions! 🚀');
+    res.send('¡API de MultirepuestosRG funcionando en Netlify Functions! 🚀');
 });
 
 // Enlaza el router de Express a la aplicación bajo el prefijo /api
-app.use('/api', router); 
+// CORRECCIÓN: Cambiamos '/api' por '/' para evitar el prefijo doble (Netlify ya lo añade)
+app.use('/', router); 
 
 // 6. Exportar la función Serverless (El Servidor ya no "Escucha")
 // El 'handler' es el punto de entrada que Netlify ejecutará.
