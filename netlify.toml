@@ -15,6 +15,13 @@ functions = "server/netlify/functions"
 # Forzamos Node.js v18 para asegurar compatibilidad.
 NODE_VERSION = "18"
 
+# --- PLUGIN PARA INSTALAR DEPENDENCIAS DE FUNCIONES ---
+# ¡ESTA ES LA CORRECCIÓN!
+# Este plugin oficial de Netlify busca automáticamente cualquier
+# package.json dentro de la carpeta de funciones e instala sus dependencias.
+[[plugins]]
+package = "@netlify/plugin-functions-install-core"
+
 # --- REGLAS DE REDIRECCIÓN (SIN CAMBIOS) ---
 
 [[redirects]]
@@ -29,3 +36,4 @@ force = true
 from = "/*"
 to = "/index.html"
 status = 200
+
