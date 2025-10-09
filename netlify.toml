@@ -1,26 +1,28 @@
 # ==========================================================
-# ARCHIVO: netlify.toml
-# CONFIGURACIÓN PARA NETLIFY - MultirepuestosRG
+# CONFIGURACIÓN PARA FRONTEND-ONLY (Netlify)
+# Backend en Render, Base de Datos en Supabase
 # ==========================================================
 
 [build]
-  # Comando para instalar dependencias del cliente y generar el build
-  command = "npm install --prefix client && npm run build --prefix client"
-  # Carpeta que Netlify usará para publicar el sitio
-  publish = "client/dist"
-  # Carpeta donde están las funciones serverless
-  functions = "server/netlify/functions"
+  # Le dice a Netlify que entre a la carpeta 'client' para construir el frontend
+  base = "client"
+  # El comando para construir tu aplicación de Vite
+  command = "npm run build"
+  # La carpeta donde Vite deja los archivos construidos
+  publish = "dist"
 
-# ==========================================================
-# REDIRECCIONES
-# ==========================================================
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/server/:splat"
-  status = 200
-  force = true
+[context.production.environment]
+  # Forzamos Node.js v18 para asegurar compatibilidad.
+  NODE_VERSION = "18"
+  # Mantenemos el aumento de memoria para el build de Vite, es una buena práctica.
+  NODE_OPTIONS = "--max-old-space-size=4096"
 
+# --- REGLA ÚNICA Y CRÍTICA PARA EL FRONTEND (SPA) ---
+# Cualquier petición que llegue a Netlify debe servir el archivo principal
+# de tu aplicación de React (index.html). Esto permite que el router de
+# React en el navegador tome el control de las rutas.
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
