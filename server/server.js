@@ -1,6 +1,6 @@
 // ==========================================================
 // ARCHIVO: server/server.js
-// VERSIÓN FINAL PARA RENDER
+// VERSIÓN FINAL PARA RENDER (CON RUTAS CORREGIDAS)
 // ==========================================================
 
 const express = require('express');
@@ -24,11 +24,11 @@ const reportRoutes = require('./src/routes/reportRoutes.js');
 
 const app = express();
 
-// CORS - Permite que tu frontend en Netlify se comunique con tu backend en Render
+// CORS
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
-  'https://rg11.netlify.app' // ¡MUY IMPORTANTE!
+  'https://rg11.netlify.app'
 ];
 
 app.use(cors({
@@ -43,7 +43,6 @@ app.use(cors({
 app.use(express.json());
 
 // Montar rutas en el prefijo /api
-// Ahora la URL completa será: https://tu-backend.onrender.com/api/auth/login
 const router = express.Router();
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
@@ -56,15 +55,15 @@ router.use('/finances', financeRoutes);
 router.use('/sales', salesRoutes);
 router.use('/reports', reportRoutes);
 
-app.use('/api', router); // Usamos /api como base para todas las rutas
+app.use('/api', router);
 
-// Ruta de prueba para saber si el servidor está vivo
+// Ruta de prueba
 app.get('/', (req, res) => {
   res.send('Servidor de MultirepuestosRG funcionando en Render! 🚀');
 });
 
-// CAMBIO CRÍTICO: Iniciar el servidor para Render
-const PORT = process.env.PORT || 3001; // Render asignará el puerto automáticamente
+// Iniciar el servidor
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en el puerto ${PORT}`);
 });
