@@ -3,26 +3,18 @@ base = "client"
 command = "npm run build"
 publish = "dist"
 
-functions = "server/netlify/functions"
+# Le decimos a Netlify que las funciones están en la carpeta 'server'
+functions = "server"
 
 [[redirects]]
-# 1. API: Subida de archivos (ruta específica)
-from = "/api/inventory/upload"
-to = "/.netlify/functions/inventory-upload"
-status = 200
-force = true
-
-[[redirects]]
-# 2. API: Todas las demás rutas de la API
+# Todas las peticiones a /api/... irán a nuestra función 'server.js'
 from = "/api/*"
 to = "/.netlify/functions/server/:splat"
 status = 200
 force = true
 
 [[redirects]]
-# 3. REGLA CRÍTICA SPA (FRONTEND)
-# Envía todas las rutas no encontradas a index.html.
-# ESTO ES LO QUE ARREGLA EL ERROR 404/CÓDIGO EXPUESTO.
+# Regla para que el frontend funcione correctamente
 from = "/*"
 to = "/index.html"
 status = 200

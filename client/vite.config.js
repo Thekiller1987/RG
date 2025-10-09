@@ -5,11 +5,11 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   
-  // CORRECCIÓN CRÍTICA: Usa rutas relativas para el CSS/JS
+  // CRÍTICO: Usa rutas relativas (./) para que el CSS/JS cargue bien en Netlify.
   base: './', 
   
   build: {
-    // Coincide con publish = "dist" en netlify.toml
+    // Coincide con 'publish = "dist"' en netlify.toml
     outDir: 'dist', 
   }
 })

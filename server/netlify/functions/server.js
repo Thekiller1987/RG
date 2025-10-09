@@ -1,3 +1,8 @@
+// ==========================================================
+// ARCHIVO: server/server.js
+// Este es tu ÚNICO archivo de servidor.
+// ==========================================================
+
 // 1. Importar las librerías
 const express = require('express');
 const cors = require('cors');
@@ -21,55 +26,51 @@ const reportRoutes = require('./src/routes/reportRoutes.js');
 
 // 2. Crear una instancia de Express
 const app = express();
-const router = express.Router(); 
 
 // 3. Configurar Middlewares
-// Reemplaza [TU-DOMINIO-DE-NETLIFY] con https://rg11.netlify.app
 const allowedOrigins = [
-    'http://localhost:3000', 
-    'http://localhost:3001',
-    'https://rg11.netlify.app', 
-    'https://qfytudzenhpqvoxclmat.supabase.co'
+    'http://localhost:3000', 
+    'http://localhost:5173', // Puerto común de Vite
+    'https://rg11.netlify.app', 
 ];
 
 const corsOptions = {
-    origin: (origin, callback) => {
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            console.error('Bloqueado por CORS:', origin);
-            callback(new Error('No permitido por CORS'));
-        }
-    }
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            console.error('Bloqueado por CORS:', origin);
+            callback(new Error('No permitido por CORS'));
+        }
+    }
 };
 
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// 4. No necesitamos el puerto aquí, Netlify lo maneja.
-
-// 5. Usar las rutas
-// Todas las rutas se añaden al router de Express
-router.use('/auth', authRoutes);
-router.use('/users', userRoutes);
-router.use('/products', productRoutes);
-router.use('/categories', categoryRoutes);
-router.use('/providers', providerRoutes);
-router.use('/clients', clientRoutes);
-router.use('/orders', orderRoutes);
-router.use('/finances', financeRoutes);
-router.use('/sales', salesRoutes); 
-router.use('/reports', reportRoutes);
+// 4. Montar todas las rutas en un router base
+// Esto es importante para que Netlify las maneje bien.
+const apiRouter = express.Router();
+apiRouter.use('/auth', authRoutes);
+apiRouter.use('/users', userRoutes);
+apiRouter.use('/products', productRoutes);
+apiRouter.use('/categories', categoryRoutes);
+apiRouter.use('/providers', providerRoutes);
+apiRouter.use('/clients', clientRoutes);
+apiRouter.use('/orders', orderRoutes);
+apiRouter.use('/finances', financeRoutes);
+apiRouter.use('/sales', salesRoutes); 
+apiRouter.use('/reports', reportRoutes);
 
 // Ruta de prueba
-router.get('/', (req, res) => {
-    res.send('¡API de MultirepuestosRG funcionando en Netlify Functions! 🚀');
+apiRouter.get('/', (req, res) => {
+    res.send('¡API de MultirepuestosRG funcionando en Netlify Functions! 🚀');
 });
 
-// CORRECCIÓN CRÍTICA: Montamos el router en la raíz ('/') para que
-// funcione correctamente después de que Netlify reescribe el prefijo /api.
-app.use('/', router); 
+// Usamos el router en la app. Netlify quita el prefijo /api,
+// así que lo montamos en la raíz '/'.
+app.use('/', apiRouter); 
 
-// 6. Exportar la función Serverless (El Servidor ya no "Escucha")
-// El 'handler' es el punto de entrada que Netlify ejecutará.
+// 5. Exportar la función Serverless
+// Esto es lo que Netlify usará para ejecutar todo tu servidor.
 module.exports.handler = serverless(app);
