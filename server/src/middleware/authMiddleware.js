@@ -1,44 +1,34 @@
+// ==========================================================
+// ARCHIVO: server/src/middleware/authMiddleware.js
+// VERSIÓN FINAL Y CORREGIDA
+// ==========================================================
+
 const jwt = require('jsonwebtoken');
+require('dotenv').config();
 
-// Middleware para verificar el token
-const verifyToken = (req, res, next) => {
-  let token;
+// Exportamos directamente la función del middleware
+module.exports = function (req, res, next) {
+  // 1. Obtener el token del header
+  const authHeader = req.header('Authorization');
 
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    try {
-      // Obtenemos el token del encabezado 'Bearer <token>'
-      token = req.headers.authorization.split(' ')[1];
-
-      // Verificamos la validez del token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-      // Adjuntamos los datos del usuario (id y rol) a la petición
-      req.user = decoded;
-      next(); // Pasamos al siguiente paso
-      return; // Importante para evitar que se ejecute el código siguiente
-    } catch (error) {
-      // Si el token es inválido o expiró
-      return res.status(401).json({ msg: 'No autorizado, el token falló o expiró' });
-    }
+  // 2. Verificar si no hay token o si no tiene el formato correcto
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ msg: 'No hay token, autorización denegada' });
   }
 
-  if (!token) {
-    // Si no se encuentra el token en los headers
-    return res.status(401).json({ msg: 'No autorizado, no hay token' });
-  }
-};
+  try {
+    // 3. Extraer el token (quitando "Bearer ")
+    const token = authHeader.split(' ')[1];
 
-// Middleware para verificar si el usuario es Administrador
-const isAdmin = (req, res, next) => {
-  // Asegúrate de que el token ya haya adjuntado el rol a req.user
-  if (req.user && req.user.rol === 'Administrador') {
-    next(); // Si es admin, puede continuar
-  } else {
-    res.status(403).json({ msg: 'Acceso denegado. Se requiere rol de Administrador.' });
+    // 4. Verificar el token con el secreto
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // 5. Si es válido, adjuntar el payload del usuario a la petición
+    req.user = decoded.user;
+
+    // 6. Continuar al siguiente paso (el controlador)
+    next();
+  } catch (err) {
+    res.status(401).json({ msg: 'Token no es válido' });
   }
 };
-
-// Se exporta un objeto con ambas funciones.
-// En las rutas, se debe llamar a la función específica que se necesita.
-module.exports = { verifyToken, isAdmin };
-
