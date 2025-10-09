@@ -1,42 +1,41 @@
-    # ==========================================================
-    # CONFIGURACIÓN FINAL PARA MONOREPO (CLIENT + SERVER)
-    # ==========================================================
+# ==========================================================
+# CONFIGURACIÓN FINAL PARA MONOREPO (CLIENT + SERVER)
+# VERSIÓN CORREGIDA CON INSTALACIÓN MANUAL
+# ==========================================================
 
-    [build]
-    # NO se usa 'base'. Todo se ejecuta desde la raíz del proyecto.
-    # 1. Entra a la carpeta 'client' y construye el frontend.
-    command = "cd client && npm install && npm run build"
-    # 2. La carpeta de publicación del frontend, vista desde la raíz.
-    publish = "client/dist"
-    # 3. La carpeta de funciones del backend, vista desde la raíz.
-    functions = "server/netlify/functions"
+[build]
+  # CORRECCIÓN CLAVE: Se modifica el comando de build para instalar todo manualmente
+  # 1. Instala las dependencias del backend (en su carpeta)
+  # 2. Instala las dependencias del frontend (en su carpeta)
+  # 3. Construye el frontend
+  command = "npm install --prefix server/netlify/functions && npm install --prefix client && npm run build --prefix client"
+  
+  # La carpeta de publicación del frontend, vista desde la raíz.
+  publish = "client/dist"
+  # La carpeta de funciones del backend, vista desde la raíz.
+  functions = "server/netlify/functions"
 
-    [context.production.environment]
-    # Forzamos Node.js v18 para asegurar compatibilidad.
-    NODE_VERSION = "18"
-    # ¡ESTA ES LA CORRECCIÓN CLAVE!
-    # Aumentamos la memoria disponible para el proceso de Node.js a 4GB.
-    # Esto evita que el build se quede sin memoria.
-    NODE_OPTIONS = "--max-old-space-size=4096"
+[context.production.environment]
+  # Forzamos Node.js v18 para asegurar compatibilidad.
+  NODE_VERSION = "18"
+  # Mantenemos el aumento de memoria por si acaso.
+  NODE_OPTIONS = "--max-old-space-size=4096"
 
-    # --- PLUGIN PARA INSTALAR DEPENDENCIAS DE FUNCIONES ---
-    # Este plugin oficial de Netlify busca automáticamente cualquier
-    # package.json dentro de la carpeta de funciones e instala sus dependencias.
-    [[plugins]]
-    package = "@netlify/plugin-functions-install-core"
+# --- Se elimina el plugin ya que ahora instalamos las dependencias manualmente ---
+# [[plugins]]
+# package = "@netlify/plugin-functions-install-core"
 
-    # --- REGLAS DE REDIRECCIÓN (SIN CAMBIOS) ---
+# --- REGLAS DE REDIRECCIÓN (SIN CAMBIOS) ---
+[[redirects]]
+  # REGLA 1: API
+  from = "/api/*"
+  to = "/.netlify/functions/server/:splat"
+  status = 200
+  force = true
 
-    [[redirects]]
-    # REGLA 1: API (Debe ir primero)
-    from = "/api/*"
-    to = "/.netlify/functions/server/:splat"
-    status = 200
-    force = true
-
-    [[redirects]]
-    # REGLA 2: FRONTEND (Debe ir al final)
-    from = "/*"
-    to = "/index.html"
-    status = 200
+[[redirects]]
+  # REGLA 2: FRONTEND
+  from = "/*"
+  to = "/index.html"
+  status = 200
 
