@@ -14,11 +14,10 @@
   command = "npm run build"
 
 # --- Regla Crítica para Single Page Application (SPA) ---
-# Esto asegura que CUALQUIER ruta (ej: /pos, /dashboard) cargue tu aplicación de React
+# Esto asegura que CUALQUIER ruta (ej: /pos, /dashboard, /orders) cargue tu aplicación de React
 # y permita que React Router maneje la navegación.
 # Esto soluciona los problemas de CSS y assets que no cargan en sub-páginas.
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
