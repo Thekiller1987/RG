@@ -1,89 +1,82 @@
-const { pool } = require('../config/db.js');
-const bcrypt = require('../../node_modules/bcryptjs/umd/index.js');
+// ==========================================================
+// ARCHIVO: server/src/controllers/userController.js
+// VERSIÓN FINAL Y CORREGIDA PARA RENDER Y SUPABASE
+// ==========================================================
 
-// @desc    Obtener todos los usuarios
-// @route   GET /api/users
-// @access  Private/Admin
-const getAllUsers = async (req, res) => {
-    try {
-        // CAMBIO 1: Usar pool.query()
-        const result = await pool.query('SELECT id_usuario, nombre_usuario, rol FROM usuarios');
-        
-        // CAMBIO 2: Obtener resultados de .rows
-        res.json(result.rows);
-    } catch (error) {
-        console.error(error);
-        res.status(500).send('Error en el servidor');
-    }
+const db = require('../config/db');
+const bcrypt = require('bcryptjs');
+
+// OBTENER TODOS LOS USUARIOS
+// exports.getAllUsers es la forma correcta de exportar
+exports.getAllUsers = async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT id_usuario, nombre_usuario, rol FROM usuarios ORDER BY nombre_usuario');
+    res.json(rows);
+  } catch (err) {
+    console.error('Error en getAllUsers:', err.message);
+    res.status(500).send('Error en el servidor');
+  }
 };
 
-// @desc    Actualizar un usuario (rol y/o contraseña)
-// @route   PUT /api/users/:id
-// @access  Private/Admin
-const updateUser = async (req, res) => {
+// CREAR UN NUEVO USUARIO
+exports.createUser = async (req, res) => {
+  const { nombre_usuario, password, rol } = req.body;
+
+  if (!nombre_usuario || !password || !rol) {
+    return res.status(400).json({ msg: 'Por favor, ingrese todos los campos' });
+  }
+
+  try {
+    const userQuery = 'SELECT * FROM usuarios WHERE nombre_usuario = $1';
+    const existingUser = await db.query(userQuery, [nombre_usuario]);
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ msg: 'El nombre de usuario ya existe' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const newUserQuery = 'INSERT INTO usuarios (nombre_usuario, password, rol) VALUES ($1, $2, $3) RETURNING id_usuario, nombre_usuario, rol';
+    const { rows } = await db.query(newUserQuery, [nombre_usuario, hashedPassword, rol]);
+
+    res.status(201).json({ msg: 'Usuario creado exitosamente', user: rows[0] });
+  } catch (err) {
+    console.error('Error en createUser:', err.message);
+    res.status(500).send('Error en el servidor');
+  }
+};
+
+// ACTUALIZAR UN USUARIO
+exports.updateUser = async (req, res) => {
     const { id } = req.params;
-    const { rol, password } = req.body;
+    const { nombre_usuario, rol } = req.body;
 
     try {
-        // 1. Buscar al usuario existente
-        // CAMBIO 1: Usar pool.query() y $1
-        const result = await pool.query('SELECT * FROM usuarios WHERE id_usuario = $1', [id]);
-        const users = result.rows; // CAMBIO 2: Obtener resultados de .rows
-
-        if (users.length === 0) {
+        const { rows } = await db.query(
+            'UPDATE usuarios SET nombre_usuario = $1, rol = $2 WHERE id_usuario = $3 RETURNING id_usuario, nombre_usuario, rol',
+            [nombre_usuario, rol, id]
+        );
+        if (rows.length === 0) {
             return res.status(404).json({ msg: 'Usuario no encontrado' });
         }
-
-        let hashedPassword = users[0].password;
-        // 2. Si se envía una nueva contraseña, la encriptamos
-        if (password) {
-            const salt = await bcrypt.genSalt(10);
-            hashedPassword = await bcrypt.hash(password, salt);
-        }
-
-        // 3. Actualizar la base de datos
-        // CAMBIO 3: Usar $1, $2, $3
-        // Nota: COALESCE(rol, users[0].rol) no es necesario aquí si se maneja en el backend JS
-        await pool.query('UPDATE usuarios SET rol = $1, password = $2 WHERE id_usuario = $3', [
-            rol || users[0].rol, // Si no se envía un nuevo rol, mantenemos el existente
-            hashedPassword,
-            id,
-        ]);
-
-        res.json({ msg: 'Usuario actualizado correctamente' });
-    } catch (error) {
-        console.error(error);
+        res.json({ msg: 'Usuario actualizado', user: rows[0] });
+    } catch (err) {
+        console.error('Error en updateUser:', err.message);
         res.status(500).send('Error en el servidor');
     }
 };
 
-// @desc    Eliminar un usuario
-// @route   DELETE /api/users/:id
-// @access  Private/Admin
-const deleteUser = async (req, res) => {
+// ELIMINAR UN USUARIO
+exports.deleteUser = async (req, res) => {
     const { id } = req.params;
     try {
-        // CAMBIO 1: Usar pool.query() y $1
-        const result = await pool.query('DELETE FROM usuarios WHERE id_usuario = $1', [id]);
-        
-        // CAMBIO 2: PostgreSQL usa .rowCount en lugar de .affectedRows
+        const result = await db.query('DELETE FROM usuarios WHERE id_usuario = $1', [id]);
         if (result.rowCount === 0) {
             return res.status(404).json({ msg: 'Usuario no encontrado' });
         }
-        
-        res.json({ msg: 'Usuario eliminado correctamente' });
-    } catch (error) {
-        // En PostgreSQL, 23503 es Foreign Key Violation
-        if (error.code === '23503') {
-             return res.status(400).json({ msg: 'No se puede eliminar el usuario porque tiene registros asociados (ventas, movimientos, etc.).' });
-        }
-        console.error(error);
+        res.json({ msg: 'Usuario eliminado' });
+    } catch (err) {
+        console.error('Error en deleteUser:', err.message);
         res.status(500).send('Error en el servidor');
     }
-};
-
-module.exports = {
-    getAllUsers,
-    updateUser,
-    deleteUser,
 };
