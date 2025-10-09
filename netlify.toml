@@ -1,30 +1,35 @@
+# ==========================================================
+# CONFIGURACIÓN DEFINITIVA PARA PROYECTO FULL-STACK EN NETLIFY
+# Frontend: React/Vite (en la carpeta 'client')
+# Backend: Node/Express (en la carpeta 'server')
+# ==========================================================
+
 [build]
 # Le dice a Netlify que entre a la carpeta 'client' para construir el frontend
 base = "client"
 command = "npm run build"
-# La carpeta donde Vite deja los archivos construidos
+# La carpeta final que se va a publicar (creada por 'npm run build')
 publish = "dist"
 
-# Le dice a Netlify que la carpeta 'server' contiene el código del backend
+# Le dice a Netlify que nuestro código del backend está en la carpeta 'server'
 functions = "server"
 
-# --- REGLAS DE REDIRECCIÓN ---
-# Netlify las lee en orden. Primero las más específicas, al final la general.
+
+# --- REGLAS DE REDIRECCIÓN (LEÍDAS EN ORDEN) ---
 
 [[redirects]]
-# REGLA 1: Todas las peticiones a la API
-# Cualquier URL que empiece con /api/ (ej: /api/login, /api/products)
-# se redirige a nuestra única función del backend (server.js).
+# REGLA 1: LA API (LA MÁS ESPECÍFICA)
+# Cualquier petición que empiece con /api/ debe ir a nuestra función de backend.
+# Esto tiene que ir primero para que Netlify no lo confunda con una ruta del frontend.
 from = "/api/*"
 to = "/.netlify/functions/server/:splat"
 status = 200
 
+
 [[redirects]]
-# REGLA 2: REGLA CRÍTICA PARA EL FRONTEND (SPA)
-# Cualquier otra petición que no fue atrapada por la regla anterior 
-# (ej: /login, /productos, / o cualquier otra ruta del frontend)
-# debe servir el archivo principal de tu aplicación de React.
-# Esto permite que el router de React en el navegador tome el control.
+# REGLA 2: EL FRONTEND (LA MÁS GENERAL)
+# Cualquier otra petición que no empezó con /api/ (ej: /login, /dashboard, etc.)
+# debe cargar el index.html principal. El router de React se encargará del resto.
 # ¡ESTA REGLA SIEMPRE DEBE SER LA ÚLTIMA!
 from = "/*"
 to = "/index.html"
