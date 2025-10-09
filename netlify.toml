@@ -1,13 +1,19 @@
 # ==========================================================
 # ARCHIVO: netlify.toml
-# CONFIGURACIÓN FINAL PARA SPA + API
+# CONFIGURACIÓN PARA NETLIFY - MultirepuestosRG
 # ==========================================================
 
 [build]
+  # Comando para instalar dependencias del cliente y generar el build
   command = "npm install --prefix client && npm run build --prefix client"
+  # Carpeta que Netlify usará para publicar el sitio
   publish = "client/dist"
+  # Carpeta donde están las funciones serverless
   functions = "server/netlify/functions"
 
+# ==========================================================
+# REDIRECCIONES
+# ==========================================================
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/server/:splat"
