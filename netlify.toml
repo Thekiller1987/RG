@@ -1,41 +1,19 @@
-# ==========================================================
-# CONFIGURACIÓN FINAL PARA MONOREPO (CLIENT + SERVER)
-# VERSIÓN CORREGIDA CON INSTALACIÓN MANUAL
-# ==========================================================
-
 [build]
-  # CORRECCIÓN CLAVE: Se modifica el comando de build para instalar todo manualmente
-  # 1. Instala las dependencias del backend (en su carpeta)
-  # 2. Instala las dependencias del frontend (en su carpeta)
-  # 3. Construye el frontend
-  command = "npm install --prefix server/netlify/functions && npm install --prefix client && npm run build --prefix client"
-  
-  # La carpeta de publicación del frontend, vista desde la raíz.
+  command = "npm install --prefix client && npm run build --prefix client"
   publish = "client/dist"
-  # La carpeta de funciones del backend, vista desde la raíz.
   functions = "server/netlify/functions"
 
 [context.production.environment]
-  # Forzamos Node.js v18 para asegurar compatibilidad.
   NODE_VERSION = "18"
-  # Mantenemos el aumento de memoria por si acaso.
   NODE_OPTIONS = "--max-old-space-size=4096"
 
-# --- Se elimina el plugin ya que ahora instalamos las dependencias manualmente ---
-# [[plugins]]
-# package = "@netlify/plugin-functions-install-core"
-
-# --- REGLAS DE REDIRECCIÓN (SIN CAMBIOS) ---
 [[redirects]]
-  # REGLA 1: API
   from = "/api/*"
   to = "/.netlify/functions/server/:splat"
   status = 200
   force = true
 
 [[redirects]]
-  # REGLA 2: FRONTEND
   from = "/*"
   to = "/index.html"
   status = 200
-
