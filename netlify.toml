@@ -1,39 +1,31 @@
 # ==========================================================
-# CONFIGURACIÓN DEFINITIVA Y A PRUEBA DE ERRORES
+# CONFIGURACIÓN FINAL PARA MONOREPO (CLIENT + SERVER)
 # ==========================================================
 
 [build]
-# Entramos a la carpeta 'client' para construir el frontend
-base = "client"
-command = "npm run build"
-publish = "dist"
-
-# La carpeta donde vive nuestra función del backend
+# NO se usa 'base'. Todo se ejecuta desde la raíz del proyecto.
+# 1. Entra a la carpeta 'client' y construye el frontend.
+command = "cd client && npm install && npm run build"
+# 2. La carpeta de publicación del frontend, vista desde la raíz.
+publish = "client/dist"
+# 3. La carpeta de funciones del backend, vista desde la raíz.
 functions = "server/netlify/functions"
 
-# --- CONFIGURACIÓN DEL ENTORNO DE CONSTRUCCIÓN ---
 [context.production.environment]
-# ¡ESTA ES LA LÍNEA MÁS IMPORTANTE!
-# Forzamos a Netlify a usar la versión 18 de Node.js para todo el proceso.
-# Esto asegura compatibilidad entre frontend, backend y sus dependencias.
+# Forzamos Node.js v18 para asegurar compatibilidad.
 NODE_VERSION = "18"
 
-# --- REGLAS DE REDIRECCIÓN ---
-# Netlify las lee en orden. La primera que coincide, se aplica.
+# --- REGLAS DE REDIRECCIÓN (SIN CAMBIOS) ---
 
 [[redirects]]
 # REGLA 1: API (Debe ir primero)
-# Cualquier petición a /api/... se redirige a nuestra función 'server'.
 from = "/api/*"
 to = "/.netlify/functions/server/:splat"
 status = 200
-force = true # 'force = true' es útil para asegurar que esta regla tiene prioridad
+force = true
 
 [[redirects]]
-# REGLA 2: FRONTEND (Single Page Application)
-# Cualquier OTRA petición que no sea /api/... debe servir el index.html
-# para que React Router tome el control. ¡ESTA REGLA DEBE SER LA ÚLTIMA!
+# REGLA 2: FRONTEND (Debe ir al final)
 from = "/*"
 to = "/index.html"
 status = 200
-
