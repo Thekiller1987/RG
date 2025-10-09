@@ -1,23 +1,37 @@
 const db = require('../config/db');
 const xlsx = require('xlsx');
 
+// --- NUEVA FUNCIÓN AUXILIAR ---
+// Limpia un valor de moneda (ej: "$1,450.00") y lo convierte en un número (ej: 1450.00)
+const parseCurrency = (value) => {
+    if (typeof value === 'number') return value;
+    if (typeof value !== 'string') return 0;
+    // Elimina el símbolo de la moneda, las comas y los espacios
+    const cleanedValue = value.replace(/[$,\s]/g, '');
+    const number = parseFloat(cleanedValue);
+    return isNaN(number) ? 0 : number;
+};
+
+
 // Función para obtener o crear una categoría y devolver su ID
 const getOrCreateCategory = async (client, name) => {
-    if (!name || name.trim() === '') return null;
-    let { rows } = await client.query('SELECT id_categoria FROM categorias WHERE nombre = $1', [name.trim()]);
+    if (!name || name.trim() === '' || name.trim() === '- Sin Departamento -') return null;
+    const trimmedName = name.trim();
+    let { rows } = await client.query('SELECT id_categoria FROM categorias WHERE nombre = $1', [trimmedName]);
     if (rows.length > 0) return rows[0].id_categoria;
     
-    ({ rows } = await client.query('INSERT INTO categorias (nombre) VALUES ($1) RETURNING id_categoria', [name.trim()]));
+    ({ rows } = await client.query('INSERT INTO categorias (nombre) VALUES ($1) RETURNING id_categoria', [trimmedName]));
     return rows[0].id_categoria;
 };
 
 // Función para obtener o crear un proveedor y devolver su ID
 const getOrCreateProvider = async (client, name) => {
     if (!name || name.trim() === '') return null;
-    let { rows } = await client.query('SELECT id_proveedor FROM proveedores WHERE nombre = $1', [name.trim()]);
+    const trimmedName = name.trim();
+    let { rows } = await client.query('SELECT id_proveedor FROM proveedores WHERE nombre = $1', [trimmedName]);
     if (rows.length > 0) return rows[0].id_proveedor;
 
-    ({ rows } = await client.query('INSERT INTO proveedores (nombre) VALUES ($1) RETURNING id_proveedor', [name.trim()]));
+    ({ rows } = await client.query('INSERT INTO proveedores (nombre) VALUES ($1) RETURNING id_proveedor', [trimmedName]));
     return rows[0].id_proveedor;
 };
 
@@ -29,6 +43,7 @@ exports.massiveUpload = async (req, res) => {
     const client = await db.getClient();
     let inserted = 0;
     let updated = 0;
+    const errors = [];
 
     try {
         await client.query('BEGIN');
@@ -38,11 +53,19 @@ exports.massiveUpload = async (req, res) => {
         const sheet = workbook.Sheets[sheetName];
         const data = xlsx.utils.sheet_to_json(sheet);
 
-        for (const row of data) {
-            const { codigo, nombre, costo, venta, existencia, nombre_categoria, nombre_proveedor } = row;
+        for (const [index, row] of data.entries()) {
+            // --- CORRECCIÓN CRÍTICA: Mapeo de los nombres de columna de tu archivo ---
+            const codigo = row['Código'] || row['codigo'];
+            const nombre = row['Producto'] || row['nombre'];
+            const costo = parseCurrency(row['P. Costo'] || row['costo']);
+            const venta = parseCurrency(row['P. Venta'] || row['venta']);
+            const existencia = row['Existencia'] || row['existencia'];
+            const nombre_categoria = row['Departamento'] || row['nombre_categoria'];
+            const nombre_proveedor = row['Proveedor'] || row['nombre_proveedor'];
 
             if (!codigo || !nombre || costo === undefined || venta === undefined || existencia === undefined) {
-                console.warn('Fila omitida por falta de datos:', row);
+                console.warn(`Fila ${index + 2} omitida por falta de datos:`, row);
+                errors.push(`Fila ${index + 2}: Faltan datos esenciales (código, nombre, costo, venta o existencia).`);
                 continue;
             }
 
@@ -52,6 +75,7 @@ exports.massiveUpload = async (req, res) => {
             const { rows: existingProducts } = await client.query('SELECT id_producto FROM productos WHERE codigo = $1', [codigo]);
 
             if (existingProducts.length > 0) {
+                // Actualizar producto existente
                 await client.query(
                     `UPDATE productos SET 
                         nombre = $1, costo = $2, venta = $3, existencia = $4, 
@@ -61,6 +85,7 @@ exports.massiveUpload = async (req, res) => {
                 );
                 updated++;
             } else {
+                // Insertar nuevo producto
                 await client.query(
                     `INSERT INTO productos 
                         (codigo, nombre, costo, venta, existencia, id_categoria, id_proveedor, stock_reservado, minimo, maximo) 
@@ -73,10 +98,11 @@ exports.massiveUpload = async (req, res) => {
 
         await client.query('COMMIT');
         res.status(200).json({
-            message: 'Carga masiva completada exitosamente.',
+            message: 'Carga masiva completada.',
             total_records: data.length,
             inserted,
             updated,
+            errors,
         });
 
     } catch (error) {
@@ -87,3 +113,4 @@ exports.massiveUpload = async (req, res) => {
         client.release();
     }
 };
+
