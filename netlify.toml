@@ -1,36 +1,38 @@
 # ==========================================================
-# CONFIGURACIÓN DEFINITIVA PARA PROYECTO FULL-STACK EN NETLIFY
-# Frontend: React/Vite (en la carpeta 'client')
-# Backend: Node/Express (en la carpeta 'server')
+# CONFIGURACIÓN DEFINITIVA Y A PRUEBA DE ERRORES
 # ==========================================================
 
 [build]
-# Le dice a Netlify que entre a la carpeta 'client' para construir el frontend
+# Entramos a la carpeta 'client' para construir el frontend
 base = "client"
 command = "npm run build"
-# La carpeta final que se va a publicar (creada por 'npm run build')
 publish = "dist"
 
-# CORRECCIÓN CRÍTICA: Apuntamos a la carpeta exacta donde viven las funciones
+# La carpeta donde vive nuestra función del backend
 functions = "server/netlify/functions"
 
+# --- CONFIGURACIÓN DEL ENTORNO DE CONSTRUCCIÓN ---
+[context.production.environment]
+# ¡ESTA ES LA LÍNEA MÁS IMPORTANTE!
+# Forzamos a Netlify a usar la versión 18 de Node.js para todo el proceso.
+# Esto asegura compatibilidad entre frontend, backend y sus dependencias.
+NODE_VERSION = "18"
 
-# --- REGLAS DE REDIRECCIÓN (LEÍDAS EN ORDEN) ---
+# --- REGLAS DE REDIRECCIÓN ---
+# Netlify las lee en orden. La primera que coincide, se aplica.
 
 [[redirects]]
-# REGLA 1: LA API (LA MÁS ESPECÍFICA)
-# Cualquier petición que empiece con /api/ debe ir a nuestra función de backend.
-# Esto tiene que ir primero para que Netlify no lo confunda con una ruta del frontend.
+# REGLA 1: API (Debe ir primero)
+# Cualquier petición a /api/... se redirige a nuestra función 'server'.
 from = "/api/*"
 to = "/.netlify/functions/server/:splat"
 status = 200
-
+force = true # 'force = true' es útil para asegurar que esta regla tiene prioridad
 
 [[redirects]]
-# REGLA 2: EL FRONTEND (LA MÁS GENERAL)
-# Cualquier otra petición que no empezó con /api/ (ej: /login, /dashboard, etc.)
-# debe cargar el index.html principal. El router de React se encargará del resto.
-# ¡ESTA REGLA SIEMPRE DEBE SER LA ÚLTIMA!
+# REGLA 2: FRONTEND (Single Page Application)
+# Cualquier OTRA petición que no sea /api/... debe servir el index.html
+# para que React Router tome el control. ¡ESTA REGLA DEBE SER LA ÚLTIMA!
 from = "/*"
 to = "/index.html"
 status = 200
