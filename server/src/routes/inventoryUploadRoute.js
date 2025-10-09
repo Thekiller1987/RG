@@ -1,24 +1,15 @@
-import express from 'express';
-import multer from 'multer';
-// Nota: Deberás asegurarte de que este archivo de ruta use 'require' si no estás usando ES Modules
-// Para compatibilidad con el resto de tus archivos, lo adaptaremos a 'require'
+const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const inventoryController = require('../controllers/inventoryController');
+const authMiddleware = require('../middleware/authMiddleware');
 
-// 🚨 Asegúrate de que las importaciones de Multer, xlsx y pool usen 'require'
-// si tus otros archivos Express usan CommonJS. Por simplicidad, asumiremos que las importaciones
-// en este archivo están en un entorno que soporta 'import' o has adaptado el import/require.
-
-// Código del router (que no requiere cambios en sí mismo, solo la importación/exportación)
-
+// Configuración de Multer para manejar el archivo en memoria
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.post('/upload', upload.single('file'), async (req, res) => {
-    // ... (Tu lógica interna de multer, xlsx, y pool.connect().query('BEGIN')... ) ...
-    // NOTA: EL CÓDIGO INTERNO QUE MANEJA EL SQL DEBE USAR LAS FUNCIONES DE POSTGRESQL/PG.
-    // La estructura de la ruta en sí es correcta:
-    // router.post('/upload', upload.single('file'), async (req, res) => { ... } );
-    // ...
-});
+// @route   POST /api/inventory/upload
+// @desc    Sube y procesa un archivo de inventario (CSV o Excel)
+// @access  Private (requiere token)
+router.post('/upload', authMiddleware, upload.single('file'), inventoryController.massiveUpload);
 
-export default router; 
-// O module.exports = router; si usas CommonJS
+module.exports = router;

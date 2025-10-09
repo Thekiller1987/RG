@@ -1,16 +1,16 @@
 // ==========================================================
 // ARCHIVO: server/server.js
-// VERSIÓN FINAL PARA RENDER (CON RUTAS CORREGIDAS)
+// VERSIÓN FINAL PARA RENDER (CON TODAS LAS RUTAS)
 // ==========================================================
 
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
-// Conexión a BD - La ruta ahora es relativa a la carpeta 'server'
+// Conexión a BD
 const db = require('./src/config/db.js'); 
 
-// Rutas - Corregidas para funcionar desde la carpeta 'server'
+// Rutas
 const authRoutes = require('./src/routes/authRoutes.js');
 const userRoutes = require('./src/routes/userRoutes.js');
 const productRoutes = require('./src/routes/productRoutes.js');
@@ -21,6 +21,8 @@ const orderRoutes = require('./src/routes/orderRoutes.js');
 const financeRoutes = require('./src/routes/financeRoutes.js');
 const salesRoutes = require('./src/routes/salesRoutes.js');
 const reportRoutes = require('./src/routes/reportRoutes.js');
+// AÑADIDO: Importar la nueva ruta de subida de inventario
+const inventoryUploadRoutes = require('./src/routes/inventoryUploadRoute.js');
 
 const app = express();
 
@@ -54,6 +56,8 @@ router.use('/orders', orderRoutes);
 router.use('/finances', financeRoutes);
 router.use('/sales', salesRoutes);
 router.use('/reports', reportRoutes);
+// AÑADIDO: Usar la nueva ruta de subida de inventario
+router.use('/inventory', inventoryUploadRoutes);
 
 app.use('/api', router);
 

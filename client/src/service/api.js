@@ -1,16 +1,15 @@
 // ==========================================================
 // ARCHIVO: client/src/service/api.js
-// VERSIÓN FINAL Y COMPLETA
+// VERSIÓN FINAL Y COMPLETA (CON FUNCIÓN DE SUBIDA)
 // ==========================================================
 
 import axios from 'axios';
 
-// La URL del backend ahora es la de Render, leída desde las variables de entorno.
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 const axiosBase = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 60000, // Aumentado a 60 segundos para subidas largas
 });
 
 const request = async (method, path, token = null, data = null, config = {}) => {
@@ -21,6 +20,26 @@ const request = async (method, path, token = null, data = null, config = {}) => 
     const requestConfig = { url: path, method, headers, ...config };
     if (data !== null) requestConfig.data = data;
     const res = await axiosBase.request(requestConfig);
+    return res.data;
+  } catch (err) {
+    if (err.response) {
+      const msg = err.response.data?.message || err.response.data?.msg || JSON.stringify(err.response.data);
+      const error = new Error(msg || `HTTP ${err.response.status}`);
+      error.status = err.response.status;
+      throw error;
+    }
+    throw err;
+  }
+};
+
+// --- FUNCIÓN ESPECIAL PARA SUBIR ARCHIVOS ---
+export const uploadFile = async (path, formData, token) => {
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'multipart/form-data',
+  };
+  try {
+    const res = await axiosBase.post(path, formData, { headers });
     return res.data;
   } catch (err) {
     if (err.response) {
