@@ -1,6 +1,6 @@
 // ==========================================================
 // ARCHIVO: server/netlify/functions/server.js
-// CORRECCIÓN: Rutas de importación ajustadas con ../../
+// VERSIÓN FINAL Y CORREGIDA
 // ==========================================================
 
 // 1. Importar las librerías
@@ -33,8 +33,8 @@ const router = express.Router();
 // 3. Configurar Middlewares
 const allowedOrigins = [
     'http://localhost:3000', 
-    'http://localhost:5173',
-    'https://rg11.netlify.app'
+    'http://localhost:5173', // Puerto común de Vite
+    'https://rg11.netlify.app' // Tu dominio de Netlify
 ];
 
 const corsOptions = {
@@ -63,13 +63,15 @@ router.use('/finances', financeRoutes);
 router.use('/sales', salesRoutes); 
 router.use('/reports', reportRoutes);
 
-// Ruta de prueba
+// Ruta de prueba para verificar que la API responde
 router.get('/', (req, res) => {
-    res.send('¡API de MultirepuestosRG funcionando! 🚀');
+    res.json({ message: '¡API de MultirepuestosRG funcionando! 🚀' });
 });
 
-// Montamos el router en la ruta base /api para que coincida con la redirección de Netlify
+// CORRECCIÓN CRÍTICA:
+// Montamos nuestro router en la ruta base "/api".
+// Netlify redirige las peticiones de "/api/*" aquí, y el router se encarga del resto.
 app.use('/api', router); 
 
-// 5. Exportar la función Serverless
+// 5. Exportar la función Serverless que Netlify ejecutará
 module.exports.handler = serverless(app);

@@ -1,7 +1,14 @@
+// ==========================================================
+// ARCHIVO: client/src/service/api.js
+// VERSIÓN FINAL Y CORREGIDA
+// ==========================================================
+
+// Línea de verificación para asegurarnos de que se está usando el archivo correcto
+console.log("--- Cargando la versión final y correcta de api.js ---");
+
 import axios from 'axios';
 
-// Usamos el prefijo relativo '/api' directamente.
-// Netlify (en producción) y el proxy de Vite (en desarrollo) se encargarán de redirigir esto.
+// La URL base que coincide con la redirección de Netlify y el proxy de Vite
 const API_BASE_URL = '/api';
 
 const axiosBase = axios.create({
@@ -14,16 +21,8 @@ const request = async (method, path, token = null, data = null, config = {}) => 
     if (token) headers.Authorization = `Bearer ${token}`;
     
     try {
-        const requestConfig = {
-            url: path,
-            method,
-            headers,
-            ...config,
-        };
-
-        if (data !== null) {
-            requestConfig.data = data;
-        }
+        const requestConfig = { url: path, method, headers, ...config };
+        if (data !== null) requestConfig.data = data;
 
         const res = await axiosBase.request(requestConfig);
         return res.data;
@@ -41,7 +40,7 @@ const request = async (method, path, token = null, data = null, config = {}) => 
 
 // --- Autenticación y Datos Maestros ---
 export const login = async (credentials) => {
-    // CORRECCIÓN CLAVE: La ruta completa es /auth/login, que se combinará con /api
+    // CORRECCIÓN CLAVE: La ruta es '/auth/login', que se une a '/api' para formar '/api/auth/login'
     return await request('post', '/auth/login', null, credentials);
 };
 
