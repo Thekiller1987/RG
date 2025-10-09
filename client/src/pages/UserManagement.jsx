@@ -7,8 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
 // IMPORTACIÓN CRÍTICA: Traemos la URL base configurada
-import API_BASE_URL from '../config/api.js'; 
-
+import * as api from '../service/api';
 // --- Iconos SVG ---
 const EyeIcon = ({ closed }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
