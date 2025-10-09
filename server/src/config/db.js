@@ -1,6 +1,6 @@
 // ==========================================================
 // ARCHIVO: server/src/config/db.js
-// VERSIÓN FINAL (FUERZA LA CONEXIÓN IPv4)
+// VERSIÓN FINAL Y LIMPIA
 // ==========================================================
 
 const { Pool } = require('pg');
@@ -11,16 +11,15 @@ const config = {
   ssl: {
     rejectUnauthorized: false
   },
-  // ¡ESTA ES LA LÍNEA MÁGICA!
-  // Le dice al driver que resuelva el host a una dirección IPv4.
-  // Esto soluciona el error 'ENETUNREACH' en Render.
+  // Dejamos esta línea por si acaso, aunque la nueva URL ya es IPv4.
+  // No causa ningún problema.
   family: 4, 
 };
 
 const pool = new Pool(config);
 
 pool.on('connect', () => {
-  console.log('Conexión exitosa a la base de datos de Supabase (vía IPv4)');
+  console.log('Conexión exitosa a la base de datos de Supabase');
 });
 
 pool.on('error', (err) => {
