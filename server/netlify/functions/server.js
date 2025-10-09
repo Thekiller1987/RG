@@ -2,7 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const serverless = require('serverless-http'); // <--- NUEVA LIBRERÍA
+const serverless = require('serverless-http'); 
 
 // Importamos la conexión a la BD
 const db = require('./src/config/db.js'); 
@@ -21,7 +21,7 @@ const reportRoutes = require('./src/routes/reportRoutes.js');
 
 // 2. Crear una instancia de Express
 const app = express();
-const router = express.Router(); // Usamos un Router para enrutar dentro de la función
+const router = express.Router(); 
 
 // 3. Configurar Middlewares
 // Reemplaza [TU-DOMINIO-DE-NETLIFY] con https://rg11.netlify.app
@@ -37,7 +37,6 @@ const corsOptions = {
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
-            // Este log se mantiene para debugging de CORS en los logs de Netlify
             console.error('Bloqueado por CORS:', origin);
             callback(new Error('No permitido por CORS'));
         }
@@ -67,8 +66,8 @@ router.get('/', (req, res) => {
     res.send('¡API de MultirepuestosRG funcionando en Netlify Functions! 🚀');
 });
 
-// Enlaza el router de Express a la aplicación bajo el prefijo /api
-// CORRECCIÓN: Cambiamos '/api' por '/' para evitar el prefijo doble (Netlify ya lo añade)
+// CORRECCIÓN CRÍTICA: Montamos el router en la raíz ('/') para que
+// funcione correctamente después de que Netlify reescribe el prefijo /api.
 app.use('/', router); 
 
 // 6. Exportar la función Serverless (El Servidor ya no "Escucha")
