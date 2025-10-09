@@ -1,13 +1,18 @@
+// ==========================================================
+// ARCHIVO: server/src/routes/providerRoutes.js
+// VERSIÓN FINAL Y CORREGIDA
+// ==========================================================
+
 const express = require('express');
 const router = express.Router();
-const { getAllProviders, createProvider, deleteProvider } = require('../controllers/providerController.js');
-const { verifyToken, isAdmin } = require('../middleware/authMiddleware.js');
+const providerController = require('../controllers/providerController');
+const authMiddleware = require('../middleware/authMiddleware');
 
-router.route('/')
-    .get(verifyToken, getAllProviders)
-    .post(verifyToken, isAdmin, createProvider);
+// Proteger todas las rutas de proveedores
+router.use(authMiddleware);
 
-router.route('/:id')
-    .delete(verifyToken, isAdmin, deleteProvider);
+router.get('/', providerController.getAllProviders);
+router.post('/', providerController.createProvider);
+router.delete('/:id', providerController.deleteProvider);
 
 module.exports = router;

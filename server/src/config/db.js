@@ -1,6 +1,6 @@
 // ==========================================================
 // ARCHIVO: server/src/config/db.js
-// VERSIÓN CORREGIDA PARA SUPABASE (PostgreSQL)
+// VERSIÓN FINAL Y COMPLETA (CON SOPORTE PARA TRANSACCIONES)
 // ==========================================================
 
 const { Pool } = require('pg');
@@ -13,14 +13,22 @@ const pool = new Pool({
   }
 });
 
-pool.connect((err) => {
-  if (err) {
-    console.error('Error al conectar con la base de datos:', err.stack);
-  } else {
-    console.log('Conexión exitosa a la base de datos de Supabase');
-  }
+// Este evento se dispara cada vez que un cliente se conecta exitosamente.
+// Es una buena forma de saber que la configuración es correcta.
+pool.on('connect', () => {
+  console.log('Conexión exitosa a la base de datos de Supabase');
+});
+
+// Manejador de errores global para la piscina de conexiones.
+pool.on('error', (err, client) => {
+    console.error('Error inesperado en el cliente de la base de datos', err);
+    process.exit(-1); // Salir si hay un error grave de BD
 });
 
 module.exports = {
+  // Para consultas simples y rápidas
   query: (text, params) => pool.query(text, params),
+  
+  // Para obtener un cliente dedicado del pool y manejar transacciones
+  getClient: () => pool.connect(),
 };

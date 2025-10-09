@@ -1,29 +1,22 @@
+// ==========================================================
+// ARCHIVO: server/src/routes/clientRoutes.js
+// VERSIÓN FINAL Y CORREGIDA
+// ==========================================================
+
 const express = require('express');
 const router = express.Router();
-const { 
-    getAllClients, 
-    createClient, 
-    updateClient, 
-    deleteClient, 
-    addCreditPayment,
-    getCreditosByClient,
-    getAbonosByClient
-} = require('../controllers/clientController');
-const { verifyToken } = require('../middleware/authMiddleware');
+const clientController = require('../controllers/clientController');
+const authMiddleware = require('../middleware/authMiddleware');
 
-router.use(verifyToken);
+// Proteger todas las rutas de clientes con el middleware
+router.use(authMiddleware);
 
-router.route('/')
-    .get(getAllClients)
-    .post(createClient);
-
-router.route('/:id')
-    .put(updateClient)
-    .delete(deleteClient);
-
-router.post('/:id/abono', addCreditPayment);
-
-router.get('/:id/creditos', getCreditosByClient);
-router.get('/:id/abonos', getAbonosByClient);
+router.get('/', clientController.getAllClients);
+router.post('/', clientController.createClient);
+router.put('/:id', clientController.updateClient);
+router.delete('/:id', clientController.deleteClient);
+router.post('/:id/abono', clientController.addCreditPayment);
+router.get('/:id/creditos', clientController.getCreditosByClient);
+router.get('/:id/abonos', clientController.getAbonosByClient);
 
 module.exports = router;

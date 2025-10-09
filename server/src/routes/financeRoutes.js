@@ -1,20 +1,25 @@
+// ==========================================================
+// ARCHIVO: server/src/routes/financeRoutes.js
+// VERSIÓN FINAL Y CORREGIDA
+// ==========================================================
+
 const express = require('express');
 const router = express.Router();
-const { 
-    getAllIngresos, 
-    createIngreso,
-    getAllEgresos,
-    createEgreso,
-    getFinancialSummary
-} = require('../controllers/financeController');
-const { verifyToken, isAdmin } = require('../middleware/authMiddleware'); 
+const financeController = require('../controllers/financeController');
+const authMiddleware = require('../middleware/authMiddleware');
 
-router.get('/ingresos', verifyToken, getAllIngresos);
-router.post('/ingresos', verifyToken, isAdmin, createIngreso);
+// Proteger todas las rutas de finanzas
+router.use(authMiddleware);
 
-router.get('/egresos', verifyToken, getAllEgresos);
-router.post('/egresos', verifyToken, isAdmin, createEgreso);
+// Rutas para Ingresos
+router.get('/ingresos', financeController.getAllIngresos);
+router.post('/ingresos', financeController.createIngreso);
 
-router.get('/summary', verifyToken, getFinancialSummary);
+// Rutas para Egresos
+router.get('/egresos', financeController.getAllEgresos);
+router.post('/egresos', financeController.createEgreso);
+
+// Ruta para el Resumen Financiero
+router.get('/summary', financeController.getFinancialSummary);
 
 module.exports = router;
