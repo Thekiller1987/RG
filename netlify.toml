@@ -6,23 +6,23 @@ publish = "dist"
 functions = "server/netlify/functions"
 
 [[redirects]]
-# 1. Redirección para la subida de archivos (ruta específica)
+# 1. API: Subida de archivos (ruta específica)
 from = "/api/inventory/upload"
 to = "/.netlify/functions/inventory-upload"
 status = 200
 force = true
 
 [[redirects]]
-# 2. Redirección de API (Todas las demás rutas)
+# 2. API: Todas las demás rutas de la API
 from = "/api/*"
 to = "/.netlify/functions/server/:splat"
 status = 200
 force = true
 
 [[redirects]]
-# 3. REGLA CRÍTICA SPA (Single Page Application)
-# Envía TODAS las solicitudes que no sean archivos estáticos o API a index.html.
-# ESTO ARREGLA EL CÓDIGO EXPUESTO/ERROR 404 EN RUTAS.
+# 3. REGLA CRÍTICA SPA (FRONTEND)
+# Envía todas las rutas no encontradas a index.html.
+# ESTO ES LO QUE ARREGLA EL ERROR 404/CÓDIGO EXPUESTO.
 from = "/*"
 to = "/index.html"
 status = 200
