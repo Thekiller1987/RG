@@ -1,20 +1,32 @@
 [build]
+# Le dice a Netlify que entre a la carpeta 'client' para construir el frontend
 base = "client"
 command = "npm run build"
+# La carpeta donde Vite deja los archivos construidos
 publish = "dist"
 
-# Le decimos a Netlify que las funciones están en la carpeta 'server'
+# Le dice a Netlify que la carpeta 'server' contiene el código del backend
 functions = "server"
 
+# --- REGLAS DE REDIRECCIÓN ---
+# Netlify las lee en orden. Primero las más específicas, al final la general.
+
 [[redirects]]
-# Todas las peticiones a /api/... irán a nuestra función 'server.js'
+# REGLA 1: Todas las peticiones a la API
+# Cualquier URL que empiece con /api/ (ej: /api/login, /api/products)
+# se redirige a nuestra única función del backend (server.js).
 from = "/api/*"
 to = "/.netlify/functions/server/:splat"
 status = 200
-force = true
 
 [[redirects]]
-# Regla para que el frontend funcione correctamente
+# REGLA 2: REGLA CRÍTICA PARA EL FRONTEND (SPA)
+# Cualquier otra petición que no fue atrapada por la regla anterior 
+# (ej: /login, /productos, / o cualquier otra ruta del frontend)
+# debe servir el archivo principal de tu aplicación de React.
+# Esto permite que el router de React en el navegador tome el control.
+# ¡ESTA REGLA SIEMPRE DEBE SER LA ÚLTIMA!
 from = "/*"
 to = "/index.html"
 status = 200
+
