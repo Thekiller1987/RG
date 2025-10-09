@@ -1,5 +1,9 @@
 [build]
-  command = "npm install --prefix client && npm run build --prefix client"
+  command = """
+    cp -r server/src server/netlify/functions/src &&
+    npm install --prefix client &&
+    npm run build --prefix client
+  """
   publish = "client/dist"
   functions = "server/netlify/functions"
 
