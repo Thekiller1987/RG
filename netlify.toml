@@ -1,7 +1,7 @@
 [build]
 base = "client"
 command = "npm run build"
-publish = "dist"  # Usamos 'dist' porque tu build local lo genera
+publish = "dist"
 
 functions = "server/netlify/functions"
 
@@ -16,3 +16,10 @@ from = "/api/*"
 to = "/.netlify/functions/server/:splat"
 status = 200
 force = true
+
+# --- CORRECCIÓN CRÍTICA: REGLA SPA ---
+# Envía todas las rutas no encontradas a index.html para que React Router las maneje.
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
