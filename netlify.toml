@@ -1,7 +1,8 @@
 [build]
 base = "client"
 command = "npm run build"
-publish = "build"  
+publish = "dist"  # Usamos 'dist' porque tu build local lo genera
+
 functions = "server/netlify/functions"
 
 [[redirects]]
