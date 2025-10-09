@@ -1,25 +1,18 @@
-netlify.toml - Archivo de configuración para el despliegue
 [build]
-  # Carpeta de tu aplicación React
-  base = "client"
-  command = "npm run build"
-  # CORRECCIÓN ANTERIOR: La carpeta compilada está DENTRO de la base
-  publish = "build" 
-  
-  # Carpeta de tus funciones
-  functions = "server/netlify/functions" 
+base = "client"
+command = "npm run build"
+publish = "build"
+
+functions = "server/netlify/functions"
 
 [[redirects]]
-  # REDIRECCIÓN 1: Para la Carga Masiva (debe ir primero por ser específica)
-  from = "/api/inventory/upload"
-  to = "/.netlify/functions/inventory-upload" 
-  status = 200
-  force = true 
+from = "/api/inventory/upload"
+to = "/.netlify/functions/inventory-upload"
+status = 200
+force = true
 
 [[redirects]]
-  # REDIRECCIÓN 2: Para TODAS las demás rutas (Auth, Products, Clients, etc.)
-  # La función 'server.js' se llama 'server' como función lambda.
-  from = "/api/*"
-  to = "/.netlify/functions/server/:splat"
-  status = 200
-  force = true
+from = "/api/*"
+to = "/.netlify/functions/server/:splat"
+status = 200
+force = true
