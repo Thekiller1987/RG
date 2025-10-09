@@ -6,20 +6,23 @@ publish = "dist"
 functions = "server/netlify/functions"
 
 [[redirects]]
+# 1. Redirección para la subida de archivos (ruta específica)
 from = "/api/inventory/upload"
 to = "/.netlify/functions/inventory-upload"
 status = 200
 force = true
 
 [[redirects]]
+# 2. Redirección de API (Todas las demás rutas)
 from = "/api/*"
 to = "/.netlify/functions/server/:splat"
 status = 200
 force = true
 
-# --- CORRECCIÓN CRÍTICA: REGLA SPA ---
-# Envía todas las rutas no encontradas a index.html para que React Router las maneje.
 [[redirects]]
+# 3. REGLA CRÍTICA SPA (Single Page Application)
+# Envía TODAS las solicitudes que no sean archivos estáticos o API a index.html.
+# ESTO ARREGLA EL CÓDIGO EXPUESTO/ERROR 404 EN RUTAS.
 from = "/*"
 to = "/index.html"
 status = 200
