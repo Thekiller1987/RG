@@ -1,6 +1,6 @@
 // ==========================================================
 // ARCHIVO: server/server.js
-// VERSIÓN AJUSTADA PARA FLY.IO (Puerto 8080)
+// VERSIÓN FINAL CON CORRECCIÓN DE CORS PARA NETLIFY Y FLY.IO
 // ==========================================================
 
 const express = require('express');
@@ -8,7 +8,6 @@ const cors = require('cors');
 require('dotenv').config();
 
 // Asegúrate de que tu archivo db.js usa las variables de entorno para Supabase.
-// La conexión a BD se mantiene igual, las variables se configuran en Fly.io
 const db = require('./src/config/db.js'); 
 
 // Rutas (Mantenemos la misma estructura de rutas)
@@ -20,7 +19,7 @@ const providerRoutes = require('./src/routes/providerRoutes.js');
 const clientRoutes = require('./src/routes/clientRoutes.js');
 const orderRoutes = require('./src/routes/orderRoutes.js');
 const financeRoutes = require('./src/routes/financeRoutes.js');
-const salesRoutes = require('src/routes/salesRoutes.js');
+const salesRoutes = require('./src/routes/salesRoutes.js');
 const reportRoutes = require('./src/routes/reportRoutes.js');
 const inventoryUploadRoutes = require('./src/routes/inventoryUploadRoute.js');
 
@@ -31,9 +30,10 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
   'https://rg11.netlify.app',
-  // IMPORTANTE: Asegúrate de reemplazar "TU-FLY-IO-DOMAIN.fly.dev" 
-  // con la URL real que Fly.io te asigne (ej: https://multirepuestos-rg-api.fly.dev)
-  'https://TU-FLY-IO-DOMAIN.fly.dev' 
+  // DOMINIO FINAL DE FLY.IO (rg1)
+  'https://rg1.fly.dev', 
+  // DOMINIO DE PREVIEW TEMPORAL DE NETLIFY (CAUSANTE DEL ERROR CORS)
+  'https://680e80d0d04952de70f0de8015a72--rg1.netlify.app'
 ];
 
 app.use(cors({
@@ -41,6 +41,8 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      // Opcional: Para ver qué dominio está siendo bloqueado en la terminal.
+      console.error(`CORS Blocked: ${origin}`); 
       callback(new Error('No permitido por CORS'));
     }
   }
@@ -69,7 +71,6 @@ app.get('/', (req, res) => {
 });
 
 // --- Iniciar el servidor ---
-// CAMBIO CLAVE: Usamos 8080 como puerto predeterminado para el contenedor Fly.io
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en el puerto ${PORT}`);
