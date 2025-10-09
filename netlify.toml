@@ -1,9 +1,20 @@
+# ==========================================================
+# NETLIFY CONFIG PARA MULTIREPUESTOSRG
+# ==========================================================
+
 [build]
+  # Comando para instalar dependencias del cliente y construir el frontend
   command = "npm install --prefix client && npm run build --prefix client"
+  
+  # Carpeta que Netlify servirá como sitio estático
   publish = "client/dist"
+
+  # Carpeta donde están tus funciones serverless
   functions = "server/netlify/functions"
 
-# --- Reglas de redirección ---
+# ==========================================================
+# REDIRECCIONES
+# ==========================================================
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/server/:splat"
