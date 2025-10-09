@@ -11,8 +11,8 @@ command = "npm run build"
 # La carpeta final que se va a publicar (creada por 'npm run build')
 publish = "dist"
 
-# Le dice a Netlify que nuestro código del backend está en la carpeta 'server'
-functions = "server"
+# CORRECCIÓN CRÍTICA: Apuntamos a la carpeta exacta donde viven las funciones
+functions = "server/netlify/functions"
 
 
 # --- REGLAS DE REDIRECCIÓN (LEÍDAS EN ORDEN) ---
