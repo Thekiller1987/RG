@@ -3,10 +3,10 @@ import styled, { keyframes } from 'styled-components';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import * as api from '../service/api';
 import { FaPlus, FaBoxOpen, FaTags, FaTruck, FaTrash, FaEdit, FaArrowLeft, FaHistory, FaSpinner, FaSearch, FaTimes, FaPlusCircle, FaMinusCircle } from 'react-icons/fa';
 import AlertModal from './pos/components/AlertModal.jsx';
 // IMPORTACIÓN CRÍTICA: Traemos la URL base configurada
-import API_BASE_URL from '../config/api.js'; 
 
 
 // --- ESTILOS ---
