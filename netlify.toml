@@ -1,26 +1,22 @@
 # ==========================================================
-# CONFIGURACIÓN PARA FRONTEND-ONLY (Netlify)
-# Backend en Render, Base de Datos en Supabase
+# ARCHIVO: netlify.toml
+# VERSIÓN FINAL PARA FRONTEND EN NETLIFY (CONECTADO A RENDER)
 # ==========================================================
 
 [build]
-  # Le dice a Netlify que entre a la carpeta 'client' para construir el frontend
-  base = "client"
-  # El comando para construir tu aplicación de Vite
-  command = "npm run build"
+  # Le decimos a Netlify que entre a la carpeta 'client' para trabajar
+  base    = "client"
+  
   # La carpeta donde Vite deja los archivos construidos
   publish = "dist"
+  
+  # El comando para construir el frontend
+  command = "npm run build"
 
-[context.production.environment]
-  # Forzamos Node.js v18 para asegurar compatibilidad.
-  NODE_VERSION = "18"
-  # Mantenemos el aumento de memoria para el build de Vite, es una buena práctica.
-  NODE_OPTIONS = "--max-old-space-size=4096"
-
-# --- REGLA ÚNICA Y CRÍTICA PARA EL FRONTEND (SPA) ---
-# Cualquier petición que llegue a Netlify debe servir el archivo principal
-# de tu aplicación de React (index.html). Esto permite que el router de
-# React en el navegador tome el control de las rutas.
+# --- Regla Crítica para Single Page Application (SPA) ---
+# Esto asegura que CUALQUIER ruta (ej: /pos, /dashboard) cargue tu aplicación de React
+# y permita que React Router maneje la navegación.
+# Esto soluciona los problemas de CSS y assets que no cargan en sub-páginas.
 [[redirects]]
   from = "/*"
   to = "/index.html"
