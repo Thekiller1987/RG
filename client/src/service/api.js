@@ -1,14 +1,11 @@
 import axios from 'axios';
 
-// --- CAMBIO CRÍTICO: Definición de la API URL ---
 // Usamos el prefijo relativo '/api' directamente.
-// Netlify y tu setup local manejarán la reescritura.
-const API_BASE_URL = '/api'; 
-
-export const API_URL = API_BASE_URL; // Ahora API_URL es la URL completa
+// Netlify (en producción) y el proxy de Vite (en desarrollo) se encargarán de redirigir esto.
+const API_BASE_URL = '/api';
 
 const axiosBase = axios.create({
-    baseURL: API_URL, // Usa la URL base dinámica
+    baseURL: API_BASE_URL,
     timeout: 10000,
 });
 
@@ -21,7 +18,6 @@ const request = async (method, path, token = null, data = null, config = {}) => 
             url: path,
             method,
             headers,
-            withCredentials: !!config.withCredentials,
             ...config,
         };
 
@@ -43,14 +39,17 @@ const request = async (method, path, token = null, data = null, config = {}) => 
     }
 };
 
-// --- Autenticación y Datos Maestros (Resto de las funciones...) ---
+// --- Autenticación y Datos Maestros ---
 export const login = async (credentials) => {
+    // CORRECCIÓN CLAVE: La ruta completa es /auth/login, que se combinará con /api
     return await request('post', '/auth/login', null, credentials);
 };
+
 export const fetchMe = async (token) => {
     if (!token) throw new Error('fetchMe requires token');
     return await request('get', '/auth/me', token);
 };
+
 export const fetchUsers = async (token) => {
     const data = await request('get', '/users', token);
     return Array.isArray(data) ? data : [];
@@ -70,11 +69,7 @@ export const fetchProducts = async (token) => {
     }));
 };
 
-
-// ===================================================================
-// =================== SECCIÓN CORREGIDA (Clientes) ==================
-// ===================================================================
-
+// --- Clientes ---
 export const fetchClients = async (token) => {
     const data = await request('get', '/clients', token);
     const list = Array.isArray(data) ? data : [];
@@ -85,80 +80,33 @@ export const fetchClients = async (token) => {
     return contado ? [contado, ...others] : list;
 };
 
-// ===================================================================
-// =================== Funciones de Venta, Pedidos, y Reportes =======
-// ===================================================================
-
-
 // --- Funciones para Ventas ---
-export const fetchSales = async (token) => {
-    return await request('get', '/sales', token);
-};
-export const createSale = async (saleData, token) => {
-    return await request('post', '/sales', token, saleData);
-};
-// FUNCIÓN AGREGADA PARA DEVOLUCIÓN PARCIAL
-export const returnItem = async (returnData, token) => { 
-    return await request('post', '/sales/return-item', token, returnData);
-};
+export const fetchSales = (token) => request('get', '/sales', token);
+export const createSale = (saleData, token) => request('post', '/sales', token, saleData);
+export const returnItem = (returnData, token) => request('post', '/sales/return-item', token, returnData);
+export const createReturn = (returnData, token) => request('post', '/sales/returns', token, returnData);
+export const cancelSale = (saleId, token) => request('delete', `/sales/${saleId}`, token);
 
-export const createReturn = async (returnData, token) => {
-    return await request('post', '/sales/returns', token, returnData);
-};
-export const cancelSale = async (saleId, token) => {
-    return await request('delete', `/sales/${saleId}`, token);
-};
+// --- Pedidos y Apartados ---
+export const fetchOrders = (token) => request('GET', '/orders', token);
+export const fetchOrderDetails = (orderId, token) => request('GET', `/orders/${orderId}`, token);
+export const createOrder = (orderData, token) => request('POST', '/orders', token, orderData);
+export const addAbonoToOrder = (orderId, abonoData, token) => request('POST', `/orders/${orderId}/abono`, token, abonoData);
+export const liquidateOrder = (orderId, paymentData, token) => request('POST', `/orders/${orderId}/liquidar`, token, paymentData);
+export const cancelOrder = (orderId, token) => request('DELETE', `/orders/${orderId}`, token);
 
-
-// --- SECCIÓN DE PEDIDOS Y APARTADOS ---
-export const fetchOrders = async (token) => {
-    return await request('GET', '/orders', token);
-};
-export const fetchOrderDetails = async (orderId, token) => {
-    return await request('GET', `/orders/${orderId}`, token);
-};
-export const createOrder = async (orderData, token) => {
-    return await request('POST', '/orders', token, orderData);
-};
-export const addAbonoToOrder = async (orderId, abonoData, token) => {
-    return await request('POST', `/orders/${orderId}/abono`, token, abonoData);
-};
-export const liquidateOrder = async (orderId, paymentData, token) => {
-    return await request('POST', `/orders/${orderId}/liquidar`, token, paymentData);
-};
-export const cancelOrder = async (orderId, token) => {
-    return await request('DELETE', `/orders/${orderId}`, token);
-};
-
-// --- FUNCIONES PARA CLIENTES Y CRÉDITOS ---
+// --- Clientes y Créditos ---
 export const fetchAllClientsWithCredit = (token) => request('GET', '/clients', token);
 export const createClient = (clientData, token) => request('POST', '/clients', token, clientData);
 export const updateClient = (clientId, clientData, token) => request('PUT', `/clients/${clientId}`, token, clientData);
 export const deleteClient = (clientId, token) => request('DELETE', `/clients/${clientId}`, token);
-export const addCreditPayment = (clientId, paymentData, token) => {
-    return request('POST', `/clients/${clientId}/abono`, token, paymentData);
-};
-export const getCreditosByClient = (clientId, token) => {
-    return request('GET', `/clients/${clientId}/creditos`, token);
-};
-export const getAbonosByClient = (clientId, token) => {
-    return request('GET', `/clients/${clientId}/abonos`, token);
-};
+export const addCreditPayment = (clientId, paymentData, token) => request('POST', `/clients/${clientId}/abono`, token, paymentData);
+export const getCreditosByClient = (clientId, token) => request('GET', `/clients/${clientId}/creditos`, token);
+export const getAbonosByClient = (clientId, token) => request('GET', `/clients/${clientId}/abonos`, token);
 
-
-// --- SECCIÓN DE REPORTES (NUEVO) ---
-export const fetchSalesSummaryReport = (token, params) => {
-    return request('get', '/reports/sales-summary', token, null, { params });
-};
-export const fetchInventoryValueReport = (token) => {
-    return request('get', '/reports/inventory-value', token);
-};
-export const fetchSalesByUserReport = (token, params) => {
-    return request('get', '/reports/sales-by-user', token, null, { params });
-};
-export const fetchTopProductsReport = (token, params) => {
-    return request('get', '/reports/top-products', token, null, { params });
-};
-export const fetchSalesChartReport = (token, params) => {
-    return request('get', '/reports/sales-chart', token, null, { params });
-};
+// --- Reportes ---
+export const fetchSalesSummaryReport = (token, params) => request('get', '/reports/sales-summary', token, null, { params });
+export const fetchInventoryValueReport = (token) => request('get', '/reports/inventory-value', token);
+export const fetchSalesByUserReport = (token, params) => request('get', '/reports/sales-by-user', token, null, { params });
+export const fetchTopProductsReport = (token, params) => request('get', '/reports/top-products', token, null, { params });
+export const fetchSalesChartReport = (token, params) => request('get', '/reports/sales-chart', token, null, { params });
