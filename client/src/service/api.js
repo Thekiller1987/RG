@@ -1,12 +1,11 @@
 // ==========================================================
 // ARCHIVO: client/src/service/api.js
-// VERSIÓN PARA CONECTARSE A RENDER
+// VERSIÓN FINAL Y COMPLETA
 // ==========================================================
 
 import axios from 'axios';
 
-// CAMBIO CRÍTICO: La URL del backend ahora es la de Render.
-// La leeremos de las variables de entorno de Netlify.
+// La URL del backend ahora es la de Render, leída desde las variables de entorno.
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 const axiosBase = axios.create({
@@ -14,7 +13,6 @@ const axiosBase = axios.create({
   timeout: 10000,
 });
 
-// El resto del archivo es idéntico, ya que la lógica es correcta.
 const request = async (method, path, token = null, data = null, config = {}) => {
   const headers = { 'Content-Type': 'application/json', ...(config.headers || {}) };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -22,7 +20,6 @@ const request = async (method, path, token = null, data = null, config = {}) => 
   try {
     const requestConfig = { url: path, method, headers, ...config };
     if (data !== null) requestConfig.data = data;
-
     const res = await axiosBase.request(requestConfig);
     return res.data;
   } catch (err) {
@@ -36,49 +33,58 @@ const request = async (method, path, token = null, data = null, config = {}) => 
   }
 };
 
-// ==========================================================
-// AUTENTICACIÓN Y USUARIO
-// ==========================================================
-export const login = async (credentials) => request('post', '/auth/login', null, credentials);
-export const fetchMe = async (token) => request('get', '/auth/me', token);
-export const fetchUsers = async (token) => {
-  const data = await request('get', '/users', token);
-  return Array.isArray(data) ? data : [];
-};
-// ... (El resto de tus funciones de API no necesitan cambios)
-// --- Manejo de Productos ---
+// --- AUTENTICACIÓN Y USUARIOS ---
+export const login = (credentials) => request('post', '/auth/login', null, credentials);
+export const fetchMe = (token) => request('get', '/auth/me', token);
+export const fetchUsers = (token) => request('get', '/users', token);
+export const createUser = (userData, token) => request('post', '/users', token, userData);
+export const updateUser = (userId, userData, token) => request('put', `/users/${userId}`, token, userData);
+export const deleteUser = (userId, token) => request('delete', `/users/${userId}`, token);
+
+// --- PRODUCTOS, CATEGORÍAS, PROVEEDORES ---
 export const fetchProducts = async (token) => {
-  const data = await request('get', '/products', token);
-  const list = Array.isArray(data) ? data : [];
-  return list.map(p => ({
-    id: p.id_producto ?? p.id ?? p._id,
-    codigo: p.codigo ?? p.code ?? '',
-    nombre: p.nombre ?? p.nombre_producto ?? p.name ?? 'Sin nombre',
-    precio: Number(p.venta ?? p.precio ?? p.price ?? 0),
-    existencia: Number(p.existencia ?? p.stock ?? 0),
-    raw: p,
-  }));
+    const data = await request('get', '/products', token);
+    const list = Array.isArray(data) ? data : [];
+    return list.map(p => ({
+        id: p.id_producto ?? p.id ?? p._id,
+        codigo: p.codigo ?? p.code ?? '',
+        nombre: p.nombre ?? p.nombre_producto ?? p.name ?? 'Sin nombre',
+        precio: Number(p.venta ?? p.precio ?? p.price ?? 0),
+        existencia: Number(p.existencia ?? p.stock ?? 0),
+        raw: p,
+    }));
 };
+export const createProduct = (productData, token) => request('post', '/products', token, productData);
+export const updateProduct = (productId, productData, token) => request('put', `/products/${productId}`, token, productData);
+export const deleteProduct = (productId, token) => request('delete', `/products/${productId}`, token);
+export const adjustStock = (productId, adjustmentData, token) => request('patch', `/products/${productId}/stock`, token, adjustmentData);
+export const fetchInventoryHistory = (token) => request('get', '/products/inventory/history', token);
 
-// --- Clientes ---
-export const fetchClients = async (token) => {
-  const data = await request('get', '/clients', token);
-  const list = Array.isArray(data) ? data : [];
-  
-  const contado = list.find(c => (c.nombre || '').toLowerCase().includes('contado'));
-  const others = list.filter(c => contado ? c.id_cliente !== contado.id_cliente : true);
-  
-  return contado ? [contado, ...others] : list;
-};
+export const fetchCategories = (token) => request('get', '/categories', token);
+export const createCategory = (categoryData, token) => request('post', '/categories', token, categoryData);
+export const deleteCategory = (categoryId, token) => request('delete', `/categories/${categoryId}`, token);
 
-// --- Funciones para Ventas ---
+export const fetchProviders = (token) => request('get', '/providers', token);
+export const createProvider = (providerData, token) => request('post', '/providers', token, providerData);
+export const deleteProvider = (providerId, token) => request('delete', `/providers/${providerId}`, token);
+
+// --- CLIENTES Y CRÉDITOS ---
+export const fetchClients = (token) => request('get', '/clients', token);
+export const createClient = (clientData, token) => request('post', '/clients', token, clientData);
+export const updateClient = (clientId, clientData, token) => request('put', `/clients/${clientId}`, token, clientData);
+export const deleteClient = (clientId, token) => request('delete', `/clients/${clientId}`, token);
+export const addCreditPayment = (clientId, paymentData, token) => request('post', `/clients/${clientId}/abono`, token, paymentData);
+export const getCreditosByClient = (clientId, token) => request('get', `/clients/${clientId}/creditos`, token);
+export const getAbonosByClient = (clientId, token) => request('get', `/clients/${clientId}/abonos`, token);
+
+// --- VENTAS ---
 export const fetchSales = (token) => request('get', '/sales', token);
 export const createSale = (saleData, token) => request('post', '/sales', token, saleData);
 export const returnItem = (returnData, token) => request('post', '/sales/return-item', token, returnData);
 export const createReturn = (returnData, token) => request('post', '/sales/returns', token, returnData);
 export const cancelSale = (saleId, token) => request('delete', `/sales/${saleId}`, token);
 
-// --- Pedidos y Apartados ---
+// --- PEDIDOS Y APARTADOS ---
 export const fetchOrders = (token) => request('GET', '/orders', token);
 export const fetchOrderDetails = (orderId, token) => request('GET', `/orders/${orderId}`, token);
 export const createOrder = (orderData, token) => request('POST', '/orders', token, orderData);
@@ -86,16 +92,7 @@ export const addAbonoToOrder = (orderId, abonoData, token) => request('POST', `/
 export const liquidateOrder = (orderId, paymentData, token) => request('POST', `/orders/${orderId}/liquidar`, token, paymentData);
 export const cancelOrder = (orderId, token) => request('DELETE', `/orders/${orderId}`, token);
 
-// --- Clientes y Créditos ---
-export const fetchAllClientsWithCredit = (token) => request('GET', '/clients', token);
-export const createClient = (clientData, token) => request('POST', '/clients', token, clientData);
-export const updateClient = (clientId, clientData, token) => request('PUT', `/clients/${clientId}`, token, clientData);
-export const deleteClient = (clientId, token) => request('DELETE', `/clients/${clientId}`, token);
-export const addCreditPayment = (clientId, paymentData, token) => request('POST', `/clients/${clientId}/abono`, token, paymentData);
-export const getCreditosByClient = (clientId, token) => request('GET', `/clients/${clientId}/creditos`, token);
-export const getAbonosByClient = (clientId, token) => request('GET', `/clients/${clientId}/abonos`, token);
-
-// --- Reportes ---
+// --- REPORTES ---
 export const fetchSalesSummaryReport = (token, params) => request('get', '/reports/sales-summary', token, null, { params });
 export const fetchInventoryValueReport = (token) => request('get', '/reports/inventory-value', token);
 export const fetchSalesByUserReport = (token, params) => request('get', '/reports/sales-by-user', token, null, { params });
