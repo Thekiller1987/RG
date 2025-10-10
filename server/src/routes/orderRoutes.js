@@ -1,21 +1,22 @@
-// ==========================================================
-// ARCHIVO: server/src/routes/orderRoutes.js
-// VERSIÓN FINAL Y CORREGIDA
-// ==========================================================
+// routes/orderRoutes.js
 
 const express = require('express');
 const router = express.Router();
-const orderController = require('../controllers/orderController');
-const authMiddleware = require('../middleware/authMiddleware');
+const { getOrders, getOrderDetails, createOrder, addAbono, liquidarOrder, cancelOrder } = require('../controllers/orderController');
+const { verifyToken } = require('../middleware/authMiddleware');
 
-// Proteger todas las rutas de pedidos
-router.use(authMiddleware);
+router.use(verifyToken);
 
-router.get('/', orderController.getOrders);
-router.post('/', orderController.createOrder);
-router.get('/:id', orderController.getOrderDetails);
-router.post('/:id/abono', orderController.addAbono);
-router.post('/:id/liquidar', orderController.liquidarOrder);
-router.delete('/:id', orderController.cancelOrder);
+router.route('/')
+    .get(getOrders)
+    .post(createOrder);
+
+// NUEVA RUTA para obtener detalles específicos de un pedido
+router.route('/:id')
+    .get(getOrderDetails)
+    .delete(cancelOrder); // Para cancelar
+
+router.post('/:id/abono', addAbono);
+router.post('/:id/liquidar', liquidarOrder);
 
 module.exports = router;

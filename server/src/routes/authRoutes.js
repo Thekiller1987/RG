@@ -1,25 +1,13 @@
-// ==========================================================
-// ARCHIVO: server/src/routes/authRoutes.js
-// VERSIÓN FINAL Y CORREGIDA
-// ==========================================================
-
 const express = require('express');
 const router = express.Router();
+const { login, register } = require('../controllers/authController.js');
 
-// Importamos el controlador
-const authController = require('../controllers/authController');
+// Ruta para el login de un usuario
+// POST /api/auth/login
+router.post('/login', login);
 
-// Importamos el middleware de autenticación para la ruta protegida
-const authMiddleware = require('../middleware/authMiddleware');
-
-// @route   POST /api/auth/login
-// @desc    Autenticar usuario y obtener token
-// @access  Public
-router.post('/login', authController.login);
-
-// @route   GET /api/auth/me
-// @desc    Obtener datos del usuario logueado
-// @access  Private
-router.get('/me', authMiddleware, authController.getMe);
+// Ruta para registrar un nuevo usuario
+// POST /api/auth/register
+router.post('/register', register);
 
 module.exports = router;

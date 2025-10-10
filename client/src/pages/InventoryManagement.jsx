@@ -1,17 +1,21 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
+import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import * as api from '../service/api';
-import { FaPlus, FaBoxOpen, FaTags, FaTruck, FaTrash, FaEdit, FaArrowLeft, FaHistory, FaSpinner, FaSearch, FaTimes, FaPlusCircle, FaMinusCircle } from 'react-icons/fa';
+import { FaPlus, FaBoxOpen, FaTags, FaTruck, FaTrash, FaEdit, FaArrowLeft, FaHistory, FaSpinner, FaSearch, FaTimes, FaPlusCircle, FaMinusCircle, FaExclamationTriangle } from 'react-icons/fa';
+// RUTA CORREGIDA Y DEFINITIVA
 import AlertModal from './pos/components/AlertModal.jsx';
 
-// --- ESTILOS ---
+// --- CONSTANTE CLAVE PARA LA CARGA INICIAL (300 productos) ---
+const PRODUCTS_INITIAL_LOAD = 300; 
+
+// --- ESTILOS (Mantenidos o ligeramente simplificados) ---
 const fadeIn = keyframes`from { opacity: 0; } to { opacity: 1; }`;
 const spin = keyframes`from { transform: rotate(0deg); } to { transform: rotate(360deg); }`;
 
 const PageWrapper = styled.div`
-    padding: 2rem 4rem;
+    padding: 2rem;
     background-color: #f0f2f5;
     min-height: 100vh;
     @media (max-width: 768px) { padding: 1rem; }
@@ -48,7 +52,8 @@ const Button = styled(motion.button)`
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     background: ${props => props.primary ? '#28a745' : props.secondary ? '#6c757d' : props.tertiary ? '#17a2b8' : '#6c757d'};
     &:hover { background: ${props => props.primary ? '#218838' : props.secondary ? '#5a6268' : props.tertiary ? '#138496' : '#5a6268'}; }
-    `;
+    &:disabled { opacity: 0.6; cursor: not-allowed; }
+`;
 const BackButton = styled(Link)`
     display: inline-flex;
     align-items: center;
@@ -96,6 +101,7 @@ const DesktopTableWrapper = styled.div`
         background-color: white;
         box-shadow: 0 4px 25px rgba(0, 0, 0, 0.07);
         border-radius: 12px;
+        margin-bottom: 1rem;
     }
 `;
 const Table = styled.table` width: 100%; border-collapse: collapse; `;
@@ -109,6 +115,7 @@ const MobileCardGrid = styled.div`
     gap: 1rem;
     @media (min-width: 640px) { grid-template-columns: 1fr 1fr; }
     @media (min-width: 992px) { display: none; }
+    margin-bottom: 1rem;
 `;
 const ProductCard = styled(motion.div)`
     background-color: white;
@@ -122,24 +129,22 @@ const CardHeader = styled.div` padding: 1rem 1.5rem; border-bottom: 1px solid #e
 const CardTitle = styled.h3` margin: 0; font-size: 1.1rem; font-weight: 600; color: #2d3748; `;
 const CardCode = styled.span` font-size: 0.8rem; color: #a0aec0; background-color: #f7fafc; padding: 0.2rem 0.5rem; border-radius: 4px; `;
 const CardBody = styled.div` padding: 1.5rem; flex-grow: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; `;
-const InfoTag = styled.div` span { font-size: 0.8rem; color: #718096; margin-bottom: 0.25rem; } strong { font-size: 1rem; color: #2d3748; } `;
+const InfoTag = styled.div` display: flex; flex-direction: column; span { font-size: 0.8rem; color: #718096; margin-bottom: 0.25rem; } strong { font-size: 1rem; color: #2d3748; } `;
 const StockTag = styled(InfoTag)` strong { color: ${props => props.$low ? '#dd6b20' : props.$out ? '#e53e3e' : '#38a169'}; } `;
 const CardFooter = styled.div` padding: 1rem 1.5rem; background-color: #f7fafc; display: flex; justify-content: flex-end; gap: 0.5rem; `;
 const ActionButton = styled.button` background: none; border: none; font-size: 1.1rem; border-radius: 6px; padding: 0.5rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s; &.edit { color: #dd6b20; &:hover { background-color: #dd6b201a; } } &.delete { color: #c53030; &:hover { background-color: #c530301a; } } &.adjust { color: #4a5568; &:hover { background-color: #e2e8f0; } }`;
 const ModalOverlay = styled(motion.div)` position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: 1rem;`;
 
 const ModalContent = styled.div`
-      background: #fdfdff;
-      padding: 2.5rem;
-      border-radius: 16px;
-      max-height: 90vh;
-      overflow-y: auto;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-      width: 90vw;
-      max-width: 450px;
-      @media (min-width: 768px) {
-        max-width: 800px;
-      }
+    background: #fdfdff;
+    padding: 2.5rem;
+    border-radius: 16px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    width: 90vw;
+    max-width: 450px;
+    @media (min-width: 768px) { max-width: 800px; }
 `;
 
 const ModalTitle = styled.h2` margin-top: 0; margin-bottom: 2rem; color: #1a202c; text-align: center; font-size: 1.75rem; `;
@@ -155,7 +160,9 @@ const SaveButton = styled(Button)` background-color: #007bff; color: white; &:ho
 const CancelButton = styled(Button)` background-color: #f8f9fa; color: #6c757d; border: 1px solid #ced4da; &:hover { background-color: #e2e6ea; } `;
 const DeleteButton = styled(Button)` background-color: #dc3545; color: white; &:hover { background-color: #c53030; } `;
 
+// Componentes de Modal (Mantenidos)
 const ManagementModal = ({ title, items, onAdd, onDelete, onClose }) => {
+    // ... (Mismo código que antes)
     const [newItemName, setNewItemName] = useState('');
     const handleAdd = () => { if (newItemName.trim()) { onAdd(newItemName.trim()); setNewItemName(''); } };
     return (
@@ -188,6 +195,7 @@ const initialFormState = {
 };
 
 const StockAdjustmentModal = ({ isOpen, product, onClose, onConfirm }) => {
+    // ... (Mismo código que antes)
     const [cantidad, setCantidad] = useState('');
     const [razon, setRazon] = useState('');
     if (!isOpen) return null;
@@ -220,289 +228,11 @@ const StockAdjustmentModal = ({ isOpen, product, onClose, onConfirm }) => {
                         </ModalActions>
                     </form>
                 </ModalContent>
-                </motion.div>
+            </motion.div>
         </ModalOverlay>
     );
 };
-
-const InventoryManagement = () => {
-    const [products, setProducts] = useState([]);
-    const [categories, setCategories] = useState([]);
-    const [providers, setProviders] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingProduct, setEditingProduct] = useState(null);
-    const [formData, setFormData] = useState(initialFormState);
-    const [profitPercentage, setProfitPercentage] = useState('');
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [productToDelete, setProductToDelete] = useState(null);
-    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-    const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
-    const [modalError, setModalError] = useState('');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterCategory, setFilterCategory] = useState('');
-    const [filterProvider, setFilterProvider] = useState('');
-    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
-    const [alert, setAlert] = useState({ isOpen: false, title: '', message: '' });
-    const [adjustmentModal, setAdjustmentModal] = useState({ isOpen: false, product: null });
-    
-    const showAlert = useCallback(({ title, message }) => setAlert({ isOpen: true, title, message }), []);
-    const closeAlert = () => setAlert({ isOpen: false });
-
-    const fetchData = useCallback(async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const token = localStorage.getItem('token');
-            const [productsRes, categoriesRes, providersRes] = await Promise.all([
-                api.fetchProducts(token),
-                api.fetchCategories(token),
-                api.fetchProviders(token)
-            ]);
-            setProducts(productsRes);
-            setCategories(categoriesRes);
-            setProviders(providersRes);
-        } catch (err) { 
-            setError('Error al cargar los datos.'); 
-            console.error('Error en fetchData:', err);
-        } 
-        finally { setLoading(false); }
-    }, []);
-
-    useEffect(() => { fetchData(); }, [fetchData]);
-
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        const newFormData = { ...formData, [name]: value };
-        if (name === 'costo' || name === 'venta') {
-            const cost = parseFloat(newFormData.costo);
-            const price = parseFloat(newFormData.venta);
-            if (cost > 0 && price > 0) { setProfitPercentage(((price - cost) / cost * 100).toFixed(2)); } 
-            else { setProfitPercentage(''); }
-        }
-        setFormData(newFormData);
-    };
-
-    const handlePercentageChange = (e) => {
-        const percentage = e.target.value;
-        setProfitPercentage(percentage);
-        const cost = parseFloat(formData.costo);
-        if (cost > 0 && percentage) { setFormData({...formData, venta: (cost * (1 + parseFloat(percentage) / 100)).toFixed(2)}); }
-    };
-
-    const openCreateModal = () => { setEditingProduct(null); setFormData(initialFormState); setProfitPercentage(''); setModalError(''); setIsModalOpen(true); };
-    
-    const openEditModal = (product) => {
-        setEditingProduct(product);
-        const cost = parseFloat(product.costo);
-        const price = parseFloat(product.venta);
-        if(cost > 0 && price > 0){ setProfitPercentage(((price - cost) / cost * 100).toFixed(2)); } 
-        else { setProfitPercentage(''); }
-        setFormData({ ...initialFormState, ...product, mayoreo: product.mayoreo || '', minimo: product.minimo || '', maximo: product.maximo || '' });
-        setModalError('');
-        setIsModalOpen(true);
-    };
-
-    const openDeleteModal = (product) => { setProductToDelete(product); setIsDeleteModalOpen(true); };
-    
-    const confirmDelete = async () => { 
-        if (!productToDelete) return; 
-        try { 
-            const token = localStorage.getItem('token'); 
-            await api.deleteProduct(productToDelete.id_producto, token); 
-            fetchData(); 
-            setIsDeleteModalOpen(false); 
-            setProductToDelete(null); 
-        } catch (err) { 
-            showAlert({title: 'Error', message: 'No se pudo eliminar el producto.'}); 
-        } 
-    };
-    
-    const handleSaveProduct = async (e) => {
-        e.preventDefault();
-        setModalError('');
-
-        // --- INICIO DE VALIDACIONES ---
-        if (!formData.codigo.trim() || !formData.nombre.trim() || !formData.costo.trim() || !formData.venta.trim() || !formData.existencia.trim()) {
-            setModalError('Los campos Código, Nombre, Costo, Venta y Existencia son obligatorios.');
-            return;
-        }
-        const cost = parseFloat(formData.costo);
-        const price = parseFloat(formData.venta);
-        const wholesale = formData.mayoreo ? parseFloat(formData.mayoreo) : null;
-        const stock = parseInt(formData.existencia, 10);
-        const minStock = formData.minimo ? parseInt(formData.minimo, 10) : null;
-        const maxStock = formData.maximo ? parseInt(formData.maximo, 10) : null;
-        if (isNaN(cost) || isNaN(price) || isNaN(stock)) {
-            setModalError('Costo, Venta y Existencia deben ser números válidos.');
-            return;
-        }
-        if (formData.mayoreo && isNaN(wholesale)) { setModalError('Precio Mayoreo debe ser un número válido o estar vacío.'); return; }
-        if (formData.minimo && isNaN(minStock)) { setModalError('Stock Mínimo debe ser un número válido o estar vacío.'); return; }
-        if (formData.maximo && isNaN(maxStock)) { setModalError('Stock Máximo debe ser un número válido o estar vacío.'); return; }
-        if (cost < 0 || price < 0 || stock < 0 || (minStock !== null && minStock < 0) || (maxStock !== null && maxStock < 0) || (wholesale !== null && wholesale < 0)) {
-            setModalError('Los precios y las cantidades de stock no pueden ser negativos.');
-            return;
-        }
-        if (price < cost) { setModalError('El precio de venta no puede ser menor que el costo.'); return; }
-        if (wholesale !== null && wholesale > price) { setModalError('El precio de mayoreo no puede ser mayor que el de venta.'); return; }
-        if (minStock !== null && maxStock !== null && minStock > maxStock) { setModalError('El stock mínimo no puede ser mayor que el máximo.'); return; }
-        const isDuplicate = products.some(p => (editingProduct ? p.id_producto !== editingProduct.id_producto : true) && (p.codigo.toLowerCase() === formData.codigo.trim().toLowerCase() || p.nombre.toLowerCase() === formData.nombre.trim().toLowerCase()));
-        if (isDuplicate) {
-            const duplicateProduct = products.find(p => (editingProduct ? p.id_producto !== editingProduct.id_producto : true) && ( p.codigo.toLowerCase() === formData.codigo.trim().toLowerCase() || p.nombre.toLowerCase() === formData.nombre.trim().toLowerCase()));
-            if (duplicateProduct.codigo.toLowerCase() === formData.codigo.trim().toLowerCase()) { setModalError(`Ya existe un producto con el código "${formData.codigo}".`); } 
-            else if (duplicateProduct.nombre.toLowerCase() === formData.nombre.trim().toLowerCase()) { setModalError(`Ya existe un producto con el nombre "${formData.nombre}".`); }
-            return;
-        }
-        // --- FIN DE VALIDACIONES ---
-
-        const token = localStorage.getItem('token');
-        const dataToSave = { ...formData, mayoreo: formData.mayoreo || null, minimo: formData.minimo || null, maximo: formData.maximo || null, id_categoria: formData.id_categoria || null, id_proveedor: formData.id_proveedor || null };
-        try {
-            if (editingProduct) {
-                await api.updateProduct(editingProduct.id_producto, dataToSave, token);
-            } else {
-                await api.createProduct(dataToSave, token);
-            }
-            setIsModalOpen(false);
-            fetchData();
-        } catch (err) { setModalError(err.response?.data?.msg || 'Error al guardar el producto.'); }
-    };
-    
-    const executeStockAdjustment = async (product, cantidad, razon) => {
-        try {
-            const token = localStorage.getItem('token');
-            // NOTA: Esta función 'adjustStock' no existe en tu api.js, necesitarás crearla.
-            await api.adjustStock(product.id_producto, { cantidad, razon }, token);
-            setAdjustmentModal({ isOpen: false, product: null });
-            showAlert({ title: "Éxito", message: "Stock actualizado correctamente." });
-            fetchData();
-        } catch (error) {
-            console.error("Error al ajustar stock:", error);
-            showAlert({ title: "Error", message: error.response?.data?.msg || "No se pudo ajustar el stock." });
-        }
-    };
-    
-    const handleAddCategory = async (name) => { const token = localStorage.getItem('token'); await api.createCategory({ nombre: name }, token); fetchData(); };
-    const handleDeleteCategory = async (id) => { const token = localStorage.getItem('token'); try { await api.deleteCategory(id, token); fetchData(); } catch (error) { showAlert({ title: 'Error', message: error.response.data.msg }); } };
-    const handleAddProvider = async (name) => { const token = localStorage.getItem('token'); await api.createProvider({ nombre: name }, token); fetchData(); };
-    const handleDeleteProvider = async (id) => { const token = localStorage.getItem('token'); try { await api.deleteProvider(id, token); fetchData(); } catch (error) { showAlert({ title: 'Error', message: error.response.data.msg }); } };
-
-    const filteredProducts = useMemo(() => {
-        return products.filter(p => {
-            const searchTermLower = searchTerm.toLowerCase();
-            const matchesSearch = p.nombre.toLowerCase().includes(searchTermLower) || (p.codigo && p.codigo.toLowerCase().includes(searchTermLower));
-            const matchesCategory = filterCategory ? p.id_categoria == filterCategory : true;
-            const matchesProvider = filterProvider ? p.id_proveedor == filterProvider : true;
-            return matchesSearch && matchesCategory && matchesProvider;
-        });
-    }, [products, searchTerm, filterCategory, filterProvider]);
-
-    if (loading) return <PageWrapper><CenteredMessage><Spinner /><p>Cargando Inventario...</p></CenteredMessage></PageWrapper>;
-    if (error) return <PageWrapper><CenteredMessage style={{ color: '#c53030' }}>{error}</CenteredMessage></PageWrapper>;
-
-    return (
-        <PageWrapper>
-            <BackButton to="/dashboard"><FaArrowLeft /> Volver al Dashboard</BackButton>
-            <HeaderContainer>
-                <Title><FaBoxOpen /> Gestión de Inventario</Title>
-                <ButtonGroup>
-                    <Button primary onClick={openCreateModal} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}><FaPlus /> Crear Producto</Button>
-                    <Button secondary onClick={() => setIsCategoryModalOpen(true)} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}><FaTags /> Categorías</Button>
-                    <Button secondary onClick={() => setIsProviderModalOpen(true)} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}><FaTruck /> Proveedores</Button>
-                    <Button tertiary onClick={() => setIsHistoryModalOpen(true)} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}><FaHistory /> Historial</Button>
-                </ButtonGroup>
-            </HeaderContainer>
-
-            <FilterContainer>
-                <SearchInputWrapper>
-                    <FaSearch style={{position: 'absolute', left: '12px', top: '14px', color: '#a0aec0'}}/>
-                    <SearchInput placeholder="Buscar por código o nombre..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                </SearchInputWrapper>
-                <Select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-                    <option value="">Todas las categorías</option>
-                    {categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}
-                </Select>
-                <Select value={filterProvider} onChange={(e) => setFilterProvider(e.target.value)}>
-                    <option value="">Todos los proveedores</option>
-                    {providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}
-                </Select>
-            </FilterContainer>
-
-            <DesktopTableWrapper>
-                <Table>
-                    <thead><Tr><Th>ID</Th><Th>Código</Th><Th>Nombre</Th><Th>Costo</Th><Th>Venta</Th><Th>Existencia</Th><Th>Acciones</Th></Tr></thead>
-                    <tbody>
-                        {filteredProducts.map((p, index) => (
-                            <Tr key={p.id_producto || p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: index * 0.02 }}>
-                                <Td>{p.id_producto || p.id}</Td>
-                                <Td>{p.codigo}</Td>
-                                <Td>{p.nombre}</Td>
-                                <Td>C${Number(p.costo).toFixed(2)}</Td>
-                                <Td>C${Number(p.venta || p.precio).toFixed(2)}</Td>
-                                <Td style={{fontWeight: 'bold', color: p.existencia <= (p.minimo || 5) ? '#dd6b20' : '#2d3748' }}>{p.existencia}</Td>
-                                <Td>
-                                    <div style={{display: 'flex', gap: '0.25rem', alignItems: 'center'}}>
-                                        <ActionButton className="adjust" title="Ajustar Stock" onClick={() => setAdjustmentModal({isOpen: true, product: p})}><FaPlusCircle /><FaMinusCircle style={{marginLeft:'4px'}}/></ActionButton>
-                                        <ActionButton className="edit" title="Editar Producto" onClick={() => openEditModal(p)}><FaEdit /></ActionButton>
-                                        <ActionButton className="delete" title="Eliminar Producto" onClick={() => openDeleteModal(p)}><FaTrash /></ActionButton>
-                                    </div>
-                                </Td>
-                            </Tr>
-                        ))}
-                    </tbody>
-                </Table>
-            </DesktopTableWrapper>
-            
-            <MobileCardGrid>
-                {filteredProducts.map((p, index) => (
-                    <ProductCard key={p.id_producto || p.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}>
-                        <CardHeader><CardTitle>{p.nombre}</CardTitle><CardCode>{p.codigo}</CardCode></CardHeader>
-                        <CardBody>
-                            <InfoTag><span>Costo</span><strong>C${Number(p.costo).toFixed(2)}</strong></InfoTag>
-                            <InfoTag><span>Venta</span><strong>C${Number(p.venta || p.precio).toFixed(2)}</strong></InfoTag>
-                            <StockTag $low={p.existencia > 0 && p.existencia <= (p.minimo || 5)} $out={p.existencia <= 0}>
-                                <span>Existencia</span><strong>{p.existencia}</strong>
-                            </StockTag>
-                            <InfoTag><span>Categoría</span><strong>{categories.find(c => c.id_categoria === p.id_categoria)?.nombre || 'N/A'}</strong></InfoTag>
-                        </CardBody>
-                        <CardFooter>
-                            <ActionButton className="adjust" title="Ajustar Stock" onClick={() => setAdjustmentModal({isOpen: true, product: p})}><FaPlusCircle /><FaMinusCircle style={{marginLeft:'4px'}}/></ActionButton>
-                            <ActionButton className="edit" onClick={() => openEditModal(p)}><FaEdit /> Editar</ActionButton>
-                            <ActionButton className="delete" onClick={() => openDeleteModal(p)}><FaTrash /> Eliminar</ActionButton>
-                        </CardFooter>
-                    </ProductCard>
-                ))}
-            </MobileCardGrid>
-
-            {filteredProducts.length === 0 && <CenteredMessage><p>No se encontraron productos que coincidan con la búsqueda.</p></CenteredMessage>}
-            
-            <AnimatePresence>
-                {isModalOpen && ( <ModalOverlay onClick={() => setIsModalOpen(false)}><motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}><ModalContent as="div" onClick={(e) => e.stopPropagation()}><form onSubmit={handleSaveProduct}><ModalTitle>{editingProduct ? 'Editar Producto' : 'Crear Nuevo Producto'}</ModalTitle>{modalError && <ModalError>{modalError}</ModalError>}<InputGrid><FormGroup><Label>Código</Label><Input name="codigo" value={formData.codigo} onChange={handleInputChange} required /></FormGroup><FormGroup><Label>Nombre</Label><Input name="nombre" value={formData.nombre} onChange={handleInputChange} required /></FormGroup><FormGroup><Label>Costo (C$)</Label><Input type="number" step="0.01" name="costo" value={formData.costo} onChange={handleInputChange} required /></FormGroup><FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup><FormGroup><Label>Precio Venta (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta} onChange={handleInputChange} required /></FormGroup><FormGroup><Label>Precio Mayoreo (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} /></FormGroup><FormGroup><Label>Existencia</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="existencia" value={formData.existencia} onChange={handleInputChange} required /></FormGroup><FormGroup><Label>Stock Mínimo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="minimo" value={formData.minimo} onChange={handleInputChange} /></FormGroup><FormGroup><Label>Stock Máximo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="maximo" value={formData.maximo} onChange={handleInputChange} /></FormGroup><FormGroup><Label>Categoría</Label><Select name="id_categoria" value={formData.id_categoria} onChange={handleInputChange}><option value="">-- Sin Categoría --</option>{categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}</Select></FormGroup><FormGroup><Label>Proveedor</Label><Select name="id_proveedor" value={formData.id_proveedor} onChange={handleInputChange}><option value="">-- Sin Proveedor --</option>{providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}</Select></FormGroup><FormGroup><Label>Tipo de Venta</Label><Select name="tipo_venta" value={formData.tipo_venta} onChange={handleInputChange}><option value="Unidad">Unidad</option><option value="Juego">Juego</option><option value="Kit">Kit</option></Select></FormGroup></InputGrid><ModalActions><CancelButton type="button" onClick={() => setIsModalOpen(false)}>Cancelar</CancelButton><SaveButton type="submit">Guardar Cambios</SaveButton></ModalActions></form></ModalContent></motion.div></ModalOverlay>)}
-            </AnimatePresence>
-            <AnimatePresence>
-                {isDeleteModalOpen && ( <ModalOverlay onClick={() => setIsDeleteModalOpen(false)}><motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}><ModalContent as="div" onClick={(e) => e.stopPropagation()}><ModalTitle>Confirmar Eliminación</ModalTitle><p>¿Estás seguro de que quieres eliminar el producto <strong>{productToDelete?.nombre}</strong>?</p><ModalActions><CancelButton onClick={() => setIsDeleteModalOpen(false)}>Cancelar</CancelButton><DeleteButton onClick={confirmDelete}>Sí, Eliminar</DeleteButton></ModalActions></ModalContent></motion.div></ModalOverlay>)}
-            </AnimatePresence>
-            <AnimatePresence>
-                {isCategoryModalOpen && ( <ManagementModal title="Gestionar Categorías" items={categories} onAdd={handleAddCategory} onDelete={handleDeleteCategory} onClose={() => setIsCategoryModalOpen(false)} /> )}
-            </AnimatePresence>
-            <AnimatePresence>
-                {isProviderModalOpen && ( <ManagementModal title="Gestionar Proveedores" items={providers} onAdd={handleAddProvider} onDelete={handleDeleteProvider} onClose={() => setIsProviderModalOpen(false)} /> )}
-            </AnimatePresence>
-            <AnimatePresence>
-                {isHistoryModalOpen && <InventoryHistoryModal onClose={() => setIsHistoryModalOpen(false)} />}
-            </AnimatePresence>
-            <AnimatePresence>
-                {adjustmentModal.isOpen && <StockAdjustmentModal isOpen={adjustmentModal.isOpen} product={adjustmentModal.product} onClose={() => setAdjustmentModal({isOpen: false, product: null})} onConfirm={executeStockAdjustment} />}
-            </AnimatePresence>
-            <AnimatePresence>
-                {alert.isOpen && <AlertModal isOpen={alert.isOpen} onClose={closeAlert} title={alert.title} message={alert.message} />}
-            </AnimatePresence>
-        </PageWrapper>
-    );
-};
-
+// Componente InventoryHistoryModal (Mantenido)
 const HistoryModalContent = styled.div` background: #fdfdff; padding: 0; border-radius: 16px; width: 90%; max-width: 1000px; height: 80vh; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2); `;
 const HistoryHeader = styled.div` padding: 1rem 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; `;
 const HistoryBody = styled.div` flex-grow: 1; overflow-y: auto; padding: 1.5rem; `;
@@ -519,9 +249,10 @@ function InventoryHistoryModal({ onClose }) {
         const fetchHistory = async () => {
             try {
                 const token = localStorage.getItem('token');
-                // CORRECCIÓN CRÍTICA: Se debe crear esta función en api.js
-                const data = await api.fetchInventoryHistory(token); 
-                setHistory(data);
+                const res = await axios.get('http://localhost:3001/api/products/inventory/history', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setHistory(res.data);
             } catch (error) { console.error("Error fetching inventory history:", error); } 
             finally { setLoading(false); }
         };
@@ -566,7 +297,7 @@ function InventoryHistoryModal({ onClose }) {
                                         </motion.tr>
                                     ))}
                                 </tbody>
-                                        </HistoryTable>
+                            </HistoryTable>
                         )}
                     </HistoryBody>
                 </HistoryModalContent>
@@ -574,5 +305,358 @@ function InventoryHistoryModal({ onClose }) {
         </ModalOverlay>
     );
 }
+// Fin de Componentes de Modal (Mantenidos)
+
+
+const InventoryManagement = () => {
+    // ... (Estados iniciales mantenidos)
+    const [products, setProducts] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [providers, setProviders] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingProduct, setEditingProduct] = useState(null);
+    const [formData, setFormData] = useState(initialFormState);
+    const [profitPercentage, setProfitPercentage] = useState('');
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [productToDelete, setProductToDelete] = useState(null);
+    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+    const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
+    const [modalError, setModalError] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterCategory, setFilterCategory] = useState('');
+    const [filterProvider, setFilterProvider] = useState('');
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [alert, setAlert] = useState({ isOpen: false, title: '', message: '' });
+    const [adjustmentModal, setAdjustmentModal] = useState({ isOpen: false, product: null });
+    
+    const showAlert = useCallback(({ title, message }) => setAlert({ isOpen: true, title, message }), []);
+    const closeAlert = () => setAlert({ isOpen: false });
+
+    // Función para obtener todos los datos (mantenida, ya que necesitamos los 5000 productos en memoria para la búsqueda del lado del cliente)
+    const fetchData = useCallback(async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            const [productsRes, categoriesRes, providersRes] = await Promise.all([
+                axios.get('http://localhost:3001/api/products', config),
+                axios.get('http://localhost:3001/api/categories', config),
+                axios.get('http://localhost:3001/api/providers', config)
+            ]);
+            setProducts(productsRes.data);
+            setCategories(categoriesRes.data);
+            setProviders(providersRes.data);
+        } catch (err) { setError('Error al cargar los datos.'); } 
+        finally { setLoading(false); }
+    }, []);
+
+    useEffect(() => { fetchData(); }, [fetchData]);
+
+    // --- LÓGICA DE FILTRADO CONDICIONAL TIPO POS ---
+    const filteredProducts = useMemo(() => {
+        const searchTermLower = searchTerm.toLowerCase().trim();
+        
+        // 1. Aplicar filtros a la lista completa
+        const matchedProducts = products.filter(p => {
+            const matchesSearch = searchTermLower.length === 0 || p.nombre.toLowerCase().includes(searchTermLower) || (p.codigo && p.codigo.toLowerCase().includes(searchTermLower));
+            const matchesCategory = filterCategory ? p.id_categoria == filterCategory : true;
+            const matchesProvider = filterProvider ? p.id_proveedor == filterProvider : true;
+            return matchesSearch && matchesCategory && matchesProvider;
+        });
+
+        // 2. Comprobar si hay filtros activos (Search, Categoría o Proveedor)
+        const hasActiveFilters = searchTermLower.length > 0 || filterCategory || filterProvider;
+        
+        if (hasActiveFilters) {
+            // Si hay filtros, mostramos todos los resultados que coincidan
+            return matchedProducts;
+        } else {
+            // Si NO hay filtros activos, limitamos la lista a los primeros 300 (tipo POS)
+            return matchedProducts.slice(0, PRODUCTS_INITIAL_LOAD);
+        }
+
+    }, [products, searchTerm, filterCategory, filterProvider]);
+    // ------------------------------------------------
+
+    // Calcular el total de resultados (sin la limitación de los 300)
+    const totalFilteredCount = useMemo(() => {
+        // Esta lógica es solo para el mensaje "Mostrando X de Y" y NO aplica el slice(300)
+        const searchTermLower = searchTerm.toLowerCase().trim();
+        return products.filter(p => {
+            const matchesSearch = searchTermLower.length === 0 || p.nombre.toLowerCase().includes(searchTermLower) || (p.codigo && p.codigo.toLowerCase().includes(searchTermLower));
+            const matchesCategory = filterCategory ? p.id_categoria == filterCategory : true;
+            const matchesProvider = filterProvider ? p.id_proveedor == filterProvider : true;
+            return matchesSearch && matchesCategory && matchesProvider;
+        }).length;
+    }, [products, searchTerm, filterCategory, filterProvider]);
+
+    // --- MANEJO DE FORMA Y MODALES (Mantenido) ---
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        const newFormData = { ...formData, [name]: value };
+        if (name === 'costo' || name === 'venta') {
+            const cost = parseFloat(newFormData.costo);
+            const price = parseFloat(newFormData.venta);
+            if (cost > 0 && price > 0) { setProfitPercentage(((price - cost) / cost * 100).toFixed(2)); } 
+            else { setProfitPercentage(''); }
+        }
+        setFormData(newFormData);
+    };
+
+    const handlePercentageChange = (e) => {
+        const percentage = e.target.value;
+        setProfitPercentage(percentage);
+        const cost = parseFloat(formData.costo);
+        if (cost > 0 && percentage) { setFormData({...formData, venta: (cost * (1 + parseFloat(percentage) / 100)).toFixed(2)}); }
+    };
+
+    const openCreateModal = () => { setEditingProduct(null); setFormData(initialFormState); setProfitPercentage(''); setModalError(''); setIsModalOpen(true); };
+    
+    const openEditModal = (product) => {
+        setEditingProduct(product);
+        const cost = parseFloat(product.costo);
+        const price = parseFloat(product.venta);
+        if(cost > 0 && price > 0){ setProfitPercentage(((price - cost) / cost * 100).toFixed(2)); } 
+        else { setProfitPercentage(''); }
+        setFormData({ ...initialFormState, ...product, mayoreo: product.mayoreo || '', minimo: product.minimo || '', maximo: product.maximo || '' });
+        setModalError('');
+        setIsModalOpen(true);
+    };
+
+    const openDeleteModal = (product) => { setProductToDelete(product); setIsDeleteModalOpen(true); };
+    
+    const confirmDelete = async () => { 
+        if (!productToDelete) return; 
+        try { 
+            const token = localStorage.getItem('token'); 
+            const config = { headers: { Authorization: `Bearer ${token}` } }; 
+            await axios.delete(`http://localhost:3001/api/products/${productToDelete.id_producto}`, config); 
+            fetchData(); 
+            setIsDeleteModalOpen(false); 
+            setProductToDelete(null); 
+        } catch (err) { 
+            showAlert({title: 'Error', message: 'No se pudo eliminar el producto.'}); 
+        } 
+    };
+    
+    const handleSaveProduct = async (e) => {
+        e.preventDefault();
+        setModalError('');
+        // ... (Validaciones de formulario mantenidas)
+        if (!formData.codigo.trim() || !formData.nombre.trim() || !formData.costo.trim() || !formData.venta.trim() || !formData.existencia.trim()) {
+            setModalError('Los campos Código, Nombre, Costo, Venta y Existencia son obligatorios.');
+            return;
+        }
+
+        const cost = parseFloat(formData.costo);
+        const price = parseFloat(formData.venta);
+        const wholesale = formData.mayoreo ? parseFloat(formData.mayoreo) : null;
+        const stock = parseInt(formData.existencia, 10);
+        const minStock = formData.minimo ? parseInt(formData.minimo, 10) : null;
+        const maxStock = formData.maximo ? parseInt(formData.maximo, 10) : null;
+
+        if (isNaN(cost) || isNaN(price) || isNaN(stock)) {
+            setModalError('Costo, Venta y Existencia deben ser números válidos.');
+            return;
+        }
+        if (formData.mayoreo && isNaN(wholesale)) {
+            setModalError('Precio Mayoreo debe ser un número válido o estar vacío.');
+            return;
+        }
+        if (formData.minimo && isNaN(minStock)) {
+            setModalError('Stock Mínimo debe ser un número válido o estar vacío.');
+            return;
+        }
+        if (formData.maximo && isNaN(maxStock)) {
+            setModalError('Stock Máximo debe ser un número válido o estar vacío.');
+            return;
+        }
+        
+        if (cost < 0 || price < 0 || stock < 0 || (minStock !== null && minStock < 0) || (maxStock !== null && maxStock < 0) || (wholesale !== null && wholesale < 0)) {
+            setModalError('Los precios y las cantidades de stock no pueden ser negativos.');
+            return;
+        }
+    
+        if (price < cost) {
+            setModalError('El precio de venta no puede ser menor que el costo.');
+            return;
+        }
+        if (wholesale !== null && wholesale > price) {
+            setModalError('El precio de mayoreo no puede ser mayor que el de venta.');
+            return;
+        }
+        if (minStock !== null && maxStock !== null && minStock > maxStock) {
+            setModalError('El stock mínimo no puede ser mayor que el máximo.');
+            return;
+        }
+
+        const isDuplicate = products.some(p => (editingProduct ? p.id_producto !== editingProduct.id_producto : true) && (p.codigo.toLowerCase() === formData.codigo.trim().toLowerCase() || p.nombre.toLowerCase() === formData.nombre.trim().toLowerCase()));
+        if (isDuplicate) {
+            const duplicateProduct = products.find(p => (editingProduct ? p.id_producto !== editingProduct.id_producto : true) && ( p.codigo.toLowerCase() === formData.codigo.trim().toLowerCase() || p.nombre.toLowerCase() === formData.nombre.trim().toLowerCase()));
+            if (duplicateProduct.codigo.toLowerCase() === formData.codigo.trim().toLowerCase()) { setModalError(`Ya existe un producto con el código "${formData.codigo}".`); } 
+            else if (duplicateProduct.nombre.toLowerCase() === formData.nombre.trim().toLowerCase()) { setModalError(`Ya existe un producto con el nombre "${formData.nombre}".`); }
+            return;
+        }
+        // --- FIN DE VALIDACIONES ---
+
+        const token = localStorage.getItem('token');
+        const config = { headers: { Authorization: `Bearer ${token}` } };
+        const dataToSave = { ...formData, mayoreo: formData.mayoreo || null, minimo: formData.minimo || null, maximo: formData.maximo || null, id_categoria: formData.id_categoria || null, id_proveedor: formData.id_proveedor || null };
+        try {
+            if (editingProduct) {
+                await axios.put(`http://localhost:3001/api/products/${editingProduct.id_producto}`, dataToSave, config);
+            } else {
+                await axios.post('http://localhost:3001/api/products', dataToSave, config);
+            }
+            setIsModalOpen(false);
+            fetchData();
+        } catch (err) { setModalError(err.response?.data?.msg || 'Error al guardar el producto.'); }
+    };
+    
+    const executeStockAdjustment = async (product, cantidad, razon) => {
+        try {
+            const token = localStorage.getItem('token');
+            await axios.patch(`http://localhost:3001/api/products/${product.id_producto}/stock`, 
+                { cantidad, razon },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setAdjustmentModal({ isOpen: false, product: null });
+            showAlert({ title: "Éxito", message: "Stock actualizado correctamente." });
+            fetchData();
+        } catch (error) {
+            console.error("Error al ajustar stock:", error);
+            showAlert({ title: "Error", message: error.response?.data?.msg || "No se pudo ajustar el stock." });
+        }
+    };
+    
+    const handleAddCategory = async (name) => { const token = localStorage.getItem('token'); await axios.post('http://localhost:3001/api/categories', { nombre: name }, { headers: { Authorization: `Bearer ${token}` } }); fetchData(); };
+    const handleDeleteCategory = async (id) => { const token = localStorage.getItem('token'); try { await axios.delete(`http://localhost:3001/api/categories/${id}`, { headers: { Authorization: `Bearer ${token}` } }); fetchData(); } catch (error) { showAlert({ title: 'Error', message: error.response.data.msg }); } };
+    const handleAddProvider = async (name) => { const token = localStorage.getItem('token'); await axios.post('http://localhost:3001/api/providers', { nombre: name }, { headers: { Authorization: `Bearer ${token}` } }); fetchData(); };
+    const handleDeleteProvider = async (id) => { const token = localStorage.getItem('token'); try { await axios.delete(`http://localhost:3001/api/providers/${id}`, { headers: { Authorization: `Bearer ${token}` } }); fetchData(); } catch (error) { showAlert({ title: 'Error', message: error.response.data.msg }); } };
+    // --- FIN DE MANEJO DE FORMA Y MODALES ---
+
+    if (loading) return <PageWrapper><CenteredMessage><Spinner /><p>Cargando Inventario...</p></CenteredMessage></PageWrapper>;
+    if (error) return <PageWrapper><CenteredMessage style={{ color: '#c53030' }}>{error}</CenteredMessage></PageWrapper>;
+
+    const isLimitedLoad = filteredProducts.length < totalFilteredCount;
+    
+    return (
+        <PageWrapper>
+            <BackButton to="/dashboard"><FaArrowLeft /> Volver al Dashboard</BackButton>
+            <HeaderContainer>
+                <Title><FaBoxOpen /> Gestión de Inventario</Title>
+                <ButtonGroup>
+                    <Button primary onClick={openCreateModal} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}><FaPlus /> Crear Producto</Button>
+                    <Button secondary onClick={() => setIsCategoryModalOpen(true)} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}><FaTags /> Categorías</Button>
+                    <Button secondary onClick={() => setIsProviderModalOpen(true)} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}><FaTruck /> Proveedores</Button>
+                    <Button tertiary onClick={() => setIsHistoryModalOpen(true)} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}><FaHistory /> Historial</Button>
+                </ButtonGroup>
+            </HeaderContainer>
+
+            <FilterContainer>
+                <SearchInputWrapper>
+                    <FaSearch style={{position: 'absolute', left: '12px', top: '14px', color: '#a0aec0'}}/>
+                    {/* Al buscar, se carga la lista completa de resultados filtrados */}
+                    <SearchInput placeholder="Buscar por código o nombre para ver más productos..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                </SearchInputWrapper>
+                <Select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+                    <option value="">Todas las categorías</option>
+                    {categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}
+                </Select>
+                <Select value={filterProvider} onChange={(e) => setFilterProvider(e.target.value)}>
+                    <option value="">Todos los proveedores</option>
+                    {providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}
+                </Select>
+            </FilterContainer>
+            
+           {/* Mensaje de estado de la carga */}
+            <div style={{ textAlign: 'right', marginBottom: '0.5rem', color: '#4a5568', fontWeight: 'bold' }}>
+                Mostrando {filteredProducts.length} de {totalFilteredCount} productos filtrados (Total: {products.length})
+            </div>
+
+            {/* Mensaje de advertencia tipo POS - TEXTO MEJORADO */}
+            {isLimitedLoad && (
+                <div style={{ padding: '0.75rem', marginBottom: '1.5rem', backgroundColor: '#fff3cd', color: '#856404', border: '1px solid #ffeeba', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <FaExclamationTriangle style={{ minWidth: '20px' }} />
+                    <small>
+                        **Carga Rápida Activa:** Solo se muestran los **primeros {PRODUCTS_INITIAL_LOAD} productos**. Para visualizar y gestionar el catálogo completo de **{totalFilteredCount}** productos, por favor, use el **campo de búsqueda** o los **filtros de Categoría/Proveedor**.
+                    </small>
+                </div>
+            )}
+            <DesktopTableWrapper>
+                <Table>
+                    <thead><Tr><Th>ID</Th><Th>Código</Th><Th>Nombre</Th><Th>Costo</Th><Th>Venta</Th><Th>Existencia</Th><Th>Acciones</Th></Tr></thead>
+                    <tbody>
+                        {filteredProducts.map((p, index) => (
+                            <Tr key={p.id_producto} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: index * 0.02 }}>
+                                <Td>{p.id_producto}</Td>
+                                <Td>{p.codigo}</Td>
+                                <Td>{p.nombre}</Td>
+                                <Td>C${Number(p.costo).toFixed(2)}</Td>
+                                <Td>C${Number(p.venta).toFixed(2)}</Td>
+                                <Td style={{fontWeight: 'bold', color: p.existencia <= (p.minimo || 5) ? '#dd6b20' : '#2d3748' }}>{p.existencia}</Td>
+                                <Td>
+                                    <div style={{display: 'flex', gap: '0.25rem', alignItems: 'center'}}>
+                                        <ActionButton className="adjust" title="Ajustar Stock" onClick={() => setAdjustmentModal({isOpen: true, product: p})}><FaPlusCircle /></ActionButton>
+                                        <ActionButton className="edit" title="Editar Producto" onClick={() => openEditModal(p)}><FaEdit /></ActionButton>
+                                        <ActionButton className="delete" title="Eliminar Producto" onClick={() => openDeleteModal(p)}><FaTrash /></ActionButton>
+                                    </div>
+                                </Td>
+                            </Tr>
+                        ))}
+                    </tbody>
+                </Table>
+            </DesktopTableWrapper>
+            
+            <MobileCardGrid>
+                {filteredProducts.map((p, index) => (
+                    <ProductCard key={p.id_producto} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}>
+                        <CardHeader><CardTitle>{p.nombre}</CardTitle><CardCode>{p.codigo}</CardCode></CardHeader>
+                        <CardBody>
+                            <InfoTag><span>Costo</span><strong>C${Number(p.costo).toFixed(2)}</strong></InfoTag>
+                            <InfoTag><span>Venta</span><strong>C${Number(p.venta).toFixed(2)}</strong></InfoTag>
+                            <StockTag $low={p.existencia > 0 && p.existencia <= (p.minimo || 5)} $out={p.existencia <= 0}>
+                                <span>Existencia</span><strong>{p.existencia}</strong>
+                            </StockTag>
+                            <InfoTag><span>Categoría</span><strong>{p.nombre_categoria || 'N/A'}</strong></InfoTag>
+                        </CardBody>
+                        <CardFooter>
+                        <ActionButton className="adjust" title="Ajustar Stock" onClick={() => setAdjustmentModal({isOpen: true, product: p})}><FaPlusCircle /><FaMinusCircle style={{marginLeft:'4px'}}/></ActionButton>
+                        <ActionButton className="edit" onClick={() => openEditModal(p)}><FaEdit /> Editar</ActionButton>
+                        <ActionButton className="delete" onClick={() => openDeleteModal(p)}><FaTrash /> Eliminar</ActionButton>
+                        </CardFooter>
+                    </ProductCard>
+                ))}
+            </MobileCardGrid>
+
+            {filteredProducts.length === 0 && totalFilteredCount > 0 && <CenteredMessage><p>No se encontraron productos que coincidan con la búsqueda.</p></CenteredMessage>}
+            {filteredProducts.length === 0 && totalFilteredCount === 0 && <CenteredMessage><p>No hay productos registrados en el inventario.</p></CenteredMessage>}
+            
+            <AnimatePresence>
+                {/* Modales mantenidos */}
+                {isModalOpen && ( /* ... Código del Modal de Crear/Editar Producto ... */ <ModalOverlay onClick={() => setIsModalOpen(false)}><motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}><ModalContent as="div" onClick={(e) => e.stopPropagation()}><form onSubmit={handleSaveProduct}><ModalTitle>{editingProduct ? 'Editar Producto' : 'Crear Nuevo Producto'}</ModalTitle>{modalError && <ModalError>{modalError}</ModalError>}<InputGrid><FormGroup><Label>Código</Label><Input name="codigo" value={formData.codigo} onChange={handleInputChange} required /></FormGroup><FormGroup><Label>Nombre</Label><Input name="nombre" value={formData.nombre} onChange={handleInputChange} required /></FormGroup><FormGroup><Label>Costo (C$)</Label><Input type="number" step="0.01" name="costo" value={formData.costo} onChange={handleInputChange} required /></FormGroup><FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup><FormGroup><Label>Precio Venta (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta} onChange={handleInputChange} required /></FormGroup><FormGroup><Label>Precio Mayoreo (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} /></FormGroup><FormGroup><Label>Existencia</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="existencia" value={formData.existencia} onChange={handleInputChange} required /></FormGroup><FormGroup><Label>Stock Mínimo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="minimo" value={formData.minimo} onChange={handleInputChange} /></FormGroup><FormGroup><Label>Stock Máximo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="maximo" value={formData.maximo} onChange={handleInputChange} /></FormGroup><FormGroup><Label>Categoría</Label><Select name="id_categoria" value={formData.id_categoria} onChange={handleInputChange}><option value="">-- Sin Categoría --</option>{categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}</Select></FormGroup><FormGroup><Label>Proveedor</Label><Select name="id_proveedor" value={formData.id_proveedor} onChange={handleInputChange}><option value="">-- Sin Proveedor --</option>{providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}</Select></FormGroup><FormGroup><Label>Tipo de Venta</Label><Select name="tipo_venta" value={formData.tipo_venta} onChange={handleInputChange}><option value="Unidad">Unidad</option><option value="Juego">Juego</option><option value="Kit">Kit</option></Select></FormGroup></InputGrid><ModalActions><CancelButton type="button" onClick={() => setIsModalOpen(false)}>Cancelar</CancelButton><SaveButton type="submit">Guardar Cambios</SaveButton></ModalActions></form></ModalContent></motion.div></ModalOverlay>)}
+            </AnimatePresence>
+            <AnimatePresence>
+                {isDeleteModalOpen && ( <ModalOverlay onClick={() => setIsDeleteModalOpen(false)}><motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}><ModalContent as="div" onClick={(e) => e.stopPropagation()}><ModalTitle>Confirmar Eliminación</ModalTitle><p>¿Estás seguro de que quieres eliminar el producto <strong>{productToDelete?.nombre}</strong>?</p><ModalActions><CancelButton onClick={() => setIsDeleteModalOpen(false)}>Cancelar</CancelButton><DeleteButton onClick={confirmDelete}>Sí, Eliminar</DeleteButton></ModalActions></ModalContent></motion.div></ModalOverlay>)}
+            </AnimatePresence>
+            <AnimatePresence>
+                {isCategoryModalOpen && ( <ManagementModal title="Gestionar Categorías" items={categories} onAdd={handleAddCategory} onDelete={handleDeleteCategory} onClose={() => setIsCategoryModalOpen(false)} /> )}
+            </AnimatePresence>
+            <AnimatePresence>
+                {isProviderModalOpen && ( <ManagementModal title="Gestionar Proveedores" items={providers} onAdd={handleAddProvider} onDelete={handleDeleteProvider} onClose={() => setIsProviderModalOpen(false)} /> )}
+            </AnimatePresence>
+            <AnimatePresence>
+                {isHistoryModalOpen && <InventoryHistoryModal onClose={() => setIsHistoryModalOpen(false)} />}
+            </AnimatePresence>
+            <AnimatePresence>
+                {adjustmentModal.isOpen && <StockAdjustmentModal isOpen={adjustmentModal.isOpen} product={adjustmentModal.product} onClose={() => setAdjustmentModal({isOpen: false, product: null})} onConfirm={executeStockAdjustment} />}
+            </AnimatePresence>
+            <AnimatePresence>
+                {alert.isOpen && <AlertModal isOpen={alert.isOpen} onClose={closeAlert} title={alert.title} message={alert.message} />}
+            </AnimatePresence>
+        </PageWrapper>
+    );
+};
 
 export default InventoryManagement;

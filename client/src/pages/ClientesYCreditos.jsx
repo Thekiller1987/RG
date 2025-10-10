@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import styled from 'styled-components';
 import { FaUsers, FaCreditCard, FaTrashAlt, FaEdit, FaPlus, FaMoneyBillWave, FaArrowLeft, FaRedo, FaHistory } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
@@ -89,6 +89,9 @@ const Table = styled.table`
     box-shadow: 0 4px 15px rgba(0,0,0,0.05);
     border-radius: 8px;
     overflow: hidden;
+    @media(max-width: 992px) {
+        display: none;
+    }
     th, td {
         padding: 1rem;
         text-align: left;
@@ -105,7 +108,7 @@ const Table = styled.table`
 `;
 
 export default function ClientesYCreditos() {
-    const { clients, token, isLoading, refreshClients, cajaSession } = useAuth();
+    const { clients, user, token, isLoading, refreshClients, cajaSession } = useAuth();
     const [modal, setModal] = useState({ name: null, data: null });
     const [alert, setAlert] = useState({ isOpen: false, title: '', message: '' });
 

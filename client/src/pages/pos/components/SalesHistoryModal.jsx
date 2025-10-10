@@ -1,11 +1,7 @@
-// src/pages/pos/components/SalesHistoryModal.jsx
-
 import React, { useState, useMemo } from 'react';
 import styled from 'styled-components';
-import { FaHistory, FaWindowClose, FaRegClock, FaUsers, FaFilter, FaSearch, FaAngleLeft, FaAngleRight, FaHandHoldingUsd } from 'react-icons/fa';
+import { FaHistory, FaWindowClose, FaRegClock, FaUsers, FaFilter, FaSearch, FaAngleLeft, FaAngleRight, FaHandHoldingUsd, FaMoneyBillWave, FaRegCreditCard, FaExchangeAlt } from 'react-icons/fa';
 import { ModalOverlay, ModalContent as OriginalModalContent, Button as OriginalButton, SearchInput, InfoBox } from '../POS.styles.jsx';
-// ELIMINADO: Ya no necesitamos la función que calculaba mal el saldo.
-// import { calculateClientCreditStatus } from './calculateClientCreditStatus.js';
 import AbonoCreditoModal from './AbonoCreditoModal';
 import SaleDetailView from './SaleDetailView';
 
@@ -23,6 +19,31 @@ const DetailSection = styled.div` margin-bottom: 1.5rem; padding-bottom: 1.5rem;
 const InfoGrid = styled.div` display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; `;
 const InfoItem = styled.div` font-size: 0.9rem; strong { display: block; color: #6c757d; margin-bottom: 4px; } `;
 const SummaryRow = styled.div` display: flex; justify-content: space-between; font-size: 1rem; padding: 0.6rem 0; span:first-child { color: #6c757d; } span:last-child { font-weight: bold; } `;
+
+
+// --- Lógica Auxiliar ---
+const getPaymentTypeLabel = (pagoDetalles) => {
+    if (!pagoDetalles) return 'N/A';
+    const { efectivo, tarjeta, transferencia, credito } = pagoDetalles;
+
+    if (Number(credito) > 0) return { label: 'Crédito', icon: <FaRegCreditCard style={{ color: '#dc3545' }} /> };
+    
+    // Si no es crédito, combinamos otros métodos
+    const methods = [];
+    if (Number(efectivo) > 0) methods.push('Efectivo');
+    if (Number(tarjeta) > 0) methods.push('Tarjeta');
+    if (Number(transferencia) > 0) methods.push('Transferencia');
+
+    if (methods.length === 1) {
+        if (methods[0] === 'Efectivo') return { label: 'Efectivo', icon: <FaMoneyBillWave style={{ color: '#28a745' }} /> };
+        if (methods[0] === 'Tarjeta') return { label: 'Tarjeta', icon: <FaRegCreditCard style={{ color: '#007bff' }} /> };
+        if (methods[0] === 'Transferencia') return { label: 'Transferencia', icon: <FaExchangeAlt style={{ color: '#007bff' }} /> };
+    } else if (methods.length > 1) {
+        return { label: 'Mixto', icon: <FaMoneyBillWave style={{ color: '#ffc107' }} /> };
+    }
+    return { label: 'Desconocido', icon: null };
+};
+
 
 // ======================= VISTA DE ABONO CON LA FÓRMULA CORRECTA =======================
 const AbonoDetailView = ({ sale, client, user, onReprintTicket }) => {
@@ -63,14 +84,18 @@ const SaleListItem = React.memo(({ sale, isSelected, onSelect, safeUsers, safeCl
     const userName = useMemo(() => safeUsers.find(u => (u.id_usuario ?? u.id) == sale.userId)?.nombre_usuario ?? 'N/A', [safeUsers, sale.userId]);
     const clientName = useMemo(() => safeClients.find(c => c.id_cliente === (sale.clientId || sale.idCliente))?.nombre || '', [safeClients, sale.clientId, sale.idCliente]);
     const isAbono = sale.estado === 'ABONO_CREDITO';
+    
+    // 🚨 CLAVE: Determinar el tipo de pago para mostrar en la lista 🚨
+    const paymentInfo = useMemo(() => getPaymentTypeLabel(sale.pagoDetalles), [sale.pagoDetalles]);
+    const displayInfo = isAbono ? `Cliente: ${clientName}` : `Vendedor: ${userName} | Pago: ${paymentInfo.label}`;
 
     return (
         <SaleListItemContainer onClick={() => onSelect(sale)} isSelected={isSelected} borderColor={statusColors[sale.estado] || '#6c757d'}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
                 <span>{isAbono ? <FaHandHoldingUsd style={{ marginRight: '8px' }}/> : `#${sale.id} - `}{isAbono ? 'ABONO A CRÉDITO' : sale.estado.replace('_', ' ')}</span>
-                <span>C${Math.abs(Number(sale.totalVenta || 0)).toFixed(2)}</span>
+                <span>{paymentInfo.icon} C${Math.abs(Number(sale.totalVenta || 0)).toFixed(2)}</span>
             </div>
-            <small style={{ display: 'block', color: '#6c757d', marginTop: '4px' }}>{new Date(sale.fecha).toLocaleDateString('es-NI')} - {isAbono ? `Cliente: ${clientName}` : `Vendedor: ${userName}`}</small>
+            <small style={{ display: 'block', color: '#6c757d', marginTop: '4px' }}>{new Date(sale.fecha).toLocaleDateString('es-NI')} - {displayInfo}</small>
         </SaleListItemContainer>
     );
 });
@@ -163,7 +188,7 @@ const SalesHistoryModal = ({ dailySales = [], onCancelSale, onReturnItem, onClos
                             <SaleDetailView
                                 sale={selectedSale}
                                 client={clientForDetails}
-                                creditStatus={clientForDetails ? { currentBalance: Number(clientForDetails.saldo_pendiente) } : null} // Usamos el saldo de la BD
+                                creditStatus={null} // Ya no usamos el cálculo viejo
                                 dailySales={dailySales}
                                 isAdmin={isAdmin}
                                 onOpenAbonoModal={() => setShowAbonoModal(true)}

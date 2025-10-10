@@ -1,16 +1,12 @@
-// ==========================================================
-// ARCHIVO: server/server.js
-// VERSIÓN FINAL CON CORRECCIÓN DE CORS PARA NETLIFY Y FLY.IO
-// ==========================================================
-
+// 1. Importar las librerías
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
-// Asegúrate de que tu archivo db.js usa las variables de entorno para Supabase.
-const db = require('./src/config/db.js'); 
+// Importamos la conexión a la BD
+const db = require('./src/config/db.js');
 
-// Rutas (Mantenemos la misma estructura de rutas)
+// Importamos nuestras rutas
 const authRoutes = require('./src/routes/authRoutes.js');
 const userRoutes = require('./src/routes/userRoutes.js');
 const productRoutes = require('./src/routes/productRoutes.js');
@@ -20,58 +16,46 @@ const clientRoutes = require('./src/routes/clientRoutes.js');
 const orderRoutes = require('./src/routes/orderRoutes.js');
 const financeRoutes = require('./src/routes/financeRoutes.js');
 const salesRoutes = require('./src/routes/salesRoutes.js');
-const reportRoutes = require('./src/routes/reportRoutes.js');
-const inventoryUploadRoutes = require('./src/routes/inventoryUploadRoute.js');
+const reportRoutes = require('./src/routes/reportRoutes.js'); 
+const uploadRoutes = require('./src/routes/uploadRouter.js'); // 🟢 CORREGIDO: 'uploadRoutes.js' cambiado a 'uploadRouter.js'
 
+
+// 2. Crear una instancia de Express
 const app = express();
 
-// --- Configuración CORS ---
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'https://rg11.netlify.app',
-  // DOMINIO FINAL DE FLY.IO (rg1)
-  'https://rg1.fly.dev', 
-  // DOMINIO DE PREVIEW TEMPORAL DE NETLIFY (CAUSANTE DEL ERROR CORS)
-  'https://680e80d0d04952de70f0de8015a72--rg1.netlify.app'
-];
+// 3. Configurar Middlewares
+app.use(cors());
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      // Opcional: Para ver qué dominio está siendo bloqueado en la terminal.
-      console.error(`CORS Blocked: ${origin}`); 
-      callback(new Error('No permitido por CORS'));
-    }
-  }
-}));
-app.use(express.json());
+// ⭐️ MODIFICACIÓN CLAVE PARA CORREGIR EL ERROR 413: PAYLOAD TOO LARGE ⭐️
+// Aumentamos el límite de la carga útil (payload) de JSON de 1MB (por defecto) a 50MB
+app.use(express.json({ limit: '50mb' }));
 
-// --- Montar Rutas ---
-const router = express.Router();
-router.use('/auth', authRoutes);
-router.use('/users', userRoutes);
-router.use('/products', productRoutes);
-router.use('/categories', categoryRoutes);
-router.use('/providers', providerRoutes);
-router.use('/clients', clientRoutes);
-router.use('/orders', orderRoutes);
-router.use('/finances', financeRoutes);
-router.use('/sales', salesRoutes);
-router.use('/reports', reportRoutes);
-router.use('/inventory', inventoryUploadRoutes);
+// Para manejar datos de formularios (si los usas)
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-app.use('/api', router);
+
+// 4. Definir el puerto
+const PORT = process.env.PORT || 3001;
+
+// 5. Usar las rutas
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/providers', providerRoutes);
+app.use('/api/clients', clientRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/finances', financeRoutes);
+app.use('/api/sales', salesRoutes); 
+app.use('/api/reports', reportRoutes);
+app.use('/api/upload', uploadRoutes); // 🟢 Ahora usa la ruta importada correctamente
 
 // Ruta de prueba
 app.get('/', (req, res) => {
-  res.send('Servidor de MultirepuestosRG funcionando en Fly.io! 🚀');
+  res.send('¡API de MultirepuestosRG funcionando! 🚀');
 });
 
-// --- Iniciar el servidor ---
-const PORT = process.env.PORT || 8080;
+// 6. Poner el servidor a escuchar
 app.listen(PORT, () => {
-  console.log(`Servidor escuchando en el puerto ${PORT}`);
+  console.log(`Servidor corriendo en el puerto ${PORT}`);
 });

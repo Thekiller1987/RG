@@ -1,20 +1,32 @@
-// ==========================================================
-// ARCHIVO: server/src/routes/reportRoutes.js
-// VERSIÓN FINAL Y CORREGIDA
-// ==========================================================
+// src/routes/reportRoutes.js
 
 const express = require('express');
 const router = express.Router();
-const reportController = require('../controllers/reportController');
-const authMiddleware = require('../middleware/authMiddleware');
 
-// Proteger todas las rutas de reportes
-router.use(authMiddleware);
+const { verifyToken } = require('../middleware/authMiddleware');
+const {
+    getSalesSummaryReport,
+    getInventoryValueReport,
+    getSalesByUserReport,
+    getTopProductsReport,
+    getSalesChartReport
+} = require('../controllers/reportController');
 
-router.get('/sales-summary', reportController.getSalesSummaryReport);
-router.get('/inventory-value', reportController.getInventoryValueReport);
-router.get('/sales-by-user', reportController.getSalesByUserReport);
-router.get('/top-products', reportController.getTopProductsReport);
-router.get('/sales-chart', reportController.getSalesChartReport);
+// --- RUTAS PARA REPORTES ---
+
+// GET /api/reports/sales-summary?startDate=...&endDate=...
+router.get('/sales-summary', verifyToken, getSalesSummaryReport);
+
+// GET /api/reports/inventory-value
+router.get('/inventory-value', verifyToken, getInventoryValueReport);
+
+// GET /api/reports/sales-by-user?startDate=...&endDate=...
+router.get('/sales-by-user', verifyToken, getSalesByUserReport);
+
+// GET /api/reports/top-products?startDate=...&endDate=...
+router.get('/top-products', verifyToken, getTopProductsReport);
+
+// GET /api/reports/sales-chart?startDate=...&endDate=...
+router.get('/sales-chart', verifyToken, getSalesChartReport);
 
 module.exports = router;

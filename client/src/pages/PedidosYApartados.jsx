@@ -1,3 +1,6 @@
+// client/src/pages/PedidosYApartados.jsx
+// VERSIÓN FINAL CON CORRECCIONES DE FILTRO (MAYÚSCULAS) Y BUCLE INFINITO
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
@@ -11,7 +14,7 @@ import ConfirmationModal from './pos/components/ConfirmationModal';
 import AlertModal from './pos/components/AlertModal';
 import { loadCajaSession } from '../utils/caja';
 
-// --- ESTILOS ---
+// --- ESTILOS (se mantienen igual que en la versión de diseño mejorado) ---
 const PageWrapper = styled.div`
     padding: 2rem 4rem;
     background-color: #f8f9fa;
@@ -116,6 +119,7 @@ const PedidosYApartados = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [modal, setModal] = useState({ name: null, props: {} });
     
+    // CORRECCIÓN BUCLE: Envolvemos estas funciones en useCallback para estabilizarlas
     const openModal = useCallback((name, props = {}) => setModal({ name, props }), []);
     const closeModal = useCallback(() => setModal({ name: null, props: {} }), []);
     const showAlert = useCallback((props) => openModal('alert', props), [openModal]);
@@ -138,7 +142,7 @@ const PedidosYApartados = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [token, showAlert]);
+    }, [token, showAlert]); // Añadimos showAlert como dependencia estable
 
     useEffect(() => {
         fetchPedidos();
@@ -147,15 +151,17 @@ const PedidosYApartados = () => {
     const pedidosFiltrados = useMemo(() => {
         let filtered = Array.isArray(pedidos) ? pedidos : [];
         if (filtroEstado === 'Activos') {
+            // CORRECCIÓN MAYÚSCULAS: Comparamos con los estados en mayúsculas de la BD
             filtered = filtered.filter(p => p.estado === 'APARTADO' || p.estado === 'PENDIENTE');
         } else if (filtroEstado !== 'Todos') {
+            // CORRECCIÓN MAYÚSCULAS
             filtered = filtered.filter(p => p.estado === filtroEstado.toUpperCase());
         }
 
         if (searchTerm) {
             const lowerSearch = searchTerm.toLowerCase();
             filtered = filtered.filter(p => 
-                (p.clientenombre && p.clientenombre.toLowerCase().includes(lowerSearch)) || 
+                (p.clienteNombre && p.clienteNombre.toLowerCase().includes(lowerSearch)) || 
                 String(p.id).includes(lowerSearch)
             );
         }
@@ -200,10 +206,10 @@ const PedidosYApartados = () => {
                         <Select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
                             <option value="Activos">Activos (Apartados y Pendientes)</option>
                             <option value="Todos">Todos</option>
-                            <option value="APARTADO">Apartados</option>
-                            <option value="PENDIENTE">Pendientes</option>
-                            <option value="COMPLETADO">Completados</option>
-                            <option value="CANCELADO">Cancelados</option>
+                            <option value="Apartado">Apartados</option>
+                            <option value="Pendiente">Pendientes</option>
+                            <option value="Completado">Completados</option>
+                            <option value="Cancelado">Cancelados</option>
                         </Select>
                     </div>
                 </FilterPanel>
@@ -219,7 +225,7 @@ const PedidosYApartados = () => {
                                         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
                                             <div>
                                                 <h3 style={{margin: 0, color: '#343a40'}}>Pedido #{pedido.id}</h3>
-                                                <p style={{margin: '0.2rem 0', color: '#6c757d'}}>{pedido.clientenombre || 'Cliente Genérico'}</p>
+                                                <p style={{margin: '0.2rem 0', color: '#6c757d'}}>{pedido.clienteNombre || 'Cliente Genérico'}</p>
                                             </div>
                                             <span style={{backgroundColor: '#e9ecef', padding: '0.25rem 0.5rem', borderRadius: '5px', fontSize: '0.8rem', fontWeight: 'bold'}}>{pedido.estado}</span>
                                         </div>

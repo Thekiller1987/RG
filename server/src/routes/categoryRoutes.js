@@ -1,26 +1,20 @@
-// ==========================================================
-// ARCHIVO: server/src/routes/categoryRoutes.js
-// VERSIÓN FINAL Y CORREGIDA
-// ==========================================================
+// server/src/routes/categoryRoutes.js (CORREGIDO)
 
 const express = require('express');
 const router = express.Router();
-const categoryController = require('../controllers/categoryController');
-const authMiddleware = require('../middleware/authMiddleware');
 
-// @route   GET /api/categories
-// @desc    Obtener todas las categorías
-// @access  Private
-router.get('/', authMiddleware, categoryController.getAllCategories);
+// Importamos TODAS las funciones que necesitamos del controlador
+const { getAllCategories, createCategory, deleteCategory } = require('../controllers/categoryController.js');
 
-// @route   POST /api/categories
-// @desc    Crear una nueva categoría
-// @access  Private (Asegúrate de que solo los admins puedan hacer esto si es necesario)
-router.post('/', authMiddleware, categoryController.createCategory);
+// *** CORRECCIÓN CRÍTICA: Cambiar 'protect' por 'verifyToken' al importar ***
+// Asegúrate de que esta desestructuración coincida con lo que exporta tu authMiddleware.js
+const { verifyToken, isAdmin } = require('../middleware/authMiddleware.js');
 
-// @route   DELETE /api/categories/:id
-// @desc    Eliminar una categoría
-// @access  Private
-router.delete('/:id', authMiddleware, categoryController.deleteCategory);
+router.route('/')
+  .get(verifyToken, getAllCategories) // Usamos verifyToken en lugar de protect
+  .post(verifyToken, isAdmin, createCategory);
+
+router.route('/:id')
+  .delete(verifyToken, isAdmin, deleteCategory); // Usamos verifyToken
 
 module.exports = router;

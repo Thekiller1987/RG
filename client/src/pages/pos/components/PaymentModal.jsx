@@ -199,8 +199,8 @@ const PaymentModal = ({ total = 0, tasaDolar = 1, onClose, onFinishSale, cliente
       return;
     }
 
-    // Ingreso real en caja: suma de ingresos - cambio (no puede ser negativo)
-    const ingresoRealEnCaja = Math.max(0, numEfectivo + numTarjeta + numTransferencia + totalDolaresEnMonedaLocal - cambio);
+    // 🚨 CORRECCIÓN CLAVE: El ingreso real en caja solo debe contar EFECTIVO y DÓLARES convertidos, menos el CAMBIO. 🚨
+    const ingresoRealEnCaja = Math.max(0, numEfectivo + totalDolaresEnMonedaLocal - cambio);
 
     // Preparo el objeto que tu POS espera
     const pagoDetalles = {
@@ -215,7 +215,8 @@ const PaymentModal = ({ total = 0, tasaDolar = 1, onClose, onFinishSale, cliente
       clienteId: finalClienteId, // idéntico a lo que espera tu POS
       tipoVenta: tipoVentaFinal,
       cambio: cambio,
-      ingresoCaja: ingresoRealEnCaja,
+      // 🚨 CLAVE: Solo el efectivo debe ir a ingresoCaja
+      ingresoCaja: ingresoRealEnCaja, 
     };
 
     // Llamo al callback del POS
@@ -280,7 +281,7 @@ const PaymentModal = ({ total = 0, tasaDolar = 1, onClose, onFinishSale, cliente
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 15px', marginTop: 8 }}>
                 {/* EFECTIVO */}
-                  <div>
+                <div>
                   <label style={{ display: 'block', fontWeight: '700', fontSize: '0.85rem', marginBottom: 4 }}><FaMoneyBillWave /> Efectivo</label>
                   <SearchInput type="number" step="0.01" value={efectivo} onChange={e => setEfectivo(e.target.value)} style={{ height: 34, fontSize: '0.95rem' }} disabled={disableInputs} />
                 </div>

@@ -1,8 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
-// Importamos FaFileImport para el nuevo módulo y FaTools para el ícono de Opciones
-import { FaSignOutAlt, FaFileImport, FaTools } from 'react-icons/fa'; 
+import { FaSignOutAlt } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const PageWrapper = styled.div`
@@ -92,6 +91,7 @@ const Dashboard = () => {
     const userRole = user.rol || 'N/A';
     const isAdmin = userRole === 'Administrador';
     
+    // CORRECCIÓN: Se hace más flexible la obtención del nombre de usuario
     const displayName = user.nombre_usuario || user.nombre || user.name || 'Usuario'; 
 
     return (
@@ -113,10 +113,20 @@ const Dashboard = () => {
                     <Card to="/orders" color="#ffc107"> <CardIcon color="#ffc107">📝</CardIcon> <h2>Pedidos y Apartados</h2> <p>Administra pedidos y seguimientos.</p> </Card>
                     <Card to="/credits" color="#17a2b8"> <CardIcon color="#17a2b8">💳</CardIcon> <h2>Clientes y Créditos</h2> <p>Gestiona clientes, saldos y abonos.</p> </Card>
                     
-                    {/* CAMBIO: De Importación Masiva a Opciones/Herramientas, manteniendo la misma ruta */}
-                    {isAdmin && <Card to="/finances" color="#dc3545"> <CardIcon color="#dc3545"><FaTools /></CardIcon> <h2>Opciones y Herramientas</h2> <p>Carga masiva, ajustes y utilidades.</p> </Card>}
-                    
+                    {/* 🌟 Módulo de Carga Masiva (Solo visible para Admin/Inventario) */}
+                    {(isAdmin || userRole === 'Encargado de Inventario') && (
+                        <Card to="/upload/inventory" color="#6f42c1"> 
+                            <CardIcon color="#6f42c1">💾</CardIcon> 
+                            <h2>Carga Masiva</h2> 
+                            <p>Actualiza inventario desde archivos CSV.</p> 
+                        </Card>
+                    )}
+
                     <Card to="/reports" color="#6c757d"> <CardIcon color="#6c757d">📊</CardIcon> <h2>Reportes</h2> <p>Visualiza el rendimiento de ventas.</p> </Card>
+                    
+                    {/* ❌ ELIMINADO: Se quitó el botón de Finanzas (I/E) */}
+                    {/* <Card to="/finances" color="#dc3545"> <CardIcon color="#dc3545">💸</CardIcon> <h2>Finanzas (I/E)</h2> <p>Controla ingresos y egresos del negocio.</p> </Card> */}
+                    
                     {isAdmin && <Card to="/admin/users" color="#6f42c1"> <CardIcon color="#6f42c1">👥</CardIcon> <h2>Usuarios</h2> <p>Administra roles y accesos.</p> </Card>}
                 </GridContainer>
             </Content>

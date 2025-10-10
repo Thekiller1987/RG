@@ -1,19 +1,16 @@
-// ==========================================================
-// ARCHIVO: server/src/routes/salesRoutes.js
-// VERSIÓN FINAL Y CORREGIDA
-// ==========================================================
-
 const express = require('express');
 const router = express.Router();
-const salesController = require('../controllers/salesController');
-const authMiddleware = require('../middleware/authMiddleware');
+const { createSale, getSales, createReturn, cancelSale } = require('../controllers/salesController');
+const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
 
-// Proteger todas las rutas de ventas
-router.use(authMiddleware);
+router.use(verifyToken);
 
-router.get('/', salesController.getSales);
-router.post('/', salesController.createSale);
-router.post('/returns', salesController.createReturn); // Ruta para devoluciones
-router.delete('/:id', salesController.cancelSale);
+router.route('/')
+    .post(createSale)
+    .get(getSales);
+
+router.post('/returns', createReturn);
+
+router.delete('/:id', isAdmin, cancelSale);
 
 module.exports = router;

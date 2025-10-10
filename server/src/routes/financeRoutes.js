@@ -1,25 +1,29 @@
-// ==========================================================
-// ARCHIVO: server/src/routes/financeRoutes.js
-// VERSIÓN FINAL Y CORREGIDA
-// ==========================================================
+// server/src/routes/financeRoutes.js (FINAL Y BUENO)
 
 const express = require('express');
 const router = express.Router();
-const financeController = require('../controllers/financeController');
-const authMiddleware = require('../middleware/authMiddleware');
 
-// Proteger todas las rutas de finanzas
-router.use(authMiddleware);
+// DESESTRUCTURACIÓN COMPLETA del controlador de finanzas
+const { 
+    getAllIngresos, 
+    createIngreso,
+    getAllEgresos,
+    createEgreso,
+    getFinancialSummary
+} = require('../controllers/financeController');
 
-// Rutas para Ingresos
-router.get('/ingresos', financeController.getAllIngresos);
-router.post('/ingresos', financeController.createIngreso);
+// DESESTRUCTURACIÓN COMPLETA del middleware
+const { verifyToken, isAdmin } = require('../middleware/authMiddleware'); 
 
-// Rutas para Egresos
-router.get('/egresos', financeController.getAllEgresos);
-router.post('/egresos', financeController.createEgreso);
+// Rutas para Ingresos (CRUD)
+router.get('/ingresos', verifyToken, getAllIngresos);
+router.post('/ingresos', verifyToken, isAdmin, createIngreso);
 
-// Ruta para el Resumen Financiero
-router.get('/summary', financeController.getFinancialSummary);
+// Rutas para Egresos (CRUD)
+router.get('/egresos', verifyToken, getAllEgresos);
+router.post('/egresos', verifyToken, isAdmin, createEgreso);
+
+// Ruta de resumen financiero
+router.get('/summary', verifyToken, getFinancialSummary);
 
 module.exports = router;

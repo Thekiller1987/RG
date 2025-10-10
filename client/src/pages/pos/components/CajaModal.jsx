@@ -19,24 +19,32 @@ const CajaModal = ({
     const summary = useMemo(() => {
         const cajaInicial = Number(session?.initialAmount || 0);
         
-        // CORRECCIÓN CLAVE: El movimiento neto SÓLO suma el efectivo (ingresoCaja), excluyendo explícitamente las ventas a crédito
+        // 🚨 CORRECCIÓN CLAVE: Calcular el efectivo que realmente ingresó a la caja (cash) 🚨
         const movimientoNetoEfectivo = transactions.reduce((total, tx) => {
-            // Ignorar ventas a crédito completamente del arqueo de efectivo
+            // Las ventas a crédito y los abonos no afectan la caja chica (se manejan en Saldos)
             if (tx.type === 'venta_credito') {
                  return total;
             }
-            // Para contado/mixtas/manuales, usa el ingresoCaja
+            
+            // Para ventas de contado/mixtas y transacciones manuales:
+            // El valor 'ingresoCaja' DEBE contener solo el efectivo (efectivo - cambio + entradas/salidas manuales).
+            // El pagoDetalles.ingresoCaja ya debe excluir tarjeta/transferencia en el POS.
+            // Usaremos tx.pagoDetalles?.efectivo para las ventas y tx.pagoDetalles?.ingresoCaja para las manuales/cancelaciones
+            
+            // Usamos la propiedad 'ingresoCaja' para las transacciones que ya están sumando/restando el neto de efectivo
             return total + Number(tx.pagoDetalles?.ingresoCaja || 0);
+
         }, 0);
 
         const efectivoEsperado = cajaInicial + movimientoNetoEfectivo;
 
-        // Resumen de todos los pagos (para el informe)
+        // Resumen de pagos (para el informe, aquí SÍ incluimos todo)
         const ventas = transactions.filter(tx => tx.type && tx.type.startsWith('venta')); 
         
         const totalTarjeta = ventas.reduce((total, tx) => total + Number(tx.pagoDetalles?.tarjeta || 0), 0);
         const totalTransferencia = ventas.reduce((total, tx) => total + Number(tx.pagoDetalles?.transferencia || 0), 0);
         const totalCredito = ventas.reduce((total, tx) => total + Number(tx.pagoDetalles?.credito || 0), 0);
+        // El total no efectivo es la suma de Tarjeta, Transferencia y Crédito
         const totalNoEfectivo = totalTarjeta + totalTransferencia + totalCredito;
 
 
@@ -175,7 +183,7 @@ const CajaModal = ({
                             <select value={newTxType} onChange={e => setNewTxType(e.target.value)} style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', flexShrink: 0 }}>
                                 <option value="entrada">Entrada</option><option value="salida">Salida</option>
                             </select>
-                            <SearchInput type="number" placeholder="Monto" value={newTxAmount} onChange={e => setNewTxAmount(e.target.value)} style={{flex: 1}}/>
+                            <SearchInput type="number" step="0.01" placeholder="Monto" value={newTxAmount} onChange={e => setNewTxAmount(e.target.value)} style={{flex: 1}}/>
                             <SearchInput placeholder="Nota (opcional)" value={newTxNote} onChange={e => setNewTxNote(e.target.value)} style={{flex: 2}}/>
                             <Button onClick={handleAddTx} style={{ flexShrink: 0, backgroundColor: '#007bff', color: 'white' }}>Agregar</Button>
                         </div>

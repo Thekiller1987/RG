@@ -1,31 +1,20 @@
-// ==========================================================
-// ARCHIVO: server/src/routes/userRoutes.js
-// VERSIÓN FINAL Y CORREGIDA
-// ==========================================================
-
 const express = require('express');
 const router = express.Router();
-const userController = require('../controllers/userController');
-const authMiddleware = require('../middleware/authMiddleware');
 
-// @route   GET /api/users
-// @desc    Obtener todos los usuarios
-// @access  Private (protegido por middleware)
-router.get('/', authMiddleware, userController.getAllUsers);
+// Importamos TODAS las funciones que necesitamos del controlador
+const { getAllUsers, updateUser, deleteUser } = require('../controllers/userController.js');
 
-// @route   POST /api/users
-// @desc    Crear un nuevo usuario
-// @access  Private
-router.post('/', authMiddleware, userController.createUser);
+// *** CORRECCIÓN CRÍTICA AQUÍ ***
+// Renombramos 'protect' por 'verifyToken' al importar, ya que así se llama en el middleware.
+const { verifyToken, isAdmin } = require('../middleware/authMiddleware.js'); 
 
-// @route   PUT /api/users/:id
-// @desc    Actualizar un usuario
-// @access  Private
-router.put('/:id', authMiddleware, userController.updateUser);
+// Ruta para obtener todos los usuarios (GET) y crear uno nuevo (POST, aunque lo hacemos desde authRoutes)
+router.route('/')
+  .get(verifyToken, isAdmin, getAllUsers); // Usamos verifyToken
 
-// @route   DELETE /api/users/:id
-// @desc    Eliminar un usuario
-// @access  Private
-router.delete('/:id', authMiddleware, userController.deleteUser);
+// Rutas para un usuario específico por su ID
+router.route('/:id')
+  .put(verifyToken, isAdmin, updateUser)      // Usamos verifyToken
+  .delete(verifyToken, isAdmin, deleteUser);  // Usamos verifyToken
 
 module.exports = router;

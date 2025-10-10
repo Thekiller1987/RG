@@ -1,22 +1,36 @@
-// ==========================================================
-// ARCHIVO: server/src/routes/clientRoutes.js
-// VERSIÓN FINAL Y CORREGIDA
-// ==========================================================
-
 const express = require('express');
 const router = express.Router();
-const clientController = require('../controllers/clientController');
-const authMiddleware = require('../middleware/authMiddleware');
 
-// Proteger todas las rutas de clientes con el middleware
-router.use(authMiddleware);
+// ===================================================================
+// =================== CORRECCIÓN PRINCIPAL AQUÍ =====================
+// ===================================================================
+const { 
+    getAllClients, 
+    createClient, 
+    updateClient, 
+    deleteClient, 
+    addCreditPayment,
+    getCreditosByClient, // <-- AÑADE ESTA LÍNEA
+    getAbonosByClient    // <-- AÑADE ESTA LÍNEA
+} = require('../controllers/clientController');
+// ===================================================================
 
-router.get('/', clientController.getAllClients);
-router.post('/', clientController.createClient);
-router.put('/:id', clientController.updateClient);
-router.delete('/:id', clientController.deleteClient);
-router.post('/:id/abono', clientController.addCreditPayment);
-router.get('/:id/creditos', clientController.getCreditosByClient);
-router.get('/:id/abonos', clientController.getAbonosByClient);
+const { verifyToken } = require('../middleware/authMiddleware');
+
+router.use(verifyToken);
+
+router.route('/')
+    .get(getAllClients)
+    .post(createClient);
+
+router.route('/:id')
+    .put(updateClient)
+    .delete(deleteClient);
+
+router.post('/:id/abono', addCreditPayment);
+
+// Estas rutas ya no darán error porque las funciones fueron importadas arriba
+router.get('/:id/creditos', getCreditosByClient);
+router.get('/:id/abonos', getAbonosByClient);
 
 module.exports = router;

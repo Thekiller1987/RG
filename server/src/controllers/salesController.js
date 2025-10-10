@@ -1,144 +1,161 @@
-// ==========================================================
-// ARCHIVO: server/src/controllers/salesController.js
-// VERSIÓN FINAL Y CORREGIDA
-// ==========================================================
+const pool = require('../config/db');
 
-const db = require('../config/db'); // CORRECCIÓN: Se importa 'db'
-
-// Crear una Venta
-exports.createSale = async (req, res) => {
-    const { totalVenta, items, pagoDetalles, userId, clientId } = req.body;
-    const client = await db.getClient();
+// **************************************************
+// FUNCIÓN createSale (AÑADE CRÉDITO A SALDO_PENDIENTE)
+// **************************************************
+const createSale = async (req, res) => {
+    const connection = await pool.getConnection();
     
+    // Desestructurar datos de la venta para logs
+    const { totalVenta, items, pagoDetalles, userId, clientId } = req.body;
+    console.log(`LOG: Iniciando transacción para nueva venta. Cliente ID: ${clientId}, Total: ${totalVenta}`);
+    console.log(`LOG: Pago Detalles recibidos:`, pagoDetalles); // Log detallado de pagos
+
     try {
-        await client.query('BEGIN');
+        await connection.beginTransaction();
         
         if (!totalVenta && totalVenta !== 0 || !items || items.length === 0 || !pagoDetalles || !userId) {
-            throw new Error('Faltan datos o no hay productos en la venta.');
+            console.error("ERROR: Faltan datos o no hay productos.");
+            return res.status(400).json({ message: 'Faltan datos o no hay productos en la venta.' });
         }
         
         const montoCredito = pagoDetalles.credito || 0; 
         
-        // 1. Insertar la venta principal
-        const saleData = [
-            totalVenta,
-            req.body.subtotal || totalVenta,
-            req.body.descuento || 0,
-            'COMPLETADA',
-            userId,
-            clientId,
-            JSON.stringify({ ...pagoDetalles, tasaDolarAlMomento: req.body.tasaDolarAlMomento }),
-            montoCredito > 0 ? 'CREDITO' : 'CONTADO',
-            req.body.referencia_pedido 
-        ];
+        const saleData = {
+            fecha: new Date(),
+            total_venta: totalVenta,
+            subtotal: req.body.subtotal || totalVenta,
+            descuento: req.body.descuento || 0,
+            estado: 'COMPLETADA',
+            id_usuario: userId,
+            id_cliente: clientId,
+            pago_detalles: JSON.stringify({ ...pagoDetalles, tasaDolarAlMomento: req.body.tasaDolarAlMomento }),
+            tipo_venta: montoCredito > 0 ? 'CREDITO' : 'CONTADO',
+            referencia_pedido: req.body.referencia_pedido 
+        };
 
-        const saleQuery = `
-            INSERT INTO ventas (fecha, total_venta, subtotal, descuento, estado, id_usuario, id_cliente, pago_detalles, tipo_venta, referencia_pedido) 
-            VALUES (NOW(), $1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING id_venta;
-        `;
-        const saleResult = await client.query(saleQuery, saleData);
-        const saleId = saleResult.rows[0].id_venta;
+        // 1. Insertar la venta principal
+        const [saleResult] = await connection.query('INSERT INTO ventas SET ?', saleData);
+        const saleId = saleResult.insertId;
+        console.log(`LOG: Venta insertada con ID: ${saleId}`);
         
-        // 2. Sumar crédito si aplica
+        // 2. LÓGICA DE NEGOCIO: Sumar crédito
         if (montoCredito > 0 && clientId) {
-            await client.query(
-                'UPDATE clientes SET saldo_pendiente = saldo_pendiente + $1 WHERE id_cliente = $2', 
+            await connection.query(
+                'UPDATE clientes SET saldo_pendiente = saldo_pendiente + ? WHERE id_cliente = ?', 
                 [montoCredito, clientId]
             );
+            console.log(`LOG: Crédito de C$${montoCredito.toFixed(2)} sumado al cliente ID: ${clientId}`);
+        } else {
+             console.log(`LOG: No se sumó crédito. Monto: ${montoCredito}, Cliente ID: ${clientId}`);
         }
         
-        // 3. Descontar Stock y registrar detalles
+        // 3. Descontar Stock y registrar detalle de venta
         for (const item of items) {
-            const itemId = item.id || item.id_producto;
-            
-            await client.query(
-                'INSERT INTO detalle_ventas (id_venta, id_producto, cantidad, precio_unitario) VALUES ($1, $2, $3, $4)',
-                [saleId, itemId, item.quantity, item.precio]
+            await connection.query(
+                'INSERT INTO detalle_ventas (id_venta, id_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?)',
+                [saleId, item.id || item.id_producto, item.quantity, item.precio]
             );
             
-            const productResult = await client.query('SELECT existencia, nombre FROM productos WHERE id_producto = $1 FOR UPDATE', [itemId]);
-            if (productResult.rows.length === 0 || productResult.rows[0].existencia < item.quantity) {
-                throw new Error(`Stock insuficiente para el producto: ${productResult.rows[0]?.nombre || item.nombre}`);
+            const [product] = await connection.query('SELECT existencia, nombre FROM productos WHERE id_producto = ? FOR UPDATE', [item.id || item.id_producto]);
+            
+            if (product.length === 0 || product[0].existencia < item.quantity) {
+                throw new Error(`Stock insuficiente para el producto: ${product[0]?.nombre || item.nombre}`);
             }
             
-            await client.query('UPDATE productos SET existencia = existencia - $1 WHERE id_producto = $2', [item.quantity, itemId]);
+            await connection.query('UPDATE productos SET existencia = existencia - ? WHERE id_producto = ?', [item.quantity, item.id || item.id_producto]);
+            console.log(`LOG: Stock actualizado para producto ID ${item.id || item.id_producto}. Cantidad: -${item.quantity}`);
         }
 
-        await client.query('COMMIT');
+        await connection.commit();
+        console.log(`LOG: Transacción Venta #${saleId} completada exitosamente.`);
         
-        const newSaleResult = await client.query('SELECT * FROM ventas WHERE id_venta = $1', [saleId]);
+        // Consultar la venta final (opcional, para asegurar que los datos estén frescos)
+        const [newSale] = await connection.query('SELECT * FROM ventas WHERE id_venta = ?', [saleId]);
         
         res.status(201).json({ 
             message: 'Venta creada exitosamente', 
             saleId,
-            saleData: { ...newSaleResult.rows[0], items, pagoDetalles } 
+            saleData: { ...newSale[0], items, pagoDetalles } 
         });
 
     } catch (error) {
-        await client.query('ROLLBACK');
+        await connection.rollback();
         console.error('ERROR CRÍTICO en transacción de venta:', error);
         res.status(500).json({ message: error.message || 'Error en el servidor al crear la venta' });
     } finally {
-        client.release();
+        if (connection) connection.release();
     }
 };
 
-// Cancelar una Venta
-exports.cancelSale = async (req, res) => {
+// **************************************************
+// FUNCIÓN cancelSale (RESTA CRÉDITO Y REVIERTE STOCK)
+// **************************************************
+const cancelSale = async (req, res) => {
     const { id } = req.params;
-    const client = await db.getClient();
+    const connection = await pool.getConnection();
+    console.log(`LOG: Iniciando cancelación de Venta #${id}`);
     
     try {
-        await client.query('BEGIN');
+        await connection.beginTransaction();
         
-        const saleResult = await client.query("SELECT id_cliente, estado, pago_detalles FROM ventas WHERE id_venta = $1 FOR UPDATE", [id]);
-        if (saleResult.rows.length === 0) throw new Error('La venta no existe.');
-        if (saleResult.rows[0].estado === 'CANCELADA') throw new Error('Esta venta ya fue cancelada.'); 
+        // 1. OBTENER VENTA
+        const [sale] = await connection.query('SELECT id_cliente, estado, pago_detalles FROM ventas WHERE id_venta = ? FOR UPDATE', [id]);
         
-        const saleData = saleResult.rows[0];
+        if (sale.length === 0) throw new Error('La venta no existe.');
+        if (sale[0].estado === 'CANCELADA') throw new Error('Esta venta ya fue cancelada.');
+        
+        const saleData = sale[0];
         const clientId = saleData.id_cliente;
+
         let detalles = {};
         try {
-            detalles = typeof saleData.pago_detalles === 'string' ? JSON.parse(saleData.pago_detalles) : saleData.pago_detalles || {};
+            detalles = typeof saleData.pago_detalles === 'string' ? JSON.parse(saleData.pago_detalles) : saleData.pago_detalles;
         } catch (e) {
-            console.warn(`Advertencia: No se pudo parsear pago_detalles para Venta #${id}.`);
+            console.warn(`Advertencia: No se pudo parsear pago_detalles para Venta #${id}. Asumiendo 0 crédito.`, e);
         }
         
         const montoCredito = detalles.credito || 0;
         
-        const itemsResult = await client.query('SELECT id_producto, cantidad FROM detalle_ventas WHERE id_venta = $1', [id]);
-        
-        for (const item of itemsResult.rows) {
-            await client.query('UPDATE productos SET existencia = existencia + $1 WHERE id_producto = $2', [item.cantidad, item.id_producto]);
+        // 2. REVERTIR STOCK
+        const [items] = await connection.query('SELECT id_producto, cantidad FROM detalle_ventas WHERE id_venta = ?', [id]);
+        for (const item of items) {
+            await connection.query('UPDATE productos SET existencia = existencia + ? WHERE id_producto = ?', [item.cantidad, item.id_producto]);
+            console.log(`LOG: Stock revertido para producto ID ${item.id_producto}. Cantidad: +${item.cantidad}`);
         }
         
+        // 3. LÓGICA DE NEGOCIO: Reversión del crédito
         if (montoCredito > 0 && clientId) {
-            await client.query(
-                'UPDATE clientes SET saldo_pendiente = GREATEST(0, saldo_pendiente - $1) WHERE id_cliente = $2', 
+            await connection.query(
+                'UPDATE clientes SET saldo_pendiente = GREATEST(0, saldo_pendiente - ?) WHERE id_cliente = ?', 
                 [montoCredito, clientId]
             );
+            console.log(`LOG: Crédito de C$${montoCredito.toFixed(2)} revertido al cliente ID: ${clientId}`);
         }
         
-        await client.query('UPDATE ventas SET estado = $1 WHERE id_venta = $2', ['CANCELADA', id]);
+        // 4. MARCAR VENTA COMO CANCELADA
+        await connection.query('UPDATE ventas SET estado = ? WHERE id_venta = ?', ['CANCELADA', id]);
+        console.log(`LOG: Venta #${id} marcada como CANCELADA.`);
         
-        await client.query('COMMIT');
+        await connection.commit();
         res.status(200).json({ message: 'Venta cancelada exitosamente, stock y crédito revertidos.' });
         
     } catch (error) {
-        await client.query('ROLLBACK');
+        await connection.rollback();
         console.error('ERROR CRÍTICO en la cancelación de venta:', error);
         res.status(500).json({ message: error.message || 'Error en el servidor al cancelar la venta' });
     } finally {
-        client.release();
+        if (connection) connection.release();
     }
 };
 
-// Crear una Devolución
-exports.createReturn = async (req, res) => {
-    const client = await db.getClient();
+// **************************************************
+// FUNCIÓN createReturn (DEVOLUCIÓN PARCIAL)
+// **************************************************
+const createReturn = async (req, res) => {
+    const connection = await pool.getConnection();
     try {
-        await client.query('BEGIN');
+        await connection.beginTransaction();
         const { originalSaleId, item, quantity, userId } = req.body;
         
         if (!originalSaleId || !item || !quantity || !userId) {
@@ -148,80 +165,105 @@ exports.createReturn = async (req, res) => {
         const returnAmount = item.precio * quantity;
         const pagoDetalles = { efectivo: returnAmount, ingresoCaja: returnAmount * -1, devueltoDeVenta: originalSaleId };
         
-        const insertSaleQuery = `
-            INSERT INTO ventas (fecha, total_venta, estado, id_usuario, pago_detalles, tipo_venta) 
-            VALUES (NOW(), $1, $2, $3, $4, 'DEVOLUCION')
-            RETURNING id_venta;
-        `;
-        const insertSaleResult = await client.query(insertSaleQuery, 
+        const [insertSaleResult] = await connection.query(
+            "INSERT INTO ventas (fecha, total_venta, estado, id_usuario, pago_detalles, tipo_venta) VALUES (NOW(), ?, ?, ?, ?, 'DEVOLUCION')",
             [returnAmount * -1, 'DEVOLUCION', userId, JSON.stringify(pagoDetalles)]
         );
-        const returnId = insertSaleResult.rows[0].id_venta;
+        const returnId = insertSaleResult.insertId;
         
-        await client.query(
-            'INSERT INTO detalle_ventas (id_venta, id_producto, cantidad, precio_unitario) VALUES ($1, $2, $3, $4)',
+        await connection.query(
+            'INSERT INTO detalle_ventas (id_venta, id_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?)',
             [returnId, item.id || item.id_producto, quantity, item.precio]
         );
+        await connection.query('UPDATE productos SET existencia = existencia + ? WHERE id_producto = ?', [quantity, item.id || item.id_producto]);
         
-        await client.query('UPDATE productos SET existencia = existencia + $1 WHERE id_producto = $2', [quantity, item.id || item.id_producto]);
-        
-        await client.query('COMMIT');
+        await connection.commit();
         res.status(201).json({ message: 'Devolución procesada exitosamente', returnId });
     } catch (error) {
-        await client.query('ROLLBACK');
+        await connection.rollback();
         console.error('Error en transacción de devolución:', error);
         res.status(500).json({ message: error.message || 'Error en el servidor al procesar la devolución' });
     } finally {
-        client.release();
+        if (connection) connection.release();
     }
 };
 
-// Obtener Ventas del Día
-exports.getSales = async (req, res) => {
+// **************************************************
+// FUNCIÓN getSales (OBTIENE VENTAS DEL DÍA)
+// **************************************************
+const getSales = async (req, res) => {
     try {
-        const salesResult = await db.query(`
-            SELECT 
-                v.id_venta AS id, v.fecha, v.total_venta AS totalVenta, v.subtotal, v.descuento,
-                v.estado, v.pago_detalles AS pagoDetalles, v.id_usuario AS userId, v.id_cliente AS clientId,
-                c.nombre AS clienteNombre, v.tipo_venta, v.referencia_pedido
-            FROM ventas v
-            LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
-            WHERE v.fecha::date = CURRENT_DATE 
-            ORDER BY v.fecha DESC
+        console.log("LOG: Intentando obtener ventas del día.");
+        
+        const [sales] = await pool.query(`
+SELECT 
+    v.id_venta AS id, 
+    v.fecha, 
+    v.total_venta AS totalVenta, 
+    v.subtotal,
+    v.descuento,
+    v.estado, 
+    v.pago_detalles AS pagoDetalles,
+    v.id_usuario AS userId,
+    v.id_cliente AS clientId,
+    c.nombre AS clienteNombre,
+    v.tipo_venta,
+    v.referencia_pedido
+FROM ventas v
+LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
+WHERE DATE(v.fecha) = CURDATE() 
+ORDER BY v.fecha DESC
         `);
 
-        if (salesResult.rows.length === 0) {
+        if (sales.length === 0) {
+            console.log("LOG: No se encontraron ventas para hoy.");
             return res.json([]);
         }
 
-        const saleIds = salesResult.rows.map(s => s.id);
+        const saleIds = sales.map(s => s.id);
         
-        const detailsResult = await db.query(`
-            SELECT 
-                dv.id_venta, p.id_producto AS id, p.nombre,
-                dv.cantidad AS quantity, dv.precio_unitario AS precio
-            FROM detalle_ventas dv
-            JOIN productos p ON dv.id_producto = p.id_producto
-            WHERE dv.id_venta = ANY($1::int[])
+        const [details] = await pool.query(`
+SELECT 
+    dv.id_venta, 
+    p.id_producto AS id,
+    p.nombre,
+    dv.cantidad AS quantity,
+    dv.precio_unitario AS precio
+FROM detalle_ventas dv
+JOIN productos p ON dv.id_producto = p.id_producto
+WHERE dv.id_venta IN (?)
         `, [saleIds]);
         
-        const salesWithDetails = salesResult.rows.map(sale => {
+        console.log(`LOG: Se encontraron ${sales.length} ventas y ${details.length} detalles de venta.`);
+
+        // Combinar los datos de forma segura
+        const salesWithDetails = sales.map(sale => {
             let parsedPagoDetalles = {};
             try {
+                // Intenta parsear si es una cadena JSON
                 parsedPagoDetalles = typeof sale.pagoDetalles === 'string' && sale.pagoDetalles ? JSON.parse(sale.pagoDetalles) : sale.pagoDetalles || {};
             } catch (e) {
-                console.warn(`Advertencia: Error al parsear pagoDetalles de Venta #${sale.id}.`);
+                console.warn(`Advertencia: Error al parsear pagoDetalles de Venta #${sale.id}.`, e);
             }
+
             return {
                 ...sale,
                 pagoDetalles: parsedPagoDetalles,
-                items: detailsResult.rows.filter(d => d.id_venta === sale.id)
+                items: details.filter(d => d.id_venta === sale.id)
             };
         });
 
         res.json(salesWithDetails);
+
     } catch (error) {
         console.error('ERROR CRÍTICO al obtener las ventas:', error);
         res.status(500).json({ message: 'Error en el servidor al obtener las ventas' });
     }
+};
+
+module.exports = {
+    createSale,
+    getSales,
+    createReturn,
+    cancelSale,
 };

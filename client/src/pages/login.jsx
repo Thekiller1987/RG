@@ -1,9 +1,13 @@
+// client/src/pages/login.jsx
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import * as api from '../service/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
+/* ===========================
+   Styled components (completos)
+   =========================== */
 const PageWrapper = styled.div`
   min-height: 100vh;
   display: flex;
@@ -89,6 +93,10 @@ const ErrorMessage = styled.p`
   margin-top: 1rem;
 `;
 
+/* ===========================
+   Component
+   =========================== */
+
 const Login = () => {
   const [nombre_usuario, setNombreUsuario] = useState('');
   const [password, setPassword] = useState('');
@@ -108,21 +116,23 @@ const Login = () => {
 
     setSubmitting(true);
     try {
+      // Llamada al helper del servicio: espera { token, user } o al menos token
       const data = await api.login({ nombre_usuario, password });
       const token = data.token ?? data.accessToken ?? null;
       const user = data.user ?? data.usuario ?? data.data?.user ?? null;
 
+      // Si backend devuelve token pero no user, intentamos fetchMe (siempre que haya token)
       if (token && !user) {
         try {
           const me = await api.fetchMe(token);
           if (me) {
             await auth.login(me, token);
             setSubmitting(false);
-            navigate('/dashboard', { replace: true });
             return;
           }
         } catch (e) {
-          console.warn('Advertencia: fetchMe falló tras login exitoso. Token obtenido pero usuario no cargado.', e);
+          // seguir al error principal
+          console.warn('fetchMe falló tras login:', e);
         }
       }
 
@@ -130,21 +140,19 @@ const Login = () => {
         throw new Error('Respuesta de login inválida: falta token o user');
       }
 
+      // login en memoria (AuthContext)
       await auth.login(user, token);
-      navigate('/dashboard', { replace: true });
 
+      // navigate al dashboard (auth.login también navega en la versión del contexto, pero aseguramos)
+      navigate('/dashboard', { replace: true });
     } catch (err) {
-      console.error('Error durante el proceso de Login:', err.message || JSON.stringify(err));
-      setErrMsg(err.message || 'Error en el inicio de sesión. Verifique sus credenciales.');
+      console.error('Login error:', err);
+      // err puede ser Error o un objeto con message
+      setErrMsg(err.message || (err.response && (err.response.data?.msg || JSON.stringify(err.response.data))) || 'Error en login');
     } finally {
       setSubmitting(false);
     }
   };
-  
-  const handleInputChange = (setter) => (e) => {
-    setErrMsg('');
-    setter(e.target.value);
-  }
 
   return (
     <PageWrapper>
@@ -158,14 +166,14 @@ const Login = () => {
             type="text"
             placeholder="Nombre de usuario"
             value={nombre_usuario}
-            onChange={handleInputChange(setNombreUsuario)}
+            onChange={(e) => setNombre_usuario_and_clear_error(e.target.value)}
           />
           <Input
             aria-label="password"
             type="password"
             placeholder="Contraseña"
             value={password}
-            onChange={handleInputChange(setPassword)}
+            onChange={(e) => setPassword_and_clear_error(e.target.value)}
           />
 
           <Button type="submit" disabled={submitting}>
@@ -176,6 +184,16 @@ const Login = () => {
       </FormContainer>
     </PageWrapper>
   );
+
+  // helper functions (local) to keep error cleared on change
+  function setNombre_usuario_and_clear_error(v) {
+    setErrMsg('');
+    setNombreUsuario(v);
+  }
+  function setPassword_and_clear_error(v) {
+    setErrMsg('');
+    setPassword(v);
+  }
 };
 
 export default Login;

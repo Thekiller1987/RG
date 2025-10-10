@@ -1,8 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import * as api from '../../service/api.js';
-// AÑADIDO: Íconos para los nuevos botones de precios
-import { FaShoppingCart, FaCreditCard, FaPrint, FaStore, FaPlus, FaLock, FaHistory, FaTrashAlt, FaLockOpen, FaTimes, FaUserTag, FaPercentage, FaKeyboard, FaExchangeAlt, FaDollarSign, FaTags, FaArrowLeft, FaEdit, FaRedo } from 'react-icons/fa';
+import { FaShoppingCart, FaCreditCard, FaPrint, FaStore, FaPlus, FaLock, FaHistory, FaTrashAlt, FaLockOpen, FaTimes, FaUserTag, FaPercentage, FaKeyboard, FaExchangeAlt, FaDollarSign, FaTags, FaArrowLeft, FaEdit, FaRedo, FaExclamationTriangle } from 'react-icons/fa'; 
 import * as S from './POS.styles.jsx'; 
 import PaymentModal from './components/PaymentModal.jsx';
 import CajaModal from './components/CajaModal.jsx';
@@ -13,6 +12,9 @@ import AlertModal from './components/AlertModal.jsx';
 import ProformaModal from './components/ProformaModal.jsx';
 import TicketModal from './components/TicketModal.jsx';
 import { saveCajaSession } from '../../utils/caja.js';
+
+// Constante para limitar la carga inicial y los resultados amplios
+const PRODUCTS_PER_PAGE = 100;
 
 const POS = () => {
     const { user: currentUser, allUsers, products: initialProducts, clients, logout, loadMasterData, cajaSession, addCajaTransaction, setCajaSession } = useAuth();
@@ -40,6 +42,36 @@ const POS = () => {
     const showAlert = useCallback((props) => openModal('alert', props), [openModal]);
     const showConfirmation = useCallback((props) => openModal('confirmation', props), [openModal]);
     const showPrompt = useCallback((props) => openModal('prompt', props), [openModal]);
+
+    // -----------------------------------------------------
+    // MOVIMIENTO DE FUNCIONES PARA RESOLVER EL ReferenceError
+    // -----------------------------------------------------
+
+    const loadSalesFromDB = useCallback(async () => {
+        if (!token) return;
+        setIsLoadingSales(true);
+        try {
+            const salesData = await api.fetchSales(token); 
+            setDailySales(salesData || []);
+        } catch (error) {
+            if (error.status === 401) {
+                showAlert({ title: "Sesión Expirada", message: "Tu sesión ha terminado. Serás redirigido al login." });
+                setTimeout(logout, 3000);
+            } else {
+                showAlert({ title: "Error de Red", message: "No se pudieron cargar las ventas del día." });
+            }
+        } finally { setIsLoadingSales(false); }
+    }, [token, logout, showAlert]);
+
+    const refreshData = useCallback(async () => {
+        if (!token) return;
+        await Promise.all([loadSalesFromDB(), loadMasterData(token)]);
+    }, [token, loadSalesFromDB, loadMasterData]);
+    
+    // -----------------------------------------------------
+    // FIN DEL MOVIMIENTO
+    // -----------------------------------------------------
+
 
     const updateActiveOrder = (key, value) => { setOrders(orders.map(o => o.id === activeOrderId ? { ...o, [key]: value } : o)); };
     const updateActiveCart = (newItems) => { updateActiveOrder('items', newItems); };
@@ -94,16 +126,14 @@ const POS = () => {
 
     const handleProductClick = (product) => {
         const precioVenta = product.precio || 0; 
-        // const precioMayoreo = product.raw?.mayoreo || 0; // Se mantiene la variable
         
-        if (product.existencia <= 0) return;
-        
+        // 🚨 LÓGICA: Si está agotado, muestra alerta y no agrega 🚨
+        if (product.existencia <= 0) {
+            showAlert({ title: "Producto Agotado", message: `El inventario de ${product.nombre} es de 0 unidades. No se puede añadir a la venta.`, type: 'error' });
+            return;
+        }
+
         handleAddToCart(product, 1, precioVenta); 
-        
-        // ELIMINACIÓN: Se quita la lógica de mostrar la alerta de precio de mayoreo
-        // if (precioMayoreo > 0 && precioMayoreo < precioVenta) { 
-        //     showAlert({ title: "Precio de Mayoreo Disponible", message: `Este producto tiene un precio de mayoreo de C$${Number(precioMayoreo).toFixed(2)}. Usa el botón (🏷️) en el carrito para aplicarlo.`, type: "info"});
-        // }
     };
 
     const handleUpdateCartQuantity = (id, newQuantity) => {
@@ -126,8 +156,7 @@ const POS = () => {
         updateActiveCart(cart.filter(item => item.id !== id));
     };
 
-    // ======================= INICIO: LÓGICA DE PRECIOS REPARADA Y AÑADIDA =======================
-    // Se reemplaza la función `applyItemDiscount` por estas tres funciones más específicas.
+    // ======================= INICIO: LÓGICA DE PRECIOS =======================
     
     const handleSetManualPrice = (item) => {
         const productData = products.find(p => p.id === item.id);
@@ -211,7 +240,16 @@ const POS = () => {
     const handleDoCloseCaja = (countedAmount) => {
         if (!cajaSession || !userId) return;
         const finalSession = { ...cajaSession };
-        const movimientoNetoEfectivo = (finalSession.transactions || []).reduce((total, tx) => tx.type === 'venta_credito' ? total : total + Number(tx.pagoDetalles?.ingresoCaja || 0), 0);
+        
+        // 🚨 CÁLCULO DE CAJA CORREGIDO 🚨
+        const movimientoNetoEfectivo = (finalSession.transactions || []).reduce((total, tx) => {
+            if (tx.type === 'venta_credito') {
+                return total;
+            }
+            // Aquí es donde se usa el 'ingresoCaja' de la transacción (debe ser solo efectivo)
+            return total + Number(tx.pagoDetalles?.ingresoCaja || 0);
+        }, 0);
+
         const efectivoEsperado = Number(finalSession.initialAmount) + movimientoNetoEfectivo;
         finalSession.closedAt = new Date().toISOString();
         finalSession.closedBy = { id: currentUser.id, name: currentUser.nombre_usuario };
@@ -222,23 +260,6 @@ const POS = () => {
         closeModal();
         showAlert({ title: "Caja Cerrada", message: `Caja cerrada con ${finalSession.difference === 0 ? 'un balance perfecto' : `una diferencia de C$${finalSession.difference.toFixed(2)}`}.`});
     };
-
-    const loadSalesFromDB = useCallback(async () => {
-        if (!token) return;
-        setIsLoadingSales(true);
-        try {
-            const salesData = await api.fetchSales(token);
-            setDailySales(salesData || []);
-        } catch (error) {
-            // ELIMINACIÓN: Quitamos el console.error, dejamos solo la alerta al usuario
-            if (error.status === 401) {
-                showAlert({ title: "Sesión Expirada", message: "Tu sesión ha terminado. Serás redirigido al login." });
-                setTimeout(logout, 3000);
-            } else {
-                showAlert({ title: "Error de Red", message: "No se pudieron cargar las ventas del día." });
-            }
-        } finally { setIsLoadingSales(false); }
-    }, [token, logout, showAlert]);
 
     const handleFinishSale = async (pagoDetalles) => {
         const finalClientId = pagoDetalles.clienteId; 
@@ -254,15 +275,37 @@ const POS = () => {
             return 0;
         })();
         const total = subtotal - discountAmount;
+        
+        // Asumimos que PaymentModal devuelve 'ingresoCaja' como el neto de efectivo (Efectivo - Cambio)
+        const ingresoCajaParaTransaccion = Number(pagoDetalles.ingresoCaja || (pagoDetalles.efectivo - pagoDetalles.cambio) || 0);
+
         const saleToCreate = { totalVenta: total, subtotal: subtotal, descuento: discountAmount, items: itemsForSale, pagoDetalles, userId, clientId: finalClientId, tasaDolarAlMomento: tasaDolar };
 
         try {
             const response = await api.createSale(saleToCreate, token);
             showAlert({ title: "Éxito", message: "Venta registrada correctamente." });
             const esCredito = (pagoDetalles.credito || 0) > 0;
-            addCajaTransaction({ id: `venta-${response.saleId || Date.now()}`, type: esCredito ? 'venta_credito' : 'venta_contado', amount: total, note: `Venta #${response.saleId} ${esCredito ? '(CRÉDITO)' : ''}`, at: new Date().toISOString(), pagoDetalles: { ...pagoDetalles, clienteId: finalClientId } });
+            
+            // Usamos el ingresoCaja calculado solo con efectivo
+            const transactionDetails = { 
+                ...pagoDetalles, 
+                clienteId: finalClientId, 
+                // Esto es lo que va a la caja y excluye Transferencia/Tarjeta
+                ingresoCaja: ingresoCajaParaTransaccion 
+            };
+            
+            addCajaTransaction({ 
+                id: `venta-${response.saleId || Date.now()}`, 
+                type: esCredito ? 'venta_credito' : 'venta_contado', 
+                amount: total, 
+                note: `Venta #${response.saleId} ${esCredito ? '(CRÉDITO)' : ''}`, 
+                at: new Date().toISOString(), 
+                pagoDetalles: transactionDetails 
+            });
+            
             updateActiveOrder('clientId', initialClientId); 
-            await Promise.all([loadSalesFromDB(), loadMasterData(token)]); 
+            // Usamos refreshData para recargar todo
+            await refreshData(); 
             handleRemoveOrder(activeOrderId); 
             closeModal();
             showConfirmation({
@@ -271,7 +314,7 @@ const POS = () => {
                 onConfirm: () => { handleReprintTicket({ ...response.saleData, ...saleToCreate }); }
             });
         } catch (error) {
-            // ELIMINACIÓN: Quitamos el console.error de error crítico
+            console.error("Error Crítico al guardar venta:", error);
             showAlert({ title: "Error Crítico", message: `La venta no se pudo guardar. ${error.message}` });
         }
     };
@@ -289,10 +332,10 @@ const POS = () => {
                 }
             }
             showAlert({ title: "Éxito", message: `Venta #${saleId} cancelada.` });
-            await loadSalesFromDB(); 
-            loadMasterData(token); 
+            // Usamos refreshData para recargar todo
+            await refreshData(); 
         } catch (error) {
-            // ELIMINACIÓN: Quitamos el console.error de error crítico
+            console.error("Error al cancelar venta:", error);
             showAlert({ title: "Error de Cancelación", message: `No se pudo cancelar la venta #${saleId}.`, type: "error" });
         }
     };
@@ -303,13 +346,20 @@ const POS = () => {
         try {
             await api.returnItem({ saleId: sale.id, itemId: item.id_producto || item.id, quantity }, token); 
             showAlert({ title: "Éxito", message: `Devolución registrada.` });
-            await loadSalesFromDB(); 
-            loadMasterData(token); 
+            // Usamos refreshData para recargar todo
+            await refreshData(); 
         } catch (error) {
-            // ELIMINACIÓN: Quitamos el console.error de error crítico
+            console.error("Error al devolver producto:", error);
             showAlert({ title: "Error de Devolución", message: `No se pudo devolver el producto. ${error.message || ''}`, type: "error" });
         }
     };
+
+    // Nueva función para manejar el éxito del abono y recargar los datos
+    const handleAbonoSuccess = useCallback(() => {
+        closeModal();
+        showAlert({ title: 'Éxito', message: 'Abono registrado correctamente' });
+        refreshData();
+    }, [closeModal, showAlert, refreshData]);
 
     const handleReprintTicket = (transaction, creditStatus = null) => { setTicketData({ transaction, creditStatus }); };
     
@@ -321,6 +371,8 @@ const POS = () => {
     }, [cajaSession, userId]);
     
     useEffect(() => { setProductsState(initialProducts || []); }, [initialProducts]);
+    
+    // Al cargar el POS (si la caja está abierta), cargamos las ventas
     useEffect(() => { if (isCajaOpen) loadSalesFromDB(); }, [isCajaOpen, loadSalesFromDB]);
 
     useEffect(() => {
@@ -340,11 +392,43 @@ const POS = () => {
         return 0;
     }, [subtotal, activeOrder.discount]);
     const total = useMemo(() => subtotal - discountAmount, [subtotal, discountAmount]);
+    
+    // --------------------------------------------------------------------------
+    // 🚀 LÓGICA DE CARGA CONDICIONAL Y BÚSQUEDA (CORRECCIÓN DE DELAY) 🚀
+    // --------------------------------------------------------------------------
     const filteredProducts = useMemo(() => {
         if (!products) return [];
-        const term = searchTerm.toLowerCase();
-        return term ? products.filter(p => (p.nombre || '').toLowerCase().includes(term) || (p.codigo || '').toLowerCase().includes(term)) : products;
+        const term = searchTerm.toLowerCase().trim();
+
+        // 1. Si no hay término de búsqueda o es muy corto, mostramos solo los primeros N productos
+        if (!term || term.length < 3) {
+            // Solo devolvemos los primeros 100 productos (para una carga inicial rápida)
+            return products.slice(0, PRODUCTS_PER_PAGE);
+        }
+
+        // 2. Si hay un término de búsqueda suficiente (3+ caracteres), filtramos la lista completa
+        const results = products.filter(p => 
+            (p.nombre || '').toLowerCase().includes(term) || 
+            (p.codigo || '').toLowerCase().includes(term)
+        );
+
+        // 3. Limitamos el número de resultados para evitar renderizados masivos, incluso en la búsqueda
+        return results.slice(0, 500); // Mostramos un máximo de 500 resultados de búsqueda
     }, [searchTerm, products]);
+    
+    const totalResults = useMemo(() => {
+        if (!products) return 0;
+        const term = searchTerm.toLowerCase().trim();
+
+        if (!term) {
+            return products.length;
+        }
+        return products.filter(p => 
+            (p.nombre || '').toLowerCase().includes(term) || 
+            (p.codigo || '').toLowerCase().includes(term)
+        ).length;
+    }, [searchTerm, products]);
+    // --------------------------------------------------------------------------
     
     if (!isCajaOpen) {
         return (
@@ -363,6 +447,7 @@ const POS = () => {
         <S.PageWrapper>
             <S.HeaderActions>
                 <S.BackButton to="/dashboard"><FaArrowLeft /> Volver</S.BackButton>
+                
                 <div style={{ fontSize: '0.8rem', color: '#555' }}><FaKeyboard /> Atajos: <strong>F1</strong> Buscar, <strong>F2</strong> Pagar, <strong>F9</strong> Caja</div>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <S.InfoBox style={{ backgroundColor: '#fff', padding: '0.5rem', borderRadius: '5px' }}>
@@ -374,38 +459,79 @@ const POS = () => {
             </S.HeaderActions>
             <S.PageContentWrapper>
                 <S.MainPanel>
-                    <S.SearchInput ref={searchInputRef} placeholder="Buscar producto... (F1)" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                    <S.SearchInput ref={searchInputRef} placeholder="Buscar producto (mín. 3 letras/números, F1)" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                     <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                        <h3 style={{ margin: '0 0 1rem 0' }}><FaStore /> Productos</h3>
+                        <h3 style={{ margin: '0 0 1rem 0' }}><FaStore /> Productos ({filteredProducts.length} de {totalResults})</h3>
+                        
+                        {/* Mensaje de advertencia si el término es muy corto o hay demasiados resultados */}
+                        {(searchTerm.length < 3 && totalResults > PRODUCTS_PER_PAGE) && (
+                            <S.InfoBox style={{ marginBottom: '1rem', backgroundColor: '#fff3cd', color: '#856404', borderColor: '#ffeeba' }}>
+                                <FaExclamationTriangle style={{ marginRight: '5px' }} />
+                                Escriba **3 o más caracteres** para buscar en los {totalResults} productos. Mostrando los primeros {PRODUCTS_PER_PAGE}.
+                            </S.InfoBox>
+                        )}
+
                         <S.ProductGrid>
                             {filteredProducts.map(p =>
-                                <S.ProductCard key={p.id} onClick={() => handleProductClick(p)} outofstock={p.existencia <= 0}>
-                                    <S.StockBadge lowstock={p.existencia < 10 && p.existencia > 0} outofstock={p.existencia <= 0}>{p.existencia}</S.StockBadge>
+                                <S.ProductCard 
+                                    key={p.id} 
+                                    onClick={() => handleProductClick(p)} 
+                                    // 🚨 CLAVE: outofstock para estilos rojos cuando existencia es 0 🚨
+                                    outofstock={p.existencia <= 0}
+                                >
+                                    <S.StockBadge 
+                                        lowstock={p.existencia < 10 && p.existencia > 0} 
+                                        // 🚨 CLAVE: outofstock para estilos rojos en badge 🚨
+                                        outofstock={p.existencia <= 0}
+                                    >
+                                        {p.existencia}
+                                    </S.StockBadge>
                                     <div className="image-placeholder">{(p.nombre || '').charAt(0)}</div>
                                     <div className="info"> <p>{p.nombre}</p> <div className="price">C${Number(p.precio || 0).toFixed(2)}</div> {p.raw?.mayoreo > 0 && <small style={{color: '#007bff'}}><FaTags /> Mayoreo: C$${Number(p.raw.mayoreo).toFixed(2)}</small>}</div>
                                 </S.ProductCard>
+                            )}
+                            {filteredProducts.length === 0 && searchTerm.length >= 3 && (
+                                <p style={{ color: '#6c757d', textAlign: 'center', gridColumn: 'span 4' }}>No se encontraron productos con el término "{searchTerm}".</p>
                             )}
                         </S.ProductGrid>
                     </div>
                 </S.MainPanel>
                 <S.CartPanel>
+                    
+                    {/* BLOQUE 1: INFO CAJA (FIJO) */}
                     <S.InfoBox $pulsate>
                         <p style={{ margin: 0, fontWeight: 'bold' }}>CAJA: <strong>{currentUser?.nombre_usuario}</strong></p>
                         <p style={{ margin: 0 }}>Fondo: <span style={{ fontWeight: 'bold' }}>C${Number(cajaSession?.initialAmount || 0).toFixed(2)}</span></p>
                     </S.InfoBox>
+                    
+                    {/* BLOQUE 2: TICKETS ACTIVOS (AHORA USA TicketContainer y es FIJO) */}
                     <div style={{ marginBottom: '1rem', borderBottom: '1px solid #eee', paddingBottom: '1rem' }}>
-                        <h3 style={{ marginTop: 0 }}>Tickets Activos ({orders.length})</h3>
-                        <div style={{ display: 'flex', gap: '5px', overflowX: 'auto', paddingBottom: '5px' }}>
+                        <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Tickets Activos ({orders.length})</h3>
+                        <S.TicketContainer>
                             {orders.map(order => (
-                                <S.Button key={order.id} style={{ backgroundColor: activeOrderId === order.id ? '#007bff' : '#6c757d', color: 'white', flexShrink: 0, padding: '0.5rem 1rem' }} onClick={() => setActiveOrderId(order.id)} onDoubleClick={() => handleRenameOrder(order.id, order.name)}>
+                                <S.Button 
+                                    key={order.id} 
+                                    style={{ backgroundColor: activeOrderId === order.id ? '#007bff' : '#6c757d', color: 'white' }} 
+                                    onClick={() => setActiveOrderId(order.id)} 
+                                    onDoubleClick={() => handleRenameOrder(order.id, order.name)}
+                                >
                                     {order.name} ({order.items.length})
                                 </S.Button>
                             ))}
-                            <S.Button primary onClick={handleNewOrder} style={{ flexShrink: 0, padding: '0.5rem 1rem' }}><FaPlus /> Nuevo</S.Button>
-                        </div>
-                        {orders.length > 1 && (<div style={{ marginTop: '10px' }}><S.Button $cancel style={{ width: '100%' }} onClick={() => handleRemoveOrder(activeOrderId)}><FaTrashAlt /> Cerrar Ticket</S.Button></div>)}
+                            <S.Button primary onClick={handleNewOrder}><FaPlus /> Nuevo</S.Button>
+                        </S.TicketContainer>
+                        
+                        {orders.length > 1 && (
+                            <div style={{ marginTop: '10px' }}>
+                                <S.Button $cancel style={{ width: '100%' }} onClick={() => handleRemoveOrder(activeOrderId)}><FaTrashAlt /> Cerrar Ticket</S.Button>
+                            </div>
+                        )}
                     </div>
+                    
+                    {/* BLOQUE 3: ENCABEZADO DEL CARRITO (FIJO) */}
                     <h2 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 0 }}>{activeOrder.name} <FaShoppingCart /></h2>
+                    
+                    {/* BLOQUE 4: LISTA DE PRODUCTOS (SCROLLABLE) */}
                     <div style={{ flexGrow: 1, overflowY: 'auto', marginBottom: '1rem' }}>
                         
                         {cart.length === 0 ? <p style={{ color: '#6c757d', textAlign: 'center', marginTop: '3rem' }}>El ticket está vacío.</p> : cart.map(item => {
@@ -438,6 +564,8 @@ const POS = () => {
                         })}
 
                     </div>
+                    
+                    {/* BLOQUE 5: TOTALES Y BOTONES DE PAGO (FIJO) */}
                     <div>
                         <S.TotalsRow><span>Subtotal:</span><span>C${subtotal.toFixed(2)}</span></S.TotalsRow>
                         <S.TotalsRow onClick={applyOrderDiscount} style={{ cursor: 'pointer', color: discountAmount > 0 ? '#dc3545' : 'inherit' }}>
@@ -451,9 +579,10 @@ const POS = () => {
                 </S.CartPanel>
             </S.PageContentWrapper>
 
-            {modal.name === 'history' && <SalesHistoryModal dailySales={dailySales} onCancelSale={handleCancelSale} onReturnItem={handleReturnItem} onReprintTicket={handleReprintTicket} users={allUsers} clients={clients} isAdmin={isAdmin} showConfirmation={showConfirmation} showPrompt={showPrompt} showAlert={showAlert} onClose={closeModal} />}
+            {/* AÑADIDO: Pasamos onAbonoSuccess al modal de historial */}
+            {modal.name === 'history' && <SalesHistoryModal dailySales={dailySales} onCancelSale={handleCancelSale} onReturnItem={handleReturnItem} onReprintTicket={handleReprintTicket} users={allUsers} clients={clients} isAdmin={isAdmin} showConfirmation={showConfirmation} showPrompt={showPrompt} showAlert={showAlert} onClose={closeModal} onAbonoSuccess={refreshData} />} 
             {modal.name === 'payment' && <PaymentModal total={total} tasaDolar={tasaDolar} clientes={clients} onFinishSale={handleFinishSale} showAlert={showAlert} onClose={closeModal} initialClientId={String(activeOrder.clientId || 0)}/>}
-            {modal.name === 'caja' && <CajaModal currentUser={currentUser} isCajaOpen={isCajaOpen} session={cajaSession} onOpenCaja={handleOpenCaja} onCloseCaja={handleDoCloseCaja} onAddTransaction={addCajaTransaction} isAdmin={isAdmin} showConfirmation={showConfirmation} showAlert={showAlert} onClose={closeModal} initialTasaDolar={tasaDolar} />}
+            {modal.name === 'caja' && <CajaModal currentUser={currentUser} isCajaOpen={isCajaOpen} session={cajaSession} onOpenCaja={handleOpenCaja} onCloseCaja={handleDoCloseCaja} isAdmin={isAdmin} showConfirmation={showConfirmation} showAlert={showAlert} onClose={closeModal} initialTasaDolar={tasaDolar} />}
             {modal.name === 'proforma' && <ProformaModal cart={cart} total={total} subtotal={subtotal} discount={discountAmount} client={clients.find(c => c.id_cliente === activeOrder.clientId)} onClose={closeModal} />}
             {ticketData.transaction && <TicketModal transaction={ticketData.transaction} creditStatus={ticketData.creditStatus} clients={clients} users={allUsers} onClose={() => setTicketData({ transaction: null, creditStatus: null })} />}
             {modal.name === 'confirmation' && <ConfirmationModal isOpen={true} onClose={closeModal} onConfirm={() => { if (modal.props.onConfirm) modal.props.onConfirm(); closeModal(); }} {...modal.props} />}
