@@ -22,8 +22,13 @@ const request = async (method, path, token = null, data = null, config = {}) => 
             ...config,
         };
 
-        if (data !== null) {
+        if (data !== null && method !== 'get') {
             requestConfig.data = data;
+        }
+
+        // 💡 CLAVE: Si hay 'params' en la configuración (usado por fetchSales), Axios los añade como query string.
+        if (config.params && method === 'get') {
+             requestConfig.params = config.params;
         }
 
         const res = await axiosBase.request(requestConfig);
@@ -87,8 +92,19 @@ export const fetchClients = async (token) => {
 
 
 // --- Funciones para Ventas ---
-export const fetchSales = async (token) => {
-    return await request('get', '/sales', token);
+/**
+ * Obtiene ventas, opcionalmente filtradas por fecha.
+ * @param {string} token 
+ * @param {string} date - Fecha en formato 'YYYY-MM-DD'.
+ * @returns {Promise<Array>}
+ */
+export const fetchSales = async (token, date = null) => {
+    const config = {};
+    if (date) {
+        // Axios usará esto para añadir ?date=YYYY-MM-DD a la URL
+        config.params = { date }; 
+    }
+    return await request('get', '/sales', token, null, config);
 };
 export const createSale = async (saleData, token) => {
     return await request('post', '/sales', token, saleData);
@@ -176,9 +192,8 @@ export const fetchSalesChartReport = (token, params) => {
 };
 
 // ===================================================================
-// --- SECCIÓN DE CARGA MASIVA (CLAVE: ESTA FUNCIÓN HACE QUE TODO FUNCIONE) ---
+// --- SECCIÓN DE CARGA MASIVA ---
 // ===================================================================
 export const bulkUploadInventory = async (items, token) => {
-    // La data se pasa como { items: [...] } que es lo que espera el controlador
     return await request('post', '/upload/inventory', token, { items });
 };
