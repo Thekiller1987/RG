@@ -1,9 +1,10 @@
-// src/pages/pos/components/ProductPanel.jsx
 import React, { useMemo } from 'react';
 import { FaStore, FaExclamationTriangle, FaTags } from 'react-icons/fa';
 import * as S from '../POS.styles.jsx';
 
 const PRODUCTS_PER_PAGE = 100;
+const fmt = (n) =>
+  Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function ProductPanel({
   products = [],
@@ -11,9 +12,8 @@ export default function ProductPanel({
   setSearchTerm,
   onProductClick,
   cartItems = [],
-  inputRef, // para que F1 enfoque este input
+  inputRef,
 }) {
-  // id -> cantidad en el carrito
   const qtyInCart = useMemo(() => {
     const map = new Map();
     for (const it of cartItems) {
@@ -74,7 +74,7 @@ export default function ProductPanel({
                 key={p.id}
                 onClick={() => restante > 0 && onProductClick(p)}
                 outOfStock={restante <= 0}
-                title={restante <= 0 ? 'Sin stock disponible para agregar' : ''}
+                title={p.nombre}
               >
                 <S.StockBadge
                   lowstock={restante < 10 && restante > 0}
@@ -86,11 +86,19 @@ export default function ProductPanel({
                 <div className="image-placeholder">{(p.nombre || '').charAt(0)}</div>
 
                 <div className="info">
-                  <p>{p.nombre}</p>
-                  <div className="price">C${Number(p.precio || 0).toFixed(2)}</div>
+                  {/* dos líneas con elipsis para que se lea mejor */}
+                  <p style={{
+                    margin: 0,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden'
+                  }}>{p.nombre}</p>
+
+                  <div className="price">C${fmt(p.precio)}</div>
                   {p.raw?.mayoreo > 0 && (
                     <small style={{ color: '#007bff' }}>
-                      <FaTags /> Mayoreo: C${Number(p.raw.mayoreo).toFixed(2)}
+                      <FaTags /> Mayoreo: C${fmt(p.raw.mayoreo)}
                     </small>
                   )}
                 </div>

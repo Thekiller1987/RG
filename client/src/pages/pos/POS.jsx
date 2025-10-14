@@ -1,14 +1,14 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+// client/src/pages/POS/POS.jsx
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   FaArrowLeft, FaKeyboard, FaTags, FaShoppingCart, FaPlus,
   FaTrashAlt, FaTimes, FaPercentage, FaHistory, FaLock, FaDollarSign, FaEdit, FaRedo,
-  FaTags as FaTagsIcon // Renombramos FaTags para evitar conflicto en este archivo
+  FaSignInAlt, FaSignOutAlt
 } from 'react-icons/fa';
 
 import { useAuth } from '../../context/AuthContext.jsx';
 import * as api from '../../service/api.js';
 import ProductPanel from './components/ProductPanel.jsx';
-import CartPanelView from './components/CartPanelView.jsx'; 
 import * as S from './POS.styles.jsx';
 
 import PaymentModal from './components/PaymentModal.jsx';
@@ -33,7 +33,11 @@ import {
 
 import { loadTickets, saveTickets, subscribeTicketChanges } from '../../utils/tickets.js';
 
-/* ===== Helper: ticket vacío con id único (CANÓNICO) ===== */
+/* ===== número bonito ===== */
+const fmt = (n) =>
+  new Intl.NumberFormat('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n || 0));
+
+/* ===== Helper: ticket vacío (estándar) ===== */
 const createEmptyTicket = (clientId = 0) => ({
   id: Date.now(),
   name: 'Ticket Nuevo',
@@ -63,31 +67,25 @@ const POS = () => {
 
   const [products, setProductsState] = useState(initialProducts || []);
   const [searchTerm, setSearchTerm] = useState('');
+  const searchRef = useRef(null);
 
   // Tickets persistentes
   const initialTickets = loadTickets(userId || 'anon');
   const [orders, setOrders] = useState(initialTickets.orders);
   const [activeOrderId, setActiveOrderId] = useState(initialTickets.activeOrderId);
 
-  // Guardar en storage cada cambio local
   useEffect(() => { if (userId) saveTickets(userId, orders, activeOrderId); }, [userId, orders, activeOrderId]);
 
-  // Suscripción cross-tab protegida (evita bucles de estado)
+  // Sync tickets cross-tab (misma máquina)
   useEffect(() => {
     if (!userId) return;
     return subscribeTicketChanges(userId, (data) => {
       if (data?.orders && data?.activeOrderId != null) {
-        const ordersContentChanged = 
-            data.orders.length !== orders.length || 
-            data.orders.some((newOrder, index) => {
-                const oldOrder = orders[index];
-                return !oldOrder || newOrder.id !== oldOrder.id;
-            });
-        
+        const ordersContentChanged =
+          data.orders.length !== orders.length ||
+          data.orders.some((n, i) => !orders[i] || n.id !== orders[i].id);
         const activeIdChanged = data.activeOrderId !== activeOrderId;
-
         if (ordersContentChanged || activeIdChanged) {
-          console.log(`LOG [SYNC]: Recibida actualización externa. Forzando (${data.orders.length} tickets).`);
           setOrders(data.orders);
           setActiveOrderId(data.activeOrderId);
         }
@@ -96,7 +94,7 @@ const POS = () => {
   }, [userId, orders.length, activeOrderId]);
 
   const activeOrder = useMemo(
-    () => orders.find(o => o.id === activeOrderId) || { items: [], clientId: initialClientId, discount: { type: 'none', value: 0 }, name: 'Ticket' },
+    () => orders.find(o => o.id === activeOrderId) || { items: [], clientId: initialClientId, discount: { type: 'none', value: 0 }, name: 'Ticket Nuevo' },
     [orders, activeOrderId]
   );
   const cart = activeOrder.items || [];
@@ -108,7 +106,7 @@ const POS = () => {
   const [isLoadingSales, setIsLoadingSales] = useState(false);
 
   const [modal, setModal] = useState({ name: null, props: {} });
-  const [ticketData, setTicketData] = useState({ transaction: null, creditStatus: null });
+  const [ticketData, setTicketData] = useState({ transaction: null, creditStatus: null, shouldOpen: false });
 
   const openModal = useCallback((name, props = {}) => setModal({ name, props }), []);
   const closeModal = useCallback(() => setModal({ name: null, props: {} }), []);
@@ -116,80 +114,71 @@ const POS = () => {
   const showConfirmation = useCallback((props) => openModal('confirmation', props), [openModal]);
   const showPrompt = useCallback((props) => openModal('prompt', props), [openModal]);
 
-  // Ventas del día (MODIFICADO para aceptar una fecha, por defecto hoy)
-  const loadSalesFromDB = useCallback(async (date = new Date().toISOString().split('T')[0]) => {
-    if (!token) return [];
-    setIsLoadingSales(true);
-    console.log(`LOG: Cargando ventas para la fecha: ${date}`);
-    try {
-      const salesData = await api.fetchSales(token, date); 
-      
-      const today = new Date().toISOString().split('T')[0];
-      if (date === today) {
-        setDailySales(Array.isArray(salesData) ? salesData : []);
-      }
-      return Array.isArray(salesData) ? salesData : [];
+ // ⬇️ Reemplaza tu loadSalesFromDB completo por este
+const loadSalesFromDB = useCallback(async (date) => {
+  if (!token) return [];
+  setIsLoadingSales(true);
+  try {
+    // Importante:
+    // - date === undefined  -> por defecto hoy
+    // - date === null       -> historial completo (sin ?date)
+    // - date === 'YYYY-MM-DD' -> ese día
+    const today = new Date().toISOString().split('T')[0];
+    const effectiveDate = (date === undefined) ? today : date; // respeta null
+    const salesData = await api.fetchSales(token, effectiveDate);
 
-    } catch (error) {
-      console.error("Error al cargar ventas:", error);
-      if (error.status === 401) {
-        showAlert({ title: "Sesión Expirada", message: "Tu sesión ha terminado. Serás redirigido al login." });
-        setTimeout(logout, 3000);
-      } else {
-        showAlert({ title: "Error de Red", message: "No se pudieron cargar las ventas." });
-      }
-      return [];
-    } finally {
-      setIsLoadingSales(false);
+    if (effectiveDate === today) {
+      setDailySales(Array.isArray(salesData) ? salesData : []);
     }
-  }, [token, logout, showAlert]);
+    return Array.isArray(salesData) ? salesData : [];
+  } catch (error) {
+    if (error.status === 401) {
+      showAlert({ title: "Sesión Expirada", message: "Tu sesión ha terminado. Serás redirigido al login." });
+      setTimeout(logout, 3000);
+    } else {
+      showAlert({ title: "Error de Red", message: "No se pudieron cargar las ventas." });
+    }
+    return [];
+  } finally {
+    setIsLoadingSales(false);
+  }
+}, [token, logout, showAlert]);
+
 
   const refreshData = useCallback(async () => {
     if (!token) return;
     await Promise.all([loadSalesFromDB(), loadMasterData(token)]);
   }, [token, loadSalesFromDB, loadMasterData]);
 
-  // Helpers tickets
   const updateActiveOrder = (key, value) =>
     setOrders(prev => prev.map(o => o.id === activeOrderId ? { ...o, [key]: value } : o));
   const updateActiveCart = (newItems) => updateActiveOrder('items', newItems);
 
-  // Lógica de cierre del ticket (usada por el botón Cerrar Ticket)
   const closeTicketById = useCallback((ticketIdToClose) => {
-    console.log(`LOG [CLOSE_TICKET_MANUAL]: Intentando cerrar ticket ID: ${ticketIdToClose}.`);
-
     setOrders(prevOrders => {
-        const filtered = prevOrders.filter(o => String(o.id) !== String(ticketIdToClose));
-        let newOrders = filtered;
-        let nextActiveId = null;
+      const filtered = prevOrders.filter(o => String(o.id) !== String(ticketIdToClose));
+      let newOrders = filtered;
+      let nextActiveId = null;
 
-        if (filtered.length === prevOrders.length) {
-            console.log(`LOG [CLOSE_TICKET_MANUAL]: ¡Advertencia! No se encontró ticket ${ticketIdToClose} para cerrar manualmente.`);
-            return prevOrders;
-        }
+      if (filtered.length === prevOrders.length) return prevOrders;
 
-        if (filtered.length === 0) {
-            const base = createEmptyTicket(0);
-            newOrders = [base];
-            nextActiveId = base.id;
-        } else {
-            nextActiveId = filtered[0].id;
-        }
+      if (filtered.length === 0) {
+        const base = createEmptyTicket(0);
+        newOrders = [base];
+        nextActiveId = base.id;
+      } else {
+        nextActiveId = filtered[0].id;
+      }
 
-        if (nextActiveId !== null) {
-            setActiveOrderId(nextActiveId);
-            if (userId) saveTickets(userId, newOrders, nextActiveId);
-        }
-        
-        return newOrders;
+      if (nextActiveId !== null) {
+        setActiveOrderId(nextActiveId);
+        if (userId) saveTickets(userId, newOrders, nextActiveId);
+      }
+      return newOrders;
     });
+  }, [userId]);
 
-  }, [userId]); 
-
-  const handleRemoveOrder = (id) => {
-    console.log(`LOG: Llamada a handleRemoveOrder para ID: ${id}`);
-    closeTicketById(id);
-  };
+  const handleRemoveOrder = (id) => closeTicketById(id);
 
   const handleNewOrder = () => {
     setOrders(prev => {
@@ -214,7 +203,7 @@ const POS = () => {
     });
   };
 
-  // Productos / carrito
+  // Carrito
   const handleAddToCart = (product, quantity = 1, priceToUse = null) => {
     const existing = cart.find(item => item.id === product.id);
     const newQty = (existing?.quantity || 0) + quantity;
@@ -224,7 +213,7 @@ const POS = () => {
     }
     const finalPrice = priceToUse != null ? priceToUse : (existing?.precio_venta || product.precio);
     const newItem = { ...product, quantity: newQty, precio_venta: finalPrice };
-    const newCart = existing ? cart.map(i => i.id === product.id ? newItem : i) : [...cart, newItem];
+    const newCart = existing ? cart.map(i => (i.id === product.id ? newItem : i)) : [...cart, newItem];
     updateActiveCart(newCart);
   };
 
@@ -247,10 +236,10 @@ const POS = () => {
     }
     if (numQuantity > productData.existencia) {
       showAlert({ title: "Stock Insuficiente", message: `Máximo ${productData.existencia} unidades.` });
-      updateActiveCart(cart.map(i => i.id === id ? { ...i, quantity: productData.existencia } : i));
+      updateActiveCart(cart.map(i => (i.id === id ? { ...i, quantity: productData.existencia } : i)));
       return;
     }
-    updateActiveCart(cart.map(i => i.id === id ? { ...i, quantity: numQuantity } : i));
+    updateActiveCart(cart.map(i => (i.id === id ? { ...i, quantity: numQuantity } : i)));
   };
 
   const handleSetManualPrice = (item) => {
@@ -260,7 +249,7 @@ const POS = () => {
 
     showPrompt({
       title: `Precio Manual para ${item.nombre}`,
-      message: `Costo: C$${productCost.toFixed(2)}. Nuevo precio de venta:`,
+      message: `Costo: C$${fmt(productCost)}. Nuevo precio de venta:`,
       initialValue: Number(currentSalePrice || 0).toFixed(2),
       inputType: 'number',
       onConfirm: (value) => {
@@ -270,10 +259,10 @@ const POS = () => {
           return;
         }
         if (newPrice < productCost) {
-          showAlert({ title: 'No permitido', message: `El precio (C$${newPrice.toFixed(2)}) no puede ser menor que el costo (C$${productCost.toFixed(2)}).` });
+          showAlert({ title: 'No permitido', message: `El precio (C$${fmt(newPrice)}) no puede ser menor que el costo (C$${fmt(productCost)}).` });
           return;
         }
-        const newCart = cart.map(i => i.id === item.id ? { ...i, precio_venta: newPrice } : i);
+        const newCart = cart.map(i => (i.id === item.id ? { ...i, precio_venta: newPrice } : i));
         updateActiveCart(newCart);
         closeModal();
       }
@@ -284,16 +273,16 @@ const POS = () => {
     const productData = products.find(p => p.id === item.id);
     const precioMayoreo = Number(productData?.raw?.mayoreo || 0);
     if (precioMayoreo > 0) {
-      const newCart = cart.map(i => i.id === item.id ? { ...i, precio_venta: precioMayoreo } : i);
+      const newCart = cart.map(i => (i.id === item.id ? { ...i, precio_venta: precioMayoreo } : i));
       updateActiveCart(newCart);
-      showAlert({ title: "Precio Actualizado", message: `Mayoreo: C$${precioMayoreo.toFixed(2)} aplicado.` });
+      showAlert({ title: "Precio Actualizado", message: `Mayoreo: C$${fmt(precioMayoreo)} aplicado.` });
     }
   };
 
   const handleRevertRetailPrice = (item) => {
     const productData = products.find(p => p.id === item.id);
     const basePrice = productData?.precio || 0;
-    const newCart = cart.map(i => i.id === item.id ? { ...i, precio_venta: basePrice } : i);
+    const newCart = cart.map(i => (i.id === item.id ? { ...i, precio_venta: basePrice } : i));
     updateActiveCart(newCart);
   };
 
@@ -316,7 +305,7 @@ const POS = () => {
     });
   };
 
-  // Caja: abrir/cerrar (botones de header)
+  /* Caja */
   const handleOpenCaja = async (monto, nuevaTasa) => {
     if (!userId) { showAlert({ title: "Error", message: "Usuario no identificado." }); return; }
     const newSession = {
@@ -328,24 +317,30 @@ const POS = () => {
       closedBy: null,
       countedAmount: null,
       difference: null,
-      notes: ''
+      notes: '',
     };
+
+    // 1) guardar local
     saveCajaSession(userId, newSession);
     saveTasaDolar(userId, (nuevaTasa ?? tasaDolar));
     setCajaSession(newSession);
     setIsCajaOpen(true);
     setTasaDolar(Number(nuevaTasa ?? tasaDolar));
     closeModal();
+
+    // 2) mandar al servidor para cross-browser
+    try {
+      await api.openCajaSession({ userId, ...newSession, tasaDolar: Number(nuevaTasa ?? tasaDolar) }, token);
+    } catch (e) {
+      // si falla servidor, mantenemos local y avisamos
+      showAlert({ title: 'Aviso', message: 'Caja abierta localmente, pero no se pudo sincronizar con el servidor.' });
+    }
   };
 
-  const handleDoCloseCaja = (countedAmount) => {
-    // 🚫 No permitir cerrar si hay tickets con productos
+  const handleDoCloseCaja = async (countedAmount) => {
     const hasPendingTickets = orders.some(o => (o.items?.length || 0) > 0);
     if (hasPendingTickets) {
-      showAlert({
-        title: 'Tickets Pendientes',
-        message: 'No puedes cerrar caja mientras existan tickets con productos. Cierra o vacía todos los tickets.'
-      });
+      showAlert({ title: 'Tickets Pendientes', message: 'No puedes cerrar caja mientras existan tickets con productos. Cierra o vacía todos los tickets.' });
       return;
     }
 
@@ -354,7 +349,10 @@ const POS = () => {
 
     const movimientoNetoEfectivo = (current.transactions || []).reduce((total, tx) => {
       if (tx.type === 'venta_credito') return total;
-      return total + Number(tx.pagoDetalles?.ingresoCaja || 0);
+      const ingreso = Number(tx.pagoDetalles?.ingresoCaja || tx.amount || 0);
+      if (tx.type === 'entrada') return total + ingreso;
+      if (tx.type === 'salida') return total - ingreso;
+      return total + ingreso;
     }, 0);
 
     const efectivoEsperado = Number(current.initialAmount) + movimientoNetoEfectivo;
@@ -366,39 +364,72 @@ const POS = () => {
       difference: Number(countedAmount) - efectivoEsperado,
     };
 
+    // local
     saveCajaSession(userId, finalSession);
     setCajaSession(finalSession);
     setIsCajaOpen(false);
     closeModal();
 
+    // servidor
+    try {
+      await api.closeCajaSession({ userId, countedAmount: Number(countedAmount), closedAt: finalSession.closedAt }, token);
+    } catch (e) {
+      showAlert({ title: 'Aviso', message: 'Caja cerrada localmente, pero no se pudo sincronizar el cierre con el servidor.' });
+    }
+
     showAlert({
       title: "Caja Cerrada",
-      message: finalSession.difference === 0
-        ? 'Balance perfecto.'
-        : `Diferencia: C$${finalSession.difference.toFixed(2)}`
+      message: finalSession.difference === 0 ? 'Balance perfecto.' : `Diferencia: C$${fmt(finalSession.difference)}`
     });
   };
 
-  /* ============================ FACTURAR (Venta) - FIX FINAL ATÓMICO ============================ */
+  // Entradas / Salidas fuera del modal (sincroniza con servidor)
+  const handleRegisterTransaction = async (type, amount, note) => {
+    if (!userId || !amount) {
+      showAlert({ title: "Error", message: "Falta el monto o el usuario." });
+      return;
+    }
+    const tx = {
+      id: `${type}-${Date.now()}`,
+      type, // 'entrada' | 'salida'
+      amount: Number(amount),
+      note: note || (type === 'entrada' ? 'Entrada de Dinero' : 'Salida de Dinero'),
+      at: new Date().toISOString(),
+      pagoDetalles: { ingresoCaja: type === 'entrada' ? Number(amount) : -Number(amount) }
+    };
+    addCajaTransaction(tx); // contexto/local
+    try {
+      await api.addCajaTx({ userId, tx }, token); // servidor
+    } catch (e) {
+      // seguimos pero avisamos
+      showAlert({ title: "Aviso", message: "Transacción registrada localmente. No se pudo sincronizar con el servidor." });
+    }
+    showAlert({ title: "Éxito", message: `${type === 'entrada' ? 'Entrada' : 'Salida'}: C$${fmt(amount)}` });
+  };
+
+  /* Venta */
+  const safeOpenTicket = (payload) => {
+    try {
+      setTicketData({ transaction: payload, creditStatus: null, shouldOpen: true });
+    } catch (e) {
+      showAlert({ title: 'Aviso', message: 'No se pudo abrir el ticket para impresión. Puedes reimprimir desde Historial.' });
+    }
+  };
+
   const handleFinishSale = async (pagoDetalles) => {
     const orderIdToClose = activeOrderId;
     const finalClientId = pagoDetalles.clienteId;
-    console.log(`LOG: Inicia handleFinishSale para ticket ID: ${orderIdToClose}`);
 
     if (finalClientId === 0) {
-      console.error("LOG: Error - Cliente ID es 0.");
       showAlert({ title: "Error de Cliente", message: "Seleccione un cliente válido.", type: 'error' });
       return false;
     }
 
     const snapshotCart = (orders.find(o => o.id === orderIdToClose)?.items || []);
     if (!snapshotCart.length) {
-      console.error("LOG: Error - Carrito vacío.");
       showAlert({ title: "Carrito vacío", message: "Agregue productos antes de facturar." });
       return false;
     }
-    console.log(`LOG: Carrito tiene ${snapshotCart.length} items. Payload de venta listo.`);
-
 
     const itemsForSale = snapshotCart.map(({ raw, costo, existencia, ...rest }) => ({
       id: rest.id || rest.id_producto,
@@ -434,66 +465,71 @@ const POS = () => {
       clientId: finalClientId,
       tasaDolarAlMomento: tasaDolar
     };
-    console.log("LOG: Datos de venta preparados:", saleToCreate);
 
     try {
       const response = await api.createSale(saleToCreate, token);
-      console.log(`LOG: Venta creada con éxito. ID de respuesta: ${response?.saleId || 'N/A'}`);
 
       const esCredito = (pagoDetalles.credito || 0) > 0;
-      addCajaTransaction({
+      const cajaTx = {
         id: `venta-${response?.saleId || Date.now()}`,
         type: esCredito ? 'venta_credito' : 'venta_contado',
         amount: totalCalc,
         note: `Venta #${response?.saleId || ''} ${esCredito ? '(CRÉDITO)' : ''}`,
         at: new Date().toISOString(),
         pagoDetalles: { ...pagoDetalles, clienteId: finalClientId, ingresoCaja }
-      });
-      console.log("LOG: Transacción de caja registrada.");
+      };
+      addCajaTransaction(cajaTx); // local
+      try { await api.addCajaTx({ userId, tx: cajaTx }, token); } catch {}
 
-      // 🚨 BLOQUE ATÓMICO DE CIERRE Y CAMBIO DE ESTADO
-      
-      // 1. Calcular el nuevo estado
-      const filteredOrders = orders.filter(o => String(o.id) !== String(orderIdToClose));
-      let newOrders = filteredOrders;
+      // Cerrar ticket activo
+      const filtered = orders.filter(o => String(o.id) !== String(orderIdToClose));
+      let newOrders = filtered;
       let nextActiveId = null;
-
-      if (filteredOrders.length === 0) {
-          const base = createEmptyTicket(0);
-          newOrders = [base];
-          nextActiveId = base.id;
+      if (filtered.length === 0) {
+        const base = createEmptyTicket(0);
+        newOrders = [base];
+        nextActiveId = base.id;
       } else {
-          nextActiveId = filteredOrders[0].id;
+        nextActiveId = filtered[0].id;
       }
-
-      // 2. Aplicar el estado a React
       setOrders(newOrders);
       setActiveOrderId(nextActiveId);
-      
-      // 3. Persistir el nuevo estado inmediatamente (lo más importante)
-      if (userId) {
-          console.log(`LOG [ATOMIC]: Ticket ${orderIdToClose} eliminado. Activo: ${nextActiveId}. Guardando estado.`);
-          saveTickets(userId, newOrders, nextActiveId);
-      }
-      
-      showAlert({ title: "Éxito", message: "Venta realizada con éxito 🎉" });
-      console.log("LOG: Mensaje de éxito mostrado.");
+      if (userId) saveTickets(userId, newOrders, nextActiveId);
 
+     // ❌ quita este alert si vas a imprimir ya
+// showAlert({ title: "Éxito", message: "Venta realizada con éxito 🎉" });
 
-      openModal('confirmation', {
-        title: "Imprimir Ticket",
-        message: "¿Desea imprimir el ticket?",
-        onConfirm: () => {
-          const tx = { ...(response?.saleData || {}), ...saleToCreate };
-          setTicketData({ transaction: tx, creditStatus: null });
-        }
-      });
+// Datos consistentes para el ticket
+const txToPrint = {
+  ...(response?.saleData || {}),
+  items: response?.saleData?.items || saleToCreate.items,
+  pagoDetalles: response?.saleData?.pagoDetalles || saleToCreate.pagoDetalles,
+  subtotal: response?.saleData?.subtotal ?? saleToCreate.subtotal,
+  descuento: response?.saleData?.descuento ?? saleToCreate.descuento,
+  total_venta: response?.saleData?.total_venta ?? saleToCreate.totalVenta,
+};
+
+if (pagoDetalles?.shouldPrintNow) {
+  // Asegura que no quede ningún modal encima (por si hubiera un alert previo)
+  try { closeModal(); } catch {}
+  // Dale un tick para que se desmonte el PaymentModal antes de abrir el Ticket
+  setTimeout(() => safeOpenTicket(txToPrint), 0);
+} else {
+  // En el flujo normal sí mostramos el alert y preguntamos
+  showAlert({ title: "Éxito", message: "Venta realizada con éxito 🎉" });
+  setTimeout(() => {
+    openModal('confirmation', {
+      title: "Imprimir Ticket",
+      message: "¿Desea imprimir el ticket?",
+      onConfirm: () => safeOpenTicket(txToPrint)
+    });
+  }, 0);
+}
+
 
       await refreshData();
-      console.log("LOG: Datos del servidor refrescados. handleFinishSale finalizado con éxito.");
       return true;
     } catch (error) {
-      console.error("LOG: Error al crear la venta:", error);
       showAlert({ title: "Error", message: `La venta no se pudo guardar. ${error.message}` });
       return false;
     }
@@ -508,13 +544,15 @@ const POS = () => {
       if (saleToReverse?.pagoDetalles) {
         const montoARestar = Number(saleToReverse.pagoDetalles.ingresoCaja || 0);
         if (montoARestar !== 0) {
-          addCajaTransaction({
+          const tx = {
             id: `cancelacion-${saleId}`,
             type: montoARestar > 0 ? 'salida' : 'entrada',
             amount: Math.abs(montoARestar),
             note: `Cancelación Venta #${saleId}`,
             pagoDetalles: { ingresoCaja: -montoARestar }
-          });
+          };
+          addCajaTransaction(tx);
+          try { await api.addCajaTx({ userId, tx }, token); } catch {}
         }
       }
       showAlert({ title: "Éxito", message: `Venta #${saleId} cancelada.` });
@@ -524,17 +562,57 @@ const POS = () => {
     }
   };
 
-  const handleReturnItem = async (sale, item, quantity) => {
-    if (!token) return;
-    showAlert({ title: "Procesando", message: `Devolviendo ${quantity} de ${item.nombre}...`, type: "loading" });
-    try {
-      await api.returnItem({ saleId: sale.id, itemId: item.id_producto || item.id, quantity }, token);
-      showAlert({ title: "Éxito", message: `Devolución registrada.` });
-      await refreshData();
-    } catch (error) {
-      showAlert({ title: "Error", message: `No se pudo devolver el producto. ${error.message || ''}` });
-    }
+// ⬇️ Reemplaza tu handleReturnItem completo por este
+const handleReturnItem = async (sale, item, qty) => {
+  if (!token) return;
+
+  // Usuario actual (ajusta si tu Auth guarda otros campos)
+  const userId =
+    currentUser?.id_usuario ??
+    currentUser?.id ??
+    JSON.parse(localStorage.getItem('me') || '{}')?.id_usuario ??
+    JSON.parse(localStorage.getItem('me') || '{}')?.id;
+
+  const quantity = Number(qty);
+  if (!sale?.id) { showAlert({ title: "Error", message: "Venta inválida." }); return; }
+  if (!item) { showAlert({ title: "Error", message: "Ítem inválido." }); return; }
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    showAlert({ title: "Error", message: "Cantidad inválida." }); return;
+  }
+  if (!userId) { showAlert({ title: "Error", message: "Usuario no identificado." }); return; }
+
+  // Normaliza datos que el backend espera
+  const productId = item.id ?? item.id_producto;
+  const unitPrice = Number(
+    item.precio ?? item.precio_unitario ?? item.precio_venta ?? 0
+  );
+
+  const body = {
+    originalSaleId: sale.id,
+    item: {
+      id: productId,
+      id_producto: productId,      // por si el server lo mira así
+      precio: unitPrice > 0 ? unitPrice : undefined,
+      nombre: item.nombre ?? item.descripcion ?? item.producto ?? ''
+    },
+    quantity,
+    userId
   };
+
+  showAlert({ title: "Procesando", message: `Devolviendo ${quantity} de ${item.nombre || 'producto'}...`, type: "loading" });
+  try {
+    await api.returnItem(body, token); // ← ahora pega a /sales/returns
+    showAlert({ title: "Éxito", message: `Devolución registrada.` });
+    await refreshData();
+  } catch (error) {
+    // Mensaje claro si faltó algún campo
+    const msg = (error?.message || '').includes('Faltan datos')
+      ? 'Faltan datos para la devolución. Verifica usuario, venta, producto y cantidad.'
+      : (error?.message || 'No se pudo devolver el producto.');
+    showAlert({ title: "Error", message: msg });
+  }
+};
+
 
   const handleAbonoSuccess = useCallback(() => {
     closeModal();
@@ -543,51 +621,73 @@ const POS = () => {
   }, [closeModal, showAlert, refreshData]);
 
   const handleReprintTicket = (transaction, creditStatus = null) => {
-    setTicketData({ transaction, creditStatus });
+    safeOpenTicket(transaction);
   };
 
-  // Efectos
   useEffect(() => { setProductsState(initialProducts || []); }, [initialProducts]);
 
-  // Cargar sesión de caja vigente
+  /* ========= Inicio de caja robusto ========= */
   useEffect(() => {
     let mounted = true;
     (async () => {
       if (!userId) return;
-      let session = loadCajaSession(userId) || cajaSessionCtx;
-      if (!session) session = await fetchCajaSessionFromServer(userId, api);
-      if (!mounted) return;
-      if (session) {
-        setCajaSession(session);
-        setIsCajaOpen(!session.closedAt);
+
+      // 1) Intenta sesión local abierta
+      let local = loadCajaSession(userId);
+      if (mounted && local && !local.closedAt) {
+        setCajaSession(local);
+        setIsCajaOpen(true);
         setTasaDolar(loadTasaDolar(userId, tasaDolar));
-      } else {
-        setIsCajaOpen(false);
+      }
+
+      // 2) Consulta al servidor (para cross-browser)
+      const server = await fetchCajaSessionFromServer(userId, api);
+      if (!mounted) return;
+
+      if (server) {
+        setCajaSession(server);
+        setIsCajaOpen(!server.closedAt);
+        setTasaDolar(loadTasaDolar(userId, tasaDolar));
+        saveCajaSession(userId, server); // cachea la del server
       }
     })();
     return () => { mounted = false; };
-  }, [userId, cajaSessionCtx, setCajaSession]);
+  }, [userId, setCajaSession]);
 
-  // Sync caja entre pestañas
+  // Suscripción local (misma máquina)
   useEffect(() => {
     if (!userId) return;
     return subscribeCajaChanges(userId, (s) => {
+      if (!s) return;
       setCajaSession(s);
-      setIsCajaOpen(!s?.closedAt);
+      setIsCajaOpen(!s.closedAt);
       setTasaDolar(loadTasaDolar(userId, tasaDolar));
     });
   }, [userId, setCajaSession]);
 
-  // Si la caja está abierta, cargar ventas del día actual
+  // Polling al servidor cada 5s para reflejar cambios desde otros dispositivos/navegadores
+  useEffect(() => {
+    if (!userId) return;
+    const id = setInterval(async () => {
+      try {
+        const server = await api.getCajaSession(userId, token);
+        if (server) {
+          setCajaSession(server);
+          setIsCajaOpen(!server.closedAt);
+          saveCajaSession(userId, server);
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(id);
+  }, [userId, token, setCajaSession]);
+
   useEffect(() => { if (isCajaOpen) loadSalesFromDB(); }, [isCajaOpen, loadSalesFromDB]);
 
-  // Atajos (F1 enfoca el buscador sin depender de ref)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'F1') {
         e.preventDefault();
-        const el = document.querySelector('input[placeholder*="Buscar producto"]');
-        if (el) el.focus();
+        (searchRef.current || document.querySelector('input[placeholder*="Buscar producto"]'))?.focus();
       }
       if (e.key === 'F2') { e.preventDefault(); if (cart.length > 0) openModal('payment', { total, initialClientId: activeOrder.clientId }); }
       if (e.key === 'F9') { e.preventDefault(); openModal('caja'); }
@@ -606,35 +706,32 @@ const POS = () => {
     if (activeOrder.discount?.type === 'fixed') return Math.min(subtotal, Number(activeOrder.discount.value));
     return 0;
   }, [subtotal, activeOrder.discount]);
-  
   const total = useMemo(() => subtotal - discountAmount, [subtotal, discountAmount]);
 
-  const handleOpenHistoryModal = () => {
-    // Pasamos la función de carga que acepta una fecha
-    openModal('history', { loadSalesFunction: loadSalesFromDB });
+  const handleOpenHistoryModal = () => openModal('history', { loadSalesFunction: loadSalesFromDB });
+
+  // flujo proforma: preguntar "a nombre de"
+  const handleOpenProformaFlow = () => {
+    showPrompt({
+      title: 'Crear Proforma',
+      message: '¿A nombre de quién se emite la proforma?',
+      inputType: 'text',
+      initialValue: '',
+      onConfirm: (nombre) => {
+        openModal('proforma', { proformaFor: (nombre || '').trim() });
+      }
+    });
   };
 
-  const crossDay = shouldWarnCrossDay(cajaSessionCtx); // Lógica de caja
-  const sessionOpenDate = getSessionOpenedDay(cajaSessionCtx); // Lógica de caja
-
-  const headerRight = (
-    <div className="right-actions">
-      <S.Button
-        dark
-        onClick={handleOpenHistoryModal}
-      >
-        <FaHistory /> Historial
-      </S.Button>
-      <S.Button $cancel onClick={() => openModal('caja')}><FaLock /> Gestionar Caja</S.Button>
-    </div>
-  );
+  const crossDay = shouldWarnCrossDay(cajaSessionCtx);
+  const sessionOpenDate = getSessionOpenedDay(cajaSessionCtx);
 
   if (!isCajaOpen) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <h1 style={{ color: '#dc3545' }}>Caja Cerrada</h1>
         <p>La caja de <strong>{currentUser?.nombre_usuario || 'este usuario'}</strong> está cerrada.</p>
-        <S.Button primary onClick={() => openModal('caja')} mt="true"> <FaKeyboard /> Abrir Mi Caja (F9) </S.Button>
+        <S.Button primary onClick={() => openModal('caja')} mt="true"><FaKeyboard /> Abrir Mi Caja (F9)</S.Button>
 
         {modal.name === 'caja' && (
           <CajaModal
@@ -643,6 +740,7 @@ const POS = () => {
             session={loadCajaSession(userId) || cajaSessionCtx}
             onOpenCaja={handleOpenCaja}
             onCloseCaja={handleDoCloseCaja}
+            onRegisterTransaction={handleRegisterTransaction}
             isAdmin={isAdmin}
             showConfirmation={showConfirmation}
             showAlert={showAlert}
@@ -668,7 +766,15 @@ const POS = () => {
       <S.HeaderActions>
         <S.BackButton to="/dashboard"><FaArrowLeft /> Volver</S.BackButton>
         <div style={{ fontSize: '0.8rem', color: '#555' }}><FaKeyboard /> Atajos: <strong>F1</strong> Buscar, <strong>F2</strong> Pagar, <strong>F9</strong> Caja</div>
-        {headerRight}
+
+        <div className="right-actions">
+          <S.Button dark onClick={handleOpenHistoryModal}>
+            <FaHistory /> Historial
+          </S.Button>
+          <S.Button $cancel onClick={() => openModal('caja')}>
+            <FaLock /> Gestionar Caja
+          </S.Button>
+        </div>
       </S.HeaderActions>
 
       <S.PageContentWrapper>
@@ -678,31 +784,88 @@ const POS = () => {
           setSearchTerm={setSearchTerm}
           onProductClick={handleProductClick}
           cartItems={cart}
+          inputRef={searchRef}
         />
 
-        {/* CONTENEDOR DEL PANEL DEL CARRITO */}
         <S.CartPanel>
           <div className="cart-fixed-top">
-            {/* Mensaje de caja abierta desde ayer */}
             {crossDay && (
               <S.InfoBox style={{ background: '#fff3cd', color: '#856404', borderColor: '#ffeeba', marginBottom: '.5rem' }}>
                 Caja abierta desde {sessionOpenDate}. <strong>Se mantiene activa hasta el cierre.</strong>
               </S.InfoBox>
             )}
 
-            <S.InfoBox $pulsate className="caja-pill">
+            <S.InfoBox className="caja-pill">
               <p style={{ margin: 0, fontWeight: 'bold' }}>
                 CAJA: <strong>{currentUser?.nombre_usuario}</strong>
               </p>
               <p style={{ margin: 0 }}>
                 Fondo: <span style={{ fontWeight: 'bold' }}>
-                  C${Number(cajaSessionCtx?.initialAmount || 0).toFixed(2)}
+                  C${fmt(cajaSessionCtx?.initialAmount || 0)}
                 </span>
               </p>
             </S.InfoBox>
-            
+
+            {/* 🔵 Botones de Entrada / Salida en el POS */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+              <S.Button
+                info
+                onClick={() => showPrompt({
+                  title: 'Entrada de dinero',
+                  message: 'Monto a ingresar a caja:',
+                  inputType: 'number',
+                  initialValue: '0',
+                  onConfirm: (val) => {
+                    const amount = Number(val);
+                    if (!Number.isFinite(amount) || amount <= 0) {
+                      showAlert({ title: 'Monto inválido', message: 'Ingresa un número mayor a 0' });
+                      return;
+                    }
+                    showPrompt({
+                      title: 'Nota (opcional)',
+                      message: 'Describe esta entrada',
+                      inputType: 'text',
+                      initialValue: 'Entrada de Dinero',
+                      onConfirm: (note) => handleRegisterTransaction('entrada', amount, note || 'Entrada de Dinero')
+                    });
+                  }
+                })}
+              >
+                <FaSignInAlt /> Entrada
+              </S.Button>
+
+              <S.Button
+                $cancel
+                onClick={() => showPrompt({
+                  title: 'Salida de dinero',
+                  message: 'Monto a retirar de caja:',
+                  inputType: 'number',
+                  initialValue: '0',
+                  onConfirm: (val) => {
+                    const amount = Number(val);
+                    if (!Number.isFinite(amount) || amount <= 0) {
+                      showAlert({ title: 'Monto inválido', message: 'Ingresa un número mayor a 0' });
+                      return;
+                    }
+                    showPrompt({
+                      title: 'Nota (opcional)',
+                      message: 'Describe esta salida',
+                      inputType: 'text',
+                      initialValue: 'Salida de Dinero',
+                      onConfirm: (note) => handleRegisterTransaction('salida', amount, note || 'Salida de Dinero')
+                    });
+                  }
+                })}
+              >
+                <FaSignOutAlt /> Salida
+              </S.Button>
+            </div>
+
             <div className="tickets-header">
               <h3 style={{ margin: 0 }}>Tickets Activos ({orders.length})</h3>
+              <S.Button primary onClick={handleNewOrder} style={{ marginLeft: 'auto' }}>
+                <FaPlus /> Nuevo
+              </S.Button>
             </div>
 
             <S.TicketContainer>
@@ -711,18 +874,15 @@ const POS = () => {
                   key={order.id}
                   style={{ backgroundColor: activeOrderId === order.id ? '#007bff' : '#6c757d', color: 'white' }}
                   onClick={() => setActiveOrderId(order.id)}
-                  onDoubleClick={() => onRenameOrder(order.id, order.name)}
+                  onDoubleClick={() => handleRenameOrder(order.id, order.name)}
+                  title={order.name}
                 >
-                  {/* FIX RESPONSIVO: Asegurar que el nombre no exceda el ancho en móvil */}
-                  <span style={{ maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {order.name}
                   </span>
-                  ({order.items.length})
+                  {' '}({order.items.length})
                 </S.Button>
               ))}
-              <S.Button primary onClick={handleNewOrder}>
-                <FaPlus /> Nuevo
-              </S.Button>
             </S.TicketContainer>
 
             {orders.length > 1 && (
@@ -730,30 +890,31 @@ const POS = () => {
                 <FaTrashAlt /> Cerrar Ticket
               </S.Button>
             )}
-            
+
             <h2 className="cart-title" style={{ marginTop: '1rem' }}>
-              {activeOrder.name} <FaShoppingCart />
+              <FaShoppingCart />
+              <span className="cart-title-name" title={activeOrder.name}>{activeOrder.name}</span>
+              <span className="cart-title-count">({cart.length})</span>
             </h2>
           </div>
 
-          {/* CLAVE: Usamos activeOrderId como 'key' para forzar la recreación de CartContentView */}
           <CartContentView
-              key={activeOrderId}
-              isAdmin={isAdmin}
-              products={products}
-              cart={cart}
-              tasaDolar={tasaDolar} // Pasamos la tasa para que el subcomponente la muestre
-              onUpdateQty={handleUpdateCartQuantity}
-              onRemoveFromCart={(id) => updateActiveCart(cart.filter(i => i.id !== id))}
-              onSetManualPrice={handleSetManualPrice}
-              onApplyWholesalePrice={handleApplyWholesalePrice}
-              onRevertRetailPrice={handleRevertRetailPrice}
-              discountAmount={discountAmount}
-              subtotal={subtotal}
-              total={total}
-              onApplyOrderDiscount={applyOrderDiscount}
-              onOpenProforma={() => openModal('proforma')}
-              onOpenPayment={() => openModal('payment', { total, initialClientId: activeOrder.clientId })}
+            key={activeOrderId}
+            isAdmin={isAdmin}
+            products={products}
+            cart={cart}
+            tasaDolar={tasaDolar}
+            onUpdateQty={handleUpdateCartQuantity}
+            onRemoveFromCart={(id) => updateActiveCart(cart.filter(i => i.id !== id))}
+            onSetManualPrice={handleSetManualPrice}
+            onApplyWholesalePrice={handleApplyWholesalePrice}
+            onRevertRetailPrice={handleRevertRetailPrice}
+            discountAmount={discountAmount}
+            subtotal={subtotal}
+            total={total}
+            onApplyOrderDiscount={applyOrderDiscount}
+            onOpenProforma={handleOpenProformaFlow}
+            onOpenPayment={() => openModal('payment', { total, initialClientId: activeOrder.clientId })}
           />
         </S.CartPanel>
       </S.PageContentWrapper>
@@ -761,8 +922,8 @@ const POS = () => {
       {/* Modales */}
       {modal.name === 'history' && (
         <SalesHistoryModal
-          loadSales={modal.props.loadSalesFunction} 
-          dailySales={dailySales} 
+          loadSales={modal.props.loadSalesFunction}
+          dailySales={dailySales}
           onCancelSale={handleCancelSale}
           onReturnItem={handleReturnItem}
           onReprintTicket={handleReprintTicket}
@@ -782,7 +943,7 @@ const POS = () => {
           total={modal.props.total || total}
           tasaDolar={tasaDolar}
           clientes={clients}
-          onFinishSale={handleFinishSale} 
+          onFinishSale={handleFinishSale}
           showAlert={showAlert}
           onClose={closeModal}
           initialClientId={String(activeOrder.clientId || 0)}
@@ -796,6 +957,7 @@ const POS = () => {
           session={loadCajaSession(userId) || cajaSessionCtx}
           onOpenCaja={handleOpenCaja}
           onCloseCaja={handleDoCloseCaja}
+          onRegisterTransaction={handleRegisterTransaction}
           isAdmin={isAdmin}
           showConfirmation={showConfirmation}
           showAlert={showAlert}
@@ -811,6 +973,7 @@ const POS = () => {
           subtotal={subtotal}
           discount={discountAmount}
           client={clients.find(c => c.id_cliente === activeOrder.clientId)}
+          proformaFor={modal.props.proformaFor || ''}  // ← nombre capturado
           onClose={closeModal}
         />
       )}
@@ -821,7 +984,8 @@ const POS = () => {
           creditStatus={ticketData.creditStatus}
           clients={clients}
           users={allUsers}
-          onClose={() => setTicketData({ transaction: null, creditStatus: null })}
+          isOpen={ticketData.shouldOpen}
+          onClose={() => setTicketData({ transaction: null, creditStatus: null, shouldOpen: false })}
         />
       )}
 
@@ -848,18 +1012,14 @@ const POS = () => {
 
 export default POS;
 
-// =================================================================
-// Subcomponente interno para el contenido del carrito (CartContentView)
-// =================================================================
+/* =================================================================
+   Subcomponente interno para el contenido del carrito (CartContentView)
+   ================================================================= */
 function CartContentView({
   isAdmin, products, cart, onUpdateQty, onRemoveFromCart, onSetManualPrice,
   onApplyWholesalePrice, onRevertRetailPrice, discountAmount, subtotal, total,
   onApplyOrderDiscount, onOpenProforma, onOpenPayment, tasaDolar
 }) {
-  // ELIMINAMOS EL REQUIRE Y USAMOS LAS IMPORTACIONES DEL ÁMBITO GLOBAL DEL ARCHIVO.
-  // Puesto que FaEdit, FaRedo, FaTags, etc. están importados al inicio de POS.jsx,
-  // el navegador puede acceder a ellos dentro de esta función anidada.
-  
   return (
     <>
       <div className="cart-scroll">
@@ -871,41 +1031,62 @@ function CartContentView({
           const hasWholesalePrice = (productData?.raw?.mayoreo || 0) > 0;
           const isPriceModified = (item.precio_venta || basePrice) !== basePrice;
 
+          const code =
+            item.codigo?.toString() ||
+            item.codigo_barras?.toString() ||
+            item.barcode?.toString() ||
+            item.id_producto?.toString() ||
+            item.id?.toString() ||
+            '';
+
+          const unit = Number(item.precio_venta || item.precio || 0);
+          const totalLine = unit * Number(item.quantity || 0);
+
           return (
             <S.CartItemWrapper key={item.id}>
-              <div className="item-info">
-                <p className="item-name">{item.nombre}</p>
-                <div className="item-details">
-                  <input
-                    type="number"
-                    value={item.quantity}
-                    min="1"
-                    max={item.existencia}
-                    onChange={(e) => onUpdateQty(item.id, e.target.value)}
-                  />
-                  <small>x C${Number(item.precio_venta || item.precio || 0).toFixed(2)}</small>
-
-                  {isAdmin && (
-                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '5px' }}>
-                      <S.ActionButton title="Precio Manual" onClick={() => onSetManualPrice(item)}><FaEdit /></S.ActionButton>
-                      {hasWholesalePrice && (
-                        <S.ActionButton title="Aplicar Mayoreo" onClick={() => onApplyWholesalePrice(item)}>
-                          <FaTags />
-                        </S.ActionButton>
-                      )}
-                      {isPriceModified && (
-                        <S.ActionButton title="Revertir a Precio Normal" onClick={() => onRevertRetailPrice(item)}>
-                          <FaRedo />
-                        </S.ActionButton>
-                      )}
-                    </div>
-                  )}
-                </div>
+              <div className="item-qty">
+                <input
+                  type="number"
+                  value={item.quantity}
+                  min="1"
+                  max={item.existencia}
+                  onChange={(e) => onUpdateQty(item.id, e.target.value)}
+                />
               </div>
 
-              <p className="item-price">
-                C${(Number(item.precio_venta || item.precio || 0) * Number(item.quantity || 0)).toFixed(2)}
-              </p>
+              <div className="item-info" style={{ display: 'grid', gap: 6, width: '100%' }}>
+                {/* NOMBRE completo (multilínea) */}
+                <p className="item-name" title={item.nombre}
+                   style={{ margin: 0, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.2 }}>
+                  {item.nombre}
+                </p>
+
+                <div className="item-meta" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: -2 }}>
+                  {code && <span>Código: <strong>{code}</strong></span>}
+                  <span>Stock: <strong>{item.existencia}</strong></span>
+                </div>
+
+                {isAdmin && (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <S.ActionButton title="Precio Manual" onClick={() => onSetManualPrice(item)}><FaEdit /></S.ActionButton>
+                    {hasWholesalePrice && (
+                      <S.ActionButton title="Aplicar Mayoreo" onClick={() => onApplyWholesalePrice(item)}>
+                        <FaTags />
+                      </S.ActionButton>
+                    )}
+                    {isPriceModified && (
+                      <S.ActionButton title="Revertir a Precio Normal" onClick={() => onRevertRetailPrice(item)}>
+                        <FaRedo />
+                      </S.ActionButton>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="item-unit">C${fmt(unit)} <span style={{ color: '#6c757d' }}>/u</span></div>
+
+              <div className="item-total">C${fmt(totalLine)}</div>
+
               <S.Button $cancel style={{ padding: '0.4rem', minWidth: 'auto', marginLeft: '1rem' }} onClick={() => onRemoveFromCart(item.id)}>
                 <FaTimes />
               </S.Button>
@@ -916,23 +1097,23 @@ function CartContentView({
 
       <div className="cart-fixed-bottom">
         <div>
-          <S.TotalsRow><span>Subtotal:</span><span>C${subtotal.toFixed(2)}</span></S.TotalsRow>
+          <S.TotalsRow><span>Subtotal:</span><span>C${fmt(subtotal)}</span></S.TotalsRow>
           <S.TotalsRow
             onClick={onApplyOrderDiscount}
             style={{ cursor: 'pointer', color: discountAmount > 0 ? '#dc3545' : 'inherit' }}
           >
             <span><FaPercentage /> Descuento Total:</span>
-            <span>- C${discountAmount.toFixed(2)}</span>
+            <span>- C${fmt(discountAmount)}</span>
           </S.TotalsRow>
           <S.TotalsRow $bordered $bold className="grand-total">
-            <span>TOTAL:</span><span>C${total.toFixed(2)}</span>
+            <span>TOTAL:</span><span>C${fmt(total)}</span>
           </S.TotalsRow>
         </div>
-        
+
         <S.InfoBox style={{ backgroundColor: '#fff', padding: '.5rem', borderRadius: 8 }}>
-          <FaDollarSign style={{ marginRight: 5 }} /> Tasa Dólar: <strong>C${Number(tasaDolar).toFixed(2)}</strong>
+          <FaDollarSign style={{ marginRight: 5 }} /> Tasa Dólar: <strong>C${fmt(tasaDolar)}</strong>
         </S.InfoBox>
-        
+
         <div className="cart-actions" style={{ display: 'flex', gap: 8, marginTop: 10 }}>
           <S.Button info onClick={onOpenProforma} disabled={cart.length === 0}>Crear Proforma</S.Button>
           <S.Button pay onClick={onOpenPayment} disabled={cart.length === 0}>Proceder al Pago (F2)</S.Button>

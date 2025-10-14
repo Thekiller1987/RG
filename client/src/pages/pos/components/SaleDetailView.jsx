@@ -1,11 +1,13 @@
-// RUTA: src/pages/pos/components/SaleDetailView.jsx
-
 import React, { useMemo } from 'react';
 import styled from 'styled-components';
 import { FaUser, FaRegClock, FaDollarSign, FaCreditCard, FaPrint, FaTrashAlt, FaUndo, FaInfoCircle } from 'react-icons/fa';
 import { Button as OriginalButton, InfoBox } from '../POS.styles.jsx';
 
-// ===================== Styled Components (Sin cambios) =====================
+const money = (n) => Number(n || 0).toFixed(2);
+const safeItemName = (it, idx = 0) =>
+  it?.nombre ?? it?.name ?? it?.producto ?? it?.descripcion ?? `Item ${idx + 1}`;
+
+// ===================== Styled =====================
 const DetailWrapper = styled.div`
   border-left: 1px solid #e9ecef; padding-left: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.2rem;
 `;
@@ -31,16 +33,22 @@ const StatusBadge = styled.span`
   font-weight: bold; padding: 0.25rem 0.5rem; border-radius: 4px; color: white; background-color: ${props => props.color};
 `;
 
-// ===================== Componente de Vista de Detalle (Final) =====================
+// ===================== Componente =====================
 const SaleDetailView = ({
-  sale, client, creditStatus, dailySales, isAdmin, onOpenAbonoModal,
-  onCancelSale, onReturnItem, onReprintTicket, showConfirmation, showPrompt, showAlert
+  sale, client, creditStatus, dailySales, isAdmin,
+  onOpenAbonoModal, onCancelSale, onReturnItem, onReprintTicket,
+  showConfirmation, showPrompt, showAlert
 }) => {
   const canModifySale = useMemo(() => {
     if (!sale || !isAdmin || sale.estado !== 'COMPLETADA') return false;
     if (sale.pagoDetalles?.credito > 0) {
       const saleDate = new Date(sale.fecha);
-      const hasSubsequentPayments = dailySales.some(tx => (tx.clientId === sale.clientId || tx.idCliente === sale.idCliente) && tx.estado === 'ABONO_CREDITO' && new Date(tx.fecha) > saleDate);
+      const hasSubsequentPayments = dailySales.some(
+        tx =>
+          (tx.clientId === sale.clientId || tx.idCliente === sale.idCliente) &&
+          tx.estado === 'ABONO_CREDITO' &&
+          new Date(tx.fecha) > saleDate
+      );
       return !hasSubsequentPayments;
     }
     return true;
@@ -63,14 +71,34 @@ const SaleDetailView = ({
   const currentStatus = statusInfo[sale.estado] || { text: sale.estado, color: '#6c757d' };
   const isSale = sale.estado === 'COMPLETADA';
 
-  const handleReturnClick = (item) => { /* ... (sin cambios) ... */ };
-  const handleCancelClick = () => { /* ... (sin cambios) ... */ };
+  // =============== HANDLERS ===============
+  const handleReturnClick = (item, index) => {
+    if (!canModifySale) return;
+    if (!onReturnItem) {
+      showAlert?.({ title: 'Config', message: 'Falta onReturnItem en props.', type: 'error' });
+      return;
+    }
+    onReturnItem(item, index); // el prompt vive en el padre
+  };
+
+  const handleCancelClick = () => {
+    if (!canModifySale) return;
+    if (!onCancelSale) {
+      showAlert?.({ title: 'Config', message: 'Falta onCancelSale en props.', type: 'error' });
+      return;
+    }
+    showConfirmation?.({
+      title: 'Cancelar Venta',
+      message: `Esta acción revertirá stock y (si aplica) crédito del cliente.\n\n¿Cancelar la venta #${sale.id}?`,
+      onConfirm: () => onCancelSale(sale.id)
+    });
+  };
 
   return (
     <DetailWrapper>
       <h3>Detalle de Transacción #{sale.id}</h3>
 
-      {/* --- MEJORA VISUAL #1: El Estado de Cuenta ahora es el protagonista y SIEMPRE se muestra si hay un cliente. --- */}
+      {/* Estado de cuenta (si lo pasas) */}
       {client && creditStatus && (
         <InfoBox $type="info" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -86,14 +114,14 @@ const SaleDetailView = ({
         </InfoBox>
       )}
 
-      {/* Detalles generales de la transacción seleccionada */}
+      {/* Datos generales */}
       <DetailSection>
         <p><strong><FaUser /> Cliente:</strong> {client?.nombre || 'Cliente Genérico'}</p>
         <p><strong><FaRegClock /> Fecha:</strong> {new Date(sale.fecha).toLocaleString('es-NI')}</p>
         <p><strong>Estado:</strong> <StatusBadge color={currentStatus.color}>{currentStatus.text}</StatusBadge></p>
       </DetailSection>
 
-      {/* --- MEJORA VISUAL #2: Los detalles de la venta (productos, pagos) solo se muestran si es una VENTA, no un abono. --- */}
+      {/* Productos + resumen solo para ventas (no abonos/devoluciones) */}
       {isSale && (
         <>
           {Array.isArray(sale.items) && sale.items.length > 0 && (
@@ -105,14 +133,14 @@ const SaleDetailView = ({
                 </thead>
                 <tbody>
                   {sale.items.map((item, index) => (
-                    <tr key={item.id_producto || index}>
-                      <td>{item.nombre}</td>
-                      <td>{item.quantity}</td>
-                      <td>C${Number(item.precio).toFixed(2)}</td>
-                      <td>C${(item.quantity * item.precio).toFixed(2)}</td>
+                    <tr key={(item && (item.id_producto || item.id)) ?? index}>
+                      <td>{safeItemName(item, index)}</td>
+                      <td>{item?.quantity ?? item?.cantidad ?? 0}</td>
+                      <td>C${money(item?.precio)}</td>
+                      <td>C${money((item?.quantity ?? item?.cantidad ?? 0) * (item?.precio ?? 0))}</td>
                       <td>
                         {canModifySale && (
-                          <OriginalButton $warning $small onClick={() => handleReturnClick(item)}>
+                          <OriginalButton $warning $small onClick={() => handleReturnClick(item, index)} title="Devolver">
                             <FaUndo />
                           </OriginalButton>
                         )}
@@ -126,24 +154,24 @@ const SaleDetailView = ({
 
           <DetailSection>
             <h4>Resumen Financiero de esta Venta</h4>
-            {sale.subtotal !== undefined && <TotalsRow><span>Subtotal:</span><span>C${Number(sale.subtotal).toFixed(2)}</span></TotalsRow>}
-            {sale.descuento > 0 && <TotalsRow><span>Descuento:</span><span style={{color: '#28a745'}}>- C${Number(sale.descuento).toFixed(2)}</span></TotalsRow>}
-            <TotalsRow $bold $bordered><span>Total Transacción:</span><span>C${Math.abs(Number(sale.totalVenta)).toFixed(2)}</span></TotalsRow>
-            
+            {sale.subtotal !== undefined && <TotalsRow><span>Subtotal:</span><span>C${money(sale.subtotal)}</span></TotalsRow>}
+            {sale.descuento > 0 && <TotalsRow><span>Descuento:</span><span style={{color: '#dc3545'}}>- C${money(sale.descuento)}</span></TotalsRow>}
+            <TotalsRow $bold $bordered><span>Total Transacción:</span><span>C${money(Math.abs(sale.totalVenta))}</span></TotalsRow>
+
             {sale.pagoDetalles && (
               <div style={{marginTop: '1rem'}}>
                 <h5 style={{marginBottom: '0.5rem', fontSize: '1rem'}}>Detalle del Pago:</h5>
-                {sale.pagoDetalles.efectivo > 0 && <TotalsRow><span><FaDollarSign /> Efectivo Recibido:</span><span>C${Number(sale.pagoDetalles.efectivo).toFixed(2)}</span></TotalsRow>}
-                {sale.pagoDetalles.tarjeta > 0 && <TotalsRow><span><FaCreditCard /> Tarjeta:</span><span>C${Number(sale.pagoDetalles.tarjeta).toFixed(2)}</span></TotalsRow>}
-                {sale.pagoDetalles.credito > 0 && <TotalsRow><span><FaUser /> Crédito Otorgado:</span><span style={{color: '#dc3545'}}>C${Number(sale.pagoDetalles.credito).toFixed(2)}</span></TotalsRow>}
-                {sale.pagoDetalles.vuelto > 0 && <TotalsRow><span>Vuelto Entregado:</span><span>- C${Number(sale.pagoDetalles.vuelto).toFixed(2)}</span></TotalsRow>}
+                {sale.pagoDetalles.efectivo > 0 && <TotalsRow><span><FaDollarSign /> Efectivo Recibido:</span><span>C${money(sale.pagoDetalles.efectivo)}</span></TotalsRow>}
+                {sale.pagoDetalles.tarjeta > 0 && <TotalsRow><span><FaCreditCard /> Tarjeta:</span><span>C${money(sale.pagoDetalles.tarjeta)}</span></TotalsRow>}
+                {sale.pagoDetalles.credito > 0 && <TotalsRow><span><FaUser /> Crédito Otorgado:</span><span style={{color: '#dc3545'}}>C${money(sale.pagoDetalles.credito)}</span></TotalsRow>}
+                {sale.pagoDetalles.vuelto > 0 && <TotalsRow><span>Vuelto Entregado:</span><span>- C${money(sale.pagoDetalles.vuelto)}</span></TotalsRow>}
               </div>
             )}
           </DetailSection>
         </>
       )}
 
-      {/* Las acciones se muestran si la transacción no está cancelada */}
+      {/* Acciones */}
       {isAdmin && sale.estado !== 'CANCELADA' && (
         <DetailSection>
           <h4>Acciones</h4>

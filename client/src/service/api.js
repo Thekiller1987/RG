@@ -109,14 +109,15 @@ export const fetchSales = async (token, date = null) => {
 export const createSale = async (saleData, token) => {
     return await request('post', '/sales', token, saleData);
 };
-// FUNCIÓN AGREGADA PARA DEVOLUCIÓN PARCIAL
-export const returnItem = async (returnData, token) => { 
-    return await request('post', '/sales/return-item', token, returnData);
-};
 
-export const createReturn = async (returnData, token) => {
+// ==================== DEVOLUCIONES (AJUSTADO) ====================
+export const returnItem = async (returnData, token) => { 
+    // Ahora apunta al endpoint correcto del servidor
     return await request('post', '/sales/returns', token, returnData);
 };
+export const createReturn = returnItem;
+// ================================================================
+
 export const cancelSale = async (saleId, token) => {
     return await request('delete', `/sales/${saleId}`, token);
 };
@@ -196,4 +197,31 @@ export const fetchSalesChartReport = (token, params) => {
 // ===================================================================
 export const bulkUploadInventory = async (items, token) => {
     return await request('post', '/upload/inventory', token, { items });
+};
+
+// ===================================================================
+// =================== SECCIÓN DE CAJA (NUEVO) =====================
+// ===================================================================
+
+// Nota: getCajaSession acepta token opcional. Si no se pasa, lo toma de localStorage
+export const getCajaSession = async (userId, token) => {
+    const t = token || localStorage.getItem('token');
+    return await request('get', '/caja/session', t, null, {
+        params: { userId }
+    });
+};
+
+export const openCajaSession = async (sessionData, token) => {
+    // { userId, openedAt, openedBy, initialAmount, tasaDolar }
+    return await request('post', '/caja/session/open', token, sessionData);
+};
+
+export const addCajaTx = async (txData, token) => {
+    // { userId, tx: { id, type, amount, note, at, pagoDetalles } }
+    return await request('post', '/caja/session/tx', token, txData);
+};
+
+export const closeCajaSession = async (closeData, token) => {
+    // { userId, countedAmount, closedAt }
+    return await request('post', '/caja/session/close', token, closeData);
 };

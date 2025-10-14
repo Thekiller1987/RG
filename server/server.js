@@ -18,6 +18,7 @@ const financeRoutes = require('./src/routes/financeRoutes.js');
 const salesRoutes = require('./src/routes/salesRoutes.js');
 const reportRoutes = require('./src/routes/reportRoutes.js'); 
 const uploadRoutes = require('./src/routes/uploadRouter.js'); // 🟢 CORREGIDO: 'uploadRoutes.js' cambiado a 'uploadRouter.js'
+const cajaRoutes = require('./src/routes/cajaRoutes.js'); // 👈 NUEVO
 
 
 // 2. Crear una instancia de Express
@@ -49,6 +50,7 @@ app.use('/api/finances', financeRoutes);
 app.use('/api/sales', salesRoutes); 
 app.use('/api/reports', reportRoutes);
 app.use('/api/upload', uploadRoutes); // 🟢 Ahora usa la ruta importada correctamente
+app.use('/api/caja', cajaRoutes); // 👈 MONTA AQUÍ
 
 // Ruta de prueba
 app.get('/', (req, res) => {

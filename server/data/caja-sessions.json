@@ -1,0 +1,150 @@
+{
+  "sessions": [
+    {
+      "id": "caja-3-1760414641610",
+      "openedAt": "2025-10-14T04:04:01.577Z",
+      "openedBy": {
+        "id": 3
+      },
+      "initialAmount": 0,
+      "transactions": [
+        {
+          "id": "entrada-1760415271483",
+          "type": "entrada",
+          "amount": 20,
+          "note": "prueba",
+          "at": "2025-10-14T04:14:31.483Z",
+          "pagoDetalles": {
+            "ingresoCaja": 20
+          }
+        },
+        {
+          "id": "venta-187",
+          "type": "venta_contado",
+          "amount": 145,
+          "note": "Venta #187 ",
+          "at": "2025-10-14T04:16:22.299Z",
+          "pagoDetalles": {
+            "totalVenta": 145,
+            "efectivo": 145,
+            "tarjeta": 0,
+            "transferencia": 0,
+            "dolares": 0,
+            "tasaDolarAlMomento": 36.6,
+            "referenciaTarjeta": null,
+            "credito": 0,
+            "clienteId": 1,
+            "tipoVenta": "contado",
+            "cambio": 0,
+            "ingresoCaja": 145,
+            "shouldPrintNow": true
+          }
+        },
+        {
+          "id": "venta-188",
+          "type": "venta_contado",
+          "amount": 290,
+          "note": "Venta #188 ",
+          "at": "2025-10-14T06:40:35.851Z",
+          "pagoDetalles": {
+            "totalVenta": 290,
+            "efectivo": 290,
+            "tarjeta": 0,
+            "transferencia": 0,
+            "dolares": 0,
+            "tasaDolarAlMomento": 0,
+            "referenciaTarjeta": null,
+            "credito": 0,
+            "clienteId": 1,
+            "tipoVenta": "contado",
+            "cambio": 0,
+            "ingresoCaja": 290,
+            "shouldPrintNow": true
+          }
+        },
+        {
+          "id": "cancelacion-188",
+          "type": "salida",
+          "amount": 290,
+          "note": "Cancelación Venta #188",
+          "at": "2025-10-14T06:40:42.354Z",
+          "pagoDetalles": {
+            "ingresoCaja": -290
+          }
+        },
+        {
+          "id": "venta-189",
+          "type": "venta_contado",
+          "amount": 1900,
+          "note": "Venta #189 ",
+          "at": "2025-10-14T06:53:23.055Z",
+          "pagoDetalles": {
+            "totalVenta": 1900,
+            "efectivo": 1900,
+            "tarjeta": 0,
+            "transferencia": 0,
+            "dolares": 0,
+            "tasaDolarAlMomento": 0,
+            "referenciaTarjeta": null,
+            "credito": 0,
+            "clienteId": 1,
+            "tipoVenta": "contado",
+            "cambio": 0,
+            "ingresoCaja": 1900,
+            "shouldPrintNow": true
+          }
+        },
+        {
+          "id": "venta-191",
+          "type": "venta_contado",
+          "amount": 10,
+          "note": "Venta #191 ",
+          "at": "2025-10-14T07:04:35.748Z",
+          "pagoDetalles": {
+            "totalVenta": 10,
+            "efectivo": 10,
+            "tarjeta": 0,
+            "transferencia": 0,
+            "dolares": 0,
+            "tasaDolarAlMomento": 0,
+            "referenciaTarjeta": null,
+            "credito": 0,
+            "clienteId": 1,
+            "tipoVenta": "contado",
+            "cambio": 0,
+            "ingresoCaja": 10,
+            "shouldPrintNow": true
+          }
+        },
+        {
+          "id": "venta-192",
+          "type": "venta_contado",
+          "amount": 10,
+          "note": "Venta #192 ",
+          "at": "2025-10-14T07:17:38.568Z",
+          "pagoDetalles": {
+            "totalVenta": 10,
+            "efectivo": 10,
+            "tarjeta": 0,
+            "transferencia": 0,
+            "dolares": 0,
+            "tasaDolarAlMomento": 0,
+            "referenciaTarjeta": null,
+            "credito": 0,
+            "clienteId": 1,
+            "tipoVenta": "contado",
+            "cambio": 0,
+            "ingresoCaja": 10,
+            "shouldPrintNow": true
+          }
+        }
+      ],
+      "closedAt": null,
+      "closedBy": null,
+      "countedAmount": null,
+      "difference": null,
+      "notes": "",
+      "tasaDolar": 36.6
+    }
+  ]
+}

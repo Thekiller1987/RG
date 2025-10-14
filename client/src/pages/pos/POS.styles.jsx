@@ -1,3 +1,4 @@
+// client/src/pages/POS/POS.styles.jsx
 import styled, { keyframes, css } from 'styled-components';
 import { FaSpinner } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
@@ -24,10 +25,7 @@ export const pulseGreen = keyframes`
   70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
   100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
 `;
-export const scaleUp = keyframes`
-  from { transform: scale(1); }
-  to { transform: scale(1.03); }
-`;
+
 export const SpinningSpinner = styled(FaSpinner)`
   animation: ${spin} 1s linear infinite;
 `;
@@ -50,7 +48,6 @@ export const HeaderActions = styled.header`
   box-shadow: 0 4px 16px rgba(0,0,0,0.1);
   box-sizing: border-box;
 
-  /* Acciones a la derecha del todo */
   .right-actions {
     justify-self: end;
     display: inline-flex;
@@ -59,32 +56,27 @@ export const HeaderActions = styled.header`
     flex-wrap: wrap;
   }
 
-  /* Contenedor auxiliar si lo usas */
-  .header-buttons {
-    display: inline-flex; gap: 10px; align-items: center;
-  }
-
-  @media (max-width: 768px) {
+  @media (max-width: 900px) {
     grid-template-columns: 1fr auto;
     grid-template-rows: auto auto;
     row-gap: .5rem;
-
-    .right-actions {
-      grid-column: 1 / -1;
-      justify-self: end;
-    }
+    .right-actions { grid-column: 1 / -1; justify-self: end; }
   }
 `;
 
+/* 65% productos / 35% carrito en desktop */
 export const PageContentWrapper = styled.div`
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 65% 35%;
   gap: 1.25rem;
   padding: 1.25rem;
   flex: 1;
   box-sizing: border-box;
 
-  @media (max-width: 1024px) {
+  @media (max-width: 1200px) {
+    grid-template-columns: 60% 40%;
+  }
+  @media (max-width: 900px) {
     grid-template-columns: 1fr;
     gap: 1rem;
     padding: 1rem;
@@ -99,62 +91,87 @@ export const Panel = styled.div`
   padding: 1rem;
   display: flex;
   flex-direction: column;
-  min-height: 0; /* para permitir scroll interno */
+  min-height: 0; /* permite scroll interno */
 `;
 
 export const MainPanel = styled(Panel)`
   animation: ${slideInFromLeft} 0.6s ease-out forwards;
   min-width: 0;
-
-  @media (max-width: 1024px) {
-    min-height: 55vh;
-  }
 `;
 
 export const CartPanel = styled(Panel)`
   animation: ${slideInFromRight} 0.6s ease-out forwards;
-  min-width: 360px;
-  max-width: 520px;
+  min-width: 340px;
+  max-width: 560px;
 
-  /* ▶ Layout fijo: top / lista-scroll / bottom */
+  /* Sticky dentro del viewport mientras se scrollean productos */
+  position: sticky;
+  top: 88px;
+
+  /* Layout: top / lista / bottom */
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: .65rem;
 
-  /* ⬆️ Mucho más alto en desktop (casi toda la pantalla) */
-  height: calc(100vh - 96px);
-  max-height: none;
-  @supports (height: 100svh) {
-    height: calc(100svh - 96px);
+  /* Alto para que siempre se vea la lista */
+  min-height: calc(100vh - 120px);
+
+  .cart-fixed-top {
+    display: flex; flex-direction: column; gap: .5rem;
   }
 
-  /* Cabecera interna del carrito */
-  .cart-fixed-top {
-    display: flex; flex-direction: column; gap: .4rem;
+  .cart-title {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin: 0;
   }
-  .cart-title { display: flex; align-items: center; justify-content: space-between; margin: 0; }
+  .cart-title-name {
+    font-weight: 800;
+    font-size: 1.25rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 75%;
+  }
+  .cart-title-count {
+    font-weight: 600;
+    color: #6c757d;
+    font-size: .95rem;
+  }
+
   .tickets-header { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
   .caja-pill { margin-bottom: .25rem; }
 
-  /* Lista con scroll (ahora mucho más alta por el height del panel) */
-  .cart-scroll { overflow: auto; padding-right: 4px; }
+  /* Lista con scroll real y espacio propio */
+  .cart-scroll {
+    overflow: auto;
+    padding-right: 4px;
+    border: 1px solid #eef1f5;
+    border-radius: 12px;
+    background: #fafbfd;
+    min-height: 260px;
+  }
 
-  /* Footer fijo */
   .cart-fixed-bottom {
     display: flex; flex-direction: column; gap: .5rem;
-    background: #fff; position: sticky; bottom: 0;
+    background: #fff;
+    position: sticky; bottom: 0;
   }
+
   .cart-actions {
     display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;
   }
 
-  /* 📱 Móvil/Tablet: también más alto que antes */
-  @media (max-width: 1024px) {
-    width: 100%; max-width: 100%;
-    min-height: 70vh;       /* antes ~44vh */
-    height: auto;           /* que crezca con la vista */
-    max-height: none;
-    @supports (height: 100svh) { min-height: 70svh; }
+  @media (max-width: 900px) {
+    position: static;
+    min-height: 65vh;
+    grid-template-rows: auto 1fr auto;
+  }
+
+  @media (min-height: 900px) {
+    min-height: calc(100vh - 120px);
   }
 `;
 
@@ -167,14 +184,14 @@ const blocked = [
 const shouldForwardProp = (prop) => !blocked.includes(prop);
 
 export const Button = styled.button.withConfig({ shouldForwardProp })`
-  min-height: 44px;
-  padding: 0.8rem 1.2rem;
+  min-height: 42px;
+  padding: 0.75rem 1rem;
   border: none; border-radius: 12px;
   cursor: pointer;
   font-weight: 600; font-size: 0.95rem;
   transition: all 0.2s cubic-bezier(0.165, 0.84, 0.44, 1);
   display: inline-flex; align-items: center; justify-content: center;
-  gap: 0.65rem;
+  gap: 0.6rem;
   margin-top: ${p => p.mt ? '0.75rem' : '0'};
   box-shadow: 0 4px 10px rgba(0,0,0,0.08);
   flex-shrink: 0;
@@ -201,12 +218,12 @@ export const Button = styled.button.withConfig({ shouldForwardProp })`
   ${p => (p.outOfStock || p.outofstock) && 'opacity: 0.6; pointer-events: none;'}
 
   @media (max-width: 768px) {
-    padding: 0.6rem 0.9rem; font-size: 0.85rem; gap: 0.5rem;
+    padding: 0.6rem 0.9rem; font-size: 0.88rem; gap: 0.5rem;
   }
 `;
 
 export const SearchInput = styled.input`
-  width: 100%; min-height: 50px; padding: 0.9rem 1.2rem;
+  width: 100%; min-height: 48px; padding: 0.9rem 1.2rem;
   border-radius: 12px; border: 1px solid #c7d2e0; background-color: #fff;
   font-size: 1.05rem; transition: all 0.2s ease;
   box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
@@ -231,6 +248,10 @@ export const ProductGrid = styled.div`
   padding: 0.5rem 0.25rem;
   align-content: start;
 
+  @media (min-width: 1400px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+  }
   @media (max-width: 768px) {
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
     gap: 0.75rem;
@@ -269,8 +290,8 @@ export const ProductCard = styled.div`
     @media (max-width: 768px) { height: 70px; font-size: 2rem; }
   }
   .info { padding: .75rem; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
-  p { margin: 0; font-size: .95em; color: #495057; font-weight: 600; line-height: 1.4; }
-  .price { font-weight: 700; color: #007bff; font-size: 1.2em; margin-top: .5rem; }
+  p { margin: 0; font-size: .95em; color: #495057; font-weight: 600; line-height: 1.35; }
+  .price { font-weight: 700; color: #007bff; font-size: 1.15em; margin-top: .5rem; }
 `;
 
 export const StockBadge = styled.div`
@@ -283,21 +304,21 @@ export const StockBadge = styled.div`
     if (out) return '#dc3545';
     if (low) return '#ffc107';
     return '#28a745';
-  }};
+  }}; 
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 `;
 
 export const InfoBox = styled.div`
   background-color: #e6f7ff;
   color: #0056b3;
-  padding: 1rem;
+  padding: 0.8rem 1rem;
   border-radius: 12px;
-  margin-bottom: 1rem;
+  margin-bottom: 0.25rem;
   font-weight: 500;
   display: flex; justify-content: space-between; align-items: center;
   border: 1px solid #bde0ff;
   ${p => p.$pulsate && css`animation: ${pulseGreen} 2s infinite;`}
-  box-shadow: 0 2px 10px rgba(0, 123, 255, 0.1);
+  box-shadow: 0 2px 10px rgba(0, 123, 255, 0.08);
 
   strong { font-weight: 700; color: #007bff; }
 `;
@@ -305,42 +326,69 @@ export const InfoBox = styled.div`
 export const TotalsRow = styled.div`
   display: flex; justify-content: space-between; align-items: center;
   font-size: 1.05rem;
-  font-weight: ${p => p.$bold ? '600' : 'normal'};
-  padding: 0.6rem 0;
+  font-weight: ${p => p.$bold ? '700' : '500'};
+  padding: 0.5rem 0;
   border-top: ${p => p.$bordered ? '1px solid #e0e6ed' : 'none'};
 
   &.grand-total {
-    font-size: 1.8rem; font-weight: 800; color: #28a745;
-    padding: .8rem 0;
+    font-size: 1.75rem; font-weight: 800; color: #28a745;
+    padding: .6rem 0;
   }
 
   @media (max-width: 768px) {
     font-size: 1rem;
-    &.grand-total { font-size: 1.6rem; }
+    &.grand-total { font-size: 1.5rem; }
   }
 `;
 
+/* Ítem de carrito COMPACTO en desktop */
 export const CartItemWrapper = styled.div`
-  display: flex; align-items: center;
-  padding: 0.8rem 0;
-  border-bottom: 1px solid #f0f2f5;
+  display: grid;
+  grid-template-columns: 72px 1fr 120px 110px auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef1f5;
+  background: #fff;
 
   &:last-child { border-bottom: none; }
 
-  .item-info { flex-grow: 1; margin-right: 1rem; }
-  .item-name { font-weight: 600; color: #343a40; margin: 0; font-size: 1.05rem; }
-  .item-details {
-    display: flex; align-items: center; gap: 0.75rem;
-    margin-top: 0.25rem; font-size: 0.9em; color: #6c757d; flex-wrap: wrap;
+  .item-qty { display:flex; align-items:center; gap:6px; }
+
+  /* 🔸 El bloque de información (nombre + meta) usa 3 columnas para tener más ancho */
+  .item-info { min-width: 0; grid-column: 2 / 5; }
+
+  .item-name {
+    font-weight: 600; color: #343a40; margin: 0; font-size: 1rem;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
-  .item-price {
-    font-weight: 700; color: #007bff; min-width: 100px; text-align: right; font-size: 1.15rem;
-  }
+
+  .item-meta { margin-top: 2px; font-size: 0.85rem; color: #6c757d; }
+
+  /* 🔸 Reubico unit y total en sus columnas para mantener orden */
+  .item-unit { grid-column: 3; text-align: right; font-size: 0.95rem; color: #495057; }
+  .item-total { grid-column: 4; font-weight: 700; color: #007bff; text-align: right; font-size: 1.05rem; }
+
   input[type="number"] {
-    width: 65px; padding: 6px; border-radius: 8px; border: 1px solid #c7d2e0;
-    text-align: center; background-color: #fcfcfc; min-height: 38px;
+    width: 64px; padding: 6px; border-radius: 8px; border: 1px solid #c7d2e0;
+    text-align: center; background-color: #fcfcfc; min-height: 36px;
     &:focus { border-color: #007bff; box-shadow: 0 0 0 2px rgba(0,123,255,0.1); outline: none; }
-    @media (max-width: 768px) { width: 52px; font-size: 0.9rem; }
+  }
+
+  @media (max-width: 1100px) {
+    grid-template-columns: 60px 1fr 100px 90px auto;
+  }
+  @media (max-width: 768px) {
+    grid-template-columns: 56px 1fr 90px;
+    grid-template-areas:
+      "qty name actions"
+      "qty meta total";
+    .item-qty { grid-area: qty; }
+    .item-info { grid-area: name; grid-column: auto; }
+    .item-meta { grid-area: meta; }
+    .item-total { grid-area: total; }
   }
 `;
 
@@ -357,13 +405,13 @@ export const ActionButton = styled.button`
   background: #fff; border: 1px solid #e0e6ed; color: #6c757d;
   padding: 6px; margin: 0; display: flex; align-items: center; justify-content: center;
   border-radius: 8px; cursor: pointer; line-height: 1; transition: all 0.2s ease;
-  min-width: 38px; min-height: 38px;
+  min-width: 36px; min-height: 36px;
 
   &:hover { background-color: #e9f5ff; color: #007bff; border-color: #bde0ff; }
 `;
 
 export const TicketContainer = styled.div`
-  display: flex; gap: 5px; overflow-x: auto; padding-bottom: 5px;
+  display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;
 
   & > ${Button} { flex-shrink: 0; padding: 0.5rem 0.75rem; font-size: 0.85rem; }
 
@@ -385,15 +433,15 @@ export const ModalContent = styled.div`
   background: white;
   padding: 2.0rem;
   border-radius: 16px;
-  width: 90%;
-  max-width: ${p => p.$large ? '900px' : '700px'};
+  width: 92%;
+  max-width: ${p => p.$large ? '900px' : '760px'};
   box-shadow: 0 15px 40px rgba(0,0,0,0.2);
-  max-height: 90vh;
+  max-height: 92vh;
   overflow-y: auto;
   animation: ${fadeIn} 0.4s ease-out;
 
   @media (max-width: 768px) {
-    padding: 1.4rem;
+    padding: 1.2rem;
     max-height: 95vh;
   }
 `;
