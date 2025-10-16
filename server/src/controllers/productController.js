@@ -1,48 +1,72 @@
 /**
  * @file productController.js
  * @description Controladores para la lógica de negocio de los productos.
- * @version 2.1.4 (Final)
+ * @version 2.2.2 (BD alineada + DELETE con FKs SET NULL)
  */
 
 const db = require('../config/db.js');
 
+/* ===================== CREATE ===================== */
 const createProduct = async (req, res) => {
-  const { codigo, nombre, costo, venta, existencia, minimo, maximo, id_categoria, id_proveedor, tipo_venta, mayoreo } = req.body;
+  const {
+    codigo, nombre, costo, venta, existencia,
+    minimo, maximo, id_categoria, id_proveedor,
+    tipo_venta, mayoreo
+  } = req.body;
+
   const id_usuario = req.user?.id_usuario || req.user?.id;
+
   if (!codigo || !nombre || costo === undefined || venta === undefined || existencia === undefined) {
     return res.status(400).json({ msg: 'Campos obligatorios: código, nombre, costo, venta y existencia.' });
   }
+
   let connection;
   try {
     connection = await db.getConnection();
     await connection.beginTransaction();
-    const [exist] = await connection.query('SELECT id_producto FROM productos WHERE codigo = ? OR nombre = ?', [codigo, nombre]);
+
+    // No duplicados por código o nombre
+    const [exist] = await connection.query(
+      'SELECT id_producto FROM productos WHERE codigo = ? OR nombre = ?',
+      [codigo, nombre]
+    );
     if (exist.length > 0) throw new Error('Ya existe un producto con este código o nombre.');
-    const productData = { codigo, nombre, costo, venta, existencia, minimo, maximo, id_categoria, id_proveedor, tipo_venta, mayoreo };
+
+    const productData = {
+      codigo, nombre, costo, venta, existencia,
+      minimo, maximo, id_categoria, id_proveedor,
+      tipo_venta, mayoreo
+    };
+
     const [result] = await connection.query('INSERT INTO productos SET ?', [productData]);
     const id_producto = result.insertId;
+
+    // Movimiento inventario
     await connection.query(
       'INSERT INTO movimientos_inventario (id_producto, tipo_movimiento, detalles, id_usuario) VALUES (?, ?, ?, ?)',
-      [id_producto, 'CREACION', `Producto creado con existencia inicial de ${existencia}`, id_usuario]
+      [id_producto, 'CREACION', `Producto creado con existencia inicial de ${existencia}`, id_usuario || null]
     );
+
     await connection.commit();
     res.status(201).json({ id: id_producto, ...productData });
   } catch (error) {
     if (connection) await connection.rollback();
     console.error('Error en createProduct:', error);
-    res.status(500).json({ msg: error.message });
+    res.status(500).json({ msg: error.message || 'Error al crear el producto.' });
   } finally {
     if (connection) connection.release();
   }
 };
 
-const getAllProducts = async (req, res) => {
+
+/* ===================== READ ===================== */
+const getAllProducts = async (_req, res) => {
   try {
     const query = `
       SELECT p.*, c.nombre AS nombre_categoria, pr.nombre AS nombre_proveedor
       FROM productos p
-      LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
-      LEFT JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
+      LEFT JOIN categorias c   ON p.id_categoria  = c.id_categoria
+      LEFT   JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
       ORDER BY p.nombre ASC
     `;
     const [rows] = await db.query(query);
@@ -58,13 +82,13 @@ const getProductById = async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT p.*, c.nombre AS nombre_categoria, pr.nombre AS nombre_proveedor
-       FROM productos p
-       LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
-       LEFT JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
+         FROM productos p
+         LEFT JOIN categorias  c  ON p.id_categoria  = c.id_categoria
+         LEFT JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
        WHERE p.id_producto = ?`,
       [id]
     );
-    if (rows.length === 0) return res.status(404).json({ msg: 'Producto no encontrado.' });
+    if (!rows.length) return res.status(404).json({ msg: 'Producto no encontrado.' });
     res.json(rows[0]);
   } catch (error) {
     console.error('Error en getProductById:', error);
@@ -72,110 +96,194 @@ const getProductById = async (req, res) => {
   }
 };
 
+
+/* ===================== UPDATE ===================== */
 const updateProduct = async (req, res) => {
   const { id } = req.params;
-  const { codigo, nombre, costo, venta, existencia, minimo, maximo, id_categoria, id_proveedor, tipo_venta, mayoreo } = req.body;
+  const {
+    codigo, nombre, costo, venta, existencia,
+    minimo, maximo, id_categoria, id_proveedor,
+    tipo_venta, mayoreo
+  } = req.body;
+
   const id_usuario = req.user?.id_usuario || req.user?.id;
+
   if (!codigo || !nombre || costo === undefined || venta === undefined || existencia === undefined) {
     return res.status(400).json({ msg: 'Campos obligatorios: código, nombre, costo, venta y existencia.' });
   }
+
   let connection;
   try {
     connection = await db.getConnection();
     await connection.beginTransaction();
+
     const [producto] = await connection.query('SELECT * FROM productos WHERE id_producto = ?', [id]);
     if (!producto.length) throw new Error('Producto no encontrado.');
+
+    // Verificar duplicados (excluyéndose a sí mismo)
     const [exist] = await connection.query(
       'SELECT id_producto FROM productos WHERE (codigo = ? OR nombre = ?) AND id_producto != ?',
       [codigo, nombre, id]
     );
     if (exist.length > 0) throw new Error('Ya existe otro producto con este código o nombre.');
-    const productData = { codigo, nombre, costo, venta, existencia, minimo, maximo, id_categoria, id_proveedor, tipo_venta, mayoreo };
+
+    const productData = {
+      codigo, nombre, costo, venta, existencia,
+      minimo, maximo, id_categoria, id_proveedor,
+      tipo_venta, mayoreo
+    };
+
     await connection.query('UPDATE productos SET ? WHERE id_producto = ?', [productData, id]);
+
     const detalles =
-      producto[0].existencia !== existencia
+      Number(producto[0].existencia) !== Number(existencia)
         ? `Stock actualizado de ${producto[0].existencia} a ${existencia}.`
         : 'Detalles del producto actualizados.';
+
     await connection.query(
       'INSERT INTO movimientos_inventario (id_producto, tipo_movimiento, detalles, id_usuario) VALUES (?, ?, ?, ?)',
-      [id, 'EDICION', detalles, id_usuario]
+      [id, 'EDICION', detalles, id_usuario || null]
     );
+
     await connection.commit();
     res.json({ id, ...productData });
   } catch (error) {
     if (connection) await connection.rollback();
     console.error('Error en updateProduct:', error);
-    res.status(500).json({ msg: error.message });
+    res.status(500).json({ msg: error.message || 'Error al actualizar el producto.' });
   } finally {
     if (connection) connection.release();
   }
 };
 
+
+/* ===================== DELETE (con FKs ON DELETE SET NULL) ===================== */
 const deleteProduct = async (req, res) => {
   const { id } = req.params;
   const id_usuario = req.user?.id_usuario || req.user?.id;
+
   let connection;
   try {
     connection = await db.getConnection();
     await connection.beginTransaction();
+
     const [rows] = await connection.query('SELECT nombre FROM productos WHERE id_producto = ?', [id]);
-    if (!rows.length) return res.status(404).json({ msg: 'Producto no encontrado.' });
-    await connection.query('DELETE FROM productos WHERE id_producto = ?', [id]);
+    if (!rows.length) {
+      await connection.rollback();
+      return res.status(404).json({ msg: 'Producto no encontrado.' });
+    }
+
+    const nombreProd = rows[0].nombre;
+
+    // 1) Registrar el movimiento ANTES del DELETE
     await connection.query(
       'INSERT INTO movimientos_inventario (id_producto, tipo_movimiento, detalles, id_usuario) VALUES (?, ?, ?, ?)',
-      [id, 'ELIMINACION', `Producto "${rows[0].nombre}" eliminado.`, id_usuario]
+      [id, 'ELIMINACION', `Producto "${nombreProd}" eliminado.`, id_usuario || null]
     );
+
+    // 2) Borrar el producto (las FKs lo pondrán en NULL donde aplique)
+    await connection.query('DELETE FROM productos WHERE id_producto = ?', [id]);
+
     await connection.commit();
     res.json({ msg: 'Producto eliminado correctamente.' });
   } catch (error) {
     if (connection) await connection.rollback();
     console.error('Error en deleteProduct:', error);
-    res.status(500).json({ msg: error.message });
+    res.status(500).json({ msg: error.message || 'Error interno al eliminar el producto.' });
   } finally {
     if (connection) connection.release();
   }
 };
 
+
+/* ===================== ARCHIVE (opcional) ===================== */
+/**
+ * Tu tabla `productos` NO tiene columna `activo`.
+ * Se mantiene la respuesta segura para no romper nada si alguien llama esta ruta.
+ */
+const archiveProduct = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [exists] = await db.query('SELECT id_producto, nombre FROM productos WHERE id_producto=?', [id]);
+    if (!exists.length) return res.status(404).json({ msg: 'Producto no encontrado.' });
+
+    return res.status(400).json({
+      msg: 'Función no disponible: la tabla productos no tiene columna "activo".',
+      hint: 'Si deseas archivar, agrega la columna: ALTER TABLE productos ADD COLUMN activo TINYINT(1) NOT NULL DEFAULT 1;'
+    });
+  } catch (error) {
+    console.error('Error en archiveProduct:', error);
+    res.status(500).json({ msg: 'No se pudo procesar el archivado.' });
+  }
+};
+
+
+/* ===================== AJUSTE DE STOCK ===================== */
 const adjustStock = async (req, res) => {
   const { id } = req.params;
   const { cantidad, razon } = req.body;
   const id_usuario = req.user?.id_usuario || req.user?.id;
+
   const cantidadNum = parseInt(cantidad, 10);
-  if (isNaN(cantidadNum)) return res.status(400).json({ msg: 'La cantidad debe ser un número válido.' });
+  if (isNaN(cantidadNum) || !Number.isFinite(cantidadNum)) {
+    return res.status(400).json({ msg: 'La cantidad debe ser un número válido.' });
+  }
+
   let connection;
   try {
     connection = await db.getConnection();
     await connection.beginTransaction();
-    const [rows] = await connection.query('SELECT existencia FROM productos WHERE id_producto = ? FOR UPDATE', [id]);
+
+    const [rows] = await connection.query(
+      'SELECT existencia FROM productos WHERE id_producto = ? FOR UPDATE',
+      [id]
+    );
     if (!rows.length) throw new Error('Producto no encontrado.');
-    const oldStock = rows[0].existencia;
+
+    const oldStock = Number(rows[0].existencia);
     const newStock = oldStock + cantidadNum;
-    await connection.query('UPDATE productos SET existencia = ? WHERE id_producto = ?', [newStock, id]);
+
+    await connection.query(
+      'UPDATE productos SET existencia = ? WHERE id_producto = ?',
+      [newStock, id]
+    );
+
     const detalles = `Ajuste: ${cantidadNum > 0 ? '+' : ''}${cantidadNum}. Razón: ${razon || 'No especificada'}. Stock ${oldStock} → ${newStock}.`;
+
     await connection.query(
       'INSERT INTO movimientos_inventario (id_producto, tipo_movimiento, detalles, id_usuario) VALUES (?, ?, ?, ?)',
-      [id, 'AJUSTE_STOCK', detalles, id_usuario]
+      [id, 'AJUSTE_STOCK', detalles, id_usuario || null]
     );
+
     await connection.commit();
     res.json({ msg: 'Stock ajustado correctamente.', newStock });
   } catch (error) {
     if (connection) await connection.rollback();
     console.error('Error en adjustStock:', error);
-    res.status(500).json({ msg: error.message });
+    res.status(500).json({ msg: error.message || 'Error al ajustar stock.' });
   } finally {
     if (connection) connection.release();
   }
 };
 
-const getInventoryHistory = async (req, res) => {
+
+/* ===================== HISTORIAL ===================== */
+const getInventoryHistory = async (_req, res) => {
   try {
     const [rows] = await db.query(`
-      SELECT mi.id_movimiento, mi.fecha, mi.tipo_movimiento, mi.detalles,
-             p.nombre AS nombre_producto, p.codigo AS codigo_producto, u.nombre_usuario
-      FROM movimientos_inventario mi
-      LEFT JOIN productos p ON mi.id_producto = p.id_producto
-      LEFT JOIN usuarios u ON mi.id_usuario = u.id_usuario
-      ORDER BY mi.fecha DESC LIMIT 100
+      SELECT mi.id_movimiento,
+             mi.fecha,
+             mi.tipo_movimiento,
+             mi.detalles,
+             p.nombre         AS nombre_producto,
+             p.codigo         AS codigo_producto,
+             u.nombre_usuario AS nombre_usuario
+        FROM movimientos_inventario mi
+        LEFT JOIN productos p ON mi.id_producto = p.id_producto
+        LEFT JOIN usuarios  u ON mi.id_usuario  = u.id_usuario
+       ORDER BY mi.fecha DESC
+       LIMIT 100
     `);
     res.json(rows);
   } catch (error) {
@@ -184,13 +292,14 @@ const getInventoryHistory = async (req, res) => {
   }
 };
 
+
 module.exports = {
   createProduct,
   getAllProducts,
   getProductById,
   updateProduct,
-  deleteProduct,
+  deleteProduct,   // ← ahora permite eliminar aunque haya ventas/pedidos (Fks SET NULL)
   adjustStock,
-  getInventoryHistory
+  getInventoryHistory,
+  archiveProduct
 };
-
