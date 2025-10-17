@@ -1,8 +1,9 @@
+// client/src/App.jsx
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 
-// --- Importaciones de Páginas ---
+// Páginas
 import Login from './pages/login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import UserManagement from './pages/UserManagement.jsx';
@@ -12,45 +13,133 @@ import ClientesYCreditos from './pages/ClientesYCreditos.jsx';
 import Finances from './pages/Finances.jsx';
 import POS from './pages/pos/POS.jsx';
 import Reports from './pages/Reports.jsx';
-import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Unauthorized from './components/Unauthorized.jsx';
 
-// 🌟 NUEVA IMPORTACIÓN
+// Módulos
+import ProtectedRoute from './components/ProtectedRoute.jsx';
 import InventoryUpload from './pages/InventoryUpload.jsx';
+import CashReport from './pages/CashReport.jsx';
+
+// Mapa de roles
+const ROLES = {
+  ADMIN: 'Administrador',
+  VENDEDOR: 'Vendedor',
+  INVENTARIO: 'Encargado de Inventario',
+  FINANZAS: 'Encargado de Finanzas',
+  GERENTE: 'Gerente',
+};
 
 function App() {
-    const { user, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
 
-    // Mientras el contexto está en su carga inicial, no mostramos nada para evitar flashes
-    if (isLoading) {
-        return null;
-    }
+  // Evitar parpadeo mientras auth carga
+  if (isLoading) return null;
 
-    return (
-        <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/unauthorized" element={<Unauthorized />} />
-            
-            {/* Rutas Protegidas */}
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/pos" element={<ProtectedRoute allowedRoles={['Administrador', 'Vendedor']}><POS /></ProtectedRoute>} />
-            <Route path="/inventory" element={<ProtectedRoute allowedRoles={['Administrador', 'Encargado de Inventario']}><InventoryManagement /></ProtectedRoute>} />
-            <Route path="/orders" element={<ProtectedRoute allowedRoles={['Administrador', 'Vendedor']}><PedidosYApartados /></ProtectedRoute>} />
-            <Route path="/credits" element={<ProtectedRoute allowedRoles={['Administrador', 'Encargado de Finanzas']}><ClientesYCreditos /></ProtectedRoute>} />
-            <Route path="/finances" element={<ProtectedRoute allowedRoles={['Administrador', 'Encargado de Finanzas']}><Finances /></ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute allowedRoles={['Administrador', 'Gerente']}><Reports /></ProtectedRoute>} />
-            <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['Administrador']}><UserManagement /></ProtectedRoute>} />
+  return (
+    <Routes>
+      {/* Públicas */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/unauthorized" element={<Unauthorized />} />
 
-            {/* 🌟 NUEVA RUTA PARA CARGA MASIVA */}
-            <Route 
-                path="/upload/inventory" 
-                element={<ProtectedRoute allowedRoles={['Administrador', 'Encargado de Inventario']}><InventoryUpload /></ProtectedRoute>} 
-            />
+      {/* Protegidas */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        }
+      />
 
-            {/* Ruta por defecto */}
-            <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
-        </Routes>
-    );
+      <Route
+        path="/pos"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR]}>
+            <POS />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/inventory"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.INVENTARIO]}>
+            <InventoryManagement />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/orders"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR]}>
+            <PedidosYApartados />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Alineado con Dashboard: también VENDEDOR */}
+      <Route
+        path="/credits"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.FINANZAS]}>
+            <ClientesYCreditos />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/finances"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS]}>
+            <Finances />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Alineado con Dashboard: ADMIN, GERENTE y FINANZAS */}
+      <Route
+        path="/reports"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
+            <Reports />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/users"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <UserManagement />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ✅ Ruta que faltaba para tu card de Dashboard */}
+      <Route
+        path="/upload/inventory"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.INVENTARIO]}>
+            <InventoryUpload />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Gestión de Cajas */}
+      <Route
+        path="/cash-report"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
+            <CashReport />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Default */}
+      <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
+    </Routes>
+  );
 }
 
 export default App;

@@ -1,199 +1,360 @@
-// client/src/pages/login.jsx
-import React, { useState } from 'react';
-import styled from 'styled-components';
-import { useNavigate } from 'react-router-dom';
-import * as api from '../service/api.js';
+// client/src/pages/Login.jsx
+import React, { useState, useEffect, useMemo } from 'react';
+import styled, { keyframes, createGlobalStyle, css } from 'styled-components';
+import { FaUser, FaLock, FaSignInAlt, FaApple, FaAndroid, FaTimes, FaSpinner } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext.jsx';
+import * as api from '../service/api.js'; // 💡 tu api.js real
+
+// Ruta del logo
+const LOGO_PATH = '/icons/logo.png';
 
 /* ===========================
-   Styled components (completos)
+    PALETA DE COLORES Y EFECTOS
    =========================== */
-const PageWrapper = styled.div`
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  background: linear-gradient(-45deg, #e0eafc, #cfdef3, #eef1f5);
+const C_BG_1 = '#0b1220';
+const C_BG_2 = '#1d2b64';
+const C_ACCENT = '#4A90E2';
+const C_ACCENT_D = '#3B7ADF';
+const C_TEXT_1 = '#e6ecff';
+const C_TEXT_2 = '#99a3c4';
+const GLASS_BG = 'rgba(255, 255, 255, 0.08)';
+const GLASS_STROKE = 'rgba(255, 255, 255, 0.18)';
+
+/* ===========================
+    ANIMACIONES
+   =========================== */
+const spin = keyframes`to { transform: rotate(360deg); }`;
+const gradientFlow = keyframes`
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+`;
+const fadeUp = keyframes`
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+`;
+
+/* ===========================
+    ESTILOS GLOBALES
+   =========================== */
+const GlobalStyle = createGlobalStyle`
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial;
+    color: ${C_TEXT_1};
+    background:
+      radial-gradient(1200px 800px at 15% 10%, #2b3d6d 0%, transparent 60%),
+      radial-gradient(900px 600px at 85% 90%, #18325b 0%, transparent 60%),
+      linear-gradient(135deg, ${C_BG_1} 0%, ${C_BG_2} 100%);
+    -webkit-tap-highlight-color: transparent;
+  }
+`;
+
+/* ===========================
+    CONTENEDORES Y ESTRUCTURA
+   =========================== */
+const Stage = styled.main`
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+`;
+
+const AnimatedBackdrop = styled.div`
+  position: absolute;
+  inset: -20%;
+  background: linear-gradient(-45deg, #4674ff, #3f7efb, #21c8f6, #7f53ac);
+  filter: blur(72px) saturate(120%);
+  opacity: 0.13;
   background-size: 400% 400%;
+  animation: ${gradientFlow} 22s ease infinite;
+  animation-play-state: ${p => (p.$paused ? 'paused' : 'running')};
+  pointer-events: none;
 `;
 
-const FormContainer = styled.div`
-  width: 100%;
-  max-width: 450px;
-  background-color: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-  padding: 2.5rem;
+const Card = styled.form`
+  width: min(440px, 94vw);
+  background: ${GLASS_BG};
+  border: 1px solid ${GLASS_STROKE};
+  border-radius: 28px;
+  backdrop-filter: ${p => (p.$typing ? 'saturate(120%) blur(6px)' : 'saturate(120%) blur(14px)')};
+  -webkit-backdrop-filter: ${p => (p.$typing ? 'saturate(120%) blur(6px)' : 'saturate(120%) blur(14px)')};
+  box-shadow:
+    0 18px 48px rgba(0,0,0,0.42),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+  padding: clamp(22px, 5.2vw, 34px);
+  display: grid;
+  gap: clamp(12px, 2.8vw, 18px);
+  animation: ${fadeUp} .5s ease both;
+`;
+
+const LogoWrap = styled.div`
+  display: grid;
+  place-items: center;
+  padding: 14px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.18);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+`;
+
+const Logo = styled.img`
+  width: clamp(120px, 42vw, 180px);
+  height: auto;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.35));
+`;
+
+const Title = styled.h2`
+  margin: 2px 0 0;
+  font-size: clamp(1.5rem, 4.8vw, 1.9rem);
   text-align: center;
-`;
-
-const Title = styled.h1`
-  font-size: 2rem;
-  font-weight: bold;
-  color: #2c3e50;
-  margin-bottom: 0.5rem;
+  font-weight: 800;
 `;
 
 const Subtitle = styled.p`
-  color: #7f8c8d;
-  margin-bottom: 2rem;
-`;
-
-const Input = styled.input`
-  width: 100%;
-  padding: 0.8rem 1rem;
-  margin-bottom: 1.2rem;
-  border: 1px solid #bdc3c7;
-  border-radius: 8px;
-  transition: all 0.2s ease-in-out;
-  box-sizing: border-box;
-
-  &:focus {
-    outline: none;
-    border-color: #3498db;
-    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.12);
-  }
-`;
-
-const Button = styled.button`
-  width: 100%;
-  padding: 0.8rem 1rem;
-  border: none;
-  border-radius: 8px;
-  background-color: #3498db;
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.12s ease-in-out;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-
-  &:hover {
-    background-color: #2980b9;
-  }
-
-  &:active {
-    transform: translateY(1px);
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-`;
-
-const ErrorMessage = styled.p`
-  color: white;
-  background-color: #e74c3c;
-  padding: 0.8rem;
-  border-radius: 8px;
-  margin-top: 1rem;
+  margin: -2px 0 6px;
+  color: ${C_TEXT_2};
+  text-align: center;
+  font-size: clamp(.9rem, 3.4vw, .95rem);
 `;
 
 /* ===========================
-   Component
+    CAMPOS
    =========================== */
+const Field = styled.label`
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.14);
+  transition: box-shadow .25s ease, border-color .25s ease, background .25s ease;
+  &:focus-within {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(118,166,255,0.6);
+    box-shadow: 0 0 0 3px rgba(74,144,226,0.25);
+  }
+`;
+const IconBox = styled.span`
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  color: ${C_TEXT_2};
+`;
+const Input = styled.input`
+  border: none;
+  outline: none;
+  background: transparent;
+  color: ${C_TEXT_1};
+  font-size: 16px;
+  padding: 8px 2px;
+  &::placeholder { color: ${C_TEXT_2}; }
+`;
+const Error = styled.p`
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: .92rem;
+  text-align: center;
+  color: #ffe6eb;
+  background: rgba(255,70,104,0.12);
+  border: 1px solid rgba(255,70,104,0.35);
+`;
 
+/* ===========================
+    BOTÓN
+   =========================== */
+const Button = styled.button`
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: 16px;
+  border: none;
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  background: linear-gradient(180deg, ${C_ACCENT} 0%, ${C_ACCENT_D} 100%);
+  box-shadow: 0 14px 24px rgba(74,144,226,0.35);
+  transition: all .25s ease;
+  &:hover { filter: brightness(1.05); }
+  &:disabled { opacity: .6; cursor: not-allowed; }
+`;
+const Spinner = styled(FaSpinner)`animation: ${spin} 1s linear infinite;`;
+
+/* ===========================
+    PROMPT PWA
+   =========================== */
+const PwaPrompt = styled.div`
+  position: fixed;
+  left: 12px; right: 12px;
+  bottom: 16px;
+  background: ${GLASS_BG};
+  border: 1px solid ${GLASS_STROKE};
+  backdrop-filter: blur(14px);
+  border-radius: 18px;
+  padding: 14px;
+  z-index: 50;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+  animation: ${fadeUp} .35s ease both;
+  @media (min-width: 768px) { display: none; }
+`;
+const PwaHeader = styled.div`
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-weight: 800; color: ${C_TEXT_1};
+  margin-bottom: 6px;
+  svg { cursor: pointer; color: ${C_TEXT_2}; }
+`;
+const PwaText = styled.p`
+  margin: 0 0 10px;
+  color: ${C_TEXT_2};
+  font-size: .95rem;
+`;
+const PwaButton = styled.button`
+  width: 100%;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 12px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(180deg, ${C_ACCENT} 0%, ${C_ACCENT_D} 100%);
+  box-shadow: 0 12px 22px rgba(74,144,226,.35);
+`;
+
+/* ===========================
+    COMPONENTE PRINCIPAL
+   =========================== */
 const Login = () => {
-  const [nombre_usuario, setNombreUsuario] = useState('');
+  const { login } = useAuth(); // del AuthContext
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [errMsg, setErrMsg] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [showPwaPrompt, setShowPwaPrompt] = useState(false);
+  const [pwaPlatform, setPwaPlatform] = useState(null);
+  const [typing, setTyping] = useState(false);
 
-  const auth = useAuth();
-  const navigate = useNavigate();
+  useEffect(() => {
+    const ua = window.navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isAndroid = /android/.test(ua);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    if ((isIOS || isAndroid) && !isStandalone) {
+      setPwaPlatform(isIOS ? 'ios' : 'android');
+      setShowPwaPrompt(true);
+    }
+  }, []);
 
+  // ✅ Lógica corregida
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setErrMsg('');
-    if (!nombre_usuario || !password) {
-      setErrMsg('Ingresa usuario y contraseña.');
-      return;
-    }
-
-    setSubmitting(true);
+    setError(null);
+    setLoading(true);
     try {
-      // Llamada al helper del servicio: espera { token, user } o al menos token
-      const data = await api.login({ nombre_usuario, password });
-      const token = data.token ?? data.accessToken ?? null;
-      const user = data.user ?? data.usuario ?? data.data?.user ?? null;
-
-      // Si backend devuelve token pero no user, intentamos fetchMe (siempre que haya token)
-      if (token && !user) {
-        try {
-          const me = await api.fetchMe(token);
-          if (me) {
-            await auth.login(me, token);
-            setSubmitting(false);
-            return;
-          }
-        } catch (e) {
-          // seguir al error principal
-          console.warn('fetchMe falló tras login:', e);
-        }
-      }
-
-      if (!token || !user) {
-        throw new Error('Respuesta de login inválida: falta token o user');
-      }
-
-      // login en memoria (AuthContext)
-      await auth.login(user, token);
-
-      // navigate al dashboard (auth.login también navega en la versión del contexto, pero aseguramos)
-      navigate('/dashboard', { replace: true });
+      const data = await api.login({ nombre_usuario: username, password });
+      const token = data?.token ?? data?.accessToken ?? data?.data?.token ?? null;
+      const user = data?.user ?? data?.usuario ?? data?.data?.user ?? null;
+      if (!token || !user) throw new Error('Respuesta de login inválida');
+      await login(user, token); // AuthContext maneja todo
     } catch (err) {
-      console.error('Login error:', err);
-      // err puede ser Error o un objeto con message
-      setErrMsg(err.message || (err.response && (err.response.data?.msg || JSON.stringify(err.response.data))) || 'Error en login');
+      const msg = err?.message?.includes('401')
+        ? 'Credenciales inválidas.'
+        : err?.message || 'Error al conectar con el servidor.';
+      setError(msg);
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
   return (
-    <PageWrapper>
-      <FormContainer>
-        <Title>MultirepuestosRG</Title>
-        <Subtitle>Bienvenido de nuevo</Subtitle>
+    <>
+      <GlobalStyle />
+      <Stage>
+        <AnimatedBackdrop $paused={typing} />
+        <Card onSubmit={handleSubmit} $typing={typing}>
+          <LogoWrap>
+            <Logo src={LOGO_PATH} alt="Logo Multirepuestos RG" />
+          </LogoWrap>
 
-        <form onSubmit={handleSubmit} aria-label="login-form">
-          <Input
-            aria-label="usuario"
-            type="text"
-            placeholder="Nombre de usuario"
-            value={nombre_usuario}
-            onChange={(e) => setNombre_usuario_and_clear_error(e.target.value)}
-          />
-          <Input
-            aria-label="password"
-            type="password"
-            placeholder="Contraseña"
-            value={password}
-            onChange={(e) => setPassword_and_clear_error(e.target.value)}
-          />
+          <Title>Acceso al Sistema</Title>
+          <Subtitle>Introduce tus credenciales de usuario para ingresar.</Subtitle>
 
-          <Button type="submit" disabled={submitting}>
-            {submitting ? 'Ingresando...' : 'Iniciar Sesión'}
+          {error && <Error>{error}</Error>}
+
+          <Field>
+            <IconBox><FaUser /></IconBox>
+            <Input
+              type="text"
+              placeholder="Nombre de usuario"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              onFocus={() => setTyping(true)}
+              onBlur={() => setTyping(false)}
+              required
+              disabled={loading}
+              autoComplete="username"
+              spellCheck={false}
+            />
+          </Field>
+
+          <Field>
+            <IconBox><FaLock /></IconBox>
+            <Input
+              type="password"
+              placeholder="Contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onFocus={() => setTyping(true)}
+              onBlur={() => setTyping(false)}
+              required
+              disabled={loading}
+              autoComplete="current-password"
+            />
+          </Field>
+
+          <Button type="submit" disabled={loading}>
+            {loading ? <Spinner /> : <FaSignInAlt />}
+            {loading ? 'Cargando…' : 'Ingresar'}
           </Button>
-          {errMsg && <ErrorMessage role="alert">{errMsg}</ErrorMessage>}
-        </form>
-      </FormContainer>
-    </PageWrapper>
-  );
+        </Card>
 
-  // helper functions (local) to keep error cleared on change
-  function setNombre_usuario_and_clear_error(v) {
-    setErrMsg('');
-    setNombreUsuario(v);
-  }
-  function setPassword_and_clear_error(v) {
-    setErrMsg('');
-    setPassword(v);
-  }
+        {showPwaPrompt && (
+          <PwaPrompt>
+            <PwaHeader>
+              <span>¡Descarga MultirepuestosRG! 📲</span>
+              <FaTimes onClick={() => setShowPwaPrompt(false)} />
+            </PwaHeader>
+            <PwaText>
+              {pwaPlatform === 'ios'
+                ? 'Para instalar la app, toca el botón de Compartir (⬆️) y luego “Añadir a pantalla de inicio”.'
+                : 'Toca el menú (⋮) de tu navegador y luego “Instalar aplicación”.'}
+            </PwaText>
+            <PwaButton onClick={() => setShowPwaPrompt(false)}>
+              {pwaPlatform === 'ios' ? <FaApple /> : <FaAndroid />}
+              {pwaPlatform === 'ios' ? 'Entendido' : 'Instalar ahora'}
+            </PwaButton>
+          </PwaPrompt>
+        )}
+      </Stage>
+    </>
+  );
 };
 
 export default Login;

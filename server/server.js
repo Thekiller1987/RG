@@ -17,9 +17,8 @@ const orderRoutes = require('./src/routes/orderRoutes.js');
 const financeRoutes = require('./src/routes/financeRoutes.js');
 const salesRoutes = require('./src/routes/salesRoutes.js');
 const reportRoutes = require('./src/routes/reportRoutes.js'); 
-const uploadRoutes = require('./src/routes/uploadRouter.js'); // 🟢 CORREGIDO: 'uploadRoutes.js' cambiado a 'uploadRouter.js'
-const cajaRoutes = require('./src/routes/cajaRoutes.js'); // 👈 NUEVO
-
+const uploadRoutes = require('./src/routes/uploadRouter.js'); // 🟢 CORREGIDO
+const cajaRoutes = require('./src/routes/cajaRoutes.js');     // 👈 NUEVO / REPORTE CAJA
 
 // 2. Crear una instancia de Express
 const app = express();
@@ -27,13 +26,9 @@ const app = express();
 // 3. Configurar Middlewares
 app.use(cors());
 
-// ⭐️ MODIFICACIÓN CLAVE PARA CORREGIR EL ERROR 413: PAYLOAD TOO LARGE ⭐️
-// Aumentamos el límite de la carga útil (payload) de JSON de 1MB (por defecto) a 50MB
+// ⭐️ Evita 413: payload grande
 app.use(express.json({ limit: '50mb' }));
-
-// Para manejar datos de formularios (si los usas)
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
-
 
 // 4. Definir el puerto
 const PORT = process.env.PORT || 3001;
@@ -49,15 +44,15 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/finances', financeRoutes);
 app.use('/api/sales', salesRoutes); 
 app.use('/api/reports', reportRoutes);
-app.use('/api/upload', uploadRoutes); // 🟢 Ahora usa la ruta importada correctamente
-app.use('/api/caja', cajaRoutes); // 👈 MONTA AQUÍ
+app.use('/api/upload', uploadRoutes);
+app.use('/api/caja', cajaRoutes); // 👈 MONTAJE DE CAJA (incluye /reporte)
 
 // Ruta de prueba
-app.get('/', (req, res) => {
-  res.send('¡API de MultirepuestosRG funcionando! 🚀');
+app.get('/', (_req, res) => {
+  res.send('¡API de MultirepuestosRG funcionando! 🚀');
 });
 
 // 6. Poner el servidor a escuchar
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en el puerto ${PORT}`);
+  console.log(`Servidor corriendo en el puerto ${PORT}`);
 });

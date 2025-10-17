@@ -774,10 +774,65 @@
           }
         }
       ],
-      "closedAt": null,
-      "closedBy": null,
-      "countedAmount": null,
-      "difference": null,
+      "closedAt": "2025-10-16T23:32:19.329Z",
+      "closedBy": {
+        "id": 3
+      },
+      "countedAmount": 3228,
+      "difference": -1180,
+      "notes": "",
+      "tasaDolar": 36.6
+    },
+    {
+      "id": "caja-3-1760662701812",
+      "openedAt": "2025-10-17T00:58:21.779Z",
+      "openedBy": {
+        "id": 3
+      },
+      "initialAmount": 1,
+      "transactions": [],
+      "closedAt": "2025-10-17T00:58:29.153Z",
+      "closedBy": {
+        "id": 3
+      },
+      "countedAmount": 1,
+      "difference": 0,
+      "notes": "",
+      "tasaDolar": 36.6
+    },
+    {
+      "id": "caja-3-1760664088663",
+      "openedAt": "2025-10-17T01:21:28.630Z",
+      "openedBy": {
+        "id": 3
+      },
+      "initialAmount": 1,
+      "transactions": [],
+      "closedAt": "2025-10-17T04:54:54.052Z",
+      "closedBy": {
+        "id": 3
+      },
+      "countedAmount": 1,
+      "difference": 0,
+      "notes": "",
+      "tasaDolar": 36.6
+    },
+    {
+      "id": "caja-3-1760681829011",
+      "openedAt": "2025-10-17T06:17:08.951Z",
+      "openedBy": {
+        "id": "3",
+        "name": "waskar"
+      },
+      "initialAmount": 1,
+      "transactions": [],
+      "closedAt": "2025-10-17T06:17:15.961Z",
+      "closedBy": {
+        "id": "3",
+        "name": "waskar"
+      },
+      "countedAmount": 1,
+      "difference": 0,
       "notes": "",
       "tasaDolar": 36.6
     }

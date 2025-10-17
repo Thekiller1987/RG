@@ -28,7 +28,7 @@ const request = async (method, path, token = null, data = null, config = {}) => 
 
         // 💡 CLAVE: Si hay 'params' en la configuración (usado por fetchSales), Axios los añade como query string.
         if (config.params && method === 'get') {
-             requestConfig.params = config.params;
+            requestConfig.params = config.params;
         }
 
         const res = await axiosBase.request(requestConfig);
@@ -200,7 +200,7 @@ export const bulkUploadInventory = async (items, token) => {
 };
 
 // ===================================================================
-// =================== SECCIÓN DE CAJA (NUEVO) =====================
+// =================== SECCIÓN DE CAJA (ACTUALIZADO) =================
 // ===================================================================
 
 // Nota: getCajaSession acepta token opcional. Si no se pasa, lo toma de localStorage
@@ -224,4 +224,35 @@ export const addCajaTx = async (txData, token) => {
 export const closeCajaSession = async (closeData, token) => {
     // { userId, countedAmount, closedAt }
     return await request('post', '/caja/session/close', token, closeData);
+};
+
+
+/**
+ * NUEVO: Obtiene el reporte de cierres de caja para una fecha específica.
+ * Asume el endpoint usado en CashReport.jsx.
+ * @param {string} date - Fecha en formato 'YYYY-MM-DD'.
+ * @param {string} token - Token de autenticación.
+ */
+export const fetchClosedCajaReport = async (date, token) => {
+    return await request('get', '/caja/reporte', token, null, { params: { date } });
+};
+
+/**
+ * NUEVO: Obtiene todas las sesiones de caja actualmente abiertas.
+ * Asume el endpoint usado en CashReport.jsx.
+ * @param {string} token - Token de autenticación.
+ */
+export const fetchActiveCajaSessions = async (token) => {
+    return await request('get', '/caja/abiertas/activas', token);
+};
+
+/**
+ * NUEVO: Permite obtener el reporte individual (PDF/HTML) por ID.
+ * @param {string} sessionId - ID de la sesión (puede ser 'caja-X-TIMESTAMP').
+ * @param {string} token - Token de autenticación.
+ */
+export const fetchCajaReportById = async (sessionId, token) => {
+    // Si tu backend retorna un PDF o HTML, este endpoint solo necesita ser llamado.
+    // La forma en que lo usamos en el frontend es navegar a la URL directamente.
+    return await request('get', `/caja/reporte/${sessionId}`, token);
 };

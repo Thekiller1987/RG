@@ -1,4 +1,5 @@
 // client/src/utils/caja.js
+
 /**
  * Persistencia y sincronización de sesión de caja por USUARIO y por DÍA.
  * - Clave por día: "caja_session_${userId}_${YYYY-MM-DD}"
@@ -9,8 +10,16 @@
 // ───────────────────────────────────────────────────────────────
 // Utilidades de fecha y claves
 // ───────────────────────────────────────────────────────────────
-/** Formatea fecha a YYYY-MM-DD (UTC) */
-const toDay = (date) => date.toISOString().substring(0, 10);
+
+/** Día LOCAL YYYY-MM-DD (evita desfases por UTC) */
+const toDay = (date) => {
+  const d = (date instanceof Date) ? date : new Date(date);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+};
+
 /** Clave por día para una sesión de caja de un usuario */
 const dayKey = (userId, date) => `caja_session_${userId}_${toDay(date)}`;
 /** Índice estable que apunta a la clave vigente del día (o la última usada) */
@@ -18,12 +27,53 @@ const indexKey = (userId) => `caja_session_index_${userId}`;
 /** Prefijo para detectar eventos de otras fechas en storage */
 const keyPrefix = (userId) => `caja_session_${userId}_`;
 
+/* ──────────────────────────────────────────────────────────────
+   Normalización de usuario (para que no aparezca "Usuario 3")
+   ────────────────────────────────────────────────────────────── */
+export const displayCajaUser = (u) => {
+  if (!u) return '—';
+  if (typeof u === 'string') return u;
+  return (
+    u.name ??
+    u.nombre ??
+    u.fullName ??
+    u.displayName ??
+    u.nombre_usuario ??
+    u.username ??
+    (u.id ? `Usuario ${u.id}` : '—')
+  );
+};
+
+export const normalizeCajaUser = (u, fallbackId) => {
+  if (!u) {
+    const id = String(fallbackId ?? '').trim();
+    return id ? { id, name: `Usuario ${id}` } : null;
+  }
+  if (typeof u !== 'object') return { name: String(u) };
+
+  const id = String(u.id ?? fallbackId ?? '').trim();
+  const name =
+    u.name ??
+    u.nombre ??
+    u.fullName ??
+    u.displayName ??
+    u.nombre_usuario ??
+    u.username ??
+    (id ? `Usuario ${id}` : undefined);
+
+  return {
+    ...u,
+    ...(id ? { id } : {}),
+    ...(name ? { name } : {}),
+  };
+};
+
 // ───────────────────────────────────────────────────────────────
 // CARGAR / GUARDAR / LIMPIAR
 // ───────────────────────────────────────────────────────────────
 /**
  * Carga la sesión vigente:
- * 1) Usa índice estable si existe; 2) intenta por día actual; 3) busca huérfanas (últimos 7 días, sin closedAt)
+ * 1) Usa índice estable si existe; 2) intenta por el día actual; 3) busca huérfanas (últimos 7 días, sin closedAt)
  */
 export const loadCajaSession = (userId) => {
   if (!userId) return null;
@@ -44,13 +94,22 @@ export const loadCajaSession = (userId) => {
 
 /**
  * Guarda la sesión y actualiza índice estable. Respeta el día de openedAt si viene, o usa hoy.
+ * Además, normaliza openedBy/closedBy para asegurar que tengan `name`.
  */
 export const saveCajaSession = (userId, sessionObj) => {
   if (!userId || !sessionObj) return;
   try {
-    const openedDate = sessionObj.openedAt ? new Date(sessionObj.openedAt) : new Date();
+    const normalized = { ...sessionObj };
+    if (normalized.openedBy) {
+      normalized.openedBy = normalizeCajaUser(normalized.openedBy, userId);
+    }
+    if (normalized.closedBy) {
+      normalized.closedBy = normalizeCajaUser(normalized.closedBy, normalized.closedBy?.id || userId);
+    }
+
+    const openedDate = normalized.openedAt ? new Date(normalized.openedAt) : new Date();
     const dKey = dayKey(userId, openedDate);
-    localStorage.setItem(dKey, JSON.stringify(sessionObj));
+    localStorage.setItem(dKey, JSON.stringify(normalized));
     localStorage.setItem(indexKey(userId), dKey);
   } catch (e) {
     console.error('Error al guardar la sesión de caja:', e);
@@ -127,6 +186,9 @@ export async function fetchCajaSessionFromServer(userId, api) {
   try {
     const s = await api.getCajaSession(userId);
     if (s) {
+      // Normaliza posibles usuarios antes de persistir
+      if (s.openedBy) s.openedBy = normalizeCajaUser(s.openedBy, userId);
+      if (s.closedBy) s.closedBy = normalizeCajaUser(s.closedBy, s.closedBy?.id || userId);
       saveCajaSession(userId, s);
       return s;
     }
@@ -164,17 +226,20 @@ export const loadTasaDolar = (userId, fallback = 36.60) => {
 // Helpers opcionales para UI (no autocierra a medianoche)
 // ───────────────────────────────────────────────────────────────
 export const isSessionOpen = (session) => Boolean(session && !session.closedAt);
+
 export const getSessionOpenedDay = (session) =>
-  session?.openedAt ? new Date(session.openedAt).toISOString().substring(0, 10) : null;
+  session?.openedAt ? toDay(new Date(session.openedAt)) : null;
+
 export const shouldWarnCrossDay = (session) => {
   if (!isSessionOpen(session)) return false;
   const openedDay = getSessionOpenedDay(session);
-  const today = new Date().toISOString().substring(0, 10);
+  const today = toDay(new Date());
   return openedDay && openedDay !== today;
 };
+
 export const pingCajaIndex = (userId) => {
   if (!userId) return;
-  const idxKey = indexKey(userId);
-  const idx = localStorage.getItem(idxKey);
-  if (idx) localStorage.setItem(idxKey, idx); // dispara 'storage'
+  const idxK = indexKey(userId);
+  const idx = localStorage.getItem(idxK);
+  if (idx) localStorage.setItem(idxK, idx); // dispara 'storage'
 };

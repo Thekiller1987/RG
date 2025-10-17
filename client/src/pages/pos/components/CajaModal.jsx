@@ -5,6 +5,7 @@ import {
   FaLockOpen, FaFileInvoiceDollar, FaRegCreditCard,
   FaMoneyBillWave, FaExchangeAlt, FaUserClock, FaPrint
 } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * Props esperadas:
@@ -27,6 +28,7 @@ const CajaModal = ({
   const [tasaDolar, setTasaDolar] = useState(initialTasaDolar || 36.60);
   const [montoContado, setMontoContado] = useState('');
   const [viewingReport, setViewingReport] = useState(false);
+  const navigate = useNavigate();
 
   const transactions = useMemo(
     () => Array.isArray(session?.transactions) ? session.transactions : [],
@@ -261,6 +263,9 @@ const CajaModal = ({
 
             <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
               <Button primary onClick={handleOpen} style={{ flex: 1, padding: '10px' }}>Abrir Caja</Button>
+            <Button onClick={() => navigate('/dashboard')} style={{ flex: 0.7, padding: '10px', fontWeight: 700 }}>
+                ← Ir al Dashboard
+              </Button>
             </div>
           </>
         ) : viewingReport ? (
