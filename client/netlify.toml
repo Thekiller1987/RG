@@ -1,16 +1,10 @@
-[build]
-  base = "."
-  command = "npm run build"
-  publish = "dist"
-  functions = "no-functions-here" # ruta inexistente para desactivar
-
-# SPA
+# SPA: evita 404 al refrescar
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Proxy API
+# Proxy de API: Netlify (HTTPS) -> VPS (HTTP)
 [[redirects]]
   from = "/api/*"
   to = "http://134.199.195.151/api/:splat"
