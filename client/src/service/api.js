@@ -1,8 +1,8 @@
 // Contenido del archivo '../api.js'
-
 import axios from 'axios';
 
-export const API_URL = 'http://localhost:3001/api';
+// Usa env o cae a /api (para Netlify proxy). En local, pon VITE_API_BASE en .env.local
+export const API_URL = (import.meta?.env?.VITE_API_BASE || '/api').replace(/\/+$/, '');
 
 const axiosBase = axios.create({
     baseURL: API_URL,
@@ -16,18 +16,18 @@ const request = async (method, path, token = null, data = null, config = {}) => 
     try {
         const requestConfig = {
             url: path,
-            method,
+            method: String(method || 'get').toLowerCase(), // normaliza, soporta 'GET'/'get'
             headers,
             withCredentials: !!config.withCredentials,
             ...config,
         };
 
-        if (data !== null && method !== 'get') {
+        if (data !== null && requestConfig.method !== 'get') {
             requestConfig.data = data;
         }
 
-        // 💡 CLAVE: Si hay 'params' en la configuración (usado por fetchSales), Axios los añade como query string.
-        if (config.params && method === 'get') {
+        // Si hay 'params' en la configuración (usado por fetchSales), Axios los añade como query string.
+        if (config.params && requestConfig.method === 'get') {
             requestConfig.params = config.params;
         }
 
