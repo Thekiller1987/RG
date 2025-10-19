@@ -223,24 +223,27 @@ const PaymentModal = ({
     const ingresoRealEnCaja = Math.max(0, numEfectivo + dolaresEnMonedaLocal - cambio);
 
     const pagoDetalles = {
-      totalVenta: Number(total),
-      efectivo: numEfectivo,
-      tarjeta: numTarjeta,
-      transferencia: numTransferencia,
-      dolares: numDolares,
-      tasaDolarAlMomento: Number(tasaDolar),
-      referenciaTarjeta: numTarjeta > 0.01 ? referenciaTarjeta.trim() : null,
-      credito: credito,
-      clienteId: finalClienteId,
-      tipoVenta: computeTipoVenta({
-        efectivo: numEfectivo, tarjeta: numTarjeta, transferencia: numTransferencia,
-        dolaresLocal: dolaresEnMonedaLocal, credito: tipoPagoPrincipal === 'credito'
-      }),
-      cambio: Number(cambio),
-      ingresoCaja: Number(ingresoRealEnCaja),
-      // 👉 bandera para que el POS pregunte si deseas imprimir y abra TicketModal
-      shouldPrintNow: shouldPrintNow
-    };
+  totalVenta: Number(total),
+  efectivo: numEfectivo,
+  tarjeta: numTarjeta,
+  transferencia: numTransferencia,
+  dolares: numDolares,
+  tasaDolarAlMomento: Number(tasaDolar),
+  referenciaTarjeta: numTarjeta > 0.01 ? referenciaTarjeta.trim() : null,
+  credito,                           // shorthand
+  clienteId: finalClienteId,
+  tipoVenta: computeTipoVenta({
+    efectivo: numEfectivo,
+    tarjeta: numTarjeta,
+    transferencia: numTransferencia,
+    dolaresLocal: dolaresEnMonedaLocal,
+    credito: tipoPagoPrincipal === 'credito',
+  }),
+  cambio: Number(cambio),
+  ingresoCaja: Number(ingresoRealEnCaja),
+  shouldPrintNow: shouldPrintNow,    // <- aquí, fuera de computeTipoVenta
+};
+
 
     try {
       if (typeof onFinishSale === 'function') {
@@ -484,25 +487,24 @@ const PaymentModal = ({
 
             {/* Acciones */}
             <div style={{ marginTop: 'auto', display: 'flex', gap: '10px' }}>
-              <Button
-                $cancel
-                onClick={() => handleFinish(true)}   // shouldPrintNow=true → POS pregunta e imprime
-                disabled={isButtonDisabled}
-                onMouseEnter={handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
-                style={{
-                  flex: 1,
-                  padding: '12px 0',
-                  fontSize: '1.1rem',
-                  fontWeight: 800,
-                  backgroundColor: isButtonDisabled ? '#adb5bd' : buttonBgColor,
-                  color: 'white',
-                  transition: 'background-color 0.15s ease-in-out',
-                  borderColor: buttonBorderColor
-                }}
-              >
-                <FaCheckCircle /> Pagar
-              </Button>
+             <Button
+  onClick={() => handleFinish(true)}    // shouldPrintNow = true
+  disabled={isButtonDisabled}
+  onMouseEnter={handleMouseEnter}
+  onMouseLeave={handleMouseLeave}
+  style={{
+    flex: 1,
+    padding: '12px 0',
+    fontSize: '1.1rem',
+    fontWeight: 800,
+    backgroundColor: isButtonDisabled ? '#adb5bd' : buttonBgColor,
+    color: 'white',
+    transition: 'background-color 0.15s ease-in-out',
+    borderColor: buttonBorderColor
+  }}
+>
+  <FaCheckCircle /> Pagar
+</Button>
             </div>
           </div>
         </div>

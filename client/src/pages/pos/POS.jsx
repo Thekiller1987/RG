@@ -51,6 +51,16 @@ import { loadTickets, saveTickets, subscribeTicketChanges } from '../../utils/ti
  * 2. FUNCIONES HELPER FUERA DEL COMPONENTE
  * ================================================================= */
 
+// correlativo simple y persistente para proformas
+const nextProformaNumber = () => {
+  const key = 'proforma_seq';
+  const base = 1760000000000;   // base alta para que siempre aumente
+  const curr = Number(localStorage.getItem(key) || base);
+  const next = curr + 1;
+  localStorage.setItem(key, String(next));
+  return next;
+};
+
 /**
  * Helper: Formatea un número a un string en formato de moneda (C$ con 2 decimales).
  * @param {number} n - El número a formatear.
@@ -85,8 +95,6 @@ const toUserRef = (u, fallbackId = null) => ({
     u?.username ??
     (u?.id_usuario || u?.id ? `Usuario ${u?.id_usuario ?? u?.id}` : 'Usuario'),
 });
-
-
 
 
 /* =================================================================
@@ -225,6 +233,38 @@ const POS = () => {
   // Persistir tickets localmente cada vez que cambian
   useEffect(() => { if (userId) saveTickets(userId, orders, activeOrderId); }, [userId, orders, activeOrderId]);
 
+  // Completa datos faltantes si alguna proforma llega sin número o sin cajero
+  useEffect(() => {
+    const tx = ticketData.transaction;
+    if (!tx) return;
+
+    if (tx.isProforma && (!tx.id || !tx.usuarioNombre)) {
+      setTicketData(prev => ({
+        ...prev,
+        transaction: {
+          ...tx,
+          id: tx.id || nextProformaNumber(),
+          usuarioNombre:
+            tx.usuarioNombre
+            || currentUser?.nombre_usuario
+            || currentUser?.name
+            || 'Cajero',
+        }
+      }));
+    }
+  }, [ticketData.transaction, currentUser, setTicketData]);
+
+  // 🔒 Auto-cerrar la vista previa de ticket después de imprimir
+  useEffect(() => {
+    const handleAfterPrint = () => {
+      setTicketData({ transaction: null, creditStatus: null, shouldOpen: false });
+    };
+    if (ticketData.shouldOpen) {
+      window.addEventListener('afterprint', handleAfterPrint);
+    }
+    return () => window.removeEventListener('afterprint', handleAfterPrint);
+  }, [ticketData.shouldOpen]);
+
   // Sincronización de tickets entre pestañas (misma máquina/usuario)
   useEffect(() => {
     if (!userId) return;
@@ -344,7 +384,7 @@ const POS = () => {
     setIsCajaOpen(false);
     closeModal();
 
-    // 2) Sincronizar con el servidor  ✅ incluye closedBy (arreglo clave)
+    // 2) Sincronizar con el servidor  ✅ incluye closedBy (arreglo clave)
     try {
       await api.closeCajaSession({
         userId,
@@ -674,6 +714,57 @@ const POS = () => {
   /* -----------------------------------------------------------------
    * 3.10. LÓGICA DE VENTA, CANCELACIÓN Y DEVOLUCIÓN
    * ----------------------------------------------------------------- */
+  
+  // ** NUEVA FUNCIÓN: Pregunta por el formato de impresión **
+  const askForPrint = useCallback((txToPrint) => {
+    showAlert({
+      title: "Imprimir Factura",
+      message: "¿Desea imprimir la factura?",
+      type: "custom",
+      buttons: [
+        { 
+          label: "80 mm (Recibo)", 
+          action: () => {
+            setTicketData({ transaction: txToPrint, creditStatus: null, shouldOpen: true, printMode: '80' });
+            closeModal();
+          }, 
+          isPrimary: true 
+        },
+        { 
+          label: "A4 (Completo)", 
+          action: () => {
+            setTicketData({ transaction: txToPrint, creditStatus: null, shouldOpen: true, printMode: 'A4' });
+            closeModal();
+          } 
+        },
+        { label: "No", action: closeModal, isCancel: true }
+      ]
+    });
+  }, [closeModal, showAlert]);
+
+  // =============================================================
+  // Helper centralizado para abrir ticket con usuario correcto
+  // =============================================================
+  const openTicketWith = (tx, payload = {}) => {
+    setTicketData(prev => ({
+      transaction: {
+        ...tx,
+        usuarioNombre:
+          tx?.usuarioNombre ||
+          currentUser?.nombre_usuario ||
+          currentUser?.name ||
+          currentUser?.displayName ||
+          'Usuario',
+        userId: tx?.userId ?? currentUser?.id_usuario ?? currentUser?.id,
+        isProforma: Boolean(payload?.isProforma ?? tx?.isProforma),
+        proformaNombre: payload?.proformaFor ?? tx?.proformaNombre,
+        id: tx?.id ?? tx?.saleId ?? (tx?.isProforma ? `P-${Date.now()}` : undefined),
+      },
+      creditStatus: null,
+      shouldOpen: true,
+      printMode: payload?.printMode || '80',
+    }));
+  };
 
   /**
    * Maneja el proceso final de venta (después del modal de pago).
@@ -777,23 +868,17 @@ const POS = () => {
             descuento: response?.saleData?.descuento ?? discountAmountCalc,
             total_venta: response?.saleData?.total_venta ?? totalCalc,
             totalVenta: response?.saleData?.totalVenta ?? totalCalc,
+            // Añadir datos de usuario y cliente a la transacción para TicketModal
+            userId: currentUser?.id_usuario || currentUser?.id,
+            usuarioNombre: currentUser?.nombre_usuario || currentUser?.name,
         };
 
-        showAlert({ title: "Éxito", message: "Venta realizada con éxito 🎉" });
+showAlert({ title: "Éxito", message: "Venta realizada con éxito" });
 
-        // 4. Preguntar por impresión si el flag está activo
-        if (pagoDetalles?.shouldPrintNow) {
-            setTimeout(() => {
-                openModal('confirmation', {
-                    title: "Imprimir Ticket",
-                    message: "¿Desea imprimir el ticket de venta?",
-                    onConfirm: () => {
-                        safeOpenTicket(txToPrint);
-                        closeModal();
-                    }
-                });
-            }, 0);
-        }
+        // 4. Preguntar por impresión (NUEVO FLUJO)
+       setTimeout(() => askForPrint(txToPrint), 0);
+
+        
 
         await refreshData();
         return true;
@@ -809,7 +894,8 @@ const POS = () => {
    */
   const safeOpenTicket = (payload) => {
     try {
-      setTicketData({ transaction: payload, creditStatus: null, shouldOpen: true });
+      // Abre el modal de confirmación con las opciones de impresión
+      askForPrint(payload);
     } catch (e) {
       showAlert({ title: 'Aviso', message: 'No se pudo abrir el ticket para impresión. Puedes reimprimir desde Historial.' });
     }
@@ -820,6 +906,7 @@ const POS = () => {
    * @param {number} saleId - ID de la venta a cancelar.
    */
   const handleCancelSale = async (saleId) => {
+    // ... (Toda la lógica de cancelación se mantiene sin cambios)
     if (!token) return;
     showAlert({ title: "Procesando", message: "Cancelando venta...", type: "loading" });
     const saleToReverse = dailySales.find(s => String(s.id) === String(saleId));
@@ -892,7 +979,8 @@ const POS = () => {
 
   // Handler para la reimpresión del ticket (desde historial)
   const handleReprintTicket = (transaction, creditStatus = null) => {
-    safeOpenTicket(transaction);
+    // Muestra el modal de opciones de impresión al reimprimir
+    askForPrint(transaction); 
   };
   
   // Handler para recargar datos después de un abono a crédito
@@ -905,7 +993,7 @@ const POS = () => {
   // Handler para abrir el modal de historial de ventas
   const handleOpenHistoryModal = () => openModal('history', { loadSalesFunction: loadSalesFromDB });
   
-  // Flujo para crear una proforma
+  // Flujo para crear una proforma (con correlativo y cajero)
   const handleOpenProformaFlow = () => {
     showPrompt({
       title: 'Crear Proforma',
@@ -913,7 +1001,30 @@ const POS = () => {
       inputType: 'text',
       initialValue: '',
       onConfirm: (nombre) => {
-        openModal('proforma', { proformaFor: (nombre || '').trim() });
+        const proformaNumero = nextProformaNumber(); // ← genera correlativo
+
+        // Abrimos el modal de Proforma pero “envolvemos” setTicketData
+        openModal('proforma', {
+          proformaFor: (nombre || '').trim(),
+          currentUser, // por si el modal lo necesita
+          setTicketData: (payload = {}) => {
+            const baseTx = payload?.transaction || {};
+            const tx = {
+              ...baseTx,
+              isProforma: true,
+              id: baseTx.id ?? proformaNumero, // ← fuerza nro proforma
+              proformaNombre: (nombre || '').trim(),
+              usuarioNombre: baseTx.usuarioNombre
+                ?? currentUser?.nombre_usuario
+                ?? currentUser?.name
+                ?? 'Cajero',
+            };
+
+            // 🔁 Reemplazo del bloque pedido:
+            // setTicketData({ ... })  →  openTicketWith(tx, payload)
+            openTicketWith(tx, payload);
+          }
+        });
       }
     });
   };
@@ -1085,7 +1196,7 @@ const POS = () => {
                   title={order.name}
                 >
                   <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {order.name}
+                      {order.name}
                   </span>
                   {' '}({order.items.length})
                 </S.Button>
@@ -1189,6 +1300,8 @@ const POS = () => {
           client={clients.find(c => c.id_cliente === activeOrder.clientId)}
           proformaFor={modal.props.proformaFor || ''}
           onClose={closeModal}
+          setTicketData={setTicketData} // (el modal puede ignorarlo si usa el wrapper)
+          currentUser={currentUser}
         />
       )}
 
@@ -1200,7 +1313,18 @@ const POS = () => {
           users={allUsers}
           isOpen={ticketData.shouldOpen}
           onClose={() => setTicketData({ transaction: null, creditStatus: null, shouldOpen: false })}
+          printMode={ticketData.printMode}
+          currentUser={currentUser}   // ← clave
         />
+      )}
+
+      {/* 🧲 Botón flotante para cerrar manualmente la vista previa del ticket */}
+      {ticketData.shouldOpen && (
+        <div style={{ position: 'fixed', right: 16, bottom: 16, zIndex: 10000 }}>
+          <S.Button $cancel onClick={() => setTicketData({ transaction: null, creditStatus: null, shouldOpen: false })}>
+            <FaTimes /> Cerrar vista previa
+          </S.Button>
+        </div>
       )}
 
       {/* Modales genéricos: siempre deben ser los últimos para aparecer encima de todo */}
@@ -1231,7 +1355,6 @@ export default POS;
 
 /* =================================================================
  * 4. SUBCOMPONENTE CartContentView (Para el panel derecho del carrito)
- * Se separa para mejor legibilidad, aunque sigue siendo un componente interno.
  * ================================================================= */
 function CartContentView({
   isAdmin, products, cart, onUpdateQty, onRemoveFromCart, onSetManualPrice,
@@ -1290,17 +1413,17 @@ function CartContentView({
                 {/* Acciones solo para Administrador */}
                 {isAdmin && (
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <S.ActionButton title="Precio Manual" onClick={() => onSetManualPrice(item)}><FaEdit /></S.ActionButton>
-                    {hasWholesalePrice && (
-                      <S.ActionButton title="Aplicar Mayoreo" onClick={() => onApplyWholesalePrice(item)}>
-                        <FaTags />
-                      </S.ActionButton>
-                    )}
-                    {isPriceModified && (
-                      <S.ActionButton title="Revertir a Precio Normal" onClick={() => onRevertRetailPrice(item)}>
-                        <FaRedo />
-                      </S.ActionButton>
-                    )}
+                      <S.ActionButton title="Precio Manual" onClick={() => onSetManualPrice(item)}><FaEdit /></S.ActionButton>
+                      {hasWholesalePrice && (
+                        <S.ActionButton title="Aplicar Mayoreo" onClick={() => onApplyWholesalePrice(item)}>
+                          <FaTags />
+                        </S.ActionButton>
+                      )}
+                      {isPriceModified && (
+                        <S.ActionButton title="Revertir a Precio Normal" onClick={() => onRevertRetailPrice(item)}>
+                          <FaRedo />
+                        </S.ActionButton>
+                      )}
                   </div>
                 )}
               </div>
