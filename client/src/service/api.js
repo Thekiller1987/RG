@@ -1,14 +1,19 @@
 import axios from 'axios';
 
-// Normaliza baseURL: si no hay var, usa '/api'; garantiza que empiece con '/'
-const RAW_BASE = import.meta.env.VITE_API_BASE || '/api';
+// ===================================================================
+// === MODIFICACIÓN OBLIGATORIA: CONEXIÓN DIRECTA A DIGITALOCEAN ===
+// Se utiliza la IP pública de tu Droplet (134.199.195.151) y la ruta /api
+// Esto ignora el proxy de Netlify que está fallando.
+const RAW_BASE = 'http://134.199.195.151/api'; 
+// ===================================================================
+
 const API_URL = RAW_BASE.startsWith('/') ? RAW_BASE : `/${RAW_BASE}`;
 
 export { API_URL };
 
 const axiosBase = axios.create({
-  baseURL: API_URL.replace(/\/+$/, ''), // sin slash al final
-  timeout: 10000,
+  baseURL: API_URL.replace(/\/+$/, ''), // sin slash al final
+  timeout: 10000,
 });
 
 
