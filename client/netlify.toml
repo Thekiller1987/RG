@@ -4,9 +4,7 @@
   to = "/index.html"
   status = 200
 
-# Proxy de API: Netlify (HTTPS) -> VPS (HTTP)
-[[redirects]]
-  from = "/api/*"
-  to = "http://134.199.195.151/api/:splat"
-  status = 200
-  force = true
+# REGLA API ELIMINADA:
+# Se eliminó la regla de redireccionamiento para /api/* porque el código
+# JavaScript ahora usa una URL absoluta (http://IP:8080/api),
+# lo cual es más estable y evita conflictos con el proxy de Netlify.
