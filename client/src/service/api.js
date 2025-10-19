@@ -4,10 +4,11 @@ import axios from 'axios';
 // === MODIFICACIÓN OBLIGATORIA: CONEXIÓN DIRECTA A DIGITALOCEAN ===
 // Se utiliza la IP pública de tu Droplet (134.199.195.151) y la ruta /api
 // Esto ignora el proxy de Netlify que está fallando.
-const RAW_BASE = 'http://134.199.195.151/api'; 
+const RAW_BASE = import.meta.env.VITE_API_BASE || '/api';
+const API_URL = RAW_BASE.startsWith('/') ? RAW_BASE : `/${RAW_BASE}`;
 // ===================================================================
 
-const API_URL = RAW_BASE.startsWith('/') ? RAW_BASE : `/${RAW_BASE}`;
+
 
 export { API_URL };
 
