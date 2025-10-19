@@ -1,13 +1,16 @@
-// Contenido del archivo '../api.js'
 import axios from 'axios';
 
-// Usa env o cae a /api (para Netlify proxy). En local, pon VITE_API_BASE en .env.local
-export const API_URL = (import.meta?.env?.VITE_API_BASE || '/api').replace(/\/+$/, '');
+// Normaliza baseURL: si no hay var, usa '/api'; garantiza que empiece con '/'
+const RAW_BASE = import.meta.env.VITE_API_BASE || '/api';
+const API_URL = RAW_BASE.startsWith('/') ? RAW_BASE : `/${RAW_BASE}`;
+
+export { API_URL };
 
 const axiosBase = axios.create({
-    baseURL: API_URL,
-    timeout: 10000,
+  baseURL: API_URL.replace(/\/+$/, ''), // sin slash al final
+  timeout: 10000,
 });
+
 
 const request = async (method, path, token = null, data = null, config = {}) => {
     const headers = { 'Content-Type': 'application/json', ...(config.headers || {}) };
