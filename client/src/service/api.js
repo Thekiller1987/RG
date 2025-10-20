@@ -3,7 +3,7 @@ import axios from 'axios';
 // ===================================================================
 // === MODIFICACIÓN OBLIGATORIA: CONEXIÓN DIRECTA A DIGITALOCEAN ===
 // RAW_BASE DEBE TERMINAR SIN SLASH PARA UNIÓN LIMPIA
-const RAW_BASE = 'http://134.199.195.151:8080/api'; 
+const RAW_BASE = 'https://multirepuestosrg.com/api';
 // ===================================================================
 
 const API_URL = RAW_BASE; // Simplificado
