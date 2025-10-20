@@ -10,11 +10,6 @@ const API_URL = RAW_BASE; // Simplificado
 
 export { API_URL };
 
-// Eliminamos axiosBase para evitar ambigüedades de baseURL
-/* const axiosBase = axios.create({
-  baseURL: API_URL.replace(/\/+$/, ''), 
-  timeout: 10000,
-}); */
 
 
 const request = async (method, path, token = null, data = null, config = {}) => {
@@ -58,11 +53,12 @@ const request = async (method, path, token = null, data = null, config = {}) => 
     }
 };
 
-// --- Autenticación y Datos Maestros ---
 export const login = async (credentials) => {
-    // Asegúrate de que el path comience con un slash para concatenación limpia
-    return await request('post', '/auth/login', null, credentials);
+  const { username, nombre_usuario, password } = credentials;
+  const body = { nombre_usuario: nombre_usuario ?? username, password };
+  return await request('post', '/auth/login', null, body);
 };
+
 export const fetchMe = async (token) => {
     if (!token) throw new Error('fetchMe requires token');
     return await request('get', '/auth/me', token);
