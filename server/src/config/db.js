@@ -1,9 +1,10 @@
-// api/src/config/db.js
+// server/config/db.js
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
+// Crear pool de conexiones usando variables del .env
 const pool = mysql.createPool({
-  host: process.env.MYSQL_HOST || 'db',       // servicio del compose
+  host: process.env.MYSQL_HOST || 'localhost',   // tu droplet
   port: Number(process.env.MYSQL_PORT) || 3306,
   user: process.env.MYSQL_USER || 'appuser',
   password: process.env.MYSQL_PASSWORD || 'AppSegura_2025!',
@@ -13,7 +14,7 @@ const pool = mysql.createPool({
   queueLimit: 0,
 });
 
-// justo después del createPool
+// Test rápido de conexión
 (async () => {
   try {
     const conn = await pool.getConnection();
@@ -23,6 +24,5 @@ const pool = mysql.createPool({
     console.error('Error al conectar con la base de datos (DB.JS):', e.message);
   }
 })();
-
 
 module.exports = pool;
