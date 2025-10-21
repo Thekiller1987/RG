@@ -248,7 +248,7 @@ const UserManagement = () => {
       setError(null);
       const token = localStorage.getItem('token');
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      const { data } = await axios.get('http://localhost:3001/api/users', config);
+      const { data } = await axios.get('/api/users', config);
       setUsers(data);
     } catch (err) {
       setError('Error al cargar los usuarios.');
@@ -291,7 +291,7 @@ const UserManagement = () => {
     try {
       const token = localStorage.getItem('token');
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      await axios.delete(`http://localhost:3001/api/users/${userToDelete.id_usuario}`, config);
+      await axios.delete(`/api/users/${userToDelete.id_usuario}`, config);
       setUsers(users.filter(u => u.id_usuario !== userToDelete.id_usuario));
       setIsDeleteModalOpen(false);
       setUserToDelete(null);
@@ -321,9 +321,9 @@ const UserManagement = () => {
         if (formData.password) {
           updateData.password = formData.password;
         }
-        await axios.put(`http://localhost:3001/api/users/${editingUser.id_usuario}`, updateData, config);
+        await axios.put(`/api/users/${editingUser.id_usuario}`, updateData, config);
       } else {
-        await axios.post('http://localhost:3001/api/auth/register', {
+        await axios.post('/api/auth/register', {
           nombre_usuario: formData.nombre_usuario,
           password: formData.password,
           rol: formData.rol

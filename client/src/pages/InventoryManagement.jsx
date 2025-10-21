@@ -241,7 +241,7 @@ function InventoryHistoryModal({ onClose }) {
     const fetchHistory = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get('http://localhost:3001/api/products/inventory/history', {
+        const res = await axios.get('/api/products/inventory/history', {
           headers: { Authorization: `Bearer ${token}` }
         });
         setHistory(res.data || []);
@@ -466,7 +466,7 @@ const InventoryManagement = () => {
   ================================= */
   const fetchProductList = useCallback(async () => {
     const token = localStorage.getItem('token');
-    const res = await axios.get('http://localhost:3001/api/products', { headers: { Authorization: `Bearer ${token}` } });
+    const res = await axios.get('/api/products', { headers: { Authorization: `Bearer ${token}` } });
     return res.data;
   }, []);
 
@@ -475,8 +475,8 @@ const InventoryManagement = () => {
       const token = localStorage.getItem('token');
       const [full, cats, provs] = await Promise.all([
         fetchProductList(),
-        axios.get('http://localhost:3001/api/categories', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('http://localhost:3001/api/providers',  { headers: { Authorization: `Bearer ${token}` } })
+        axios.get('/api/categories', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/providers',  { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
       setAllProductsRaw(full);
@@ -586,10 +586,7 @@ const InventoryManagement = () => {
       codigo:'', nombre:'', costo:'', venta:'', mayoreo:'', id_categoria:'',
       existencia:'', minimo:'', maximo:'', tipo_venta:'Unidad', id_proveedor:'', descripcion:'',
       ...product,
-      mayoreo: product.mayoreo || '',
-      minimo: product.minimo || '',
-      maximo: product.maximo || '',
-      descripcion: product.descripcion || ''
+      
     });
     setModalError('');
     setIsModalOpen(true);
@@ -601,7 +598,7 @@ const InventoryManagement = () => {
     if (!productToDelete) return;
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:3001/api/products/${productToDelete.id_producto}`, {
+      await axios.delete(`/api/products/${productToDelete.id_producto}`, {
         headers:{ Authorization:`Bearer ${token}` }
       });
       await fetchData();
@@ -621,7 +618,7 @@ const InventoryManagement = () => {
   const archiveProduct = async (p) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.patch(`http://localhost:3001/api/products/${p.id_producto}/archive`, {}, {
+      await axios.patch(`/api/products/${p.id_producto}/archive`, {}, {
         headers:{ Authorization:`Bearer ${token}` }
       });
       setArchivePrompt({ open:false, product:null, detail:null });
@@ -700,9 +697,9 @@ const InventoryManagement = () => {
     try {
       if (editingProduct) {
         const { existencia, ...updatePayload } = payload;
-        await axios.put(`http://localhost:3001/api/products/${editingProduct.id_producto}`, updatePayload, { headers:{ Authorization:`Bearer ${token}` } });
+        await axios.put(`/api/products/${editingProduct.id_producto}`, updatePayload, { headers:{ Authorization:`Bearer ${token}` } });
       } else {
-        await axios.post('http://localhost:3001/api/products', payload, { headers:{ Authorization:`Bearer ${token}` } });
+        await axios.post('/api/products', payload, { headers:{ Authorization:`Bearer ${token}` } });
       }
       setIsModalOpen(false);
       await fetchData();
@@ -714,7 +711,7 @@ const InventoryManagement = () => {
   const executeStockAdjustment = async (product, cantidad, razon) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.patch(`http://localhost:3001/api/products/${product.id_producto}/stock`,
+      await axios.patch(`/api/products/${product.id_producto}/stock`,
         { cantidad, razon }, { headers:{ Authorization:`Bearer ${token}` } }
       );
       setAdjustmentModal({ isOpen:false, product:null });
@@ -729,7 +726,7 @@ const InventoryManagement = () => {
   const handleAddCategory = async (name) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.post('http://localhost:3001/api/categories', { nombre:name }, { headers:{ Authorization:`Bearer ${token}` } });
+      await axios.post('/api/categories', { nombre:name }, { headers:{ Authorization:`Bearer ${token}` } });
       await fetchData();
     } catch (error) {
       showAlert({ title:'Error', message:error.response?.data?.msg || 'No se pudo agregar la categoría.' });
@@ -738,7 +735,7 @@ const InventoryManagement = () => {
   const handleDeleteCategory = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:3001/api/categories/${id}`, { headers:{ Authorization:`Bearer ${token}` } });
+      await axios.delete(`/api/categories/${id}`, { headers:{ Authorization:`Bearer ${token}` } });
       await fetchData();
     } catch (error) {
       showAlert({ title:'Error', message:error.response?.data?.msg || 'No se pudo eliminar la categoría. (Verifique que no esté en uso)' });
@@ -747,7 +744,7 @@ const InventoryManagement = () => {
   const handleAddProvider = async (name) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.post('http://localhost:3001/api/providers', { nombre:name }, { headers:{ Authorization:`Bearer ${token}` } });
+      await axios.post('/api/providers', { nombre:name }, { headers:{ Authorization:`Bearer ${token}` } });
       await fetchData();
     } catch (error) {
       showAlert({ title:'Error', message:error.response?.data?.msg || 'No se pudo agregar el proveedor.' });
@@ -756,7 +753,7 @@ const InventoryManagement = () => {
   const handleDeleteProvider = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:3001/api/providers/${id}`, { headers:{ Authorization:`Bearer ${token}` } });
+      await axios.delete(`/api/providers/${id}`, { headers:{ Authorization:`Bearer ${token}` } });
       await fetchData();
     } catch (error) {
       showAlert({ title:'Error', message:error.response?.data?.msg || 'No se pudo eliminar el proveedor. (Verifique que no esté en uso)' });

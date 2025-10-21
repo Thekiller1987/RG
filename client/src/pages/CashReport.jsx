@@ -15,7 +15,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 
 /* ================== CONFIG ================== */
-const API_URL = 'http://localhost:3001/api';
+const API_URL = '/api';
 const ENDPOINT_REPORTE = `${API_URL}/caja/reporte`;              // ?date=YYYY-MM-DD
 const ENDPOINT_ABIERTAS_ACTIVAS = `${API_URL}/caja/abiertas/activas`;
 
