@@ -1,16 +1,17 @@
 const pool = require('../config/db');
 
+// ✅ Obtener pedidos (con nombre de cliente real o “Cliente no asignado” si no tiene)
 const getOrders = async (req, res) => {
     try {
         const query = `
             SELECT 
-                o.id_pedido as id, 
-                c.nombre as clienteNombre, 
-                o.id_cliente as clienteId,
-                o.total_pedido as total, 
+                o.id_pedido AS id, 
+                COALESCE(NULLIF(c.nombre, ''), 'Cliente no asignado') AS clienteNombre,
+                o.id_cliente AS clienteId,
+                o.total_pedido AS total, 
                 o.abonado, 
                 o.estado, 
-                o.fecha_creacion as fecha
+                o.fecha_creacion AS fecha
             FROM pedidos o
             LEFT JOIN clientes c ON o.id_cliente = c.id_cliente
             ORDER BY o.fecha_creacion DESC
@@ -23,15 +24,60 @@ const getOrders = async (req, res) => {
     }
 };
 
+// ✅ Obtener detalles del pedido y permitir búsqueda de productos por nombre o código
 const getOrderDetails = async (req, res) => {
     const { id } = req.params;
+    const { search } = req.query; // ← parámetro opcional: búsqueda
+
     try {
-        const [orderQuery] = await pool.query('SELECT o.id_pedido as id, c.nombre as cliente, o.total_pedido as total, o.abonado, o.estado, o.fecha_creacion as fecha FROM pedidos o LEFT JOIN clientes c ON o.id_cliente = c.id_cliente WHERE o.id_pedido = ?', [id]);
+        // Datos generales del pedido
+        const [orderQuery] = await pool.query(`
+            SELECT 
+                o.id_pedido AS id, 
+                COALESCE(NULLIF(c.nombre, ''), 'Cliente no asignado') AS cliente,
+                o.total_pedido AS total, 
+                o.abonado, 
+                o.estado, 
+                o.fecha_creacion AS fecha
+            FROM pedidos o
+            LEFT JOIN clientes c ON o.id_cliente = c.id_cliente
+            WHERE o.id_pedido = ?
+        `, [id]);
+
         if (orderQuery.length === 0) {
             return res.status(404).json({ message: 'Pedido no encontrado' });
         }
-        const [itemsQuery] = await pool.query('SELECT p.nombre, p.codigo, dp.cantidad, dp.precio_unitario as precio FROM detalle_pedidos dp JOIN productos p ON dp.id_producto = p.id_producto WHERE dp.id_pedido = ?', [id]);
-        const [abonosQuery] = await pool.query("SELECT fecha, total_venta as monto, pago_detalles FROM ventas WHERE tipo_venta = 'PEDIDO' AND referencia_pedido = ? ORDER BY fecha ASC", [id]);
+
+        // Consulta base para los productos del pedido
+        let productQuery = `
+            SELECT 
+                p.nombre, 
+                p.codigo, 
+                dp.cantidad, 
+                dp.precio_unitario AS precio
+            FROM detalle_pedidos dp
+            JOIN productos p ON dp.id_producto = p.id_producto
+            WHERE dp.id_pedido = ?
+        `;
+        const params = [id];
+
+        // Si hay búsqueda, se filtra por nombre o código
+        if (search && search.trim() !== '') {
+            productQuery += ` AND (p.nombre LIKE ? OR p.codigo LIKE ?)`;
+            const likeSearch = `%${search}%`;
+            params.push(likeSearch, likeSearch);
+        }
+
+        const [itemsQuery] = await pool.query(productQuery, params);
+
+        // Abonos del pedido
+        const [abonosQuery] = await pool.query(`
+            SELECT fecha, total_venta AS monto, pago_detalles 
+            FROM ventas 
+            WHERE tipo_venta = 'PEDIDO' AND referencia_pedido = ?
+            ORDER BY fecha ASC
+        `, [id]);
+
         res.json({
             ...orderQuery[0],
             items: itemsQuery,
@@ -91,7 +137,7 @@ const addAbono = async (req, res) => {
         if (orderRows.length === 0) throw new Error('Pedido no encontrado');
         const order = orderRows[0];
         const saldoPendiente = parseFloat(order.total_pedido) - parseFloat(order.abonado);
-        if(parseFloat(monto) > saldoPendiente + 0.01) { // Tolerancia para decimales
+        if(parseFloat(monto) > saldoPendiente + 0.01) {
             throw new Error('El monto del abono no puede ser mayor al saldo pendiente.');
         }
         const nuevoAbonado = parseFloat(order.abonado) + parseFloat(monto);
