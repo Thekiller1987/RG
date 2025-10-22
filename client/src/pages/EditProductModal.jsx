@@ -1,312 +1,238 @@
-// EditProductModal.jsx
-import React, { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { motion } from 'framer-motion';
-import styled from 'styled-components';
+import React, { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import {
+  ModalOverlay,
+  ModalContent,
+  ModalTitle,
+  ModalError,
+  InputGrid,
+  FormGroup,
+  Label,
+  Input,
+  Select,
+  ModalActions,
+  CancelButton,
+  SaveButton,
+} from "../styles/ModalStyles"; // 👈 ajusta esta ruta a tus estilos
 
-// === Estilos ===
-const ModalOverlay = styled(motion.div)`
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-  padding: 1rem;
-`;
+const EditProductModal = ({
+  isOpen,
+  onClose,
+  onSave,
+  productToEdit,
+  categories,
+  providers,
+  allProductsRaw,
+}) => {
+  const [formData, setFormData] = useState({});
+  const [profitPercentage, setProfitPercentage] = useState("");
+  const [modalError, setModalError] = useState("");
 
-const ModalContent = styled.div`
-  background: #fdfdff;
-  padding: 2.5rem;
-  border-radius: 16px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 10px 30px rgba(0,0,0,.2);
-  width: 90vw;
-  max-width: 450px;
-
-  @media (min-width: 768px) {
-    max-width: 800px;
-  }
-`;
-
-const ModalTitle = styled.h2`
-  margin: 0 0 2rem;
-  color: #1a202c;
-  text-align: center;
-  font-size: 1.75rem;
-`;
-
-const ModalError = styled.p`
-  color: #dc3545;
-  font-size: .9rem;
-  text-align: center;
-  margin-bottom: 1rem;
-  min-height: 1.2rem;
-`;
-
-const InputGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
-`;
-
-const FormGroup = styled.div`
-  display: flex;
-  flex-direction: column;
-`;
-
-const Label = styled.label`
-  margin-bottom: .5rem;
-  color: #495057;
-  font-weight: 600;
-`;
-
-const Input = styled.input`
-  width: 100%;
-  padding: .8rem 1rem;
-  border-radius: 8px;
-  border: 1px solid #ced4da;
-  font-size: 1rem;
-`;
-
-const Select = styled.select`
-  width: 100%;
-  padding: .75rem 1rem;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  font-size: 1rem;
-  background: #fff;
-  cursor: pointer;
-`;
-
-const ModalActions = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  margin-top: 2rem;
-
-  @media (max-width: 500px) {
-    justify-content: space-between;
-  }
-`;
-
-const Button = styled(motion.button)`
-  padding: .6rem 1.2rem;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  gap: .5rem;
-  cursor: pointer;
-  font-size: .9rem;
-  transition: background-color .2s;
-  box-shadow: 0 4px 6px rgba(0,0,0,.1);
-`;
-
-const SaveButton = styled(Button)`
-  background: #007bff;
-  &:hover { background: #0069d9; }
-`;
-
-const CancelButton = styled(Button)`
-  background: #f8f9fa;
-  color: #6c757d;
-  border: 1px solid #ced4da;
-  &:hover { background: #e2e6ea; }
-`;
-
-// === Componente ===
-const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories = [], providers = [], allProductsRaw = [] }) => {
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-    reset,
-    setError,
-    clearErrors
-  } = useForm({ mode: 'onChange' });
-
-  const costo = watch('costo');
-  const venta = watch('venta');
-  const existencia = watch('existencia');
-
-  const profitPercentage = costo && venta && costo > 0
-    ? (((parseFloat(venta) - parseFloat(costo)) / parseFloat(costo)) * 100).toFixed(2)
-    : '';
-
-  // Cargar datos al abrir
   useEffect(() => {
     if (productToEdit) {
-      reset({
-        codigo: productToEdit.codigo || '',
-        nombre: productToEdit.nombre || '',
-        descripcion: productToEdit.descripcion || '',
-        tipo_venta: productToEdit.tipo_venta || 'Unidad',
-        costo: productToEdit.costo || '',
-        venta: productToEdit.venta || '',
-        mayoreo: productToEdit.mayoreo || '',
-        minimo: productToEdit.minimo || '',
-        maximo: productToEdit.maximo || '',
-        id_categoria: productToEdit.id_categoria || '',
-        id_proveedor: productToEdit.id_proveedor || '',
-        existencia: productToEdit.existencia ?? 0
+      setFormData({
+        ...productToEdit,
+        mayoreo: productToEdit.mayoreo ?? "",
+        minimo: productToEdit.minimo ?? "",
+        maximo: productToEdit.maximo ?? "",
+        id_categoria: productToEdit.id_categoria ?? "",
+        id_proveedor: productToEdit.id_proveedor ?? "",
+        descripcion: productToEdit.descripcion ?? "",
       });
-      clearErrors();
+      const cost = parseFloat(productToEdit.costo);
+      const price = parseFloat(productToEdit.venta);
+      setProfitPercentage(
+        cost > 0 && price > 0 ? (((price - cost) / cost) * 100).toFixed(2) : ""
+      );
+      setModalError("");
     }
-  }, [productToEdit, reset, clearErrors]);
+  }, [productToEdit]);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    if (name === "existencia") return;
+    const next = { ...formData, [name]: value };
+
+    if (name === "costo" || name === "venta") {
+      const cost = parseFloat(next.costo);
+      const price = parseFloat(next.venta);
+      setProfitPercentage(
+        cost > 0 && price > 0 ? (((price - cost) / cost) * 100).toFixed(2) : ""
+      );
+    }
+
+    setFormData(next);
+    setModalError("");
+  };
 
   const handlePercentageChange = (e) => {
-    const percentage = parseFloat(e.target.value);
-    if (costo && percentage) {
-      const nuevaVenta = (parseFloat(costo) * (1 + percentage / 100)).toFixed(2);
-      setValue('venta', nuevaVenta);
+    const percentage = e.target.value;
+    setProfitPercentage(percentage);
+    const cost = parseFloat(formData.costo);
+    if (cost > 0 && percentage) {
+      setFormData((prev) => ({
+        ...prev,
+        venta: (cost * (1 + parseFloat(percentage) / 100)).toFixed(2),
+      }));
     }
   };
 
-  const onSubmit = (data) => {
-    // Validar duplicados
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setModalError("");
+    const f = formData;
+
+    if (!f.codigo || !f.nombre || !f.costo || !f.venta) {
+      setModalError("Código, Nombre, Costo y Venta son obligatorios.");
+      return;
+    }
+    if (parseFloat(f.venta) < parseFloat(f.costo)) {
+      setModalError("El precio de venta no puede ser menor que el costo.");
+      return;
+    }
+
     const duplicate = allProductsRaw.find(
       (p) =>
         p.id_producto !== productToEdit.id_producto &&
-        (p.codigo?.toLowerCase() === data.codigo.toLowerCase() ||
-         p.nombre?.toLowerCase() === data.nombre.toLowerCase())
+        (p.codigo?.toLowerCase() === f.codigo.trim().toLowerCase() ||
+          p.nombre?.toLowerCase() === f.nombre.trim().toLowerCase())
     );
     if (duplicate) {
-      setError('codigo', { type: 'manual', message: 'Ya existe otro producto con este código o nombre.' });
+      setModalError("Ya existe otro producto con ese código o nombre.");
       return;
     }
 
-    // Venta no menor que costo
-    if (parseFloat(data.venta) < parseFloat(data.costo)) {
-      setError('venta', { type: 'manual', message: 'La venta no puede ser menor que el costo.' });
-      return;
-    }
-
-    // Validar existencia segura
-    let existenciaSegura = parseInt(data.existencia, 10);
-    if (isNaN(existenciaSegura) || existenciaSegura < 0) {
-      existenciaSegura = 0;
-    }
-
-    const payload = {
-      codigo: data.codigo.trim(),
-      nombre: data.nombre.trim(),
-      descripcion: data.descripcion?.trim() || '',
-      tipo_venta: data.tipo_venta,
-      costo: parseFloat(data.costo),
-      venta: parseFloat(data.venta),
-      mayoreo: data.mayoreo ? parseFloat(data.mayoreo) : null,
-      minimo: data.minimo ? parseInt(data.minimo, 10) : null,
-      maximo: data.maximo ? parseInt(data.maximo, 10) : null,
-      id_categoria: data.id_categoria ? parseInt(data.id_categoria, 10) : null,
-      id_proveedor: data.id_proveedor ? parseInt(data.id_proveedor, 10) : null,
-      existencia: existenciaSegura // 👈 asegurado, nunca null o NaN
+    // 🧼 Armamos payload limpio
+    const { existencia, ...payload } = {
+      ...f,
+      mayoreo: f.mayoreo || null,
+      minimo: f.minimo || null,
+      maximo: f.maximo || null,
+      id_categoria: f.id_categoria || null,
+      id_proveedor: f.id_proveedor || null,
+      descripcion: f.descripcion || "",
     };
 
-    console.log('🟡 Payload que envío al backend:', payload);
+    console.log("🟡 Enviando payload editado:", payload);
     onSave(payload, productToEdit.id_producto);
   };
 
   if (!isOpen || !productToEdit) return null;
 
   return (
-    <ModalOverlay
-      onClick={onClose}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
-      <motion.div
-        initial={{ y: -50, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 50, opacity: 0 }}
-      >
-        <ModalContent onClick={(e) => e.stopPropagation()}>
-          <form onSubmit={handleSubmit(onSubmit)}>
+    <ModalOverlay onClick={onClose}>
+      <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}>
+        <ModalContent as="div" onClick={(e) => e.stopPropagation()}>
+          <form onSubmit={handleSubmit}>
             <ModalTitle>Editar Producto</ModalTitle>
-            {errors.codigo && <ModalError>{errors.codigo.message}</ModalError>}
-            {errors.venta && <ModalError>{errors.venta.message}</ModalError>}
-
+            {modalError && <ModalError>{modalError}</ModalError>}
             <InputGrid>
               <FormGroup>
-                <Label>Código *</Label>
-                <Input {...register('codigo', { required: 'Código es obligatorio' })} />
+                <Label>Código</Label>
+                <Input
+                  name="codigo"
+                  value={formData.codigo || ""}
+                  onChange={handleInputChange}
+                  required
+                />
               </FormGroup>
-
               <FormGroup>
-                <Label>Nombre *</Label>
-                <Input {...register('nombre', { required: 'Nombre es obligatorio' })} />
+                <Label>Nombre</Label>
+                <Input
+                  name="nombre"
+                  value={formData.nombre || ""}
+                  onChange={handleInputChange}
+                  required
+                />
               </FormGroup>
-
               <FormGroup>
-                <Label>Costo (C$) *</Label>
+                <Label>Costo (C$)</Label>
                 <Input
                   type="number"
                   step="0.01"
-                  {...register('costo', { required: 'Costo es obligatorio', min: 0 })}
+                  name="costo"
+                  value={formData.costo || ""}
+                  onChange={handleInputChange}
+                  required
                 />
               </FormGroup>
-
               <FormGroup>
                 <Label>% Ganancia</Label>
                 <Input
                   type="number"
                   step="0.01"
+                  value={profitPercentage || ""}
                   onChange={handlePercentageChange}
                   placeholder="ej: 50"
                 />
               </FormGroup>
-
               <FormGroup>
-                <Label>Precio Venta (C$) *</Label>
+                <Label>Precio Venta (C$)</Label>
                 <Input
                   type="number"
                   step="0.01"
-                  {...register('venta', { required: 'Venta es obligatoria', min: 0 })}
+                  name="venta"
+                  value={formData.venta || ""}
+                  onChange={handleInputChange}
+                  required
                 />
               </FormGroup>
-
               <FormGroup>
                 <Label>Precio Mayoreo (C$)</Label>
-                <Input type="number" step="0.01" {...register('mayoreo')} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  name="mayoreo"
+                  value={formData.mayoreo || ""}
+                  onChange={handleInputChange}
+                />
               </FormGroup>
-
               <FormGroup>
                 <Label>Existencia</Label>
                 <Input
-                  readOnly
-                  {...register('existencia')}
-                  style={{ backgroundColor: '#f0f0f0' }}
+                  name="existencia"
+                  value={formData.existencia || ""}
+                  disabled
+                  style={{ backgroundColor: "#f0f0f0" }}
                 />
-                <small style={{ marginTop: '5px', color: '#dc3545', fontWeight: 'bold' }}>
+                <small style={{ color: "#dc3545", fontWeight: "bold" }}>
                   ¡Ajustar solo con el botón de stock!
                 </small>
               </FormGroup>
-
               <FormGroup>
                 <Label>Stock Mínimo</Label>
-                <Input type="number" inputMode="numeric" {...register('minimo')} />
+                <Input
+                  type="number"
+                  name="minimo"
+                  value={formData.minimo || ""}
+                  onChange={handleInputChange}
+                />
               </FormGroup>
-
               <FormGroup>
                 <Label>Stock Máximo</Label>
-                <Input type="number" inputMode="numeric" {...register('maximo')} />
+                <Input
+                  type="number"
+                  name="maximo"
+                  value={formData.maximo || ""}
+                  onChange={handleInputChange}
+                />
               </FormGroup>
-
               <FormGroup>
                 <Label>Descripción</Label>
-                <Input {...register('descripcion')} placeholder="Detalles del producto" />
+                <Input
+                  name="descripcion"
+                  value={formData.descripcion || ""}
+                  onChange={handleInputChange}
+                  placeholder="Detalles del producto"
+                />
               </FormGroup>
-
               <FormGroup>
                 <Label>Categoría</Label>
-                <Select {...register('id_categoria')}>
+                <Select
+                  name="id_categoria"
+                  value={formData.id_categoria || ""}
+                  onChange={handleInputChange}
+                >
                   <option value="">-- Sin Categoría --</option>
                   {categories.map((c) => (
                     <option key={c.id_categoria} value={c.id_categoria}>
@@ -315,10 +241,13 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories =
                   ))}
                 </Select>
               </FormGroup>
-
               <FormGroup>
                 <Label>Proveedor</Label>
-                <Select {...register('id_proveedor')}>
+                <Select
+                  name="id_proveedor"
+                  value={formData.id_proveedor || ""}
+                  onChange={handleInputChange}
+                >
                   <option value="">-- Sin Proveedor --</option>
                   {providers.map((p) => (
                     <option key={p.id_proveedor} value={p.id_proveedor}>
@@ -327,24 +256,24 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories =
                   ))}
                 </Select>
               </FormGroup>
-
               <FormGroup>
                 <Label>Tipo de Venta</Label>
-                <Select {...register('tipo_venta')}>
+                <Select
+                  name="tipo_venta"
+                  value={formData.tipo_venta || "Unidad"}
+                  onChange={handleInputChange}
+                >
                   <option value="Unidad">Unidad</option>
                   <option value="Juego">Juego</option>
                   <option value="Kit">Kit</option>
                 </Select>
               </FormGroup>
             </InputGrid>
-
             <ModalActions>
               <CancelButton type="button" onClick={onClose}>
                 Cancelar
               </CancelButton>
-              <SaveButton type="submit">
-                Guardar Cambios
-              </SaveButton>
+              <SaveButton type="submit">Guardar Cambios</SaveButton>
             </ModalActions>
           </form>
         </ModalContent>
