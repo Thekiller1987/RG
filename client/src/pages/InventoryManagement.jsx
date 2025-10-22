@@ -18,7 +18,7 @@ const LARGE_LIST_CUTOFF = 120;
 const SLICE_STEP = 200;
 
 /* ================================
-   ESTILOS (Mejoras con enfoque Bootstrap)
+   ESTILOS (SIN MODIFICACIONES DE DISEÑO)
 ================================ */
 const spin = keyframes`from{transform:rotate(0)}to{transform:rotate(360deg)}`;
 const Spinner = styled(FaSpinner)`font-size:2rem;color:#2b6cb0;animation:${spin} 1s linear infinite;`;
@@ -1000,6 +1000,7 @@ const InventoryManagement = () => {
                 </form>
               </ModalContent>
             </motion.div>
+          </ModalOverlay> 
         )}
       </AnimatePresence>
 
