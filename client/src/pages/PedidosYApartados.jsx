@@ -1,5 +1,4 @@
 // client/src/pages/PedidosYApartados.jsx
-
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import styled, { keyframes } from "styled-components";
 import { Link } from "react-router-dom";
@@ -11,7 +10,6 @@ import {
   FaSpinner, FaTrash, FaUser, FaBarcode, FaShoppingCart, FaDollarSign
 } from "react-icons/fa";
 
-// Modales importados desde sus archivos
 import OrderDetailModal from "./pos/components/OrderDetailModal.jsx";
 import ConfirmationModal from "./pos/components/ConfirmationModal.jsx";
 import AlertModal from "./pos/components/AlertModal.jsx";
@@ -134,7 +132,7 @@ const ModalActions = styled.div`
 `;
 
 // ==================================================================
-// ✅ COMPONENTE DEL MODAL DE CREACIÓN (INTEGRADO EN ESTE ARCHIVO)
+// MODAL DE CREACIÓN (INTEGRADO EN ESTE ARCHIVO)
 // ==================================================================
 const CreateOrderModal = ({ onClose, onSubmit, showAlert, clients, products }) => {
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -248,7 +246,7 @@ const CreateOrderModal = ({ onClose, onSubmit, showAlert, clients, products }) =
 };
 
 // ===============================================
-// ✅ COMPONENTE PRINCIPAL (ACTUALIZADO)
+// COMPONENTE PRINCIPAL (ACTUALIZADO)
 // ===============================================
 const PedidosYApartados = () => {
   const { user } = useAuth();
@@ -378,7 +376,6 @@ const PedidosYApartados = () => {
                     layout
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.3 }}
                   >
                     <CardBody>
@@ -403,7 +400,7 @@ const PedidosYApartados = () => {
                       </p>
                     </CardBody>
                     <CardFooter>
-                      <ProgressBar $percent={percentPaid}><div></div></ProgressBar>
+                      <ProgressBar $percent={percentPaid} />
                     </CardFooter>
                   </PedidoCard>
                 );
