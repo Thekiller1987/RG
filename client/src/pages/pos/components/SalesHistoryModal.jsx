@@ -22,10 +22,16 @@ import SaleDetailView from './SaleDetailView';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 const todayLocal = () => {
+  // Crea una fecha. new Date() ya usa la zona horaria del sistema.
   const now = new Date();
-  const off = now.getTimezoneOffset();
-  const local = new Date(now.getTime() - off * 60000);
-  return local.toISOString().slice(0, 10);
+
+  // Formatea esa fecha al formato YYYY-MM-DD usando la zona horaria de Nicaragua.
+  // Esto es más explícito y seguro que los cálculos manuales.
+  const year = now.toLocaleString('en-US', { year: 'numeric', timeZone: 'America/Managua' });
+  const month = now.toLocaleString('en-US', { month: '2-digit', timeZone: 'America/Managua' });
+  const day = now.toLocaleString('en-US', { day: '2-digit', timeZone: 'America/Managua' });
+
+  return `${year}-${month}-${day}`;
 };
 
 const money = (n) =>
