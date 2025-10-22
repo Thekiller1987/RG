@@ -577,19 +577,25 @@ const InventoryManagement = () => {
     setIsModalOpen(true);
   };
 
-  const openEditModal = (product) => {
-    setEditingProduct(product);
-    const cost = parseFloat(product.costo);
-    const price = parseFloat(product.venta);
-    setProfitPercentage(cost>0 && price>0 ? (((price - cost)/cost*100).toFixed(2)) : '');
-    setFormData({
-      codigo:'', nombre:'', costo:'', venta:'', mayoreo:'', id_categoria:'',
-      existencia:'', minimo:'', maximo:'', tipo_venta:'Unidad', id_proveedor:'', descripcion:'',
-      ...product,
-      
-    });
-    setModalError('');
-    setIsModalOpen(true);
+ const openEditModal = (product) => {
+    setEditingProduct(product);
+    const cost = parseFloat(product.costo);
+    const price = parseFloat(product.venta);
+    setProfitPercentage(cost>0 && price>0 ? (((price - cost)/cost*100).toFixed(2)) : '');
+    setFormData({
+      codigo:'', nombre:'', costo:'', venta:'', mayoreo:'', id_categoria:'',
+      existencia:'', minimo:'', maximo:'', tipo_venta:'Unidad', id_proveedor:'', descripcion:'',
+      ...product,
+      
+      // 🛑 FIX CLAVE: Convertir la existencia a STRING si es número
+      existencia: product.existencia !== undefined && product.existencia !== null 
+        ? String(product.existencia) 
+        : '',
+      
+    });
+    setModalError('');
+    setIsModalOpen(true);
+  };
   };
 
   const openDeleteModal = (product) => { setProductToDelete(product); setIsDeleteModalOpen(true); };
@@ -654,16 +660,22 @@ const InventoryManagement = () => {
       setFormData(prev => ({ ...prev, venta: (cost * (1 + parseFloat(percentage)/100)).toFixed(2) }));
     }
   };
+// InventoryManagement.jsx
+const handleSaveProduct = async (e) => {
+    e.preventDefault();
+    setModalError('');
+    const f = formData;
 
-  const handleSaveProduct = async (e) => {
-    e.preventDefault();
-    setModalError('');
-    const f = formData;
+    // 🛑 FIX: Solo requerir existencia si NO estamos editando (es decir, creando)
+    const requiredFields = !editingProduct 
+      ? ['codigo', 'nombre', 'costo', 'venta', 'existencia']
+      : ['codigo', 'nombre', 'costo', 'venta']; 
 
-    if (!f.codigo.trim() || !f.nombre.trim() || !f.costo.trim() || !f.venta.trim() || !f.existencia.trim()) {
-      setModalError('Los campos Código, Nombre, Costo, Venta y Existencia son obligatorios.');
-      return;
-    }
+    if (requiredFields.some(field => !f[field] || !String(f[field]).trim())) { // 🛑 FIX SECUNDARIO: Convertir a String antes de trim
+      setModalError('Los campos Código, Nombre, Costo, Venta y Existencia son obligatorios al crear.');
+      return;
+    
+    
     const cost = parseFloat(f.costo), price = parseFloat(f.venta), wholesale = f.mayoreo ? parseFloat(f.mayoreo) : null;
     const stock = parseInt(f.existencia, 10);
     const minStock = f.minimo ? parseInt(f.minimo, 10) : null;
