@@ -577,25 +577,77 @@ const InventoryManagement = () => {
     setIsModalOpen(true);
   };
 
- const openEditModal = (product) => {
-    setEditingProduct(product);
-    const cost = parseFloat(product.costo);
-    const price = parseFloat(product.venta);
-    setProfitPercentage(cost>0 && price>0 ? (((price - cost)/cost*100).toFixed(2)) : '');
-    setFormData({
-      codigo:'', nombre:'', costo:'', venta:'', mayoreo:'', id_categoria:'',
-      existencia:'', minimo:'', maximo:'', tipo_venta:'Unidad', id_proveedor:'', descripcion:'',
-      ...product,
-      
-      // 🛑 FIX CLAVE: Convertir la existencia a STRING si es número
-      existencia: product.existencia !== undefined && product.existencia !== null 
-        ? String(product.existencia) 
-        : '',
-      
-    });
-    setModalError('');
-    setIsModalOpen(true);
-  };
+// Abrir modal para editar producto
+const openEditModal = (product) => {
+  setEditingProduct(product);
+
+  const cost = parseFloat(product.costo) || 0;
+  const price = parseFloat(product.venta) || 0;
+
+  setProfitPercentage(cost > 0 && price > 0 ? (((price - cost) / cost) * 100).toFixed(2) : '');
+
+  setFormData({
+    ...product,
+    // Asegurar que los campos numéricos se conviertan a string para inputs
+    costo: product.costo !== undefined ? String(product.costo) : '',
+    venta: product.venta !== undefined ? String(product.venta) : '',
+    mayoreo: product.mayoreo !== undefined ? String(product.mayoreo) : '',
+    existencia: product.existencia !== undefined ? String(product.existencia) : '',
+    minimo: product.minimo !== undefined ? String(product.minimo) : '',
+    maximo: product.maximo !== undefined ? String(product.maximo) : '',
+  });
+
+  setModalError('');
+  setIsModalOpen(true);
+};
+
+// Guardar cambios de producto editado
+// InventoryManagement.jsx
+const handleSaveProduct = async (e) => {
+  e.preventDefault();
+  setModalError('');
+
+  // Copia de formData para limpiar y convertir
+  const cleanedFormData = { ...formData };
+
+  // Limpiar espacios de strings
+  Object.keys(cleanedFormData).forEach(key => {
+    if (typeof cleanedFormData[key] === 'string') {
+      cleanedFormData[key] = cleanedFormData[key].trim();
+    }
+  });
+
+  // Convertir campos numéricos
+  ['costo', 'venta', 'existencia', 'mayoreo', 'minimo', 'maximo'].forEach(key => {
+    if (cleanedFormData[key] !== undefined && cleanedFormData[key] !== '') {
+      cleanedFormData[key] = Number(cleanedFormData[key]);
+    }
+  });
+
+  // Validación mínima sin cambiar tu lógica
+  if (!cleanedFormData.codigo || !cleanedFormData.nombre || !cleanedFormData.costo || !cleanedFormData.venta || !cleanedFormData.existencia) {
+    setModalError('Los campos Código, Nombre, Costo, Venta y Existencia son obligatorios.');
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem('token');
+    // CORRECCIÓN: usar id_producto en vez de id
+    await axios.put(`https://multirepuestosrg.com/api/products/${cleanedFormData.id_producto}`, cleanedFormData, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    setIsModalOpen(false);
+    setEditingProduct(null);
+    await fetchData();
+    showAlert({ title: 'Éxito', message: `Producto "${cleanedFormData.nombre}" actualizado correctamente.` });
+  } catch (err) {
+    console.error(err.response?.data || err.message);
+    setModalError('Error al guardar el producto.');
+  }
+};
+
+
   };
 
   const openDeleteModal = (product) => { setProductToDelete(product); setIsDeleteModalOpen(true); };
@@ -712,6 +764,30 @@ const handleSaveProduct = async (e) => {
       showAlert({ title:'Error', message:error.response?.data?.msg || 'No se pudo ajustar el stock.' });
     
   };
+// Limpia y normaliza cualquier formulario automáticamente
+const normalizeFormDataAuto = (formData) => {
+  const cleanedData = {};
+
+  Object.keys(formData).forEach((key) => {
+    let value = formData[key];
+
+    if (typeof value === 'string') {
+      // Quita espacios al inicio/final
+      value = value.trim();
+      // Convierte números en strings a números si es posible
+      if (!isNaN(value) && value !== '') {
+        value = value.includes('.') ? parseFloat(value) : parseInt(value, 10);
+      }
+    } else if (value == null) {
+      // Evita null o undefined
+      value = '';
+    }
+
+    cleanedData[key] = value;
+  });
+
+  return cleanedData;
+};
 
   // Categorías / Proveedores
   const handleAddCategory = async (name) => {
