@@ -104,6 +104,10 @@ const getProductById = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   const { id } = req.params;
+console.log("🔥🔥🔥 ¡SÍ ESTOY USANDO EL CÓDIGO NUEVO PARA EDITAR! 🔥🔥🔥");
+
+
+
   
   // ✅ CAMBIO 1: Ya no se extrae 'existencia' del body.
   const {

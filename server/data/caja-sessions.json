@@ -954,6 +954,70 @@
           }
         }
       ],
+      "closedAt": "2025-10-22T15:04:55.355Z",
+      "closedBy": {
+        "id": "3",
+        "name": "waskar"
+      },
+      "countedAmount": 2326,
+      "difference": 0,
+      "notes": "",
+      "tasaDolar": 36.6
+    },
+    {
+      "id": "caja-3-1761145499419",
+      "openedAt": "2025-10-22T15:04:59.361Z",
+      "openedBy": {
+        "id": "3",
+        "name": "waskar"
+      },
+      "initialAmount": 1,
+      "transactions": [
+        {
+          "id": "venta-97",
+          "type": "venta_contado",
+          "amount": 22,
+          "note": "Venta #97 ",
+          "at": "2025-10-22T15:05:17.654Z",
+          "pagoDetalles": {
+            "totalVenta": 22,
+            "efectivo": 22,
+            "tarjeta": 0,
+            "transferencia": 0,
+            "dolares": 0,
+            "tasaDolarAlMomento": 36.6,
+            "referenciaTarjeta": null,
+            "credito": 0,
+            "clienteId": 1,
+            "tipoVenta": "contado",
+            "cambio": 0,
+            "ingresoCaja": 22,
+            "shouldPrintNow": true
+          }
+        },
+        {
+          "id": "venta-98",
+          "type": "venta_contado",
+          "amount": 100,
+          "note": "Venta #98 ",
+          "at": "2025-10-22T17:44:26.027Z",
+          "pagoDetalles": {
+            "totalVenta": 100,
+            "efectivo": 100,
+            "tarjeta": 0,
+            "transferencia": 0,
+            "dolares": 0,
+            "tasaDolarAlMomento": 0,
+            "referenciaTarjeta": null,
+            "credito": 0,
+            "clienteId": 1,
+            "tipoVenta": "contado",
+            "cambio": 0,
+            "ingresoCaja": 100,
+            "shouldPrintNow": true
+          }
+        }
+      ],
       "closedAt": null,
       "closedBy": null,
       "countedAmount": null,
