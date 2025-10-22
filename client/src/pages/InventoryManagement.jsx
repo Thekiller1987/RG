@@ -241,7 +241,7 @@ function InventoryHistoryModal({ onClose }) {
     const fetchHistory = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get('/api/products/inventory/history', {
+        const res = await axios.get('/api/products/inventory/history', { // CONEXIÓN CORREGIDA
           headers: { Authorization: `Bearer ${token}` }
         });
         setHistory(res.data || []);
@@ -262,12 +262,12 @@ function InventoryHistoryModal({ onClose }) {
     return <TypeBadge>{type}</TypeBadge>;
   };
 
-  // Utilidades de fecha - CORRECCIÓN DE ZONA HORARIA APLICADA AQUÍ (USANDO UTC)
+  // Utilidades de fecha - CORRECCIÓN DE ZONA HORARIA
   const toKey = (iso) => {
     const d = new Date(iso);
-    const y = d.getUTCFullYear(); // <-- CORRECCIÓN: Usar UTC para evitar el desplazamiento de día
-    const m = String(d.getUTCMonth() + 1).padStart(2, '0'); // <-- CORRECCIÓN: Usar UTC
-    const day = String(d.getUTCDate()).padStart(2, '0'); // <-- CORRECCIÓN: Usar UTC
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
     return `${y}-${m}-${day}`; // yyyy-mm-dd
   };
   const toNice = (key) => {
@@ -466,6 +466,7 @@ const InventoryManagement = () => {
   ================================= */
   const fetchProductList = useCallback(async () => {
     const token = localStorage.getItem('token');
+    // CORRECCIÓN 1: De localhost a ruta relativa para fetch inicial
     const res = await axios.get('/api/products', { headers: { Authorization: `Bearer ${token}` } });
     return res.data;
   }, []);
@@ -475,8 +476,10 @@ const InventoryManagement = () => {
       const token = localStorage.getItem('token');
       const [full, cats, provs] = await Promise.all([
         fetchProductList(),
+        // CORRECCIÓN 2: De localhost a ruta relativa para categorías
         axios.get('/api/categories', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('/api/providers',  { headers: { Authorization: `Bearer ${token}` } })
+        // CORRECCIÓN 3: De localhost a ruta relativa para proveedores
+        axios.get('/api/providers',  { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
       setAllProductsRaw(full);
@@ -586,7 +589,10 @@ const InventoryManagement = () => {
       codigo:'', nombre:'', costo:'', venta:'', mayoreo:'', id_categoria:'',
       existencia:'', minimo:'', maximo:'', tipo_venta:'Unidad', id_proveedor:'', descripcion:'',
       ...product,
-      
+      mayoreo: product.mayoreo || '',
+      minimo: product.minimo || '',
+      maximo: product.maximo || '',
+      descripcion: product.descripcion || ''
     });
     setModalError('');
     setIsModalOpen(true);
@@ -598,6 +604,7 @@ const InventoryManagement = () => {
     if (!productToDelete) return;
     try {
       const token = localStorage.getItem('token');
+      // CORRECCIÓN 4: De localhost a ruta relativa para DELETE
       await axios.delete(`/api/products/${productToDelete.id_producto}`, {
         headers:{ Authorization:`Bearer ${token}` }
       });
@@ -618,6 +625,7 @@ const InventoryManagement = () => {
   const archiveProduct = async (p) => {
     try {
       const token = localStorage.getItem('token');
+      // CORRECCIÓN 5: De localhost a ruta relativa para PATCH/archive
       await axios.patch(`/api/products/${p.id_producto}/archive`, {}, {
         headers:{ Authorization:`Bearer ${token}` }
       });
@@ -660,28 +668,15 @@ const InventoryManagement = () => {
     setModalError('');
     const f = formData;
 
-    // CORRECCIÓN DEL ERROR 400 y TYPE ERROR: Asegurar que los campos numéricos sean strings antes de validar con trim
-    const codigoTrim = String(f.codigo ?? '').trim();
-    const nombreTrim = String(f.nombre ?? '').trim();
-    // Corregido: Si existencia está vacío/null, el modal falla. Usamos String() para la validación.
-    const existenciaTrim = String(f.existencia ?? '').trim(); 
-    const costoTrim = String(f.costo ?? '').trim();
-    const ventaTrim = String(f.venta ?? '').trim();
-
-    if (!codigoTrim || !nombreTrim || !costoTrim || !ventaTrim || !existenciaTrim) {
+    if (!f.codigo.trim() || !f.nombre.trim() || !f.costo.trim() || !f.venta.trim() || !f.existencia.trim()) {
       setModalError('Los campos Código, Nombre, Costo, Venta y Existencia son obligatorios.');
       return;
     }
-
     const cost = parseFloat(f.costo), price = parseFloat(f.venta), wholesale = f.mayoreo ? parseFloat(f.mayoreo) : null;
-    // Usamos existenciaTrim porque parseFloat(f.existencia) puede fallar si está vacío
-    const stock = parseInt(existenciaTrim, 10); 
+    const stock = parseInt(f.existencia, 10);
     const minStock = f.minimo ? parseInt(f.minimo, 10) : null;
     const maxStock = f.maximo ? parseInt(f.maximo, 10) : null;
-    
-    // Validaciones de números (incluyendo la existencia corregida)
     if ([cost, price, stock].some(isNaN)) { setModalError('Costo, Venta y Existencia deben ser números válidos.'); return; }
-    // ... (otras validaciones de número se mantienen)
     if (f.mayoreo && isNaN(wholesale)) { setModalError('Precio Mayoreo debe ser un número válido o estar vacío.'); return; }
     if (f.minimo && isNaN(minStock)) { setModalError('Stock Mínimo debe ser un número válido o estar vacío.'); return; }
     if (f.maximo && isNaN(maxStock)) { setModalError('Stock Máximo debe ser un número válido o estar vacío.'); return; }
@@ -690,14 +685,12 @@ const InventoryManagement = () => {
     if (wholesale !== null && wholesale > price) { setModalError('El precio de mayoreo no puede ser mayor que el de venta.'); return; }
     if (minStock !== null && maxStock !== null && minStock > maxStock) { setModalError('El stock mínimo no puede ser mayor que el máximo.'); return; }
 
-    // CORRECCIÓN DEL ERROR: Asegurar que p.codigo y p.nombre son strings antes de usar .toLowerCase()
-    // Esto soluciona los TypeErrors en las líneas de comparación
     const duplicate = allProductsRaw.find(p =>
       (editingProduct ? p.id_producto !== editingProduct.id_producto : true) &&
-      (String(p.codigo ?? '').toLowerCase() === codigoTrim.toLowerCase() || String(p.nombre ?? '').toLowerCase() === nombreTrim.toLowerCase())
+      (p.codigo?.toLowerCase() === f.codigo.trim().toLowerCase() || p.nombre?.toLowerCase() === f.nombre.trim().toLowerCase())
     );
     if (duplicate) {
-      if (String(duplicate.codigo ?? '').toLowerCase() === codigoTrim.toLowerCase()) setModalError(`Ya existe un producto con el código "${f.codigo}".`);
+      if ((duplicate.codigo||'').toLowerCase() === f.codigo.trim().toLowerCase()) setModalError(`Ya existe un producto con el código "${f.codigo}".`);
       else setModalError(`Ya existe un producto con el nombre "${f.nombre}".`);
       return;
     }
@@ -705,15 +698,17 @@ const InventoryManagement = () => {
     const token = localStorage.getItem('token');
     const payload = {
       ...f,
-      existencia: editingProduct ? editingProduct.existencia : stock, // Usar 'stock' parseado si es creación
+      existencia: editingProduct ? editingProduct.existencia : f.existencia,
       mayoreo: f.mayoreo || null, minimo: f.minimo || null, maximo: f.maximo || null,
       id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null
     };
     try {
       if (editingProduct) {
         const { existencia, ...updatePayload } = payload;
+        // CORRECCIÓN 6: De localhost a ruta relativa para PUT/Edit
         await axios.put(`/api/products/${editingProduct.id_producto}`, updatePayload, { headers:{ Authorization:`Bearer ${token}` } });
       } else {
+        // CORRECCIÓN 7: De localhost a ruta relativa para POST/Create
         await axios.post('/api/products', payload, { headers:{ Authorization:`Bearer ${token}` } });
       }
       setIsModalOpen(false);
@@ -726,6 +721,7 @@ const InventoryManagement = () => {
   const executeStockAdjustment = async (product, cantidad, razon) => {
     try {
       const token = localStorage.getItem('token');
+      // CORRECCIÓN 8: De localhost a ruta relativa para PATCH/stock
       await axios.patch(`/api/products/${product.id_producto}/stock`,
         { cantidad, razon }, { headers:{ Authorization:`Bearer ${token}` } }
       );
@@ -741,6 +737,7 @@ const InventoryManagement = () => {
   const handleAddCategory = async (name) => {
     try {
       const token = localStorage.getItem('token');
+      // CORRECCIÓN 9: De localhost a ruta relativa para POST/categories
       await axios.post('/api/categories', { nombre:name }, { headers:{ Authorization:`Bearer ${token}` } });
       await fetchData();
     } catch (error) {
@@ -750,6 +747,7 @@ const InventoryManagement = () => {
   const handleDeleteCategory = async (id) => {
     try {
       const token = localStorage.getItem('token');
+      // CORRECCIÓN 10: De localhost a ruta relativa para DELETE/categories
       await axios.delete(`/api/categories/${id}`, { headers:{ Authorization:`Bearer ${token}` } });
       await fetchData();
     } catch (error) {
@@ -759,6 +757,7 @@ const InventoryManagement = () => {
   const handleAddProvider = async (name) => {
     try {
       const token = localStorage.getItem('token');
+      // CORRECCIÓN 11: De localhost a ruta relativa para POST/providers
       await axios.post('/api/providers', { nombre:name }, { headers:{ Authorization:`Bearer ${token}` } });
       await fetchData();
     } catch (error) {
@@ -768,6 +767,7 @@ const InventoryManagement = () => {
   const handleDeleteProvider = async (id) => {
     try {
       const token = localStorage.getItem('token');
+      // CORRECCIÓN 12: De localhost a ruta relativa para DELETE/providers
       await axios.delete(`/api/providers/${id}`, { headers:{ Authorization:`Bearer ${token}` } });
       await fetchData();
     } catch (error) {
