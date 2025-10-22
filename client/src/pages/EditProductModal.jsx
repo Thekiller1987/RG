@@ -134,6 +134,8 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories =
 
   const costo = watch('costo');
   const venta = watch('venta');
+  const existencia = watch('existencia');
+
   const profitPercentage = costo && venta && costo > 0
     ? (((parseFloat(venta) - parseFloat(costo)) / parseFloat(costo)) * 100).toFixed(2)
     : '';
@@ -153,7 +155,7 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories =
         maximo: productToEdit.maximo || '',
         id_categoria: productToEdit.id_categoria || '',
         id_proveedor: productToEdit.id_proveedor || '',
-        existencia: productToEdit.existencia || ''
+        existencia: productToEdit.existencia ?? 0
       });
       clearErrors();
     }
@@ -186,6 +188,12 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories =
       return;
     }
 
+    // Validar existencia segura
+    let existenciaSegura = parseInt(data.existencia, 10);
+    if (isNaN(existenciaSegura) || existenciaSegura < 0) {
+      existenciaSegura = 0;
+    }
+
     const payload = {
       codigo: data.codigo.trim(),
       nombre: data.nombre.trim(),
@@ -197,10 +205,11 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories =
       minimo: data.minimo ? parseInt(data.minimo, 10) : null,
       maximo: data.maximo ? parseInt(data.maximo, 10) : null,
       id_categoria: data.id_categoria ? parseInt(data.id_categoria, 10) : null,
-      id_proveedor: data.id_proveedor ? parseInt(data.id_proveedor, 10) : null
+      id_proveedor: data.id_proveedor ? parseInt(data.id_proveedor, 10) : null,
+      existencia: existenciaSegura // 👈 asegurado, nunca null o NaN
     };
-console.log('🟡 Payload que envío al backend:', payload);
 
+    console.log('🟡 Payload que envío al backend:', payload);
     onSave(payload, productToEdit.id_producto);
   };
 
@@ -270,7 +279,11 @@ console.log('🟡 Payload que envío al backend:', payload);
 
               <FormGroup>
                 <Label>Existencia</Label>
-                <Input disabled {...register('existencia')} style={{ backgroundColor: '#f0f0f0' }} />
+                <Input
+                  readOnly
+                  {...register('existencia')}
+                  style={{ backgroundColor: '#f0f0f0' }}
+                />
                 <small style={{ marginTop: '5px', color: '#dc3545', fontWeight: 'bold' }}>
                   ¡Ajustar solo con el botón de stock!
                 </small>
