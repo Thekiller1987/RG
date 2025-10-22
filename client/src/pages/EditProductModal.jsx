@@ -61,12 +61,14 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
     setModalError('');
     const f = formData;
 
-    if (!f.codigo || !f.nombre || !f.costo || !f.venta) {
+    // ✅ **CORRECCIÓN APLICADA AQUÍ**
+    // La validación ahora solo comprueba los campos necesarios para la edición.
+    const requiredFields = ['codigo', 'nombre', 'costo', 'venta'];
+    if (requiredFields.some(field => !f[field] || String(f[field]).trim() === '')) {
       setModalError('Código, Nombre, Costo y Venta son obligatorios.');
       return;
     }
-
-    // ✅ **CORRECCIÓN APLICADA AQUÍ**
+    
     const payload = {
         codigo: f.codigo.trim(),
         nombre: f.nombre.trim(),
