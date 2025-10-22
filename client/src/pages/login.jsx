@@ -10,7 +10,7 @@ const LOGO_PATH = '/icons/logo.png';
 
 /* ===========================
     PALETA DE COLORES Y EFECTOS
-   =========================== */
+    =========================== */
 const C_BG_1 = '#0b1220';
 const C_BG_2 = '#1d2b64';
 const C_ACCENT = '#4A90E2';
@@ -22,7 +22,7 @@ const GLASS_STROKE = 'rgba(255, 255, 255, 0.18)';
 
 /* ===========================
     ANIMACIONES
-   =========================== */
+    =========================== */
 const spin = keyframes`to { transform: rotate(360deg); }`;
 const gradientFlow = keyframes`
   0% { background-position: 0% 50%; }
@@ -36,7 +36,7 @@ const fadeUp = keyframes`
 
 /* ===========================
     ESTILOS GLOBALES
-   =========================== */
+    =========================== */
 const GlobalStyle = createGlobalStyle`
   html, body, #root {
     height: 100%;
@@ -48,12 +48,20 @@ const GlobalStyle = createGlobalStyle`
       radial-gradient(900px 600px at 85% 90%, #18325b 0%, transparent 60%),
       linear-gradient(135deg, ${C_BG_1} 0%, ${C_BG_2} 100%);
     -webkit-tap-highlight-color: transparent;
+    
+    // 💡 INICIO CÓDIGO AÑADIDO/MODIFICADO: Ajuste de scroll en móvil
+    @media (max-width: 768px) {
+        // Esto asegura que el fondo y el scroll se manejen bien en pantallas pequeñas
+        min-height: 100vh;
+        min-height: 100dvh; /* Para Safari y Chrome móvil */
+    }
+    // 💡 FIN CÓDIGO AÑADIDO/MODIFICADO
   }
 `;
 
 /* ===========================
     CONTENEDORES Y ESTRUCTURA
-   =========================== */
+    =========================== */
 const Stage = styled.main`
   min-height: 100dvh;
   display: grid;
@@ -61,6 +69,16 @@ const Stage = styled.main`
   padding: 24px;
   position: relative;
   overflow: hidden;
+  
+  // 💡 INICIO CÓDIGO AÑADIDO/MODIFICADO: Ajuste de padding en móvil
+  @media (max-width: 768px) {
+    padding: 16px; 
+    // Evita que el teclado virtual empuje el contenido si el foco está en un input
+    align-items: flex-start; 
+    padding-top: 5vh; 
+    padding-bottom: 5vh;
+  }
+  // 💡 FIN CÓDIGO AÑADIDO/MODIFICADO
 `;
 
 const AnimatedBackdrop = styled.div`
@@ -89,6 +107,16 @@ const Card = styled.form`
   display: grid;
   gap: clamp(12px, 2.8vw, 18px);
   animation: ${fadeUp} .5s ease both;
+  
+  // 💡 INICIO CÓDIGO AÑADIDO/MODIFICADO: Ajuste del formulario en móvil
+  @media (max-width: 768px) {
+      width: 100%; /* Ocupa todo el ancho en móvil */
+      max-width: 400px; 
+      padding: 24px;
+      margin-top: auto; /* Permite centrar mejor si Stage tiene flex */
+      margin-bottom: auto;
+  }
+  // 💡 FIN CÓDIGO AÑADIDO/MODIFICADO
 `;
 
 const LogoWrap = styled.div`
@@ -108,6 +136,12 @@ const Logo = styled.img`
   user-select: none;
   pointer-events: none;
   filter: drop-shadow(0 2px 8px rgba(0,0,0,0.35));
+  
+  // 💡 INICIO CÓDIGO AÑADIDO/MODIFICADO: Logo ligeramente más pequeño en móvil
+  @media (max-width: 480px) {
+    width: 100px; /* Tamaño fijo en móvil muy pequeño */
+  }
+  // 💡 FIN CÓDIGO AÑADIDO/MODIFICADO
 `;
 
 const Title = styled.h2`
@@ -126,7 +160,7 @@ const Subtitle = styled.p`
 
 /* ===========================
     CAMPOS
-   =========================== */
+    =========================== */
 const Field = styled.label`
   display: grid;
   grid-template-columns: 42px 1fr;
@@ -142,6 +176,13 @@ const Field = styled.label`
     border-color: rgba(118,166,255,0.6);
     box-shadow: 0 0 0 3px rgba(74,144,226,0.25);
   }
+  
+  // 💡 INICIO CÓDIGO AÑADIDO/MODIFICADO: Padding más generoso en móvil
+  @media (max-width: 768px) {
+    padding: 14px 10px;
+    border-radius: 18px;
+  }
+  // 💡 FIN CÓDIGO AÑADIDO/MODIFICADO
 `;
 const IconBox = styled.span`
   display: grid;
@@ -157,6 +198,13 @@ const Input = styled.input`
   font-size: 16px;
   padding: 8px 2px;
   &::placeholder { color: ${C_TEXT_2}; }
+  
+  // 💡 INICIO CÓDIGO AÑADIDO/MODIFICADO: Fuente un poco más grande en móvil
+  @media (max-width: 768px) {
+    font-size: 17px; 
+    padding: 6px 2px;
+  }
+  // 💡 FIN CÓDIGO AÑADIDO/MODIFICADO
 `;
 const Error = styled.p`
   margin: 0;
@@ -171,7 +219,7 @@ const Error = styled.p`
 
 /* ===========================
     BOTÓN
-   =========================== */
+    =========================== */
 const Button = styled.button`
   display: grid;
   grid-auto-flow: column;
@@ -191,12 +239,20 @@ const Button = styled.button`
   transition: all .25s ease;
   &:hover { filter: brightness(1.05); }
   &:disabled { opacity: .6; cursor: not-allowed; }
+  
+  // 💡 INICIO CÓDIGO AÑADIDO/MODIFICADO: Botón más grande en móvil
+  @media (max-width: 768px) {
+    padding: 16px 20px;
+    font-size: 17px;
+    border-radius: 18px;
+  }
+  // 💡 FIN CÓDIGO AÑADIDO/MODIFICADO
 `;
 const Spinner = styled(FaSpinner)`animation: ${spin} 1s linear infinite;`;
 
 /* ===========================
     PROMPT PWA
-   =========================== */
+    =========================== */
 const PwaPrompt = styled.div`
   position: fixed;
   left: 12px; right: 12px;
@@ -240,7 +296,7 @@ const PwaButton = styled.button`
 
 /* ===========================
     COMPONENTE PRINCIPAL
-   =========================== */
+    =========================== */
 const Login = () => {
   const { login } = useAuth(); // del AuthContext
   const [username, setUsername] = useState('');
@@ -252,14 +308,23 @@ const Login = () => {
   const [typing, setTyping] = useState(false);
 
   useEffect(() => {
+    // 💡 INICIO CÓDIGO MODIFICADO: Lógica de PWA Prompt
     const ua = window.navigator.userAgent.toLowerCase();
     const isIOS = /iphone|ipad|ipod/.test(ua);
     const isAndroid = /android/.test(ua);
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    // isStandalone será TRUE si la app se abrió desde el icono de la PWA
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                         window.navigator.standalone; // Soporte para iOS viejo
+
+    // Solo mostramos el prompt si es Android/iOS Y NO está en modo standalone (es decir, está en el navegador)
     if ((isIOS || isAndroid) && !isStandalone) {
       setPwaPlatform(isIOS ? 'ios' : 'android');
       setShowPwaPrompt(true);
+    } else {
+        // Ocultar si ya está instalada o no es un móvil compatible con el prompt nativo
+        setShowPwaPrompt(false);
     }
+    // 💡 FIN CÓDIGO MODIFICADO
   }, []);
 
   // ✅ Lógica corregida
