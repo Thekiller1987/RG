@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import styled from 'styled-components';
+import styled, { css } from 'styled-components'; // Importamos 'css' para las media queries
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -19,11 +19,17 @@ const BackIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
 );
 
-// --- Estilos Mejorados ---
+// --- Estilos Mejorados (CON MODIFICACIONES PARA MOBILE) ---
 const PageWrapper = styled.div`
   padding: 2rem 4rem;
   background-color: #f8f9fa;
   min-height: 100vh;
+
+  // 💡 MOBILE: Ajustar padding
+  @media (max-width: 768px) {
+    padding: 1rem;
+    min-height: 100dvh;
+  }
 `;
 
 const TopBar = styled.div`
@@ -31,11 +37,24 @@ const TopBar = styled.div`
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
+
+  // 💡 MOBILE: Apilar en pantallas pequeñas
+  @media (max-width: 500px) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
 `;
 
 const Header = styled.h1`
   font-size: 2.5rem;
   color: #343a40;
+
+  // 💡 MOBILE: Reducir tamaño de fuente
+  @media (max-width: 768px) {
+    font-size: 1.8rem;
+    text-align: center;
+  }
 `;
 
 const Button = styled.button`
@@ -68,12 +87,25 @@ const BackButton = styled(Link)`
     &:hover {
         color: #007bff;
     }
+
+    // 💡 MOBILE: Centrar y hacer el botón más visible
+    @media (max-width: 768px) {
+      margin-bottom: 1.5rem;
+      font-size: 1rem;
+      align-self: flex-start;
+    }
 `;
 
 const CreateButton = styled(Button)`
   background-color: #28a745;
   color: white;
   &:hover { background-color: #218838; }
+
+  // 💡 MOBILE: Ocupar todo el ancho cuando apilado
+  @media (max-width: 500px) {
+    width: 100%;
+    justify-content: center;
+  }
 `;
 
 const EditButton = styled(Button)`
@@ -99,6 +131,74 @@ const DeleteButton = styled(Button)`
   }
 `;
 
+// 💡 MOBILE: Contenedor para la vista de tarjetas en móvil
+const MobileCardContainer = styled.div`
+  display: none; /* Oculto por defecto */
+
+  @media (max-width: 768px) {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+`;
+
+// 💡 MOBILE: Estilo de tarjeta para cada usuario
+const UserCard = styled.div`
+  background-color: white;
+  padding: 1rem 1.2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  border-left: 5px solid ${props => props.$roleColor || '#007bff'};
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas: 
+    "name role"
+    "id id"
+    "actions actions";
+  gap: 0.5rem;
+`;
+
+const CardDetail = styled.p`
+  margin: 0;
+  font-size: 0.9rem;
+  color: #6c757d;
+  strong {
+    color: #343a40;
+    font-weight: 700;
+  }
+`;
+
+const CardName = styled.p`
+  grid-area: name;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #343a40;
+  margin: 0;
+`;
+
+const CardRole = styled.span`
+  grid-area: role;
+  text-align: right;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: ${props => props.$roleColor};
+`;
+
+const CardActions = styled.div`
+  grid-area: actions;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+
+  ${EditButton}, ${DeleteButton} {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.8rem;
+    margin-right: 0;
+  }
+`;
+
+// 💡 DESKTOP: Estilos de Tabla (Oculta en móvil)
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
@@ -106,6 +206,10 @@ const Table = styled.table`
   box-shadow: 0 4px 25px rgba(0, 0, 0, 0.07);
   border-radius: 12px;
   overflow: hidden;
+
+  @media (max-width: 768px) {
+    display: none; /* Ocultar la tabla en móvil */
+  }
 `;
 
 const Th = styled.th`
@@ -136,7 +240,7 @@ const Message = styled.p`
   color: #6c757d;
 `;
 
-// --- Estilos para el Modal Animado ---
+// --- Estilos para el Modal Animado (Ajuste para móvil) ---
 const ModalOverlay = styled(motion.div)`
   position: fixed;
   top: 0;
@@ -157,6 +261,13 @@ const ModalContent = styled(motion.form)`
   width: 90%;
   max-width: 500px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+
+  // 💡 MOBILE: Ocupar más espacio en pantalla y ajuste de padding
+  @media (max-width: 500px) {
+    width: 95%;
+    padding: 1.5rem;
+    margin: 1rem;
+  }
 `;
 
 const ModalTitle = styled.h2`
@@ -164,6 +275,11 @@ const ModalTitle = styled.h2`
   margin-bottom: 2rem;
   color: #343a40;
   text-align: center;
+
+  @media (max-width: 500px) {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
 `;
 
 const Input = styled.input`
@@ -173,6 +289,12 @@ const Input = styled.input`
   border-radius: 8px;
   border: 1px solid #ced4da;
   font-size: 1rem;
+
+  // 💡 MOBILE: Fuente ligeramente más grande para tacto
+  @media (max-width: 768px) {
+    padding: 0.9rem 1rem;
+    font-size: 1.05rem;
+  }
 `;
 
 const Select = styled.select`
@@ -182,6 +304,12 @@ const Select = styled.select`
   border-radius: 8px;
   border: 1px solid #ced4da;
   font-size: 1rem;
+
+  // 💡 MOBILE: Fuente ligeramente más grande para tacto
+  @media (max-width: 768px) {
+    padding: 0.9rem 1rem;
+    font-size: 1.05rem;
+  }
 `;
 
 const PasswordWrapper = styled.div`
@@ -196,6 +324,12 @@ const TogglePasswordButton = styled.span`
   cursor: pointer;
   user-select: none;
   color: #adb5bd;
+
+  // 💡 MOBILE: Ajustar posición
+  @media (max-width: 768px) {
+    top: 17px;
+    right: 18px;
+  }
 `;
 
 const ModalActions = styled.div`
@@ -203,6 +337,18 @@ const ModalActions = styled.div`
   justify-content: flex-end;
   gap: 1rem;
   margin-top: 2rem;
+
+  // 💡 MOBILE: Ocupar todo el ancho en móvil
+  @media (max-width: 500px) {
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+
+    ${Button} {
+      width: 100%;
+      justify-content: center;
+    }
+  }
 `;
 
 const SaveButton = styled(Button)`
@@ -260,6 +406,16 @@ const UserManagement = () => {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  // 💡 Helper para asignar color a la tarjeta según el rol (mejora visual en móvil)
+  const getRoleColor = (rol) => {
+    switch(rol) {
+      case 'Administrador': return '#dc3545'; // Rojo
+      case 'Contador': return '#ffc107'; // Amarillo
+      case 'Vendedor': return '#007bff'; // Azul
+      default: return '#6c757d';
+    }
+  };
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -354,6 +510,8 @@ const UserManagement = () => {
           <span style={{ fontSize: '1.2rem' }}>+</span> Crear Nuevo Usuario
         </CreateButton>
       </TopBar>
+      
+      {/* 💡 DESKTOP VIEW: Tabla */}
       <Table>
         <thead>
           <Tr>
@@ -374,13 +532,29 @@ const UserManagement = () => {
           ))}
         </tbody>
       </Table>
+      
+      {/* 💡 MOBILE VIEW: Tarjetas */}
+      <MobileCardContainer>
+        {users.map((user) => (
+          <UserCard key={user.id_usuario} $roleColor={getRoleColor(user.rol)}>
+            <CardName>{user.nombre_usuario}</CardName>
+            <CardRole $roleColor={getRoleColor(user.rol)}>{user.rol}</CardRole>
+            <CardDetail style={{ gridArea: 'id' }}>ID: <strong>{user.id_usuario}</strong></CardDetail>
+            <CardActions>
+              <EditButton onClick={() => openEditModal(user)}>✏️ Editar</EditButton>
+              <DeleteButton onClick={() => openDeleteModal(user)}>🗑️ Eliminar</DeleteButton>
+            </CardActions>
+          </UserCard>
+        ))}
+      </MobileCardContainer>
+      
 
       <AnimatePresence>
         {isModalOpen && (
           <ModalOverlay initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)}>
             <ModalContent variants={modalVariants} initial="hidden" animate="visible" exit="exit" onSubmit={handleSaveUser} onClick={(e) => e.stopPropagation()}>
               <ModalTitle>{editingUser ? 'Editar Usuario' : 'Crear Nuevo Usuario'}</ModalTitle>
-              {modalError && <ModalError>{modalError}</ModalError>}
+              <ModalError>{modalError}</ModalError>
               <Input 
                 type="text" name="nombre_usuario" placeholder="Nombre de usuario" 
                 value={formData.nombre_usuario} onChange={handleInputChange}
@@ -442,4 +616,3 @@ const UserManagement = () => {
 };
 
 export default UserManagement;
-
