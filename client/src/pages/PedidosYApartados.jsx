@@ -1,5 +1,4 @@
 // client/src/pages/PedidosYApartados.jsx
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { Link } from 'react-router-dom';
@@ -75,8 +74,9 @@ const PedidosGrid = styled(motion.div)`
 const PedidoCard = styled(motion.div)`
     background-color: white; border-radius: 12px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    /* ✅ CORRECCIÓN: Se usa $estado para que no pase al DOM */
     border-left: 6px solid ${props => {
-        switch (props.estado) {
+        switch (props.$estado) {
             case 'Apartado': return '#ffc107'; 
             case 'COMPLETADO': return '#28a745';
             case 'Cancelado': return '#dc3545';
@@ -98,7 +98,8 @@ const CardFooter = styled.div`
 const ProgressBar = styled.div`
     background-color: #e9ecef; border-radius: 99px; height: 10px; overflow: hidden;
     div {
-        width: ${props => props.percent}%;
+        /* ✅ CORRECCIÓN: Se usa $percent para que no pase al DOM */
+        width: ${props => props.$percent}%;
         background-color: #28a745; height: 100%;
         transition: width 0.5s ease;
     }
@@ -150,7 +151,7 @@ const ModalActions = styled.div`
 `;
 
 // ==================================================================
-// ✅ NUEVO MODAL DE CREACIÓN (INTEGRADO EN ESTE ARCHIVO)
+// ✅ COMPONENTE DEL MODAL DE CREACIÓN (INTEGRADO EN ESTE ARCHIVO)
 // ==================================================================
 const CreateOrderModal = ({ onClose, onSubmit, showAlert, clients, products }) => {
     const [selectedClientId, setSelectedClientId] = useState('');
@@ -161,7 +162,6 @@ const CreateOrderModal = ({ onClose, onSubmit, showAlert, clients, products }) =
     const filteredProducts = useMemo(() => {
         if (!productSearch) return [];
         const lowerSearch = productSearch.toLowerCase();
-        // ✅ MEJORA: Búsqueda por nombre Y código
         return products.filter(p => 
             p.nombre.toLowerCase().includes(lowerSearch) || 
             (p.codigo && p.codigo.toLowerCase().includes(lowerSearch))
@@ -204,7 +204,6 @@ const CreateOrderModal = ({ onClose, onSubmit, showAlert, clients, products }) =
         }
         
         const orderData = {
-            // ✅ CORRECCIÓN: Se envía el ID del cliente seleccionado
             clienteId: selectedClientId || null,
             items: cart,
             total: totalPedido,
@@ -416,7 +415,8 @@ const PedidosYApartados = () => {
                                 return (
                                     <PedidoCard 
                                         key={pedido.id} 
-                                        estado={pedido.estado}
+                                        /* ✅ CORRECCIÓN: Se pasa $estado como prop transitoria */
+                                        $estado={pedido.estado}
                                         onClick={() => openModal('orderDetail', { pedidoId: pedido.id })}
                                         layout
                                         initial={{ opacity: 0, y: 20 }}
@@ -446,7 +446,8 @@ const PedidosYApartados = () => {
                                             </p>
                                         </CardBody>
                                         <CardFooter>
-                                            <ProgressBar percent={percentPaid}><div></div></ProgressBar>
+                                            {/* ✅ CORRECCIÓN: Se pasa $percent como prop transitoria */}
+                                            <ProgressBar $percent={percentPaid}><div></div></ProgressBar>
                                         </CardFooter>
                                     </PedidoCard>
                                 );
