@@ -569,8 +569,6 @@ const InventoryManagement = () => {
     try {
       const token = localStorage.getItem('token');
       await axios.put(`/api/products/${productId}`, payload, { headers: { Authorization: `Bearer ${token}` } });
-      console.log('🟠 Llega a handleUpdateProduct:', payload, id);
-
       setIsEditModalOpen(false);
       showAlert({ title: 'Éxito', message: 'Producto actualizado correctamente.' });
       await fetchData();
