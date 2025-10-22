@@ -98,18 +98,23 @@ const getProductById = async (req, res) => {
 
 
 /* ===================== UPDATE ===================== */
+// En tu archivo: productController.js
+
 const updateProduct = async (req, res) => {
   const { id } = req.params;
+  
+  // ✅ CAMBIO 1: Ya no extraemos 'existencia' del body, porque no debe modificarse aquí.
   const {
-    codigo, nombre, costo, venta, existencia,
+    codigo, nombre, costo, venta,
     minimo, maximo, id_categoria, id_proveedor,
     tipo_venta, mayoreo
   } = req.body;
 
   const id_usuario = req.user?.id_usuario || req.user?.id;
 
-  if (!codigo || !nombre || costo === undefined || venta === undefined || existencia === undefined) {
-    return res.status(400).json({ msg: 'Campos obligatorios: código, nombre, costo, venta y existencia.' });
+  // ✅ CAMBIO 2: Eliminamos 'existencia' de la validación.
+  if (!codigo || !nombre || costo === undefined || venta === undefined) {
+    return res.status(400).json({ msg: 'Campos obligatorios: código, nombre, costo y venta.' });
   }
 
   let connection;
@@ -120,25 +125,23 @@ const updateProduct = async (req, res) => {
     const [producto] = await connection.query('SELECT * FROM productos WHERE id_producto = ?', [id]);
     if (!producto.length) throw new Error('Producto no encontrado.');
 
-    // Verificar duplicados (excluyéndose a sí mismo)
     const [exist] = await connection.query(
       'SELECT id_producto FROM productos WHERE (codigo = ? OR nombre = ?) AND id_producto != ?',
       [codigo, nombre, id]
     );
     if (exist.length > 0) throw new Error('Ya existe otro producto con este código o nombre.');
 
+    // ✅ CAMBIO 3: El objeto a actualizar ya no incluye 'existencia'.
     const productData = {
-      codigo, nombre, costo, venta, existencia,
+      codigo, nombre, costo, venta,
       minimo, maximo, id_categoria, id_proveedor,
       tipo_venta, mayoreo
     };
 
     await connection.query('UPDATE productos SET ? WHERE id_producto = ?', [productData, id]);
 
-    const detalles =
-      Number(producto[0].existencia) !== Number(existencia)
-        ? `Stock actualizado de ${producto[0].existencia} a ${existencia}.`
-        : 'Detalles del producto actualizados.';
+    // El movimiento de inventario ahora solo registra la edición de detalles.
+    const detalles = 'Detalles del producto actualizados.';
 
     await connection.query(
       'INSERT INTO movimientos_inventario (id_producto, tipo_movimiento, detalles, id_usuario) VALUES (?, ?, ?, ?)',
@@ -146,7 +149,7 @@ const updateProduct = async (req, res) => {
     );
 
     await connection.commit();
-    res.json({ id, ...productData });
+    res.json({ id, ...productData, existencia: producto[0].existencia }); // Devolvemos la existencia original.
   } catch (error) {
     if (connection) await connection.rollback();
     console.error('Error en updateProduct:', error);
