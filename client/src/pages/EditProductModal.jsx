@@ -56,22 +56,17 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
     }
   };
 
-  // ✅ **VERSIÓN CORREGIDA Y SIMPLIFICADA DE `handleSubmit`**
   const handleSubmit = (e) => {
     e.preventDefault();
     setModalError('');
     const f = formData;
 
-    // 1. Validar campos obligatorios de forma explícita
-    if (!f.codigo || String(f.codigo).trim() === '' ||
-        !f.nombre || String(f.nombre).trim() === '' ||
-        !f.costo  || String(f.costo).trim() === ''  ||
-        !f.venta  || String(f.venta).trim() === '') {
+    if (!f.codigo || !f.nombre || !f.costo || !f.venta) {
       setModalError('Los campos Código, Nombre, Costo y Venta son obligatorios.');
       return;
     }
-
-    // 2. Crear el payload con los tipos de dato correctos y SIN EXISTENCIA
+    
+    // ✅ **LA SOLUCIÓN**: Añadimos la existencia original para satisfacer cualquier caché.
     const payload = {
         codigo: String(f.codigo).trim(),
         nombre: String(f.nombre).trim(),
@@ -79,39 +74,29 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
         tipo_venta: f.tipo_venta,
         costo: parseFloat(f.costo),
         venta: parseFloat(f.venta),
+        existencia: productToEdit.existencia, // <-- ESTA LÍNEA ES LA CLAVE
         mayoreo: f.mayoreo ? parseFloat(f.mayoreo) : null,
         minimo: f.minimo ? parseInt(f.minimo, 10) : null,
         maximo: f.maximo ? parseInt(f.maximo, 10) : null,
         id_categoria: f.id_categoria ? parseInt(f.id_categoria, 10) : null,
         id_proveedor: f.id_proveedor ? parseInt(f.id_proveedor, 10) : null,
     };
-    
-    // 3. Validar que los números sean válidos después de la conversión
-    if (isNaN(payload.costo) || isNaN(payload.venta) || 
-        (payload.mayoreo !== null && isNaN(payload.mayoreo)) || 
-        (payload.minimo !== null && isNaN(payload.minimo)) ||
-        (payload.maximo !== null && isNaN(payload.maximo))) {
+
+    if (isNaN(payload.costo) || isNaN(payload.venta) || (payload.mayoreo !== null && isNaN(payload.mayoreo)) || (payload.minimo !== null && isNaN(payload.minimo)) || (payload.maximo !== null && isNaN(payload.maximo))) {
         setModalError('Por favor, introduce números válidos para los precios y stocks.');
         return;
     }
-    
-    // 4. Resto de validaciones lógicas
     if (payload.venta < payload.costo) { 
         setModalError('El precio de venta no puede ser menor que el costo.'); 
         return; 
     }
     
-    const duplicate = allProductsRaw.find(p => 
-        p.id_producto !== productToEdit.id_producto && 
-        (p.codigo?.toLowerCase() === payload.codigo.toLowerCase() || p.nombre?.toLowerCase() === payload.nombre.toLowerCase())
-    );
-
+    const duplicate = allProductsRaw.find(p => p.id_producto !== productToEdit.id_producto && (p.codigo?.toLowerCase() === payload.codigo.toLowerCase() || p.nombre?.toLowerCase() === payload.nombre.toLowerCase()));
     if (duplicate) { 
         setModalError(`Ya existe otro producto con ese código o nombre.`); 
         return; 
     }
 
-    // 5. Enviar el payload limpio al servidor
     onSave(payload, productToEdit.id_producto);
   };
 
