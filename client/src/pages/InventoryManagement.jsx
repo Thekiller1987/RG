@@ -246,7 +246,7 @@ function InventoryHistoryModal({ onClose }) {
         });
         setHistory(res.data || []);
       } catch (error) {
-        // Agregado log de error más detallado para ayudar en la depuración del VPS
+        // Log de error más detallado (si el build pasa, esto te ayudará a depurar la API)
         console.error("Error fetching inventory history:", error);
         if (error.response) {
             console.error("API Response Status:", error.response.status);
@@ -400,6 +400,7 @@ function InventoryHistoryModal({ onClose }) {
                             <HistoryTd>{item.detalles}</HistoryTd>
                             <HistoryTd>{item.nombre_usuario || 'Sistema'}</HistoryTd>
                           </motion.tr>
+                        ))}
                       </tbody>
                     </HistoryTable>
                   </div>
