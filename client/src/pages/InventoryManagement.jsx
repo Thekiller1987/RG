@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue } from 'react';
 import styled, { keyframes } from 'styled-components';
 import axios from 'axios';
@@ -578,24 +579,24 @@ const InventoryManagement = () => {
   };
 
  const openEditModal = (product) => {
-    setEditingProduct(product);
-    const cost = parseFloat(product.costo);
-    const price = parseFloat(product.venta);
-    setProfitPercentage(cost>0 && price>0 ? (((price - cost)/cost*100).toFixed(2)) : '');
-    setFormData({
-      codigo:'', nombre:'', costo:'', venta:'', mayoreo:'', id_categoria:'',
-      existencia:'', minimo:'', maximo:'', tipo_venta:'Unidad', id_proveedor:'', descripcion:'',
-      ...product,
-      
-      // 🛑 FIX CLAVE: Convertir la existencia a STRING si es número
-      existencia: product.existencia !== undefined && product.existencia !== null 
-        ? String(product.existencia) 
-        : '',
-      
-    });
-    setModalError('');
-    setIsModalOpen(true);
- 
+    setEditingProduct(product);
+    const cost = parseFloat(product.costo);
+    const price = parseFloat(product.venta);
+    setProfitPercentage(cost>0 && price>0 ? (((price - cost)/cost*100).toFixed(2)) : '');
+    setFormData({
+      codigo:'', nombre:'', costo:'', venta:'', mayoreo:'', id_categoria:'',
+      existencia:'', minimo:'', maximo:'', tipo_venta:'Unidad', id_proveedor:'', descripcion:'',
+      ...product,
+      
+      // 🛑 FIX CLAVE: Convertir la existencia a STRING si es número
+      existencia: product.existencia !== undefined && product.existencia !== null 
+        ? String(product.existencia) 
+        : '',
+      
+    });
+    setModalError('');
+    setIsModalOpen(true);
+  };
   };
 
   const openDeleteModal = (product) => { setProductToDelete(product); setIsDeleteModalOpen(true); };
@@ -662,19 +663,19 @@ const InventoryManagement = () => {
   };
 // InventoryManagement.jsx
 const handleSaveProduct = async (e) => {
-    e.preventDefault();
-    setModalError('');
-    const f = formData;
+    e.preventDefault();
+    setModalError('');
+    const f = formData;
 
     // 🛑 FIX: Solo requerir existencia si NO estamos editando (es decir, creando)
-    const requiredFields = !editingProduct 
-      ? ['codigo', 'nombre', 'costo', 'venta', 'existencia']
-      : ['codigo', 'nombre', 'costo', 'venta']; 
+    const requiredFields = !editingProduct 
+      ? ['codigo', 'nombre', 'costo', 'venta', 'existencia']
+      : ['codigo', 'nombre', 'costo', 'venta']; 
 
-    if (requiredFields.some(field => !f[field] || !String(f[field]).trim())) { // 🛑 FIX SECUNDARIO: Convertir a String antes de trim
-      setModalError('Los campos Código, Nombre, Costo, Venta y Existencia son obligatorios al crear.');
-      return;
-    
+    if (requiredFields.some(field => !f[field] || !String(f[field]).trim())) { // 🛑 FIX SECUNDARIO: Convertir a String antes de trim
+      setModalError('Los campos Código, Nombre, Costo, Venta y Existencia son obligatorios al crear.');
+      return;
+    
     
     const cost = parseFloat(f.costo), price = parseFloat(f.venta), wholesale = f.mayoreo ? parseFloat(f.mayoreo) : null;
     const stock = parseInt(f.existencia, 10);
@@ -701,23 +702,23 @@ const handleSaveProduct = async (e) => {
 
     const token = localStorage.getItem('token');
   
-    const payload = {
-      ...f,
-      // 🛑 FIX: Al crear, usa f.existencia (formulario); al editar, se excluye el campo del PUT.
-      existencia: editingProduct ? editingProduct.existencia : f.existencia, 
-      mayoreo: f.mayoreo || null, minimo: f.minimo || null, maximo: f.maximo || null,
-      id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null
-    };
-    try {
-      if (editingProduct) {
-        // 🛑 FIX: Excluir 'existencia' del payload de actualización (PUT)
-        const { existencia, ...updatePayload } = payload; 
-        await axios.put(`/api/products/${editingProduct.id_producto}`, updatePayload, { headers:{ Authorization:`Bearer ${token}` } });
-      } else {
-        // Al CREAR, se necesita la existencia inicial.
-        await axios.post('/api/products', payload, { headers:{ Authorization:`Bearer ${token}` } });
-      }
-      setIsModalOpen(false);
+    const payload = {
+      ...f,
+      // 🛑 FIX: Al crear, usa f.existencia (formulario); al editar, se excluye el campo del PUT.
+      existencia: editingProduct ? editingProduct.existencia : f.existencia, 
+      mayoreo: f.mayoreo || null, minimo: f.minimo || null, maximo: f.maximo || null,
+      id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null
+    };
+    try {
+      if (editingProduct) {
+        // 🛑 FIX: Excluir 'existencia' del payload de actualización (PUT)
+        const { existencia, ...updatePayload } = payload; 
+        await axios.put(`/api/products/${editingProduct.id_producto}`, updatePayload, { headers:{ Authorization:`Bearer ${token}` } });
+      } else {
+        // Al CREAR, se necesita la existencia inicial.
+        await axios.post('/api/products', payload, { headers:{ Authorization:`Bearer ${token}` } });
+      }
+      setIsModalOpen(false);
       await fetchData();
     } catch (err) {
       setModalError(err.response?.data?.msg || 'Error al guardar el producto.');
