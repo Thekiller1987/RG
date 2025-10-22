@@ -180,85 +180,81 @@ const createReturn = async (req, res) => {
     if (connection) connection.release();
   }
 };
-
-/* ───────────────────────── getSales (✅ AJUSTE DE ZONA HORARIA) ───────────────────────── */
+/* ───────────────────────── getSales (✅ CON AJUSTE DE ZONA HORARIA) ───────────────────────── */
 const getSales = async (req, res) => {
-  try {
-    const { date } = req.query;
+  try {
+    const { date } = req.query;
 
-    let where = '1=1';
-    const params = [];
+    let where = '1=1';
+    const params = [];
 
-    if (date) {
-      // AJUSTE CLAVE 1: Cambiamos la condición.
-      // Le pedimos a MySQL que convierta la fecha de UTC a la hora local de Nicaragua
-      // y luego la compare con la fecha que nos llega.
-      where += ` AND DATE(CONVERT_TZ(v.fecha, 'UTC', 'America/Managua')) = ?`;
-      
-      // AJUSTE CLAVE 2: Ahora solo necesitamos pasar la fecha, no el rango de horas.
-      params.push(date);
-      console.log(`LOG: Buscando ventas para la fecha local: ${date} (Zona Horaria: America/Managua)`);
-    } else {
-      console.log('LOG: Obteniendo historial completo de ventas (sin filtro de fecha).');
-    }
+    if (date) {
+      // AJUSTE CLAVE: Le pedimos a MySQL que convierta la fecha de UTC a la hora local 
+      // de Nicaragua y luego la compare con la fecha que nos llega.
+      where += ` AND DATE(CONVERT_TZ(v.fecha, 'UTC', 'America/Managua')) = ?`;
+      params.push(date);
+      console.log(`LOG: Buscando ventas para la fecha local: ${date} (Zona Horaria: America/Managua)`);
+    } else {
+      console.log('LOG: Obteniendo historial completo de ventas (sin filtro de fecha).');
+    }
 
-    const [sales] = await pool.query(
-      `
-      SELECT 
-        v.id_venta AS id, 
-        v.fecha, 
-        v.total_venta AS totalVenta, 
-        v.subtotal,
-        v.descuento,
-        v.estado, 
-        v.pago_detalles AS pagoDetalles,
-        v.id_usuario AS userId,
-        v.id_cliente AS clientId,
-        c.nombre AS clienteNombre,
-        v.tipo_venta,
-        v.referencia_pedido
-      FROM ventas v
-      LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
-      WHERE ${where}
-      ORDER BY v.fecha DESC
-      `,
-      params
-    );
+    const [sales] = await pool.query(
+      `
+      SELECT 
+        v.id_venta AS id, 
+        v.fecha, 
+        v.total_venta AS totalVenta, 
+        v.subtotal,
+        v.descuento,
+        v.estado, 
+        v.pago_detalles AS pagoDetalles,
+        v.id_usuario AS userId,
+        v.id_cliente AS clientId,
+        c.nombre AS clienteNombre,
+        v.tipo_venta,
+        v.referencia_pedido
+      FROM ventas v
+      LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
+      WHERE ${where}
+      ORDER BY v.fecha DESC
+      `,
+      params
+    );
 
-    if (!sales.length) return res.json([]);
+    if (!sales.length) return res.json([]);
 
-    const saleIds = sales.map(s => s.id);
-    if (!saleIds.length) {
-      return res.json(sales.map(s => ({ ...s, pagoDetalles: safeParseJSON(s.pagoDetalles), items: [] })));
-    }
+    const saleIds = sales.map(s => s.id);
+    if (!saleIds.length) {
+      return res.json(sales.map(s => ({ ...s, pagoDetalles: safeParseJSON(s.pagoDetalles), items: [] })));
+    }
 
-    const [details] = await pool.query(
-      `
-      SELECT 
-        dv.id_venta, 
-        p.id_producto AS id,
-        p.nombre,
-        dv.cantidad AS quantity,
-        dv.precio_unitario AS precio
-      FROM detalle_ventas dv
-      JOIN productos p ON dv.id_producto = p.id_producto
-      WHERE dv.id_venta IN (?)
-      `,
-      [saleIds]
-    );
+    const [details] = await pool.query(
+      `
+      SELECT 
+        dv.id_venta, 
+        p.id_producto AS id,
+        p.nombre,
+        dv.cantidad AS quantity,
+        dv.precio_unitario AS precio
+      FROM detalle_ventas dv
+      JOIN productos p ON dv.id_producto = p.id_producto
+      WHERE dv.id_venta IN (?)
+      `,
+      [saleIds]
+    );
 
-    const salesWithDetails = sales.map(sale => ({
-      ...sale,
-      pagoDetalles: safeParseJSON(sale.pagoDetalles),
-      items: details.filter(d => d.id_venta === sale.id)
-    }));
+    const salesWithDetails = sales.map(sale => ({
+      ...sale,
+      pagoDetalles: safeParseJSON(sale.pagoDetalles),
+      items: details.filter(d => d.id_venta === sale.id)
+    }));
 
-    res.json(salesWithDetails);
+    res.json(salesWithDetails);
 
-  } catch (error) {
-    console.error('ERROR CRÍTICO al obtener las ventas:', error);
-    res.status(500).json({ message: 'Error en el servidor al obtener las ventas' });
-  }
+  } catch (error) {
+    console.error('ERROR CRÍTICO al obtener las ventas:', error);
+    res.status(500).json({ message: 'Error en el servidor al obtener las ventas' });
+  }
 };
 
 module.exports = {

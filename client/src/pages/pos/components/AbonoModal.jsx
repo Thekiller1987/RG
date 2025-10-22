@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { FaTimes, FaSave, FaSpinner } from 'react-icons/fa';
-import * as api from '../../service/api'; // asegúrate que la ruta sea correcta
-import { useAuth } from '../../context/AuthContext';
+import * as api from '../../../service/api.js'; // asegúrate que la ruta sea correcta
+import { useAuth } from '../../../context/AuthContext.jsx';
 
 const ModalOverlay = styled.div`
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
