@@ -1,5 +1,3 @@
-// InventoryManagement.jsx
-
 import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue } from 'react';
 import styled, { keyframes } from 'styled-components';
 import axios from 'axios';
@@ -9,10 +7,7 @@ import {
   FaPlus, FaBoxOpen, FaTags, FaTruck, FaTrash, FaEdit, FaArrowLeft, FaHistory, FaSpinner,
   FaSearch, FaTimes, FaPlusCircle, FaMinusCircle, FaExclamationTriangle
 } from 'react-icons/fa';
-
 import AlertModal from './pos/components/AlertModal.jsx';
-import CreateProductModal from './CreateProductModal';
-import EditProductModal from './EditProductModal';
 
 /* ================================
   CONSTANTES DE RENDIMIENTO
@@ -75,12 +70,15 @@ const ModalContent = styled.div`background:#fdfdff;padding:2.5rem;border-radius:
 const ModalTitle = styled.h2`margin:0 0 2rem;color:#1a202c;text-align:center;font-size:1.75rem;`;
 const CenteredMessage = styled.div`text-align:center;padding:3rem;color:#718096;`;
 const Input = styled.input`width:100%;padding:.8rem 1rem;border-radius:8px;border:1px solid #ced4da;font-size:1rem;`;
+const ModalError = styled.p`color:#dc3545;font-size:.9rem;text-align:center;margin-bottom:1rem;min-height:1.2rem;`;
+const InputGrid = styled.div`display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1.5rem;`;
 const FormGroup = styled.div`display:flex;flex-direction:column;`;
 const Label = styled.label`margin-bottom:.5rem;color:#495057;font-weight:600;`;
 const ModalActions = styled.div`display:flex;justify-content:flex-end;gap:1rem;margin-top:2rem;@media(max-width:500px){justify-content:space-between}`;
+const SaveButton = styled(Button)`background:#007bff;color:#fff;&:hover{background:#0069d9}`;
 const CancelButton = styled(Button)`background:#f8f9fa;color:#6c757d;border:1px solid #ced4da;&:hover{background:#e2e6ea}`;
 const DeleteButton = styled(Button)`background:#dc3545;color:#fff;&:hover{background:#c53030}`;
-const SaveButton = styled(Button)`background:#007bff;color:#fff;&:hover{background:#0069d9}`;
+const TypeBadge = styled.span`display:inline-block;padding:.25em .6em;font-size:.75rem;font-weight:700;line-height:1;text-align:center;border-radius:.375rem;color:${p=>p.$color || '#fff'};background-color:${p=>p.$bg || '#6c757d'};`;
 const HistoryModalContent = styled.div`background:#fdfdff;padding:0;border-radius:16px;width:90%;max-width:1000px;height:80vh;display:flex;flex-direction:column;box-shadow:0 10px 30px rgba(0,0,0,.2);`;
 const HistoryHeader = styled.div`padding:1rem 1.5rem;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;`;
 const HistoryBody = styled.div`flex-grow:1;overflow-y:auto;padding:1.5rem;`;
@@ -225,9 +223,208 @@ const StockAdjustmentModal = ({ isOpen, product, onClose, onConfirm }) => {
 
 function InventoryHistoryModal({ onClose }) {
     // El código completo de InventoryHistoryModal va aquí...
-    return <div>Historial Modal</div>;
+    return <div>Historial Modal</div>
 }
 
+/* ================================
+  MODAL DE CREACIÓN
+================================ */
+const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, allProductsRaw }) => {
+  const [formData, setFormData] = useState({
+    codigo: '', nombre: '', costo: '', venta: '', mayoreo: '', id_categoria: '',
+    existencia: '', minimo: '', maximo: '', tipo_venta: 'Unidad', id_proveedor: '', descripcion: ''
+  });
+  const [profitPercentage, setProfitPercentage] = useState('');
+  const [modalError, setModalError] = useState('');
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    const next = { ...formData, [name]: value };
+    if (name === 'costo' || name === 'venta') {
+      const cost = parseFloat(next.costo);
+      const price = parseFloat(next.venta);
+      setProfitPercentage(cost > 0 && price > 0 ? (((price - cost) / cost * 100).toFixed(2)) : '');
+    }
+    setFormData(next);
+    setModalError('');
+  };
+
+  const handlePercentageChange = (e) => {
+    const percentage = e.target.value;
+    setProfitPercentage(percentage);
+    const cost = parseFloat(formData.costo);
+    if (cost > 0 && percentage) {
+      setFormData(prev => ({ ...prev, venta: (cost * (1 + parseFloat(percentage) / 100)).toFixed(2) }));
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setModalError('');
+    const f = formData;
+
+    const requiredFields = ['codigo', 'nombre', 'costo', 'venta', 'existencia'];
+    if (requiredFields.some(field => !f[field] || !String(f[field]).trim())) {
+      setModalError('Código, Nombre, Costo, Venta y Existencia son obligatorios.');
+      return;
+    }
+
+    const cost = parseFloat(f.costo), price = parseFloat(f.venta), wholesale = f.mayoreo ? parseFloat(f.mayoreo) : null;
+    const stock = parseInt(f.existencia, 10);
+    const minStock = f.minimo ? parseInt(f.minimo, 10) : null;
+    const maxStock = f.maximo ? parseInt(f.maximo, 10) : null;
+    if ([cost, price, stock].some(isNaN)) { setModalError('Costo, Venta y Existencia deben ser números válidos.'); return; }
+    if (f.mayoreo && isNaN(wholesale)) { setModalError('Precio Mayoreo debe ser un número válido o estar vacío.'); return; }
+    if (f.minimo && isNaN(minStock)) { setModalError('Stock Mínimo debe ser un número válido o estar vacío.'); return; }
+    if (f.maximo && isNaN(maxStock)) { setModalError('Stock Máximo debe ser un número válido o estar vacío.'); return; }
+    if (cost < 0 || price < 0 || stock < 0 || (minStock ?? 0) < 0 || (maxStock ?? 0) < 0 || (wholesale ?? 0) < 0) { setModalError('Precios y cantidades no pueden ser negativos.'); return; }
+    if (price < cost) { setModalError('El precio de venta no puede ser menor que el costo.'); return; }
+    if (wholesale !== null && wholesale > price) { setModalError('El precio de mayoreo no puede ser mayor que el de venta.'); return; }
+    if (minStock !== null && maxStock !== null && minStock > maxStock) { setModalError('El stock mínimo no puede ser mayor que el máximo.'); return; }
+
+    const duplicate = allProductsRaw.find(p =>
+        (p.codigo?.toLowerCase() === f.codigo.trim().toLowerCase() || p.nombre?.toLowerCase() === f.nombre.trim().toLowerCase())
+    );
+    if (duplicate) {
+        if ((duplicate.codigo || '').toLowerCase() === f.codigo.trim().toLowerCase()) setModalError(`Ya existe un producto con el código "${f.codigo}".`);
+        else setModalError(`Ya existe un producto con el nombre "${f.nombre}".`);
+        return;
+    }
+
+    onSave({
+        ...f,
+        mayoreo: f.mayoreo || null, minimo: f.minimo || null, maximo: f.maximo || null,
+        id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null
+    });
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <ModalOverlay onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}>
+        <ModalContent as="div" onClick={(e) => e.stopPropagation()}>
+          <form onSubmit={handleSubmit}>
+            <ModalTitle>Crear Nuevo Producto</ModalTitle>
+            {modalError && <ModalError>{modalError}</ModalError>}
+            <InputGrid>
+              <FormGroup><Label>Código</Label><Input name="codigo" value={formData.codigo} onChange={handleInputChange} required /></FormGroup>
+              <FormGroup><Label>Nombre</Label><Input name="nombre" value={formData.nombre} onChange={handleInputChange} required /></FormGroup>
+              <FormGroup><Label>Costo (C$)</Label><Input type="number" step="0.01" name="costo" value={formData.costo} onChange={handleInputChange} required /></FormGroup>
+              <FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup>
+              <FormGroup><Label>Precio Venta (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta} onChange={handleInputChange} required /></FormGroup>
+              <FormGroup><Label>Precio Mayoreo (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Existencia Inicial</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="existencia" value={formData.existencia} onChange={handleInputChange} required /></FormGroup>
+              <FormGroup><Label>Stock Mínimo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="minimo" value={formData.minimo} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Stock Máximo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="maximo" value={formData.maximo} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Descripción</Label><Input name="descripcion" value={formData.descripcion} onChange={handleInputChange} placeholder="Detalles del producto" /></FormGroup>
+              <FormGroup><Label>Categoría</Label><Select name="id_categoria" value={formData.id_categoria} onChange={handleInputChange}><option value="">-- Sin Categoría --</option>{categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}</Select></FormGroup>
+              <FormGroup><Label>Proveedor</Label><Select name="id_proveedor" value={formData.id_proveedor} onChange={handleInputChange}><option value="">-- Sin Proveedor --</option>{providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}</Select></FormGroup>
+              <FormGroup><Label>Tipo de Venta</Label><Select name="tipo_venta" value={formData.tipo_venta} onChange={handleInputChange}><option value="Unidad">Unidad</option><option value="Juego">Juego</option><option value="Kit">Kit</option></Select></FormGroup>
+            </InputGrid>
+            <ModalActions>
+              <CancelButton type="button" onClick={onClose}>Cancelar</CancelButton>
+              <SaveButton type="submit">Crear Producto</SaveButton>
+            </ModalActions>
+          </form>
+        </ModalContent>
+      </motion.div>
+    </ModalOverlay>
+  );
+};
+
+/* ================================
+  MODAL DE EDICIÓN
+================================ */
+const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, providers, allProductsRaw }) => {
+  const [formData, setFormData] = useState({});
+  const [profitPercentage, setProfitPercentage] = useState('');
+  const [modalError, setModalError] = useState('');
+
+  useEffect(() => {
+    if (productToEdit) {
+        setFormData({ ...productToEdit, mayoreo: productToEdit.mayoreo ?? '', minimo: productToEdit.minimo ?? '', maximo: productToEdit.maximo ?? '', id_categoria: productToEdit.id_categoria ?? '', id_proveedor: productToEdit.id_proveedor ?? '', descripcion: productToEdit.descripcion ?? '' });
+        const cost = parseFloat(productToEdit.costo);
+        const price = parseFloat(productToEdit.venta);
+        setProfitPercentage(cost > 0 && price > 0 ? (((price - cost) / cost * 100).toFixed(2)) : '');
+        setModalError('');
+    }
+  }, [productToEdit]);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    if (name === 'existencia') return;
+    const next = { ...formData, [name]: value };
+    if (name === 'costo' || name === 'venta') {
+      const cost = parseFloat(next.costo);
+      const price = parseFloat(next.venta);
+      setProfitPercentage(cost > 0 && price > 0 ? (((price - cost) / cost * 100).toFixed(2)) : '');
+    }
+    setFormData(next);
+    setModalError('');
+  };
+
+  const handlePercentageChange = (e) => {
+    const percentage = e.target.value;
+    setProfitPercentage(percentage);
+    const cost = parseFloat(formData.costo);
+    if (cost > 0 && percentage) {
+      setFormData(prev => ({ ...prev, venta: (cost * (1 + parseFloat(percentage) / 100)).toFixed(2) }));
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setModalError('');
+    const f = formData;
+
+    if (!f.codigo || !f.nombre || !f.costo || !f.venta) { setModalError('Código, Nombre, Costo y Venta son obligatorios.'); return; }
+    if (parseFloat(f.venta) < parseFloat(f.costo)) { setModalError('El precio de venta no puede ser menor que el costo.'); return; }
+
+    const duplicate = allProductsRaw.find(p =>
+        (p.id_producto !== productToEdit.id_producto) &&
+        (p.codigo?.toLowerCase() === f.codigo.trim().toLowerCase() || p.nombre?.toLowerCase() === f.nombre.trim().toLowerCase())
+    );
+    if (duplicate) { setModalError(`Ya existe otro producto con ese código o nombre.`); return; }
+
+    const { existencia, ...payload } = { ...f, mayoreo: f.mayoreo || null, minimo: f.minimo || null, maximo: f.maximo || null, id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null };
+    onSave(payload, productToEdit.id_producto);
+  };
+
+  if (!isOpen || !productToEdit) return null;
+
+  return (
+    <ModalOverlay onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}>
+        <ModalContent as="div" onClick={(e) => e.stopPropagation()}>
+          <form onSubmit={handleSubmit}>
+            <ModalTitle>Editar Producto</ModalTitle>
+            {modalError && <ModalError>{modalError}</ModalError>}
+            <InputGrid>
+              <FormGroup><Label>Código</Label><Input name="codigo" value={formData.codigo || ''} onChange={handleInputChange} required /></FormGroup>
+              <FormGroup><Label>Nombre</Label><Input name="nombre" value={formData.nombre || ''} onChange={handleInputChange} required /></FormGroup>
+              <FormGroup><Label>Costo (C$)</Label><Input type="number" step="0.01" name="costo" value={formData.costo || ''} onChange={handleInputChange} required /></FormGroup>
+              <FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage || ''} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup>
+              <FormGroup><Label>Precio Venta (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta || ''} onChange={handleInputChange} required /></FormGroup>
+              <FormGroup><Label>Precio Mayoreo (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo || ''} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Existencia</Label><Input name="existencia" value={formData.existencia || ''} disabled style={{backgroundColor: '#f0f0f0'}} /><small style={{marginTop: '5px', color: '#dc3545', fontWeight: 'bold'}}>¡Ajustar solo con el botón de stock!</small></FormGroup>
+              <FormGroup><Label>Stock Mínimo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="minimo" value={formData.minimo || ''} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Stock Máximo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="maximo" value={formData.maximo || ''} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Descripción</Label><Input name="descripcion" value={formData.descripcion || ''} onChange={handleInputChange} placeholder="Detalles del producto" /></FormGroup>
+              <FormGroup><Label>Categoría</Label><Select name="id_categoria" value={formData.id_categoria || ''} onChange={handleInputChange}><option value="">-- Sin Categoría --</option>{categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}</Select></FormGroup>
+              <FormGroup><Label>Proveedor</Label><Select name="id_proveedor" value={formData.id_proveedor || ''} onChange={handleInputChange}><option value="">-- Sin Proveedor --</option>{providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}</Select></FormGroup>
+              <FormGroup><Label>Tipo de Venta</Label><Select name="tipo_venta" value={formData.tipo_venta || 'Unidad'} onChange={handleInputChange}><option value="Unidad">Unidad</option><option value="Juego">Juego</option><option value="Kit">Kit</option></Select></FormGroup>
+            </InputGrid>
+            <ModalActions>
+              <CancelButton type="button" onClick={onClose}>Cancelar</CancelButton>
+              <SaveButton type="submit">Guardar Cambios</SaveButton>
+            </ModalActions>
+          </form>
+        </ModalContent>
+      </motion.div>
+    </ModalOverlay>
+  );
+};
 
 /* ==================================
   COMPONENTE PRINCIPAL: InventoryManagement
@@ -244,6 +441,8 @@ const InventoryManagement = () => {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterProvider, setFilterProvider] = useState('');
   const [error, setError] = useState(null);
+  
+  // Estados para los modales
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState(null);
@@ -272,7 +471,7 @@ const InventoryManagement = () => {
       const [full, cats, provs] = await Promise.all([
         fetchProductList(),
         axios.get('/api/categories', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('/api/providers',  { headers: { Authorization: `Bearer ${token}` } })
+        axios.get('/api/providers', { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
       setAllProductsRaw(full);
@@ -342,6 +541,7 @@ const InventoryManagement = () => {
     };
   }, [allProducts, deferredSearch, filterCategory, filterProvider, visibleCount]);
 
+  // Handlers para abrir modales
   const openCreateModal = () => setIsCreateModalOpen(true);
   const openEditModal = (product) => {
     setProductToEdit(product);
@@ -352,6 +552,7 @@ const InventoryManagement = () => {
     setIsDeleteModalOpen(true);
   };
 
+  // Handlers de Lógica (API calls)
   const handleCreateProduct = async (payload) => {
     try {
       const token = localStorage.getItem('token');
@@ -376,13 +577,93 @@ const InventoryManagement = () => {
     }
   };
 
-  const confirmDelete = async () => { /* ... */ };
-  const archiveProduct = async (p) => { /* ... */ };
-  const executeStockAdjustment = async (product, cantidad, razon) => { /* ... */ };
-  const handleAddCategory = async (name) => { /* ... */ };
-  const handleDeleteCategory = async (id) => { /* ... */ };
-  const handleAddProvider = async (name) => { /* ... */ };
-  const handleDeleteProvider = async (id) => { /* ... */ };
+  const confirmDelete = async () => {
+    if (!productToDelete) return;
+    try {
+        const token = localStorage.getItem('token');
+        await axios.delete(`/api/products/${productToDelete.id_producto}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        await fetchData();
+        setIsDeleteModalOpen(false);
+        setProductToDelete(null);
+        showAlert({ title: 'Éxito', message: `El producto ${productToDelete.nombre} fue eliminado.` });
+    } catch (err) {
+        const data = err?.response?.data;
+        const msg = data?.msg || 'No se pudo eliminar el producto.';
+        showAlert({ title: 'Error', message: msg, type: 'error' });
+        if (data?.reasons) {
+            setArchivePrompt({ open: true, product: productToDelete, detail: data.reasons });
+        }
+    }
+  };
+  
+  const archiveProduct = async (p) => {
+    try {
+        const token = localStorage.getItem('token');
+        await axios.patch(`/api/products/${p.id_producto}/archive`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        setArchivePrompt({ open: false, product: null, detail: null });
+        setIsDeleteModalOpen(false);
+        setProductToDelete(null);
+        await fetchData();
+        showAlert({ title: 'Archivado', message: `"${p.nombre}" fue archivado (inactivo).` });
+    } catch (e) {
+        showAlert({ title: 'Error', message: e?.response?.data?.msg || 'No se pudo archivar el producto.', type: 'error' });
+    }
+  };
+
+  const executeStockAdjustment = async (product, cantidad, razon) => {
+    try {
+        const token = localStorage.getItem('token');
+        await axios.patch(`/api/products/${product.id_producto}/stock`,
+            { cantidad, razon }, { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setAdjustmentModal({ isOpen: false, product: null });
+        showAlert({ title: 'Éxito', message: 'Stock actualizado correctamente.' });
+        await fetchData();
+    } catch (error) {
+        showAlert({ title: 'Error', message: error.response?.data?.msg || 'No se pudo ajustar el stock.' });
+    }
+  };
+
+  const handleAddCategory = async (name) => {
+      try {
+          const token = localStorage.getItem('token');
+          await axios.post('/api/categories', { nombre: name }, { headers: { Authorization: `Bearer ${token}` } });
+          await fetchData();
+      } catch (error) {
+          showAlert({ title: 'Error', message: error.response?.data?.msg || 'No se pudo agregar la categoría.' });
+      }
+  };
+  const handleDeleteCategory = async (id) => {
+      try {
+          const token = localStorage.getItem('token');
+          await axios.delete(`/api/categories/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+          await fetchData();
+      } catch (error) {
+          showAlert({ title: 'Error', message: error.response?.data?.msg || 'No se pudo eliminar la categoría. (Verifique que no esté en uso)' });
+      }
+  };
+  const handleAddProvider = async (name) => {
+      try {
+          const token = localStorage.getItem('token');
+          await axios.post('/api/providers', { nombre: name }, { headers: { Authorization: `Bearer ${token}` } });
+          await fetchData();
+      } catch (error) {
+          showAlert({ title: 'Error', message: error.response?.data?.msg || 'No se pudo agregar el proveedor.' });
+      }
+  };
+  const handleDeleteProvider = async (id) => {
+      try {
+          const token = localStorage.getItem('token');
+          await axios.delete(`/api/providers/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+          await fetchData();
+      } catch (error) {
+          showAlert({ title: 'Error', message: error.response?.data?.msg || 'No se pudo eliminar el proveedor. (Verifique que no esté en uso)' });
+      }
+  };
 
   if (!initialLoadComplete) return <PageWrapper><CenteredMessage><Spinner /><p>Cargando Inventario...</p></CenteredMessage></PageWrapper>;
   if (error) return <PageWrapper><CenteredMessage style={{ color: '#c53030' }}>{error}</CenteredMessage></PageWrapper>;
@@ -475,6 +756,7 @@ const InventoryManagement = () => {
             <CenteredMessage><p>No se encontraron productos que coincidan con la búsqueda.</p></CenteredMessage>
         )}
 
+        {/* --- Renderizado de Modales --- */}
         <AnimatePresence>
             {isCreateModalOpen && (
                 <CreateProductModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSave={handleCreateProduct} categories={categories} providers={providers} allProductsRaw={allProductsRaw} />
@@ -503,7 +785,16 @@ const InventoryManagement = () => {
                 <ConfirmDialog
                     open={archivePrompt.open}
                     title="Eliminación bloqueada"
-                    message={ <div style={{ textAlign: 'left', lineHeight: 1.6 }}> Este producto tiene referencias y no puede eliminarse.<br /> <strong>Referencias:</strong><br /> Ventas: {archivePrompt.detail?.ventas ?? 0}<br /> Compras: {archivePrompt.detail?.compras ?? 0}<br /> Movimientos (kardex): {archivePrompt.detail?.kardex ?? 0}<br /><br /> Puedes <strong>archivarlo</strong> para ocultarlo del sistema sin perder historial. </div> }
+                    message={
+                        <div style={{ textAlign: 'left', lineHeight: 1.6 }}>
+                            Este producto tiene referencias y no puede eliminarse.<br />
+                            <strong>Referencias:</strong><br />
+                            Ventas: {archivePrompt.detail?.ventas ?? 0}<br />
+                            Compras: {archivePrompt.detail?.compras ?? 0}<br />
+                            Movimientos (kardex): {archivePrompt.detail?.kardex ?? 0}<br /><br />
+                            Puedes <strong>archivarlo</strong> para ocultarlo del sistema sin perder historial.
+                        </div>
+                    }
                     onCancel={() => setArchivePrompt({ open: false, product: null, detail: null })}
                     onConfirm={() => archiveProduct(archivePrompt.product)}
                     confirmLabel="Archivar producto"
