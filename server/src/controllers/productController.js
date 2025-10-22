@@ -1,7 +1,7 @@
 /**
  * @file productController.js
  * @description Controladores para la lógica de negocio de los productos.
- * @version 2.2.3 (Ignora 'existencia' en updateProduct sin romper compatibilidad con frontend)
+ * @version 2.2.2 (BD alineada + DELETE con FKs SET NULL)
  */
 
 const db = require('../config/db.js');
@@ -25,7 +25,7 @@ const createProduct = async (req, res) => {
     connection = await db.getConnection();
     await connection.beginTransaction();
 
-    // Verificar duplicados
+    // No duplicados por código o nombre
     const [exist] = await connection.query(
       'SELECT id_producto FROM productos WHERE codigo = ? OR nombre = ?',
       [codigo, nombre]
@@ -41,7 +41,7 @@ const createProduct = async (req, res) => {
     const [result] = await connection.query('INSERT INTO productos SET ?', [productData]);
     const id_producto = result.insertId;
 
-    // Registrar creación en historial
+    // Movimiento inventario
     await connection.query(
       'INSERT INTO movimientos_inventario (id_producto, tipo_movimiento, detalles, id_usuario) VALUES (?, ?, ?, ?)',
       [id_producto, 'CREACION', `Producto creado con existencia inicial de ${existencia}`, id_usuario || null]
@@ -66,7 +66,7 @@ const getAllProducts = async (_req, res) => {
       SELECT p.*, c.nombre AS nombre_categoria, pr.nombre AS nombre_proveedor
       FROM productos p
       LEFT JOIN categorias c   ON p.id_categoria  = c.id_categoria
-      LEFT JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
+      LEFT   JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
       ORDER BY p.nombre ASC
     `;
     const [rows] = await db.query(query);
@@ -82,9 +82,9 @@ const getProductById = async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT p.*, c.nombre AS nombre_categoria, pr.nombre AS nombre_proveedor
-       FROM productos p
-       LEFT JOIN categorias c  ON p.id_categoria  = c.id_categoria
-       LEFT JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
+         FROM productos p
+         LEFT JOIN categorias  c  ON p.id_categoria  = c.id_categoria
+         LEFT JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
        WHERE p.id_producto = ?`,
       [id]
     );
@@ -98,18 +98,21 @@ const getProductById = async (req, res) => {
 
 
 /* ===================== UPDATE ===================== */
+// En tu archivo: productController.js
+
 const updateProduct = async (req, res) => {
   const { id } = req.params;
-
-  // ✅ Aceptamos 'existencia' por compatibilidad pero la ignoramos
+  
+  // ✅ CAMBIO 1: Ya no extraemos 'existencia' del body, porque no debe modificarse aquí.
   const {
     codigo, nombre, costo, venta,
     minimo, maximo, id_categoria, id_proveedor,
-    tipo_venta, mayoreo, existencia
+    tipo_venta, mayoreo
   } = req.body;
 
   const id_usuario = req.user?.id_usuario || req.user?.id;
 
+  // ✅ CAMBIO 2: Eliminamos 'existencia' de la validación.
   if (!codigo || !nombre || costo === undefined || venta === undefined) {
     return res.status(400).json({ msg: 'Campos obligatorios: código, nombre, costo y venta.' });
   }
@@ -128,29 +131,25 @@ const updateProduct = async (req, res) => {
     );
     if (exist.length > 0) throw new Error('Ya existe otro producto con este código o nombre.');
 
-    // ✅ Ignoramos existencia si llega en el body
+    // ✅ CAMBIO 3: El objeto a actualizar ya no incluye 'existencia'.
     const productData = {
-      codigo,
-      nombre,
-      costo,
-      venta,
-      minimo,
-      maximo,
-      id_categoria,
-      id_proveedor,
-      tipo_venta,
-      mayoreo
+      codigo, nombre, costo, venta,
+      minimo, maximo, id_categoria, id_proveedor,
+      tipo_venta, mayoreo
     };
 
     await connection.query('UPDATE productos SET ? WHERE id_producto = ?', [productData, id]);
 
+    // El movimiento de inventario ahora solo registra la edición de detalles.
+    const detalles = 'Detalles del producto actualizados.';
+
     await connection.query(
       'INSERT INTO movimientos_inventario (id_producto, tipo_movimiento, detalles, id_usuario) VALUES (?, ?, ?, ?)',
-      [id, 'EDICION', 'Detalles del producto actualizados.', id_usuario || null]
+      [id, 'EDICION', detalles, id_usuario || null]
     );
 
     await connection.commit();
-    res.json({ id, ...productData, existencia: producto[0].existencia });
+    res.json({ id, ...productData, existencia: producto[0].existencia }); // Devolvemos la existencia original.
   } catch (error) {
     if (connection) await connection.rollback();
     console.error('Error en updateProduct:', error);
@@ -161,7 +160,7 @@ const updateProduct = async (req, res) => {
 };
 
 
-/* ===================== DELETE ===================== */
+/* ===================== DELETE (con FKs ON DELETE SET NULL) ===================== */
 const deleteProduct = async (req, res) => {
   const { id } = req.params;
   const id_usuario = req.user?.id_usuario || req.user?.id;
@@ -179,11 +178,13 @@ const deleteProduct = async (req, res) => {
 
     const nombreProd = rows[0].nombre;
 
+    // 1) Registrar el movimiento ANTES del DELETE
     await connection.query(
       'INSERT INTO movimientos_inventario (id_producto, tipo_movimiento, detalles, id_usuario) VALUES (?, ?, ?, ?)',
       [id, 'ELIMINACION', `Producto "${nombreProd}" eliminado.`, id_usuario || null]
     );
 
+    // 2) Borrar el producto (las FKs lo pondrán en NULL donde aplique)
     await connection.query('DELETE FROM productos WHERE id_producto = ?', [id]);
 
     await connection.commit();
@@ -191,14 +192,18 @@ const deleteProduct = async (req, res) => {
   } catch (error) {
     if (connection) await connection.rollback();
     console.error('Error en deleteProduct:', error);
-    res.status(500).json({ msg: error.message || 'Error al eliminar el producto.' });
+    res.status(500).json({ msg: error.message || 'Error interno al eliminar el producto.' });
   } finally {
     if (connection) connection.release();
   }
 };
 
 
-/* ===================== ARCHIVE ===================== */
+/* ===================== ARCHIVE (opcional) ===================== */
+/**
+ * Tu tabla `productos` NO tiene columna `activo`.
+ * Se mantiene la respuesta segura para no romper nada si alguien llama esta ruta.
+ */
 const archiveProduct = async (req, res) => {
   const { id } = req.params;
 
@@ -277,11 +282,11 @@ const getInventoryHistory = async (_req, res) => {
              p.nombre         AS nombre_producto,
              p.codigo         AS codigo_producto,
              u.nombre_usuario AS nombre_usuario
-      FROM movimientos_inventario mi
-      LEFT JOIN productos p ON mi.id_producto = p.id_producto
-      LEFT JOIN usuarios  u ON mi.id_usuario  = u.id_usuario
-      ORDER BY mi.fecha DESC
-      LIMIT 100
+        FROM movimientos_inventario mi
+        LEFT JOIN productos p ON mi.id_producto = p.id_producto
+        LEFT JOIN usuarios  u ON mi.id_usuario  = u.id_usuario
+       ORDER BY mi.fecha DESC
+       LIMIT 100
     `);
     res.json(rows);
   } catch (error) {
@@ -296,7 +301,7 @@ module.exports = {
   getAllProducts,
   getProductById,
   updateProduct,
-  deleteProduct,
+  deleteProduct,   // ← ahora permite eliminar aunque haya ventas/pedidos (Fks SET NULL)
   adjustStock,
   getInventoryHistory,
   archiveProduct
