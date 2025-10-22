@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
   FaPlus, FaBoxOpen, FaTags, FaTruck, FaTrash, FaEdit, FaArrowLeft, FaHistory, FaSpinner,
-  FaSearch, FaTimes, FaPlusCircle, FaMinusCircle, FaExclamationTriangle
+  FaSearch, FaTimes, FaPlusCircle, FaMinusCircle, FaExclamationTriangle, FaCheckCircle
 } from 'react-icons/fa';
 import AlertModal from './pos/components/AlertModal.jsx';
 
@@ -18,7 +18,7 @@ const LARGE_LIST_CUTOFF = 120;
 const SLICE_STEP = 200;
 
 /* ================================
-   ESTILOS (SIN MODIFICACIONES)
+   ESTILOS (Mejoras con enfoque Bootstrap)
 ================================ */
 const spin = keyframes`from{transform:rotate(0)}to{transform:rotate(360deg)}`;
 const Spinner = styled(FaSpinner)`font-size:2rem;color:#2b6cb0;animation:${spin} 1s linear infinite;`;
@@ -27,54 +27,89 @@ const HeaderContainer = styled.header`display:flex;justify-content:space-between
 const Title = styled.h1`font-size:2.25rem;color:#1a202c;display:flex;align-items:center;gap:.75rem;margin:0;@media(max-width:768px){font-size:1.5rem}`;
 const ButtonGroup = styled.div`display:flex;gap:.75rem;flex-wrap:wrap;@media(max-width:500px){width:100%;justify-content:stretch;button{flex-grow:1}}`;
 const Button = styled(motion.button)`
+  /* Estilo base con sombreado tipo Bootstrap */
   padding:.6rem 1.2rem;border:none;border-radius:8px;font-weight:600;color:#fff;display:inline-flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem;
-  transition:background-color .2s;box-shadow:0 4px 6px rgba(0,0,0,.1);
-  background:${p=>p.primary?'#28a745':p.secondary?'#6c757d':p.tertiary?'#17a2b8':'#6c757d'};
-  &:hover{background:${p=>p.primary?'#218838':p.secondary?'#5a6268':p.tertiary?'#138496':'#5a6268'};}
+  transition:background-color .2s;box-shadow:0 0.125rem 0.25rem rgba(0,0,0,.075);
+  
+  /* Clases de colores tipo Bootstrap */
+  background:${p=>p.primary?'#28a745':p.secondary?'#6c757d':p.tertiary?'#17a2b8':p.danger?'#dc3545':'#6c757d'};
+  &:hover{background:${p=>p.primary?'#218838':p.secondary?'#5a6268':p.tertiary?'#138496':p.danger?'#c82333':'#5a6268'};}
   &:disabled{opacity:.6;cursor:not-allowed;}
 `;
 const BackButton = styled(Link)`display:inline-flex;align-items:center;gap:.5rem;text-decoration:none;color:#4a5568;font-weight:600;margin-bottom:1.5rem;&:hover{color:#2b6cb0}`;
 const FilterContainer = styled.div`
-  display:grid;grid-template-columns:1fr;gap:1rem;padding:1.5rem;background:#fff;border-radius:12px;margin-bottom:2rem;box-shadow:0 4px 12px rgba(0,0,0,.05);
+  /* Uso de grid para layout responsivo (col-md-4 * 3) */
+  display:grid;grid-template-columns:1fr;gap:1rem;padding:1.5rem;background:#fff;border-radius:12px;margin-bottom:2rem;box-shadow:0 0.5rem 1rem rgba(0,0,0,.15);
   @media(min-width:768px){grid-template-columns:2fr 1fr 1fr;}
 `;
 const SearchInputWrapper = styled.div`position:relative;`;
 const SearchInput = styled.input`
-  width:100%;padding:.75rem 1rem .75rem 2.5rem;border-radius:8px;border:1px solid #e2e8f0;font-size:1rem;
-  &:focus{border-color:#2b6cb0;box-shadow:0 0 0 2px rgba(43,108,176,.2);outline:none;}
+  width:100%;padding:.75rem 1rem .75rem 2.5rem;border-radius:8px;border:1px solid #ced4da;font-size:1rem;
+  &:focus{border-color:#007bff;box-shadow:0 0 0 0.2rem rgba(0,123,255,.25);outline:none;} /* Focus azul tipo Bootstrap */
 `;
 const Select = styled.select`
-  width:100%;padding:.75rem 1rem;border-radius:8px;border:1px solid #e2e8f0;font-size:1rem;background:#fff;cursor:pointer;
+  width:100%;padding:.75rem 1rem;border-radius:8px;border:1px solid #ced4da;font-size:1rem;background:#fff;cursor:pointer;
+  &:focus{border-color:#007bff;box-shadow:0 0 0 0.2rem rgba(0,123,255,.25);outline:none;}
 `;
 const MobileCardGrid = styled.div`
-  display:grid;grid-template-columns:1fr;gap:1rem;margin-bottom:1rem;
-  @media(min-width:640px){grid-template-columns:1fr 1fr;}
-  @media(min-width:992px){grid-template-columns:repeat(3,1fr);}
+  /* Estructura de tarjetas responsiva (card-deck/grid) */
+  display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:1rem;margin-bottom:1rem;
 `;
-const ProductCard = styled(motion.div)`background:#fff;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.05);display:flex;flex-direction:column;overflow:hidden;`;
-const CardHeader = styled.div`padding:1rem 1.5rem;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:flex-start;flex-direction:column;`;
-const CardTitle = styled.h3`margin:0;font-size:1.1rem;font-weight:600;color:#2d3748;`;
-const CardCode = styled.span`font-size:.8rem;color:#a0aec0;background:#f7fafc;padding:.2rem .5rem;border-radius:4px;margin-top:5px;`;
-const CardBody = styled.div`padding:1.5rem;flex-grow:1;display:grid;grid-template-columns:1fr 1fr;gap:1rem;`;
-const InfoTag = styled.div`display:flex;flex-direction:column;span{font-size:.8rem;color:#718096;margin-bottom:.25rem;}strong{font-size:1rem;color:#2d3748}`;
-const StockTag = styled(InfoTag)`strong{color:${p=>p.$low?'#dd6b20':p.$out?'#e53e3e':'#38a169'}}`;
-const CardFooter = styled.div`padding:1rem 1.5rem;background:#f7fafc;display:flex;justify-content:space-between;gap:.5rem;`;
+const ProductCard = styled(motion.div)`
+  background:#fff;border-radius:12px;box-shadow:0 0.125rem 0.25rem rgba(0,0,0,.075); /* Sombra ligera */
+  display:flex;flex-direction:column;overflow:hidden;border: 1px solid #e9ecef; /* Borde sutil */
+`;
+const CardHeader = styled.div`
+  padding:1rem 1.5rem;border-bottom:1px solid #e2e8f0;
+  display:flex;justify-content:space-between;align-items:flex-start;flex-direction:column;
+`;
+const CardTitle = styled.h3`margin:0;font-size:1.2rem;font-weight:700;color:#343a40;`;
+const CardCode = styled.span`font-size:.85rem;color:#6c757d;background:#f8f9fa;padding:.3rem .75rem;border-radius:0.5rem;margin-top:5px;`;
+const CardBody = styled.div`
+  padding:1.5rem;flex-grow:1;
+  display:grid;grid-template-columns:1fr 1fr;gap:1rem;
+`;
+const InfoTag = styled.div`
+  display:flex;flex-direction:column;
+  span{font-size:.75rem;color:#718096;margin-bottom:.25rem;text-transform:uppercase;}
+  strong{font-size:1.1rem;color:#2d3748; white-space: nowrap;}
+`;
+const StockTag = styled(InfoTag)`
+  strong{
+    color:${p=>p.$low?'#fd7e14':p.$out?'#dc3545':'#28a745'}
+  } /* Colores de estado: warning/danger/success */
+`;
+const CardFooter = styled.div`
+  padding:1rem 1.5rem;background:#f8f9fa; /* Fondo gris claro */
+  border-top: 1px solid #e9ecef;
+  display:flex;justify-content:space-between;gap:.5rem;
+`;
 const ActionButton = styled.button`
   background:none;border:none;font-size:.9rem;border-radius:6px;padding:.5rem;cursor:pointer;display:flex;align-items:center;gap:.5rem;transition:all .2s;
-  &.edit{color:#dd6b20;&:hover{background:#dd6b201a}}
-  &.delete{color:#c53030;&:hover{background:#c530301a}}
-  &.adjust{color:#4a5568;&:hover{background:#e2e8f0}}
+  &.edit{color:#ffc107;&:hover{background:rgba(255,193,7,.1)}} /* Color warning */
+  &.delete{color:#dc3545;&:hover{background:rgba(220,53,69,.1)}} /* Color danger */
+  &.adjust{color:#007bff;&:hover{background:rgba(0,123,255,.1)}} /* Color primary (ajuste) */
 `;
-const ModalOverlay = styled(motion.div)`position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;justify-content:center;align-items:center;z-index:1000;padding:1rem;`;
+const ModalOverlay = styled(motion.div)`
+  position:fixed;inset:0;background:rgba(0,0,0,.7);
+  display:flex;justify-content:center;align-items:center;z-index:1000;padding:1rem;
+`;
 const ModalContent = styled.div`
-  background:#fdfdff;padding:2.5rem;border-radius:16px;max-height:90vh;overflow-y:auto;box-shadow:0 10px 30px rgba(0,0,0,.2);
-  width:90vw;max-width:450px;@media(min-width:768px){max-width:800px;}
+  background:#fff;padding:2.5rem;border-radius:8px;max-height:90vh;overflow-y:auto;
+  box-shadow:0 0.5rem 1rem rgba(0,0,0,.5); /* Sombra intensa para modal */
+  width:90vw;max-width:450px;
+  @media(min-width:768px){max-width:800px;}
 `;
-const ModalTitle = styled.h2`margin:0 0 2rem;color:#1a202c;text-align:center;font-size:1.75rem;`;
+const ModalTitle = styled.h2`margin:0 0 1.5rem;color:#1a202c;text-align:center;font-size:1.75rem;border-bottom: 1px solid #eee; padding-bottom: 1rem;`;
 const CenteredMessage = styled.div`text-align:center;padding:3rem;color:#718096;`;
-const Input = styled.input`width:100%;padding:.8rem 1rem;border-radius:8px;border:1px solid #ced4da;font-size:1rem;`;
+const Input = styled.input`
+  width:100%;padding:.8rem 1rem;border-radius:4px;border:1px solid #ced4da;font-size:1rem;
+  &:focus{border-color:#007bff;box-shadow:0 0 0 0.2rem rgba(0,123,255,.25);outline:none;}
+`;
 const ModalError = styled.p`color:#dc3545;font-size:.9rem;text-align:center;margin-bottom:1rem;min-height:1.2rem;`;
-const InputGrid = styled.div`display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1.5rem;`;
+const InputGrid = styled.div`
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1.5rem;
+`;
 const FormGroup = styled.div`display:flex;flex-direction:column;`;
 const Label = styled.label`margin-bottom:.5rem;color:#495057;font-weight:600;`;
 const ModalActions = styled.div`display:flex;justify-content:flex-end;gap:1rem;margin-top:2rem;@media(max-width:500px){justify-content:space-between}`;
@@ -84,17 +119,54 @@ const DeleteButton = styled(Button)`background:#dc3545;color:#fff;&:hover{backgr
 
 /* ============  FIX props transientes  ============ */
 const TypeBadge = styled.span`
-  display:inline-block;padding:.25em .6em;font-size:.75rem;font-weight:700;line-height:1;text-align:center;border-radius:.375rem;
+  display:inline-block;padding:.35em .6em;font-size:.75rem;font-weight:700;line-height:1;text-align:center;border-radius:.25rem;
   color:${p=>p.$color || '#fff'};background-color:${p=>p.$bg || '#6c757d'};
 `;
 
 /* ======= Modales auxiliares (historial) ======= */
-const HistoryModalContent = styled.div`background:#fdfdff;padding:0;border-radius:16px;width:90%;max-width:1000px;height:80vh;display:flex;flex-direction:column;box-shadow:0 10px 30px rgba(0,0,0,.2);`;
-const HistoryHeader = styled.div`padding:1rem 1.5rem;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;`;
+const HistoryModalContent = styled.div`
+  background:#fdfdff;padding:0;border-radius:16px;width:90%;max-width:1000px;height:80vh;
+  display:flex;flex-direction:column;box-shadow:0 10px 30px rgba(0,0,0,.2);
+`;
+const HistoryHeader = styled.div`
+  padding:1rem 1.5rem;border-bottom:1px solid #e2e8f0;display:flex;
+  justify-content:space-between;align-items:center;flex-shrink:0;
+  flex-wrap: wrap; gap: 0.5rem;
+`;
 const HistoryBody = styled.div`flex-grow:1;overflow-y:auto;padding:1.5rem;`;
-const HistoryTable = styled.table`width:100%;border-collapse:collapse;`;
-const HistoryTh = styled.th`padding:.75rem;text-align:left;border-bottom:2px solid #e2e8f0;color:#718096;font-size:.8rem;text-transform:uppercase;`;
-const HistoryTd = styled.td`padding:1rem .75rem;border-bottom:1px solid #f7fafc;`;
+const HistoryTable = styled.table`
+  width:100%;border-collapse:separate; border-spacing: 0;
+  /* Estilo de tabla condensada y responsiva */
+  thead tr { background-color: #f8f9fa; }
+`;
+const HistoryTh = styled.th`
+  padding:.75rem;text-align:left;border-bottom:2px solid #e2e8f0;
+  color:#495057;font-size:.8rem;text-transform:uppercase;
+`;
+const HistoryTd = styled.td`
+  padding:1rem .75rem;border-bottom:1px solid #f8f9fa;
+  vertical-align: middle;
+  /* Se asegura que el texto largo no rompa la tabla */
+  word-break: break-word; max-width: 250px;
+`;
+const HistoryDayHeader = styled.div`
+  position: sticky; top: 0; z-index: 10;
+  background: #ffffff;
+  border-bottom: 2px solid #007bff;
+  padding: .5rem 0;
+  margin-bottom: .5rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #007bff;
+`;
+const ClearFiltersButton = styled(Button)`
+  background: none; 
+  color: #6c757d; 
+  border: 1px solid #ced4da; 
+  box-shadow: none;
+  padding: .375rem .75rem;
+  &:hover { background: #e9ecef; }
+`;
 
 /* ================================
    MODALES AUXILIARES
@@ -153,19 +225,19 @@ const ManagementModal = ({ title, items, onAdd, onDelete, onClose }) => {
 
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
             <Input value={newItemName} onChange={(e) => setNewItemName(e.target.value)} placeholder={`Nuevo ${title.slice(10, -1)}`} />
-            <Button primary onClick={handleAdd}>Agregar</Button>
+            <Button primary onClick={handleAdd} style={{minWidth: '100px'}}>Agregar</Button>
           </div>
 
-          <ul style={{ listStyle: 'none', padding: 0, maxHeight: '300px', overflowY: 'auto' }}>
+          <ul style={{ listStyle: 'none', padding: 0, maxHeight: '300px', overflowY: 'auto', border: '1px solid #dee2e6', borderRadius: '4px' }}>
             {items.map(item => (
               <li key={item.id_categoria || item.id_proveedor}
                   style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'.75rem .5rem', borderBottom:'1px solid #eee' }}>
                 {item.nombre}
-                <Button as="a"
+                <ClearFiltersButton as="a" danger
                         onClick={() => askDelete(item.id_categoria || item.id_proveedor, item.nombre)}
                         style={{background:'none', border:'1px solid #dc3545', color:'#dc3545', boxShadow:'none', padding:'.4rem .8rem'}}>
                   Eliminar
-                </Button>
+                </ClearFiltersButton>
               </li>
             ))}
           </ul>
@@ -231,7 +303,7 @@ const StockAdjustmentModal = ({ isOpen, product, onClose, onConfirm }) => {
   );
 };
 
-// --- Componente InventoryHistoryModal (Se mantiene sin cambios en lógica de API para usar /api/products/inventory/history) ---
+// Componente InventoryHistoryModal (Se mantiene sin errores de sintaxis JSX)
 function InventoryHistoryModal({ onClose }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -246,16 +318,7 @@ function InventoryHistoryModal({ onClose }) {
         });
         setHistory(res.data || []);
       } catch (error) {
-        // Log de error más detallado (si el build pasa, esto te ayudará a depurar la API)
         console.error("Error fetching inventory history:", error);
-        if (error.response) {
-            console.error("API Response Status:", error.response.status);
-            console.error("API Response Data:", error.response.data);
-        } else if (error.request) {
-            console.error("No response received. Possible network or Nginx proxy issue.");
-        } else {
-            console.error("Error setting up request:", error.message);
-        }
       } finally {
         setLoading(false);
       }
@@ -265,10 +328,10 @@ function InventoryHistoryModal({ onClose }) {
 
   const getTypeBadge = (type) => {
     const upperType = String(type).toUpperCase();
-    if (upperType.includes('ENTRADA') || upperType.includes('CREACION')) { return <TypeBadge $bg="#e6fffa" $color="#2c7a7b">ENTRADA</TypeBadge>; }
-    if (upperType.includes('SALIDA') || upperType.includes('VENTA') || upperType.includes('ELIMINACION')) { return <TypeBadge $bg="#fed7d7" $color="#9b2c2c">SALIDA</TypeBadge>; }
-    if (upperType.includes('AJUSTE') || upperType.includes('EDICION')) { return <TypeBadge $bg="#feebc8" $color="#9c4221">AJUSTE</TypeBadge>; }
-    return <TypeBadge>{type}</TypeBadge>;
+    if (upperType.includes('ENTRADA') || upperType.includes('CREACION')) { return <TypeBadge $bg="#d4edda" $color="#155724">ENTRADA</TypeBadge>; } // Success (verde)
+    if (upperType.includes('SALIDA') || upperType.includes('VENTA') || upperType.includes('ELIMINACION')) { return <TypeBadge $bg="#f8d7da" $color="#721c24">SALIDA</TypeBadge>; } // Danger (rojo)
+    if (upperType.includes('AJUSTE') || upperType.includes('EDICION')) { return <TypeBadge $bg="#fff3cd" $color="#856404">AJUSTE</TypeBadge>; } // Warning (amarillo)
+    return <TypeBadge $bg="#e2e6ea" $color="#383d41">{type}</TypeBadge>; // Secondary (gris)
   };
 
   // Utilidades de fecha
@@ -323,30 +386,29 @@ function InventoryHistoryModal({ onClose }) {
 
             {/* Filtro por día */}
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <label style={{ fontSize: '.9rem', color: '#4a5568' }}>Filtrar por día:</label>
+              <label style={{ fontSize: '.9rem', color: '#4a5568', flexShrink: 0 }}>Filtrar por día:</label>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
                 style={{
-                  height: 36, padding: '0 .5rem', borderRadius: 8, border: '1px solid #e2e8f0'
+                  height: 36, padding: '0 .5rem', borderRadius: 8, border: '1px solid #ced4da'
                 }}
               />
-              <Button
+              <ClearFiltersButton
                 as="a"
                 onClick={() => setSelectedDate('')}
-                style={{ background: '#6c757d', boxShadow: 'none' }}
               >
                 Limpiar
-              </Button>
-              <Button
+              </ClearFiltersButton>
+              <ClearFiltersButton
                 as="a"
                 onClick={() => setSelectedDate(toKey(new Date().toISOString()))}
-                style={{ background: '#17a2b8', boxShadow: 'none' }}
+                style={{ color: '#17a2b8', borderColor: '#17a2b8' }}
               >
                 Hoy
-              </Button>
-              <Button as="a" onClick={onClose} style={{ background: 'none', color: '#a0aec0', boxShadow: 'none' }}>
+              </ClearFiltersButton>
+              <Button as="a" onClick={onClose} style={{ background: 'none', color: '#a0aec0', boxShadow: 'none', marginLeft: 'auto' }}>
                 <FaTimes size={24} />
               </Button>
             </div>
@@ -354,30 +416,22 @@ function InventoryHistoryModal({ onClose }) {
 
           <HistoryBody>
             {loading ? (
-              <CenteredMessage><Spinner /></CenteredMessage>
+              <CenteredMessage><Spinner /><p>Cargando Historial...</p></CenteredMessage>
             ) : history.length === 0 ? (
               <CenteredMessage>No hay movimientos registrados.</CenteredMessage>
             ) : grouped.length === 0 ? (
               <CenteredMessage>No hay movimientos para la fecha seleccionada.</CenteredMessage>
             ) : (
-              <>
+                <div>
                 {grouped.map(([dayKey, items]) => (
                   <div key={dayKey} style={{ marginBottom: '1.75rem' }}>
-                    {/* Encabezado de día */}
-                    <div
-                      style={{
-                        position: 'sticky', top: 0, zIndex: 1,
-                        background: '#ffffff',
-                        borderBottom: '1px solid #e2e8f0',
-                        padding: '.35rem .5rem',
-                        marginBottom: '.35rem'
-                      }}
-                    >
-                      <strong style={{ color: '#2d3748' }}>{toNice(dayKey)}</strong>
-                      <span style={{ color: '#718096', marginLeft: 8 }}>({items.length} mov.)</span>
-                    </div>
+                    
+                    <HistoryDayHeader>
+                      {toNice(dayKey)} <span style={{ color: '#718096', marginLeft: 8, fontSize: '0.9rem' }}>({items.length} mov.)</span>
+                    </HistoryDayHeader>
 
                     {/* Tabla del día */}
+                    <div style={{overflowX: 'auto'}}>
                     <HistoryTable>
                       <thead>
                         <tr>
@@ -403,9 +457,10 @@ function InventoryHistoryModal({ onClose }) {
                         ))}
                       </tbody>
                     </HistoryTable>
+                    </div>
                   </div>
                 ))}
-              </>
+                </div>
             )}
           </HistoryBody>
         </HistoryModalContent>
@@ -585,22 +640,24 @@ const InventoryManagement = () => {
     setIsModalOpen(true);
   };
   
-  // **Función openEditModal corregida**
+  // **CORRECCIÓN DE ERRORES (TypeError: .trim is not a function) y datos**
   const openEditModal = (product) => {
     setEditingProduct(product);
     const cost = parseFloat(product.costo);
     const price = parseFloat(product.venta);
-    setProfitPercentage(cost>0 && price>0 ? (((price - cost)/cost*100).toFixed(2)) : '');
+    setProfitPercentage(cost > 0 && price > 0 ? (((price - cost) / cost * 100).toFixed(2)) : '');
+    
+    // Asegurar que los valores numéricos de la API (si vienen como Number) sean String para el Input
     setFormData({
       codigo: product.codigo ?? '', 
       nombre: product.nombre ?? '', 
-      costo: product.costo ?? '', 
-      venta: product.venta ?? '', 
-      mayoreo: product.mayoreo ?? '', 
+      costo: String(product.costo ?? ''), 
+      venta: String(product.venta ?? ''), 
+      mayoreo: String(product.mayoreo ?? ''), 
       id_categoria: product.id_categoria ?? '',
-      existencia: product.existencia ?? '', 
-      minimo: product.minimo ?? '', 
-      maximo: product.maximo ?? '', 
+      existencia: String(product.existencia ?? ''), 
+      minimo: String(product.minimo ?? ''), 
+      maximo: String(product.maximo ?? ''), 
       tipo_venta: product.tipo_venta ?? 'Unidad', 
       id_proveedor: product.id_proveedor ?? '', 
       descripcion: product.descripcion ?? ''
@@ -678,14 +735,17 @@ const InventoryManagement = () => {
     setModalError('');
     const f = formData;
 
-    if (!f.codigo.trim() || !f.nombre.trim() || !f.costo.trim() || !f.venta.trim() || !f.existencia.trim()) {
+    // Validación de campos obligatorios (solo se usa .trim() en código y nombre)
+    if (!f.codigo.trim() || !f.nombre.trim() || f.costo === '' || f.venta === '' || f.existencia === '') {
       setModalError('Los campos Código, Nombre, Costo, Venta y Existencia son obligatorios.');
       return;
     }
+    
     const cost = parseFloat(f.costo), price = parseFloat(f.venta), wholesale = f.mayoreo ? parseFloat(f.mayoreo) : null;
     const stock = parseInt(f.existencia, 10);
     const minStock = f.minimo ? parseInt(f.minimo, 10) : null;
     const maxStock = f.maximo ? parseInt(f.maximo, 10) : null;
+    
     if ([cost, price, stock].some(isNaN)) { setModalError('Costo, Venta y Existencia deben ser números válidos.'); return; }
     if (f.mayoreo && isNaN(wholesale)) { setModalError('Precio Mayoreo debe ser un número válido o estar vacío.'); return; }
     if (f.minimo && isNaN(minStock)) { setModalError('Stock Mínimo debe ser un número válido o estar vacío.'); return; }
@@ -940,7 +1000,6 @@ const InventoryManagement = () => {
                 </form>
               </ModalContent>
             </motion.div>
-          </ModalOverlay>
         )}
       </AnimatePresence>
 
