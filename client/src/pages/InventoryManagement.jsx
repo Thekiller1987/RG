@@ -660,11 +660,11 @@ const InventoryManagement = () => {
     setModalError('');
     const f = formData;
 
-    // CORRECCIÓN DEL ERROR: 'existencia.trim is not a function' y validación de campos
-    // Se utiliza String(f.prop) para asegurar que se pueda llamar .trim() y se usa el operador ?? '' para valores nulos.
+    // CORRECCIÓN DEL ERROR 400 y TYPE ERROR: Asegurar que los campos numéricos sean strings antes de validar con trim
     const codigoTrim = String(f.codigo ?? '').trim();
     const nombreTrim = String(f.nombre ?? '').trim();
-    const existenciaTrim = String(f.existencia ?? '').trim();
+    // Corregido: Si existencia está vacío/null, el modal falla. Usamos String() para la validación.
+    const existenciaTrim = String(f.existencia ?? '').trim(); 
     const costoTrim = String(f.costo ?? '').trim();
     const ventaTrim = String(f.venta ?? '').trim();
 
@@ -674,10 +674,14 @@ const InventoryManagement = () => {
     }
 
     const cost = parseFloat(f.costo), price = parseFloat(f.venta), wholesale = f.mayoreo ? parseFloat(f.mayoreo) : null;
-    const stock = parseInt(f.existencia, 10);
+    // Usamos existenciaTrim porque parseFloat(f.existencia) puede fallar si está vacío
+    const stock = parseInt(existenciaTrim, 10); 
     const minStock = f.minimo ? parseInt(f.minimo, 10) : null;
     const maxStock = f.maximo ? parseInt(f.maximo, 10) : null;
+    
+    // Validaciones de números (incluyendo la existencia corregida)
     if ([cost, price, stock].some(isNaN)) { setModalError('Costo, Venta y Existencia deben ser números válidos.'); return; }
+    // ... (otras validaciones de número se mantienen)
     if (f.mayoreo && isNaN(wholesale)) { setModalError('Precio Mayoreo debe ser un número válido o estar vacío.'); return; }
     if (f.minimo && isNaN(minStock)) { setModalError('Stock Mínimo debe ser un número válido o estar vacío.'); return; }
     if (f.maximo && isNaN(maxStock)) { setModalError('Stock Máximo debe ser un número válido o estar vacío.'); return; }
@@ -687,6 +691,7 @@ const InventoryManagement = () => {
     if (minStock !== null && maxStock !== null && minStock > maxStock) { setModalError('El stock mínimo no puede ser mayor que el máximo.'); return; }
 
     // CORRECCIÓN DEL ERROR: Asegurar que p.codigo y p.nombre son strings antes de usar .toLowerCase()
+    // Esto soluciona los TypeErrors en las líneas de comparación
     const duplicate = allProductsRaw.find(p =>
       (editingProduct ? p.id_producto !== editingProduct.id_producto : true) &&
       (String(p.codigo ?? '').toLowerCase() === codigoTrim.toLowerCase() || String(p.nombre ?? '').toLowerCase() === nombreTrim.toLowerCase())
@@ -700,7 +705,7 @@ const InventoryManagement = () => {
     const token = localStorage.getItem('token');
     const payload = {
       ...f,
-      existencia: editingProduct ? editingProduct.existencia : f.existencia,
+      existencia: editingProduct ? editingProduct.existencia : stock, // Usar 'stock' parseado si es creación
       mayoreo: f.mayoreo || null, minimo: f.minimo || null, maximo: f.maximo || null,
       id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null
     };
