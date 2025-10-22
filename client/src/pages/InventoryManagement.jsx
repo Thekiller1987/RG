@@ -595,7 +595,7 @@ const InventoryManagement = () => {
     });
     setModalError('');
     setIsModalOpen(true);
-  };
+ 
   };
 
   const openDeleteModal = (product) => { setProductToDelete(product); setIsDeleteModalOpen(true); };
