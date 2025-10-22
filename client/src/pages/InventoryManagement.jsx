@@ -18,7 +18,7 @@ const LARGE_LIST_CUTOFF = 120;
 const SLICE_STEP = 200;
 
 /* ================================
-   ESTILOS (SIN MODIFICACIONES DE DISEÑO)
+   ESTILOS (Diseño CSS/Styled Components Corregido)
 ================================ */
 const spin = keyframes`from{transform:rotate(0)}to{transform:rotate(360deg)}`;
 const Spinner = styled(FaSpinner)`font-size:2rem;color:#2b6cb0;animation:${spin} 1s linear infinite;`;
@@ -27,37 +27,33 @@ const HeaderContainer = styled.header`display:flex;justify-content:space-between
 const Title = styled.h1`font-size:2.25rem;color:#1a202c;display:flex;align-items:center;gap:.75rem;margin:0;@media(max-width:768px){font-size:1.5rem}`;
 const ButtonGroup = styled.div`display:flex;gap:.75rem;flex-wrap:wrap;@media(max-width:500px){width:100%;justify-content:stretch;button{flex-grow:1}}`;
 const Button = styled(motion.button)`
-  /* Estilo base con sombreado tipo Bootstrap */
   padding:.6rem 1.2rem;border:none;border-radius:8px;font-weight:600;color:#fff;display:inline-flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem;
   transition:background-color .2s;box-shadow:0 0.125rem 0.25rem rgba(0,0,0,.075);
   
-  /* Clases de colores tipo Bootstrap */
   background:${p=>p.primary?'#28a745':p.secondary?'#6c757d':p.tertiary?'#17a2b8':p.danger?'#dc3545':'#6c757d'};
   &:hover{background:${p=>p.primary?'#218838':p.secondary?'#5a6268':p.tertiary?'#138496':p.danger?'#c82333':'#5a6268'};}
   &:disabled{opacity:.6;cursor:not-allowed;}
 `;
 const BackButton = styled(Link)`display:inline-flex;align-items:center;gap:.5rem;text-decoration:none;color:#4a5568;font-weight:600;margin-bottom:1.5rem;&:hover{color:#2b6cb0}`;
 const FilterContainer = styled.div`
-  /* Uso de grid para layout responsivo (col-md-4 * 3) */
   display:grid;grid-template-columns:1fr;gap:1rem;padding:1.5rem;background:#fff;border-radius:12px;margin-bottom:2rem;box-shadow:0 0.5rem 1rem rgba(0,0,0,.15);
   @media(min-width:768px){grid-template-columns:2fr 1fr 1fr;}
 `;
 const SearchInputWrapper = styled.div`position:relative;`;
 const SearchInput = styled.input`
   width:100%;padding:.75rem 1rem .75rem 2.5rem;border-radius:8px;border:1px solid #ced4da;font-size:1rem;
-  &:focus{border-color:#007bff;box-shadow:0 0 0 0.2rem rgba(0,123,255,.25);outline:none;} /* Focus azul tipo Bootstrap */
+  &:focus{border-color:#007bff;box-shadow:0 0 0 0.2rem rgba(0,123,255,.25);outline:none;}
 `;
 const Select = styled.select`
   width:100%;padding:.75rem 1rem;border-radius:8px;border:1px solid #ced4da;font-size:1rem;background:#fff;cursor:pointer;
   &:focus{border-color:#007bff;box-shadow:0 0 0 0.2rem rgba(0,123,255,.25);outline:none;}
 `;
 const MobileCardGrid = styled.div`
-  /* Estructura de tarjetas responsiva (card-deck/grid) */
   display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:1rem;margin-bottom:1rem;
 `;
 const ProductCard = styled(motion.div)`
-  background:#fff;border-radius:12px;box-shadow:0 0.125rem 0.25rem rgba(0,0,0,.075); /* Sombra ligera */
-  display:flex;flex-direction:column;overflow:hidden;border: 1px solid #e9ecef; /* Borde sutil */
+  background:#fff;border-radius:12px;box-shadow:0 0.125rem 0.25rem rgba(0,0,0,.075);
+  display:flex;flex-direction:column;overflow:hidden;border: 1px solid #e9ecef;
 `;
 const CardHeader = styled.div`
   padding:1rem 1.5rem;border-bottom:1px solid #e2e8f0;
@@ -77,18 +73,18 @@ const InfoTag = styled.div`
 const StockTag = styled(InfoTag)`
   strong{
     color:${p=>p.$low?'#fd7e14':p.$out?'#dc3545':'#28a745'}
-  } /* Colores de estado: warning/danger/success */
+  }
 `;
 const CardFooter = styled.div`
-  padding:1rem 1.5rem;background:#f8f9fa; /* Fondo gris claro */
+  padding:1rem 1.5rem;background:#f8f9fa;
   border-top: 1px solid #e9ecef;
   display:flex;justify-content:space-between;gap:.5rem;
 `;
 const ActionButton = styled.button`
   background:none;border:none;font-size:.9rem;border-radius:6px;padding:.5rem;cursor:pointer;display:flex;align-items:center;gap:.5rem;transition:all .2s;
-  &.edit{color:#ffc107;&:hover{background:rgba(255,193,7,.1)}} /* Color warning */
-  &.delete{color:#dc3545;&:hover{background:rgba(220,53,69,.1)}} /* Color danger */
-  &.adjust{color:#007bff;&:hover{background:rgba(0,123,255,.1)}} /* Color primary (ajuste) */
+  &.edit{color:#ffc107;&:hover{background:rgba(255,193,7,.1)}}
+  &.delete{color:#dc3545;&:hover{background:rgba(220,53,69,.1)}}
+  &.adjust{color:#007bff;&:hover{background:rgba(0,123,255,.1)}}
 `;
 const ModalOverlay = styled(motion.div)`
   position:fixed;inset:0;background:rgba(0,0,0,.7);
@@ -96,7 +92,7 @@ const ModalOverlay = styled(motion.div)`
 `;
 const ModalContent = styled.div`
   background:#fff;padding:2.5rem;border-radius:8px;max-height:90vh;overflow-y:auto;
-  box-shadow:0 0.5rem 1rem rgba(0,0,0,.5); /* Sombra intensa para modal */
+  box-shadow:0 0.5rem 1rem rgba(0,0,0,.5);
   width:90vw;max-width:450px;
   @media(min-width:768px){max-width:800px;}
 `;
@@ -136,7 +132,6 @@ const HistoryHeader = styled.div`
 const HistoryBody = styled.div`flex-grow:1;overflow-y:auto;padding:1.5rem;`;
 const HistoryTable = styled.table`
   width:100%;border-collapse:separate; border-spacing: 0;
-  /* Estilo de tabla condensada y responsiva */
   thead tr { background-color: #f8f9fa; }
 `;
 const HistoryTh = styled.th`
@@ -146,7 +141,6 @@ const HistoryTh = styled.th`
 const HistoryTd = styled.td`
   padding:1rem .75rem;border-bottom:1px solid #f8f9fa;
   vertical-align: middle;
-  /* Se asegura que el texto largo no rompa la tabla */
   word-break: break-word; max-width: 250px;
 `;
 const HistoryDayHeader = styled.div`
@@ -303,7 +297,7 @@ const StockAdjustmentModal = ({ isOpen, product, onClose, onConfirm }) => {
   );
 };
 
-// Componente InventoryHistoryModal (Se mantiene sin errores de sintaxis JSX)
+// Componente InventoryHistoryModal
 function InventoryHistoryModal({ onClose }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -640,14 +634,14 @@ const InventoryManagement = () => {
     setIsModalOpen(true);
   };
   
-  // **CORRECCIÓN DE ERRORES (TypeError: .trim is not a function) y datos**
+  // **Función openEditModal corregida para evitar el TypeError**
   const openEditModal = (product) => {
     setEditingProduct(product);
     const cost = parseFloat(product.costo);
     const price = parseFloat(product.venta);
     setProfitPercentage(cost > 0 && price > 0 ? (((price - cost) / cost * 100).toFixed(2)) : '');
     
-    // Asegurar que los valores numéricos de la API (si vienen como Number) sean String para el Input
+    // CORRECCIÓN: Asegurar que los valores numéricos de la API se conviertan a String para el Input
     setFormData({
       codigo: product.codigo ?? '', 
       nombre: product.nombre ?? '', 
@@ -730,31 +724,42 @@ const InventoryManagement = () => {
     }
   };
 
+  // **Función handleSaveProduct corregida para evitar el error 400 en la API**
   const handleSaveProduct = async (e) => {
     e.preventDefault();
     setModalError('');
     const f = formData;
 
-    // Validación de campos obligatorios (solo se usa .trim() en código y nombre)
-    if (!f.codigo.trim() || !f.nombre.trim() || f.costo === '' || f.venta === '' || f.existencia === '') {
-      setModalError('Los campos Código, Nombre, Costo, Venta y Existencia son obligatorios.');
+    // Paso 1: Validación de campos obligatorios
+    if (!f.codigo.trim() || !f.nombre.trim()) {
+      setModalError('Los campos Código y Nombre son obligatorios.');
       return;
     }
-    
-    const cost = parseFloat(f.costo), price = parseFloat(f.venta), wholesale = f.mayoreo ? parseFloat(f.mayoreo) : null;
+    if (f.costo === '' || f.venta === '' || f.existencia === '') {
+      setModalError('Los campos Costo, Venta y Existencia son obligatorios y no pueden estar vacíos.');
+      return;
+    }
+
+    // Paso 2: Conversión y validación de tipos
+    const cost = parseFloat(f.costo); 
+    const price = parseFloat(f.venta);
     const stock = parseInt(f.existencia, 10);
+    
+    const wholesale = f.mayoreo ? parseFloat(f.mayoreo) : null;
     const minStock = f.minimo ? parseInt(f.minimo, 10) : null;
     const maxStock = f.maximo ? parseInt(f.maximo, 10) : null;
     
     if ([cost, price, stock].some(isNaN)) { setModalError('Costo, Venta y Existencia deben ser números válidos.'); return; }
-    if (f.mayoreo && isNaN(wholesale)) { setModalError('Precio Mayoreo debe ser un número válido o estar vacío.'); return; }
-    if (f.minimo && isNaN(minStock)) { setModalError('Stock Mínimo debe ser un número válido o estar vacío.'); return; }
-    if (f.maximo && isNaN(maxStock)) { setModalError('Stock Máximo debe ser un número válido o estar vacío.'); return; }
+    if (f.mayoreo !== '' && isNaN(wholesale)) { setModalError('Precio Mayoreo debe ser un número válido o estar vacío.'); return; }
+    if (f.minimo !== '' && isNaN(minStock)) { setModalError('Stock Mínimo debe ser un número válido o estar vacío.'); return; }
+    if (f.maximo !== '' && isNaN(maxStock)) { setModalError('Stock Máximo debe ser un número válido o estar vacío.'); return; }
+    
     if (cost<0 || price<0 || stock<0 || (minStock??0)<0 || (maxStock??0)<0 || (wholesale??0)<0) { setModalError('Los precios y las cantidades de stock no pueden ser negativos.'); return; }
     if (price < cost) { setModalError('El precio de venta no puede ser menor que el costo.'); return; }
     if (wholesale !== null && wholesale > price) { setModalError('El precio de mayoreo no puede ser mayor que el de venta.'); return; }
     if (minStock !== null && maxStock !== null && minStock > maxStock) { setModalError('El stock mínimo no puede ser mayor que el máximo.'); return; }
 
+    // Paso 3: Validación de duplicados
     const duplicate = allProductsRaw.find(p =>
       (editingProduct ? p.id_producto !== editingProduct.id_producto : true) &&
       (p.codigo?.toLowerCase() === f.codigo.trim().toLowerCase() || p.nombre?.toLowerCase() === f.nombre.trim().toLowerCase())
@@ -765,24 +770,40 @@ const InventoryManagement = () => {
       return;
     }
 
+    // Paso 4: Construir el Payload Final
     const token = localStorage.getItem('token');
-    const payload = {
-      ...f,
-      existencia: editingProduct ? editingProduct.existencia : f.existencia,
-      mayoreo: f.mayoreo || null, minimo: f.minimo || null, maximo: f.maximo || null,
-      id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null
+    
+    const basePayload = {
+      codigo: f.codigo.trim(),
+      nombre: f.nombre.trim(),
+      costo: cost,
+      venta: price,
+      existencia: stock, // Incluir en POST (crear), omitir en PUT (editar)
+      descripcion: f.descripcion || null, 
+      mayoreo: wholesale, 
+      minimo: minStock,
+      maximo: maxStock,
+      id_categoria: f.id_categoria || null, 
+      id_proveedor: f.id_proveedor || null,
+      tipo_venta: f.tipo_venta || 'Unidad',
     };
+
     try {
       if (editingProduct) {
-        const { existencia, ...updatePayload } = payload;
+        // Para PUT (editar), se EXCLUYE 'existencia' del payload.
+        const { existencia, ...updatePayload } = basePayload;
         await axios.put(`/api/products/${editingProduct.id_producto}`, updatePayload, { headers:{ Authorization:`Bearer ${token}` } });
       } else {
-        await axios.post('/api/products', payload, { headers:{ Authorization:`Bearer ${token}` } });
+        // Para POST (crear), se usa el payload completo.
+        await axios.post('/api/products', basePayload, { headers:{ Authorization:`Bearer ${token}` } });
       }
+      
       setIsModalOpen(false);
       await fetchData();
+      showAlert({ title: 'Éxito', message: `Producto ${editingProduct ? 'actualizado' : 'creado'} correctamente.`, type: 'success' });
     } catch (err) {
-      setModalError(err.response?.data?.msg || 'Error al guardar el producto.');
+      console.error("API Error:", err.response);
+      setModalError(err.response?.data?.msg || 'Error al guardar el producto. Verifique los campos y el servidor.');
     }
   };
 
@@ -932,7 +953,7 @@ const InventoryManagement = () => {
       {showLoadMore && (
         <div style={{ display:'flex', justifyContent:'center', margin:'1rem 0 2rem' }}>
           <Button onClick={()=>setVisibleCount(v => v + SLICE_STEP)}><FaPlus /> Cargar más resultados</Button>
-        </div>
+          </div>
       )}
 
       {filtered.length === 0 && initialLoadComplete && (
