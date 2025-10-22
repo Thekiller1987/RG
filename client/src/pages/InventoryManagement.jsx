@@ -577,25 +577,33 @@ const InventoryManagement = () => {
     setIsModalOpen(true);
   };
 
- const openEditModal = (product) => {
+const openEditModal = (product) => {
     setEditingProduct(product);
     const cost = parseFloat(product.costo);
     const price = parseFloat(product.venta);
     setProfitPercentage(cost>0 && price>0 ? (((price - cost)/cost*100).toFixed(2)) : '');
+    
+    // FIX CLAVE: Inicializar el formData EXPLICITAMENTE CONVIRTIENDO TODO A STRING
+    // Esto resuelve el error '.trim is not a function' y el warning de duplicación.
     setFormData({
-      codigo:'', nombre:'', costo:'', venta:'', mayoreo:'', id_categoria:'',
-      existencia:'', minimo:'', maximo:'', tipo_venta:'Unidad', id_proveedor:'', descripcion:'',
-      ...product,
-      
-      // 🛑 FIX CLAVE: Convertir la existencia a STRING si es número
-      existencia: product.existencia !== undefined && product.existencia !== null 
-        ? String(product.existencia) 
-        : '',
-      
+      codigo: String(product.codigo ?? ''), 
+      nombre: String(product.nombre ?? ''), 
+      costo: String(product.costo ?? ''), 
+      venta: String(product.venta ?? ''), 
+      mayoreo: String(product.mayoreo ?? ''), 
+      id_categoria: String(product.id_categoria ?? ''),
+      existencia: String(product.existencia ?? ''), 
+      minimo: String(product.minimo ?? ''), 
+      maximo: String(product.maximo ?? ''), 
+      tipo_venta: String(product.tipo_venta ?? 'Unidad'), 
+      id_proveedor: String(product.id_proveedor ?? ''), 
+      descripcion: String(product.descripcion ?? '')
     });
+    
     setModalError('');
     setIsModalOpen(true);
-  };
+ 
+  
   };
 
   const openDeleteModal = (product) => { setProductToDelete(product); setIsDeleteModalOpen(true); };
@@ -660,57 +668,76 @@ const InventoryManagement = () => {
       setFormData(prev => ({ ...prev, venta: (cost * (1 + parseFloat(percentage)/100)).toFixed(2) }));
     }
   };
-// InventoryManagement.jsx
+// InventoryManagement.jsx (Línea 620 aprox.)
+
 const handleSaveProduct = async (e) => {
     e.preventDefault();
     setModalError('');
     const f = formData;
 
-    // 🛑 FIX: Solo requerir existencia si NO estamos editando (es decir, creando)
-    const requiredFields = !editingProduct 
-      ? ['codigo', 'nombre', 'costo', 'venta', 'existencia']
-      : ['codigo', 'nombre', 'costo', 'venta']; 
+    // 1. VALIDACIÓN DE CAMPOS OBLIGATORIOS (Código, Nombre, Costo, Venta + Existencia si es CREACIÓN)
+    const codigoOk = String(f.codigo).trim();
+    const nombreOk = String(f.nombre).trim();
+    const costoOk = String(f.costo).trim();
+    const ventaOk = String(f.venta).trim();
+    const existenciaOk = String(f.existencia).trim();
 
-    if (requiredFields.some(field => !f[field] || !String(f[field]).trim())) { // 🛑 FIX SECUNDARIO: Convertir a String antes de trim
-      setModalError('Los campos Código, Nombre, Costo, Venta y Existencia son obligatorios al crear.');
+    if (!codigoOk || !nombreOk || !costoOk || !ventaOk || 
+        // FIX: Solo verificamos existencia si estamos CREANDO (NO EDITING PRODUCT)
+        (!editingProduct && !existenciaOk)) 
+    {
+      setModalError('Los campos Código, Nombre, Costo, Venta son obligatorios. Existencia es obligatoria al crear.');
       return;
-    
+    }
     
-    const cost = parseFloat(f.costo), price = parseFloat(f.venta), wholesale = f.mayoreo ? parseFloat(f.mayoreo) : null;
-    const stock = parseInt(f.existencia, 10);
-    const minStock = f.minimo ? parseInt(f.minimo, 10) : null;
-    const maxStock = f.maximo ? parseInt(f.maximo, 10) : null;
-    if ([cost, price, stock].some(isNaN)) { setModalError('Costo, Venta y Existencia deben ser números válidos.'); return; }
-    if (f.mayoreo && isNaN(wholesale)) { setModalError('Precio Mayoreo debe ser un número válido o estar vacío.'); return; }
-    if (f.minimo && isNaN(minStock)) { setModalError('Stock Mínimo debe ser un número válido o estar vacío.'); return; }
-    if (f.maximo && isNaN(maxStock)) { setModalError('Stock Máximo debe ser un número válido o estar vacío.'); return; }
-    if (cost<0 || price<0 || stock<0 || (minStock??0)<0 || (maxStock??0)<0 || (wholesale??0)<0) { setModalError('Los precios y las cantidades de stock no pueden ser negativos.'); return; }
-    if (price < cost) { setModalError('El precio de venta no puede ser menor que el costo.'); return; }
-    if (wholesale !== null && wholesale > price) { setModalError('El precio de mayoreo no puede ser mayor que el de venta.'); return; }
-    if (minStock !== null && maxStock !== null && minStock > maxStock) { setModalError('El stock mínimo no puede ser mayor que el máximo.'); return; }
+    // 2. VALIDACIÓN DE TIPOS Y LÍMITES
+    // FIX: Usar String() antes de parseFloat/parseInt para asegurar la conversión.
+    const cost = parseFloat(String(f.costo)), 
+          price = parseFloat(String(f.venta)), 
+          wholesale = f.mayoreo ? parseFloat(String(f.mayoreo)) : null;
 
-    const duplicate = allProductsRaw.find(p =>
-      (editingProduct ? p.id_producto !== editingProduct.id_producto : true) &&
-      (p.codigo?.toLowerCase() === f.codigo.trim().toLowerCase() || p.nombre?.toLowerCase() === f.nombre.trim().toLowerCase())
-    );
-    if (duplicate) {
-      if ((duplicate.codigo||'').toLowerCase() === f.codigo.trim().toLowerCase()) setModalError(`Ya existe un producto con el código "${f.codigo}".`);
-      else setModalError(`Ya existe un producto con el nombre "${f.nombre}".`);
-      return;
-    }
+    const stock = parseInt(String(f.existencia), 10); 
+    const minStock = f.minimo ? parseInt(String(f.minimo), 10) : null;
+    const maxStock = f.maximo ? parseInt(String(f.maximo), 10) : null;
+    
+    // FIX: La validación NaN para stock solo es necesaria si estamos CREANDO.
+    if ([cost, price].some(isNaN) || (!editingProduct && isNaN(stock))) { 
+      setModalError('Costo, Venta y Existencia (al crear) deben ser números válidos.'); 
+      return; 
+    }
 
-    const token = localStorage.getItem('token');
-  
+    // El resto de validaciones de rangos y valores se mantiene igual...
+    if (f.mayoreo && isNaN(wholesale)) { setModalError('Precio Mayoreo debe ser un número válido o estar vacío.'); return; }
+    if (f.minimo && isNaN(minStock)) { setModalError('Stock Mínimo debe ser un número válido o estar vacío.'); return; }
+    if (f.maximo && isNaN(maxStock)) { setModalError('Stock Máximo debe ser un número válido o estar vacío.'); return; }
+    if (cost<0 || price<0 || (!editingProduct && stock<0) || (minStock??0)<0 || (maxStock??0)<0 || (wholesale??0)<0) { setModalError('Los precios y las cantidades de stock no pueden ser negativos.'); return; }
+    if (price < cost) { setModalError('El precio de venta no puede ser menor que el costo.'); return; }
+    if (wholesale !== null && wholesale > price) { setModalError('El precio de mayoreo no puede ser mayor que el de venta.'); return; }
+    if (minStock !== null && maxStock !== null && minStock > maxStock) { setModalError('El stock mínimo no puede ser mayor que el máximo.'); return; }
+
+    // 3. VALIDACIÓN DE DUPLICADOS (Aseguramos que las comparaciones usen cadenas limpias)
+    const duplicate = allProductsRaw.find(p =>
+      (editingProduct ? p.id_producto !== editingProduct.id_producto : true) &&
+      (String(p.codigo).toLowerCase() === codigoOk.toLowerCase() || String(p.nombre).toLowerCase() === nombreOk.toLowerCase())
+    );
+    if (duplicate) {
+      if (String(duplicate.codigo).toLowerCase() === codigoOk.toLowerCase()) setModalError(`Ya existe un producto con el código "${f.codigo}".`);
+      else setModalError(`Ya existe un producto con el nombre "${f.nombre}".`);
+      return;
+    }
+
+    // 4. ENVÍO DE DATOS
+    const token = localStorage.getItem('token');
     const payload = {
       ...f,
-      // 🛑 FIX: Al crear, usa f.existencia (formulario); al editar, se excluye el campo del PUT.
-      existencia: editingProduct ? editingProduct.existencia : f.existencia, 
+      // Al editar, usamos la existencia original (Number); al crear, el valor del stock (Number)
+      existencia: editingProduct ? editingProduct.existencia : stock, 
       mayoreo: f.mayoreo || null, minimo: f.minimo || null, maximo: f.maximo || null,
       id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null
     };
     try {
       if (editingProduct) {
-        // 🛑 FIX: Excluir 'existencia' del payload de actualización (PUT)
+        // Excluimos 'existencia' del payload de actualización (PUT) para el backend
         const { existencia, ...updatePayload } = payload; 
         await axios.put(`/api/products/${editingProduct.id_producto}`, updatePayload, { headers:{ Authorization:`Bearer ${token}` } });
       } else {
@@ -718,11 +745,11 @@ const handleSaveProduct = async (e) => {
         await axios.post('/api/products', payload, { headers:{ Authorization:`Bearer ${token}` } });
       }
       setIsModalOpen(false);
-      await fetchData();
-    } catch (err) {
-      setModalError(err.response?.data?.msg || 'Error al guardar el producto.');
-    }
-  };
+      await fetchData();
+    } catch (err) {
+      setModalError(err.response?.data?.msg || 'Error al guardar el producto.');
+    }
+  };
 
   const executeStockAdjustment = async (product, cantidad, razon) => {
     try {
