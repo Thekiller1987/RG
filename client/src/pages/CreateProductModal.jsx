@@ -58,7 +58,6 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
       return;
     }
 
-    // ✅ **CORRECCIÓN APLICADA AQUÍ**
     const payload = {
         codigo: f.codigo.trim(),
         nombre: f.nombre.trim(),
@@ -74,9 +73,18 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
         id_proveedor: f.id_proveedor ? parseInt(f.id_proveedor, 10) : null,
     };
 
-    if (Object.values(payload).some(v => typeof v === 'number' && isNaN(v))) { setModalError('Por favor, introduce números válidos para precios y stocks.'); return; }
-    if (payload.venta < payload.costo) { setModalError('El precio de venta no puede ser menor que el costo.'); return; }
-    if (allProductsRaw.find(p => (p.codigo?.toLowerCase() === payload.codigo.toLowerCase() || p.nombre?.toLowerCase() === payload.nombre.toLowerCase()))) { setModalError(`Ya existe un producto con ese código o nombre.`); return; }
+    if (Object.values(payload).some(v => typeof v === 'number' && isNaN(v))) {
+        setModalError('Por favor, introduce números válidos para precios y stocks.');
+        return;
+    }
+    if (payload.venta < payload.costo) {
+        setModalError('El precio de venta no puede ser menor que el costo.');
+        return;
+    }
+    if (allProductsRaw.find(p => (p.codigo?.toLowerCase() === payload.codigo.toLowerCase() || p.nombre?.toLowerCase() === payload.nombre.toLowerCase()))) {
+        setModalError(`Ya existe un producto con ese código o nombre.`);
+        return;
+    }
 
     onSave(payload);
   };
