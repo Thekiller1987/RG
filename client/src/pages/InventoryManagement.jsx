@@ -953,7 +953,7 @@ const InventoryManagement = () => {
       {showLoadMore && (
         <div style={{ display:'flex', justifyContent:'center', margin:'1rem 0 2rem' }}>
           <Button onClick={()=>setVisibleCount(v => v + SLICE_STEP)}><FaPlus /> Cargar más resultados</Button>
-          </div>
+        </div>
       )}
 
       {filtered.length === 0 && initialLoadComplete && (
