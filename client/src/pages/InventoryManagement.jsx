@@ -577,77 +577,25 @@ const InventoryManagement = () => {
     setIsModalOpen(true);
   };
 
-// Abrir modal para editar producto
-const openEditModal = (product) => {
-  setEditingProduct(product);
-
-  const cost = parseFloat(product.costo) || 0;
-  const price = parseFloat(product.venta) || 0;
-
-  setProfitPercentage(cost > 0 && price > 0 ? (((price - cost) / cost) * 100).toFixed(2) : '');
-
-  setFormData({
-    ...product,
-    // Asegurar que los campos numéricos se conviertan a string para inputs
-    costo: product.costo !== undefined ? String(product.costo) : '',
-    venta: product.venta !== undefined ? String(product.venta) : '',
-    mayoreo: product.mayoreo !== undefined ? String(product.mayoreo) : '',
-    existencia: product.existencia !== undefined ? String(product.existencia) : '',
-    minimo: product.minimo !== undefined ? String(product.minimo) : '',
-    maximo: product.maximo !== undefined ? String(product.maximo) : '',
-  });
-
-  setModalError('');
-  setIsModalOpen(true);
-};
-
-// Guardar cambios de producto editado
-// InventoryManagement.jsx
-const handleSaveProduct = async (e) => {
-  e.preventDefault();
-  setModalError('');
-
-  // Copia de formData para limpiar y convertir
-  const cleanedFormData = { ...formData };
-
-  // Limpiar espacios de strings
-  Object.keys(cleanedFormData).forEach(key => {
-    if (typeof cleanedFormData[key] === 'string') {
-      cleanedFormData[key] = cleanedFormData[key].trim();
-    }
-  });
-
-  // Convertir campos numéricos
-  ['costo', 'venta', 'existencia', 'mayoreo', 'minimo', 'maximo'].forEach(key => {
-    if (cleanedFormData[key] !== undefined && cleanedFormData[key] !== '') {
-      cleanedFormData[key] = Number(cleanedFormData[key]);
-    }
-  });
-
-  // Validación mínima sin cambiar tu lógica
-  if (!cleanedFormData.codigo || !cleanedFormData.nombre || !cleanedFormData.costo || !cleanedFormData.venta || !cleanedFormData.existencia) {
-    setModalError('Los campos Código, Nombre, Costo, Venta y Existencia son obligatorios.');
-    return;
-  }
-
-  try {
-    const token = localStorage.getItem('token');
-    // CORRECCIÓN: usar id_producto en vez de id
-    await axios.put(`https://multirepuestosrg.com/api/products/${cleanedFormData.id_producto}`, cleanedFormData, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-
-    setIsModalOpen(false);
-    setEditingProduct(null);
-    await fetchData();
-    showAlert({ title: 'Éxito', message: `Producto "${cleanedFormData.nombre}" actualizado correctamente.` });
-  } catch (err) {
-    console.error(err.response?.data || err.message);
-    setModalError('Error al guardar el producto.');
-  }
-};
-
-
+ const openEditModal = (product) => {
+    setEditingProduct(product);
+    const cost = parseFloat(product.costo);
+    const price = parseFloat(product.venta);
+    setProfitPercentage(cost>0 && price>0 ? (((price - cost)/cost*100).toFixed(2)) : '');
+    setFormData({
+      codigo:'', nombre:'', costo:'', venta:'', mayoreo:'', id_categoria:'',
+      existencia:'', minimo:'', maximo:'', tipo_venta:'Unidad', id_proveedor:'', descripcion:'',
+      ...product,
+      
+      // 🛑 FIX CLAVE: Convertir la existencia a STRING si es número
+      existencia: product.existencia !== undefined && product.existencia !== null 
+        ? String(product.existencia) 
+        : '',
+      
+    });
+    setModalError('');
+    setIsModalOpen(true);
+  };
   };
 
   const openDeleteModal = (product) => { setProductToDelete(product); setIsDeleteModalOpen(true); };
@@ -714,42 +662,67 @@ const handleSaveProduct = async (e) => {
   };
 // InventoryManagement.jsx
 const handleSaveProduct = async (e) => {
-  e.preventDefault();
-  setModalError('');
+    e.preventDefault();
+    setModalError('');
+    const f = formData;
 
-  // Copia de formData para limpiar y convertir
-  const cleanedFormData = { ...formData };
+    // 🛑 FIX: Solo requerir existencia si NO estamos editando (es decir, creando)
+    const requiredFields = !editingProduct 
+      ? ['codigo', 'nombre', 'costo', 'venta', 'existencia']
+      : ['codigo', 'nombre', 'costo', 'venta']; 
 
-  // Limpiar espacios de strings
-  Object.keys(cleanedFormData).forEach(key => {
-    if (typeof cleanedFormData[key] === 'string') {
-      cleanedFormData[key] = cleanedFormData[key].trim();
+    if (requiredFields.some(field => !f[field] || !String(f[field]).trim())) { // 🛑 FIX SECUNDARIO: Convertir a String antes de trim
+      setModalError('Los campos Código, Nombre, Costo, Venta y Existencia son obligatorios al crear.');
+      return;
+    
+    
+    const cost = parseFloat(f.costo), price = parseFloat(f.venta), wholesale = f.mayoreo ? parseFloat(f.mayoreo) : null;
+    const stock = parseInt(f.existencia, 10);
+    const minStock = f.minimo ? parseInt(f.minimo, 10) : null;
+    const maxStock = f.maximo ? parseInt(f.maximo, 10) : null;
+    if ([cost, price, stock].some(isNaN)) { setModalError('Costo, Venta y Existencia deben ser números válidos.'); return; }
+    if (f.mayoreo && isNaN(wholesale)) { setModalError('Precio Mayoreo debe ser un número válido o estar vacío.'); return; }
+    if (f.minimo && isNaN(minStock)) { setModalError('Stock Mínimo debe ser un número válido o estar vacío.'); return; }
+    if (f.maximo && isNaN(maxStock)) { setModalError('Stock Máximo debe ser un número válido o estar vacío.'); return; }
+    if (cost<0 || price<0 || stock<0 || (minStock??0)<0 || (maxStock??0)<0 || (wholesale??0)<0) { setModalError('Los precios y las cantidades de stock no pueden ser negativos.'); return; }
+    if (price < cost) { setModalError('El precio de venta no puede ser menor que el costo.'); return; }
+    if (wholesale !== null && wholesale > price) { setModalError('El precio de mayoreo no puede ser mayor que el de venta.'); return; }
+    if (minStock !== null && maxStock !== null && minStock > maxStock) { setModalError('El stock mínimo no puede ser mayor que el máximo.'); return; }
+
+    const duplicate = allProductsRaw.find(p =>
+      (editingProduct ? p.id_producto !== editingProduct.id_producto : true) &&
+      (p.codigo?.toLowerCase() === f.codigo.trim().toLowerCase() || p.nombre?.toLowerCase() === f.nombre.trim().toLowerCase())
+    );
+    if (duplicate) {
+      if ((duplicate.codigo||'').toLowerCase() === f.codigo.trim().toLowerCase()) setModalError(`Ya existe un producto con el código "${f.codigo}".`);
+      else setModalError(`Ya existe un producto con el nombre "${f.nombre}".`);
+      return;
     }
-  });
 
-  // Convertir campos numéricos
-  ['costo', 'venta', 'existencia'].forEach(key => {
-    if (cleanedFormData[key] !== undefined && cleanedFormData[key] !== '') {
-      cleanedFormData[key] = Number(cleanedFormData[key]);
-    }
-  });
-
-  // Validación mínima sin cambiar tu lógica
-  if (!cleanedFormData.codigo || !cleanedFormData.nombre || !cleanedFormData.costo || !cleanedFormData.venta || !cleanedFormData.existencia) {
-    setModalError('Los campos Código, Nombre, Costo, Venta y Existencia son obligatorios.');
-    return;
-  }
-
-  try {
-    await axios.put(`https://multirepuestosrg.com/api/products/${cleanedFormData.id}`, cleanedFormData);
-    // aquí tu código para cerrar modal o actualizar lista
-  } catch (err) {
-    console.error(err.response?.data || err.message);
-    setModalError('Error al guardar el producto.');
-  }
-};
-
+    const token = localStorage.getItem('token');
   
+    const payload = {
+      ...f,
+      // 🛑 FIX: Al crear, usa f.existencia (formulario); al editar, se excluye el campo del PUT.
+      existencia: editingProduct ? editingProduct.existencia : f.existencia, 
+      mayoreo: f.mayoreo || null, minimo: f.minimo || null, maximo: f.maximo || null,
+      id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null
+    };
+    try {
+      if (editingProduct) {
+        // 🛑 FIX: Excluir 'existencia' del payload de actualización (PUT)
+        const { existencia, ...updatePayload } = payload; 
+        await axios.put(`/api/products/${editingProduct.id_producto}`, updatePayload, { headers:{ Authorization:`Bearer ${token}` } });
+      } else {
+        // Al CREAR, se necesita la existencia inicial.
+        await axios.post('/api/products', payload, { headers:{ Authorization:`Bearer ${token}` } });
+      }
+      setIsModalOpen(false);
+      await fetchData();
+    } catch (err) {
+      setModalError(err.response?.data?.msg || 'Error al guardar el producto.');
+    }
+  };
 
   const executeStockAdjustment = async (product, cantidad, razon) => {
     try {
@@ -762,32 +735,8 @@ const handleSaveProduct = async (e) => {
       await fetchData();
     } catch (error) {
       showAlert({ title:'Error', message:error.response?.data?.msg || 'No se pudo ajustar el stock.' });
-    
-  };
-// Limpia y normaliza cualquier formulario automáticamente
-const normalizeFormDataAuto = (formData) => {
-  const cleanedData = {};
-
-  Object.keys(formData).forEach((key) => {
-    let value = formData[key];
-
-    if (typeof value === 'string') {
-      // Quita espacios al inicio/final
-      value = value.trim();
-      // Convierte números en strings a números si es posible
-      if (!isNaN(value) && value !== '') {
-        value = value.includes('.') ? parseFloat(value) : parseInt(value, 10);
-      }
-    } else if (value == null) {
-      // Evita null o undefined
-      value = '';
     }
-
-    cleanedData[key] = value;
-  });
-
-  return cleanedData;
-};
+  };
 
   // Categorías / Proveedores
   const handleAddCategory = async (name) => {
