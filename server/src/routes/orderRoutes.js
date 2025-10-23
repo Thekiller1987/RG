@@ -1,8 +1,17 @@
-// routes/orderRoutes.js
+// routes/orderRoutes.js - VERSIÓN ACTUALIZADA
 
 const express = require('express');
 const router = express.Router();
-const { getOrders, getOrderDetails, createOrder, addAbono, liquidarOrder, cancelOrder } = require('../controllers/orderController');
+const { 
+    getOrders, 
+    getOrderDetails, 
+    createOrder, 
+    addAbono, 
+    liquidarOrder, 
+    cancelOrder,
+    getUsuarios,
+    getReportePedidos 
+} = require('../controllers/orderController');
 const { verifyToken } = require('../middleware/authMiddleware');
 
 router.use(verifyToken);
@@ -18,5 +27,9 @@ router.route('/:id')
 
 router.post('/:id/abono', addAbono);
 router.post('/:id/liquidar', liquidarOrder);
+
+// ✅ NUEVAS RUTAS PARA LAS FUNCIONALIDADES MEJORADAS
+router.get('/usuarios/listar', getUsuarios); // Ruta para obtener usuarios
+router.get('/reportes/pedidos', getReportePedidos); // Ruta para reporte de pedidos
 
 module.exports = router;
