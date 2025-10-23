@@ -1,4 +1,4 @@
-// routes/orderRoutes.js - VERSIÓN ACTUALIZADA
+// routes/orderRoutes.js - SOLO AGREGA ESTAS RUTAS NUEVAS
 
 const express = require('express');
 const router = express.Router();
@@ -20,16 +20,15 @@ router.route('/')
     .get(getOrders)
     .post(createOrder);
 
-// NUEVA RUTA para obtener detalles específicos de un pedido
 router.route('/:id')
     .get(getOrderDetails)
-    .delete(cancelOrder); // Para cancelar
+    .delete(cancelOrder);
 
 router.post('/:id/abono', addAbono);
 router.post('/:id/liquidar', liquidarOrder);
 
-// ✅ NUEVAS RUTAS PARA LAS FUNCIONALIDADES MEJORADAS
-router.get('/usuarios/listar', getUsuarios); // Ruta para obtener usuarios
-router.get('/reportes/pedidos', getReportePedidos); // Ruta para reporte de pedidos
+// ✅ SOLO AGREGA ESTAS 2 RUTAS NUEVAS AL FINAL
+router.get('/usuarios/listar', getUsuarios);
+router.get('/reporte-pedidos/diario', getReportePedidos);
 
 module.exports = router;

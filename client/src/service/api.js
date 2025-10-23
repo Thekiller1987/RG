@@ -129,10 +129,9 @@ export const cancelSale = async (saleId, token) => {
 };
 
 // ===================================================================
-// --- SECCIÓN DE PEDIDOS Y APARTADOS (ACTUALIZADO) ---
+// --- SECCIÓN DE PEDIDOS Y APARTADOS ---
 // ===================================================================
 
-// ✅ CORREGIDO: Ahora acepta parámetros para filtros
 export const fetchOrders = async (token, params = {}) => {
     return await request('GET', '/orders', token, null, { params });
 };
@@ -170,20 +169,6 @@ export const getCreditosByClient = (clientId, token) => {
 };
 export const getAbonosByClient = (clientId, token) => {
     return request('GET', `/clients/${clientId}/abonos`, token);
-};
-
-// ===================================================================
-// --- SECCIÓN DE USUARIOS Y REPORTES (CORREGIDO) ---
-// ===================================================================
-
-// ✅ CORREGIDO: Usando la función request en lugar de fetch
-export const fetchUsuarios = async (token) => {
-    return await request('GET', '/usuarios', token);
-};
-
-// ✅ CORREGIDO: Usando la función request en lugar de fetch
-export const fetchReportePedidos = async (token, params = {}) => {
-    return await request('GET', '/reporte-pedidos', token, null, { params });
 };
 
 // ===================================================================
@@ -269,4 +254,16 @@ export const fetchCajaReportById = async (sessionId, token) => {
     // Si tu backend retorna un PDF o HTML, este endpoint solo necesita ser llamado.
     // La forma en que lo usamos en el frontend es navegar a la URL directamente.
     return await request('get', `/caja/reporte/${sessionId}`, token);
+};
+
+// ===================================================================
+// --- NUEVAS FUNCIONES PARA PEDIDOS MEJORADOS ---
+// ===================================================================
+
+export const fetchUsuarios = async (token) => {
+    return await request('GET', '/orders/usuarios/listar', token);
+};
+
+export const fetchReportePedidos = async (token, params = {}) => {
+    return await request('GET', '/orders/reporte-pedidos/diario', token, null, { params });
 };
