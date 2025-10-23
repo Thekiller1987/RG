@@ -150,14 +150,14 @@ const CajaModal = ({
     const win = window.open('', '_blank');
     if (!win) return;
     const fmt = (n) => `C$${Number(n || 0).toFixed(2)}`;
-    const fmtDate = (d) => d ? d.toLocaleString() : '—';
+   const fmtDate = (d) => d ? d.toLocaleString('es-NI', { timeZone: 'America/Managua' }) : '—';
 
-    const rows = (arr, color = '#222') => arr.map(tx => `
-      <tr>
-        <td>${new Date(tx.at).toLocaleString()}</td>
-        <td>${tx.note || ''}</td>
-        <td style="text-align:right;color:${color}">${fmt(tx.pagoDetalles?.ingresoCaja ?? tx.amount)}</td>
-      </tr>`).join('');
+    const rows = (arr, color = '#222') => arr.map(tx => `
+      <tr>
+        <td>${new Date(tx.at).toLocaleString('es-NI', { timeZone: 'America/Managua' })}</td>
+        <td>${tx.note || ''}</td>
+        <td style="text-align:right;color:${color}">${fmt(tx.pagoDetalles?.ingresoCaja ?? tx.amount)}</td>
+      </tr>`).join('');
 
     win.document.write(`
       <html>

@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 
-// ✅ Obtener pedidos (con nombre de cliente real o “Cliente no asignado” si no tiene)
+// ✅ Obtener pedidos (con nombre de cliente real o "Cliente no asignado" si no tiene)
 const getOrders = async (req, res) => {
     try {
         const query = `
@@ -27,7 +27,7 @@ const getOrders = async (req, res) => {
 // ✅ Obtener detalles del pedido y permitir búsqueda de productos por nombre o código
 const getOrderDetails = async (req, res) => {
     const { id } = req.params;
-    const { search } = req.query; // ← parámetro opcional: búsqueda
+    const { search } = req.query;
 
     try {
         // Datos generales del pedido
@@ -94,12 +94,16 @@ const createOrder = async (req, res) => {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
-        const estadoInicial = abonoInicial > 0 ? 'Apartado' : 'Pendiente';
+        
+        // ✅ CORRECCIÓN: Estados en mayúsculas para consistencia
+        const estadoInicial = abonoInicial > 0 ? 'APARTADO' : 'PENDIENTE';
+        
         const [orderResult] = await connection.query(
             'INSERT INTO pedidos (id_cliente, total_pedido, abonado, estado, fecha_creacion) VALUES (?, ?, ?, ?, NOW())',
             [clienteId, total, abonoInicial, estadoInicial]
         );
         const orderId = orderResult.insertId;
+        
         for (const item of items) {
             await connection.query(
                 'INSERT INTO detalle_pedidos (id_pedido, id_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?)',
@@ -110,12 +114,14 @@ const createOrder = async (req, res) => {
                 [item.quantity, item.quantity, item.id]
             );
         }
+        
         if (abonoInicial > 0) {
             await connection.query(
                 "INSERT INTO ventas (fecha, total_venta, estado, id_usuario, pago_detalles, tipo_venta, referencia_pedido) VALUES (NOW(), ?, 'ABONO', ?, ?, 'PEDIDO', ?)",
                 [abonoInicial, req.user.id, JSON.stringify(pagoDetalles), orderId]
             );
         }
+        
         await connection.commit();
         res.status(201).json({ message: 'Pedido creado exitosamente', orderId });
     } catch (error) {
@@ -212,7 +218,8 @@ const cancelOrder = async (req, res) => {
             );
         }
         
-        await connection.query('UPDATE pedidos SET estado = "Cancelado" WHERE id_pedido = ?', [id]);
+        // ✅ CORRECCIÓN: Estado en mayúsculas para consistencia
+        await connection.query('UPDATE pedidos SET estado = "CANCELADO" WHERE id_pedido = ?', [id]);
         await connection.commit();
         res.status(200).json({ message: 'Pedido cancelado y stock revertido.' });
 
