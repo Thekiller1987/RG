@@ -263,9 +263,6 @@ const InventoryUpload = () => {
         });
     };
 
-    /**
-     * MODIFICACIÓN CLAVE: Se implementa la carga por lotes de 500 en 500 para evitar timeouts.
-     */
     const handleUpload = async () => {
         // --- Validación Inicial ---
         if (dataToUpload.length === 0 || isUploading || !token) {
@@ -293,7 +290,8 @@ const InventoryUpload = () => {
                 setMessage(`🚚 Procesando lote ${i + 1} de ${batches.length} (${totalProcessed} / ${dataToUpload.length} productos)...`);
 
                 // Enviar el lote a la API
-                const result = await bulkUploadInventory(batch, token);
+                // NO es necesario await new Promise(resolve => setTimeout(resolve, 500)); porque el servidor ya actúa como "tiempo de espera"
+                const result = await bulkUploadInventory(batch, token);
                 
                 // Actualizar contadores
                 totalProcessed += batch.length;
@@ -324,6 +322,7 @@ const InventoryUpload = () => {
     };
     
     // --- Renderizado de estado ---
+    // NOTA: Esta función se revisó para que funcione correctamente con tu lógica de renderizado.
     const renderStatusIcon = () => {
         switch (uploadStatus) {
             case 'parsing':
@@ -407,8 +406,7 @@ const InventoryUpload = () => {
                 
                 <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', flexDirection: 'column' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                        {/* Renderizamos el ícono de estado solo aquí si hay un estado activo (parsing, success, error) */}
-                        {!selectedFile && renderStatusIcon()} 
+                        {/* Se elimina la línea que renderizaba el ícono solo aquí, volviendo a tu lógica original. */}
                         <StatusMessage color={uploadStatus === 'error' ? '#dc3545' : '#343a40'}>{message}</StatusMessage>
                     </div>
                 </div>
