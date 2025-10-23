@@ -1,5 +1,5 @@
 // client/src/pages/PedidosYApartados.jsx
-// VERSIÓN CON DISEÑO BLANCO Y ANIMACIONES MEJORADAS
+// VERSIÓN CORREGIDA - DISEÑO BLANCO Y ANIMACIONES MEJORADAS
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
@@ -296,11 +296,12 @@ const EmptyState = styled.div`
     }
 `;
 
+// CORRECCIÓN APLICADA: Se agregaron las comillas simples faltantes
 const StatusBadge = styled.span`
     background: ${props => {
         switch (props.estado) {
             case 'APARTADO': return '#fef3c7';
-            case 'COMPLETADO': return #d1fae5';
+            case 'COMPLETADO': return '#d1fae5';
             case 'CANCELADO': return '#fee2e2';
             case 'PENDIENTE': return '#dbeafe';
             default: return '#f3f4f6';
@@ -331,7 +332,7 @@ const StatusBadge = styled.span`
             case 'COMPLETADO': return '#10b981';
             case 'CANCELADO': return '#ef4444';
             case 'PENDIENTE': return '#3b82f6';
-            default: return #6b7280';
+            default: return '#6b7280';
         }
     }};
 `;
