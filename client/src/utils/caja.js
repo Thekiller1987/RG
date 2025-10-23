@@ -9,16 +9,16 @@
 // Utilidades de fecha y claves
 // ───────────────────────────────────────────────────────────────
 
-/** Día LOCAL YYYY-MM-DD (evita desfases por UTC) */
+/** Día LOCAL YYYY-MM-DD (Usa el desfase del navegador para obtener la fecha local) */
 const toDay = (date) => {
-  // CORRECCIÓN: Usamos métodos getUTC* para asegurarnos de obtener el día de la fecha ISO
-  // sin que la conversión a la zona horaria local (del navegador) mueva el día.
-  const d = (date instanceof Date) ? date : new Date(date);
-  
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(d.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${dd}`;
+  const d = (date instanceof Date) ? date : new Date(date);
+  
+  // Calcula el desfase de la zona horaria local y lo aplica
+  const offset = d.getTimezoneOffset() * 60000;
+  const localDate = new Date(d.getTime() - offset);
+
+  // Formatea a YYYY-MM-DD
+  return localDate.toISOString().split('T')[0];
 };
 
 /** Clave por día para una sesión de caja de un usuario */

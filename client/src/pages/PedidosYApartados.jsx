@@ -1,8 +1,8 @@
 // client/src/pages/PedidosYApartados.jsx
-// VERSIÓN MEJORADA CON DISEÑO PROFESIONAL
+// VERSIÓN CON DISEÑO BLANCO Y ANIMACIONES MEJORADAS
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../service/api';
@@ -29,12 +29,47 @@ import ConfirmationModal from './pos/components/ConfirmationModal';
 import AlertModal from './pos/components/AlertModal';
 import { loadCajaSession } from '../utils/caja';
 
-// --- ESTILOS MEJORADOS CON DISEÑO PROFESIONAL ---
+// --- ANIMACIONES MEJORADAS ---
+const fadeIn = keyframes`
+    from { 
+        opacity: 0; 
+        transform: translateY(20px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+`;
+
+const slideIn = keyframes`
+    from { 
+        transform: translateX(-20px); 
+        opacity: 0; 
+    }
+    to { 
+        transform: translateX(0); 
+        opacity: 1; 
+    }
+`;
+
+const pulse = keyframes`
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+`;
+
+const shimmer = keyframes`
+    0% { background-position: -200px 0; }
+    100% { background-position: calc(200px + 100%) 0; }
+`;
+
+// --- ESTILOS BLANCOS CON ANIMACIONES ---
 const PageWrapper = styled.div`
     padding: 2rem;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #ffffff;
     min-height: 100vh;
     font-family: 'Inter', 'Segoe UI', sans-serif;
+    animation: ${fadeIn} 0.6s ease-out;
 
     @media (max-width: 768px) { 
         padding: 1rem; 
@@ -48,6 +83,7 @@ const HeaderContainer = styled.div`
     margin-bottom: 2rem; 
     flex-wrap: wrap; 
     gap: 1.5rem;
+    animation: ${slideIn} 0.5s ease-out;
 
     @media (max-width: 768px) {
         flex-direction: column;
@@ -57,12 +93,11 @@ const HeaderContainer = styled.div`
 
 const Title = styled.h1`
     font-size: 2.5rem; 
-    color: white; 
+    color: #2d3748; 
     display: flex;
     align-items: center; 
     gap: 1rem;
     margin: 0;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
     font-weight: 700;
 
     @media (max-width: 768px) { 
@@ -90,24 +125,10 @@ const Button = styled.button`
     position: relative;
     overflow: hidden;
 
-    &::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-        transition: left 0.5s;
-    }
-
-    &:hover:not(:disabled)::before {
-        left: 100%;
-    }
-
     &:hover:not(:disabled) {
         transform: translateY(-2px);
         box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        animation: ${pulse} 0.6s ease;
     }
 
     &:disabled {
@@ -120,7 +141,7 @@ const Button = styled.button`
 
 const BackButton = styled(Link)`
     padding: 0.9rem 1.8rem;
-    background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+    background: #6b7280;
     color: white; 
     border-radius: 12px; 
     font-weight: 600;
@@ -135,7 +156,7 @@ const BackButton = styled(Link)`
     &:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-        background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+        background: #4b5563;
     }
 `;
 
@@ -143,6 +164,7 @@ const ContentGrid = styled.div`
     display: grid; 
     grid-template-columns: 320px 1fr; 
     gap: 2rem;
+    animation: ${fadeIn} 0.7s ease-out 0.1s both;
     
     @media (max-width: 992px) { 
         grid-template-columns: 1fr; 
@@ -150,16 +172,16 @@ const ContentGrid = styled.div`
 `;
 
 const FilterPanel = styled.aside`
-    background: rgba(255, 255, 255, 0.95); 
+    background: #ffffff; 
     padding: 1.8rem; 
     border-radius: 16px;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     align-self: flex-start;
     display: flex; 
     flex-direction: column; 
     gap: 1.8rem;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid #e5e7eb;
+    animation: ${slideIn} 0.6s ease-out 0.2s both;
 `;
 
 const Input = styled.input`
@@ -169,13 +191,13 @@ const Input = styled.input`
     border-radius: 10px; 
     border: 2px solid #e5e7eb;
     transition: all 0.3s ease;
-    background: rgba(255, 255, 255, 0.8);
+    background: #ffffff;
 
     &:focus {
         outline: none;
         border-color: #3b82f6;
         box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        background: white;
+        transform: translateY(-1px);
     }
 `;
 
@@ -186,21 +208,21 @@ const Select = styled.select`
     border-radius: 10px; 
     border: 2px solid #e5e7eb;
     transition: all 0.3s ease;
-    background: rgba(255, 255, 255, 0.8);
+    background: #ffffff;
     cursor: pointer;
 
     &:focus {
         outline: none;
         border-color: #3b82f6;
         box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        background: white;
+        transform: translateY(-1px);
     }
 `;
 
 const PedidoCard = styled.div`
-    background: rgba(255, 255, 255, 0.95);
+    background: #ffffff;
     border-radius: 16px;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     border-left: 6px solid ${props => {
         switch (props.estado) {
             case 'APARTADO': return '#f59e0b'; 
@@ -214,12 +236,12 @@ const PedidoCard = styled.div`
     flex-direction: column;
     transition: all 0.3s ease;
     overflow: hidden;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid #f1f5f9;
+    animation: ${fadeIn} 0.5s ease-out;
 
     &:hover {
         transform: translateY(-5px);
-        box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.12);
     }
 `;
 
@@ -231,12 +253,12 @@ const CardBody = styled.div`
 
 const CardFooter = styled.div`
     padding: 1.2rem 1.8rem;
-    background: rgba(248, 250, 252, 0.8);
-    border-top: 1px solid rgba(229, 231, 235, 0.5);
+    background: #f8fafc;
+    border-top: 1px solid #e5e7eb;
 `;
 
 const ProgressBar = styled.div`
-    background: rgba(229, 231, 235, 0.8); 
+    background: #e5e7eb; 
     border-radius: 10px; 
     height: 12px;
     overflow: hidden;
@@ -254,11 +276,11 @@ const ProgressBar = styled.div`
 const EmptyState = styled.div`
     text-align: center;
     padding: 4rem 2rem;
-    background: rgba(255, 255, 255, 0.95);
+    background: #ffffff;
     border-radius: 16px;
     color: #6b7280;
-    border: 2px dashed rgba(229, 231, 235, 0.8);
-    backdrop-filter: blur(10px);
+    border: 2px dashed #e5e7eb;
+    animation: ${fadeIn} 0.6s ease-out;
 
     svg { 
         font-size: 4rem; 
@@ -277,14 +299,22 @@ const EmptyState = styled.div`
 const StatusBadge = styled.span`
     background: ${props => {
         switch (props.estado) {
-            case 'APARTADO': return 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
-            case 'COMPLETADO': return 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-            case 'CANCELADO': return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
-            case 'PENDIENTE': return 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
-            default: return 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)';
+            case 'APARTADO': return '#fef3c7';
+            case 'COMPLETADO': return #d1fae5';
+            case 'CANCELADO': return '#fee2e2';
+            case 'PENDIENTE': return '#dbeafe';
+            default: return '#f3f4f6';
         }
     }};
-    color: white;
+    color: ${props => {
+        switch (props.estado) {
+            case 'APARTADO': return '#92400e';
+            case 'COMPLETADO': return '#065f46';
+            case 'CANCELADO': return '#991b1b';
+            case 'PENDIENTE': return '#1e40af';
+            default: return '#374151';
+        }
+    }};
     padding: 0.5rem 1rem;
     border-radius: 20px;
     font-size: 0.8rem;
@@ -294,7 +324,16 @@ const StatusBadge = styled.span`
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border: 1px solid;
+    border-color: ${props => {
+        switch (props.estado) {
+            case 'APARTADO': return '#f59e0b';
+            case 'COMPLETADO': return '#10b981';
+            case 'CANCELADO': return '#ef4444';
+            case 'PENDIENTE': return '#3b82f6';
+            default: return #6b7280';
+        }
+    }};
 `;
 
 const CardHeader = styled.div`
@@ -329,14 +368,14 @@ const InfoItem = styled.div`
 `;
 
 const AmountDisplay = styled.div`
-    background: rgba(59, 130, 246, 0.05);
+    background: #f8fafc;
     padding: 1rem;
     border-radius: 10px;
-    border: 1px solid rgba(59, 130, 246, 0.1);
+    border: 1px solid #e5e7eb;
 `;
 
 const WarningBanner = styled.div`
-    background: linear-gradient(135deg, #fef3c7 0%, #fef3c7 100%);
+    background: #fef3c7;
     border: 1px solid #f59e0b;
     color: #92400e;
     padding: 1rem 1.5rem;
@@ -346,7 +385,7 @@ const WarningBanner = styled.div`
     align-items: center;
     gap: 0.75rem;
     font-weight: 500;
-    box-shadow: 0 2px 10px rgba(245, 158, 11, 0.1);
+    animation: ${pulse} 2s infinite;
 `;
 
 const ButtonGroup = styled.div`
@@ -370,17 +409,23 @@ const StatsBar = styled.div`
     gap: 1rem;
     margin-bottom: 1.5rem;
     flex-wrap: wrap;
+    animation: ${fadeIn} 0.6s ease-out 0.3s both;
 `;
 
 const StatCard = styled.div`
-    background: rgba(255, 255, 255, 0.9);
+    background: #ffffff;
     padding: 1rem 1.5rem;
     border-radius: 12px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    backdrop-filter: blur(10px);
+    border: 1px solid #f1f5f9;
     flex: 1;
     min-width: 150px;
+    transition: all 0.3s ease;
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    }
 
     .stat-value {
         font-size: 1.5rem;
@@ -395,6 +440,15 @@ const StatCard = styled.div`
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
+`;
+
+const LoadingShimmer = styled.div`
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200px 100%;
+    animation: ${shimmer} 1.5s infinite;
+    border-radius: 8px;
+    height: 100px;
+    margin-bottom: 1rem;
 `;
 
 // --- COMPONENTE PRINCIPAL MEJORADO ---
@@ -498,16 +552,23 @@ const PedidosYApartados = () => {
     if (isLoading) {
         return (
             <PageWrapper>
-                <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'center', 
-                    alignItems: 'center', 
-                    height: '50vh',
-                    color: 'white',
-                    fontSize: '1.2rem'
-                }}>
-                    Cargando pedidos...
-                </div>
+                <HeaderContainer>
+                    <Title>
+                        <FaClipboardList /> 
+                        Pedidos y Apartados
+                    </Title>
+                </HeaderContainer>
+                <ContentGrid>
+                    <FilterPanel>
+                        <LoadingShimmer style={{height: '50px'}} />
+                        <LoadingShimmer style={{height: '50px'}} />
+                    </FilterPanel>
+                    <main>
+                        {[1, 2, 3].map(i => (
+                            <LoadingShimmer key={i} style={{height: '150px', marginBottom: '1rem'}} />
+                        ))}
+                    </main>
+                </ContentGrid>
             </PageWrapper>
         );
     }
@@ -517,7 +578,7 @@ const PedidosYApartados = () => {
             <PageWrapper>
                 <div style={{ 
                     textAlign: 'center', 
-                    color: 'white',
+                    color: '#374151',
                     padding: '4rem 2rem'
                 }}>
                     <h1>No estás autenticado</h1>
@@ -627,9 +688,9 @@ const PedidosYApartados = () => {
 
                     <div style={{
                         padding: '1rem',
-                        background: 'rgba(59, 130, 246, 0.05)',
+                        background: '#f8fafc',
                         borderRadius: '10px',
-                        border: '1px solid rgba(59, 130, 246, 0.1)'
+                        border: '1px solid #e5e7eb'
                     }}>
                         <p style={{ 
                             margin: 0, 
@@ -646,12 +707,16 @@ const PedidosYApartados = () => {
                 <main>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                         {pedidosFiltrados.length > 0 ? (
-                            pedidosFiltrados.map(pedido => {
+                            pedidosFiltrados.map((pedido, index) => {
                                 const saldoPendiente = pedido.total - pedido.abonado;
                                 const percentPaid = pedido.total > 0 ? (pedido.abonado / pedido.total) * 100 : 0;
                                 
                                 return (
-                                    <PedidoCard key={pedido.id} estado={pedido.estado}>
+                                    <PedidoCard 
+                                        key={pedido.id} 
+                                        estado={pedido.estado}
+                                        style={{ animationDelay: `${index * 0.1}s` }}
+                                    >
                                         <CardBody onClick={() => openModal('orderDetail', { pedidoId: pedido.id })}>
                                             <CardHeader>
                                                 <div>
@@ -669,7 +734,7 @@ const PedidosYApartados = () => {
                                                         fontSize: '0.95rem'
                                                     }}>
                                                         <FaUser style={{ marginRight: '0.5rem' }} />
-                                                        {pedido.clienteNombre || 'Cliente Genérico'}
+                                                        {pedido.clienteNombre || 'Cliente no asignado'}
                                                     </p>
                                                 </div>
                                                 <StatusBadge estado={pedido.estado}>
