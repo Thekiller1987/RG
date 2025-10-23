@@ -1,4 +1,4 @@
-// client/src/pages/pos/components/CreateOrderModal.jsx
+// client/src/pages/pos/components/CreateOrderModal.jsx - VERSIÓN SIMPLIFICADA
 import React, { useState, useMemo } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../../context/AuthContext';
@@ -18,9 +18,6 @@ const Panel = styled.div`
 const Input = styled.input`
     width: 100%; padding: 0.8rem; font-size: 1rem; border-radius: 8px; border: 1px solid #ccc;
 `;
-const Select = styled.select`
-    width: 100%; padding: 0.8rem; font-size: 1rem; border-radius: 8px; border: 1px solid #ccc;
-`;
 const ProductListItem = styled.div`
     padding: 10px;
     border: 1px solid #eee;
@@ -31,9 +28,9 @@ const ProductListItem = styled.div`
 `;
 
 const CreateOrderModal = ({ onClose, onSubmit, showAlert }) => {
-    const { clients = [], products = [] } = useAuth();
+    const { products = [] } = useAuth();
     
-    const [clienteId, setClienteId] = useState('');
+    const [clienteNombre, setClienteNombre] = useState('');
     const [cart, setCart] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [abonoInicial, setAbonoInicial] = useState('');
@@ -82,8 +79,8 @@ const CreateOrderModal = ({ onClose, onSubmit, showAlert }) => {
     };
     
     const handleSubmit = () => {
-        if (!clienteId) {
-            showAlert({ title: "Cliente Requerido", message: "Debe seleccionar un cliente para el pedido." });
+        if (!clienteNombre.trim()) {
+            showAlert({ title: "Cliente Requerido", message: "Debe escribir el nombre del cliente." });
             return;
         }
         if (cart.length === 0) {
@@ -91,7 +88,7 @@ const CreateOrderModal = ({ onClose, onSubmit, showAlert }) => {
             return;
         }
         const abono = Number(abonoInicial || 0);
-        if (abono < 0) { // MEJORA: No permitir abonos negativos
+        if (abono < 0) {
             showAlert({ title: "Abono Inválido", message: "El abono inicial no puede ser un número negativo." });
             return;
         }
@@ -100,8 +97,9 @@ const CreateOrderModal = ({ onClose, onSubmit, showAlert }) => {
             return;
         }
         
+        // ✅ ENVIAMOS EL NOMBRE DEL CLIENTE EN LUGAR DEL ID
         onSubmit({
-            clienteId: Number(clienteId),
+            clienteNombre: clienteNombre.trim(),
             items: cart,
             total: total,
             abonoInicial: abono,
@@ -118,14 +116,22 @@ const CreateOrderModal = ({ onClose, onSubmit, showAlert }) => {
                 </div>
                 <Grid>
                     <Panel>
-                        <h3><FaUser /> 1. Seleccionar Cliente</h3>
-                        <Select value={clienteId} onChange={e => setClienteId(e.target.value)}>
-                            <option value="">-- Seleccione un Cliente --</option>
-                            {clients.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                        </Select>
+                        <h3><FaUser /> 1. Nombre del Cliente</h3>
+                        {/* ✅ CAMBIO: Input de texto en lugar de Select */}
+                        <Input 
+                            type="text" 
+                            placeholder="Escriba el nombre del cliente..." 
+                            value={clienteNombre}
+                            onChange={e => setClienteNombre(e.target.value)}
+                        />
                         
                         <h3><FaBoxOpen /> 2. Agregar Productos</h3>
-                        <Input type="text" placeholder="Buscar producto por nombre..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                        <Input 
+                            type="text" 
+                            placeholder="Buscar producto por nombre..." 
+                            value={searchTerm} 
+                            onChange={e => setSearchTerm(e.target.value)} 
+                        />
                         {filteredProducts.slice(0, 5).map(p => (
                             <ProductListItem key={p.id} onClick={() => handleAddToCart(p)}>
                                 {p.nombre} (Stock: {p.existencia}) - C${Number(p.precio).toFixed(2)}
@@ -138,14 +144,28 @@ const CreateOrderModal = ({ onClose, onSubmit, showAlert }) => {
                             <div key={item.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                                 <span>{item.nombre}</span>
                                 <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                                    <Input type="number" value={item.quantity} onChange={e => handleUpdateQuantity(item.id, e.target.value)} style={{width: '70px'}} min="1" />
+                                    <Input 
+                                        type="number" 
+                                        value={item.quantity} 
+                                        onChange={e => handleUpdateQuantity(item.id, e.target.value)} 
+                                        style={{width: '70px'}} 
+                                        min="1" 
+                                    />
                                     <span>C${(item.precio * item.quantity).toFixed(2)}</span>
-                                    <Button $cancel onClick={() => handleUpdateQuantity(item.id, 0)} style={{padding: '5px', minWidth: 'auto'}}><FaTimes/></Button>
+                                    <Button $cancel onClick={() => handleUpdateQuantity(item.id, 0)} style={{padding: '5px', minWidth: 'auto'}}>
+                                        <FaTimes/>
+                                    </Button>
                                 </div>
                             </div>
                         ))}
                          <h3><FaDollarSign /> 4. Abono Inicial (Opcional)</h3>
-                        <Input type="number" placeholder="Monto del abono" value={abonoInicial} onChange={e => setAbonoInicial(e.target.value)} min="0" />
+                        <Input 
+                            type="number" 
+                            placeholder="Monto del abono" 
+                            value={abonoInicial} 
+                            onChange={e => setAbonoInicial(e.target.value)} 
+                            min="0" 
+                        />
                     </Panel>
                 </Grid>
                 <div style={{marginTop: '2rem', borderTop: '1px solid #eee', paddingTop: '1.5rem'}}>
@@ -154,7 +174,9 @@ const CreateOrderModal = ({ onClose, onSubmit, showAlert }) => {
                     </div>
                     <div style={{display: 'flex', justifyContent: 'flex-end', gap: '1rem'}}>
                         <Button onClick={onClose}>Cancelar</Button>
-                        <Button $primary onClick={handleSubmit} disabled={cart.length === 0 || !clienteId}>Guardar Pedido</Button>
+                        <Button $primary onClick={handleSubmit} disabled={cart.length === 0 || !clienteNombre.trim()}>
+                            Guardar Pedido
+                        </Button>
                     </div>
                 </div>
             </ModalContent>
