@@ -72,7 +72,6 @@ const PedidosYApartados = () => {
     const [modal, setModal] = useState({ name: null, props: {} });
     const [ticketData, setTicketData] = useState({ transaction: null, shouldOpen: false, printMode: '80' });
     
-    // 🔑 ID de la caja activa del usuario (solo necesita uno)
     const [cajaIdActual, setCajaIdActual] = useState(null); 
     
     const [selectedOrder, setSelectedOrder] = useState(null);
@@ -80,12 +79,11 @@ const PedidosYApartados = () => {
 
     const tasaDolar = 1; 
 
-    // Define roles (se mantienen para control de cobro/vista, pero no para creación)
+    // Define roles
     const rolesCajeroAdmin = useMemo(() => ['Administrador', 'Contador', 'Encargado de Finanzas', 'Cajero'], []);
     const canCollectPayment = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser]);
     const canViewAllOrders = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser]);
-    // Cualquier usuario logueado puede crear un pedido siempre que haya una caja abierta.
-    const canCreateOrder = useMemo(() => currentUser?.id_usuario != null, [currentUser]); 
+    const isCajeroOrAdmin = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser]);
 
     // Helper para cerrar el modal genérico
     const closeGenericModal = () => setModal({ name: null, props: {} });
@@ -157,7 +155,6 @@ const PedidosYApartados = () => {
 
     /* ---- CARGA DE DATOS Y ESTADO DE CAJA ---- */
 
-    // 1. Cargar Órdenes
     const loadOrders = useCallback(async () => {
         setLoading(true);
         try {
@@ -173,7 +170,6 @@ const PedidosYApartados = () => {
         }
     }, [token]);
 
-    // 2. Cargar Cajas Activas y ASIGNAR ID ÚNICO
     const loadActiveCajas = useCallback(async () => {
         if (!token) return;
         try {
@@ -182,7 +178,7 @@ const PedidosYApartados = () => {
             });
             const cajas = response.data?.abiertas || [];
             
-            // 🔑 SIMPLIFICACIÓN: Si existe alguna caja abierta, usamos la primera.
+            // Si existe alguna caja abierta, usamos la primera.
             if (cajas.length > 0) {
                  setCajaIdActual(cajas[0].id); 
             } else {
@@ -219,7 +215,6 @@ const PedidosYApartados = () => {
         if (canViewAllOrders) {
             setFilteredOrders(pendingOrders);
         } else {
-            // Si el usuario no es de Caja/Admin, solo ve sus propias órdenes
             setFilteredOrders(
                 pendingOrders.filter(order => order.usuario_id === currentUser?.id_usuario)
             );
@@ -227,7 +222,7 @@ const PedidosYApartados = () => {
     }, [allOrders, canViewAllOrders, currentUser?.id_usuario]);
 
 
-    /* ---- Handlers de Interacción (se mantienen) ---- */
+    /* ---- Handlers de Interacción ---- */
     const filteredProducts = useMemo(() => allProducts.filter(product =>
         product.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.codigo?.toString().includes(searchTerm)
@@ -236,45 +231,53 @@ const PedidosYApartados = () => {
     const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.precio_unitario * item.cantidad), 0), [cart]);
     const total = subtotal; 
 
+    // 🔑 CORRECCIÓN: Lógica para agregar múltiples items únicos al carrito
     const handleAddToCart = useCallback((product) => {
         if ((product.existencia ?? 0) <= 0) {
             alert('Producto agotado');
             return;
         }
+        
+        const productIdKey = product.id_producto; // Usamos el ID de producto como clave única
+        const stock = product.existencia ?? 0;
+        const price = product.precio_venta ?? product.precio ?? 0;
 
         setCart(prev => {
-            const existing = prev.find(item => item.id_producto === product.id_producto);
-            const stock = product.existencia ?? 0;
-            const price = product.precio_venta ?? product.precio ?? 0;
+            // Buscamos el ítem existente usando la clave única
+            const existing = prev.find(item => item.id_producto === productIdKey);
 
             if (existing) {
+                // Si ya existe, actualizamos la cantidad (si hay stock)
                 if (existing.cantidad >= stock) {
                     alert('No hay suficiente stock');
                     return prev;
                 }
                 return prev.map(item =>
-                    item.id_producto === product.id_producto
+                    item.id_producto === productIdKey
                         ? { ...item, cantidad: item.cantidad + 1 }
                         : item
                 );
             }
+            // Si es un ítem nuevo, lo agregamos
             return [...prev, {
                 ...product,
                 cantidad: 1,
-                precio_unitario: price
+                precio_unitario: price,
+                id_producto: productIdKey // Aseguramos que la clave esté en el objeto del carrito
             }];
         });
     }, []);
 
+    // 🔑 CORRECCIÓN: Lógica para actualizar cantidad del carrito
     const handleUpdateQuantity = useCallback((productId, newQuantity) => {
         if (newQuantity < 1) {
             setCart(prev => prev.filter(item => item.id_producto !== productId));
             return;
         }
 
-        const product = allProducts.find(p => p.id_producto === productId);
-        if (newQuantity > (product?.existencia ?? 0)) {
-            alert(`Máximo ${product.existencia} unidades disponibles`);
+        const productData = allProducts.find(p => p.id_producto === productId);
+        if (newQuantity > (productData?.existencia ?? 0)) {
+            alert(`Máximo ${productData.existencia} unidades disponibles`);
             return;
         }
 
@@ -289,7 +292,6 @@ const PedidosYApartados = () => {
 
     /* ---- Lógica de Creación de Pedido con Nombre (Flujo principal simplificado) ---- */
     const handleCreateOrderFlow = () => {
-        // 🛑 NO RESTRIJAS POR ROL: Cualquiera puede crear si hay caja y carrito.
         if (!selectedCustomer) {
             alert('Selecciona un cliente primero');
             return;
@@ -298,7 +300,6 @@ const PedidosYApartados = () => {
             alert('Agrega productos al carrito');
             return;
         }
-        // 🛑 VALIDACIÓN CRÍTICA: La caja debe estar asignada
         if (!cajaIdActual) {
              alert('ERROR: Debes tener una caja activa asignada (al menos una caja debe estar abierta en el sistema).');
              return;
@@ -316,12 +317,12 @@ const PedidosYApartados = () => {
                     // LLAMADA DIRECTA: Usamos cajaIdActual
                     handleCreateOrder('pedido', pedidoName.trim(), cajaIdActual);
                 },
-                onClose: closeGenericModal // Permitir cerrar
+                onClose: closeGenericModal 
             }
         });
     };
 
-    /* ---- Crear Orden (Función Final - ASIGNACIÓN A CAJA MANUAL) ---- */
+    /* ---- Crear Orden (Función Final) ---- */
     const handleCreateOrder = async (tipo, pedidoName, idCaja) => {
         try {
             const orderData = {
@@ -331,10 +332,11 @@ const PedidosYApartados = () => {
                 total: total,
                 subtotal: subtotal,
                 
+                // Estos campos son sensibles al backend
                 abonado: 0, 
                 etiqueta: temporaryTag || pedidoName, 
                 nombre_pedido: pedidoName, 
-                id_caja: idCaja, // Usamos el ID de la caja del usuario (o la primera activa)
+                id_caja: idCaja, 
                 
                 items: cart.map(item => ({
                     producto_id: item.id_producto,
@@ -369,8 +371,8 @@ const PedidosYApartados = () => {
             
         } catch (error) {
             let errorMessage = 'Error desconocido.';
-            if (error.message && (error.message.includes('abonado') || error.message.includes('NULL'))) {
-                errorMessage = "Error de BD: Falta el campo 'abonado'. **Tu backend sigue con la configuración SQL incorrecta.**";
+            if (error.message && (error.message.includes('abonado') || error.message.includes('id_caja'))) {
+                errorMessage = "Error de BD: El servidor no está recibiendo correctamente 'abonado' o 'id_caja'. **¡Tu backend necesita la corrección final!**";
             } else if (error.message) {
                 errorMessage = error.message;
             }
@@ -773,6 +775,6 @@ const PedidosYApartados = () => {
             )}
         </div>
     );
-}
+};
 
 export default PedidosYApartados;
