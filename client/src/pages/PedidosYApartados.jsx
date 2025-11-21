@@ -24,7 +24,6 @@ const styles = {
     tabs: { display: 'flex', marginBottom: '15px', background: 'white', padding: '5px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', overflowX: 'auto' },
     tab: { padding: '10px 15px', cursor: 'pointer', borderRadius: '6px', marginRight: '5px', transition: 'all 0.3s ease', whiteSpace: 'nowrap' },
     activeTab: { background: '#007bff', color: 'white', fontWeight: 'bold' },
-    // ** DISEÑO RESPONSIVE **
     panel: { 
         display: 'grid', 
         gridTemplateColumns: '1fr 1fr', 
@@ -60,7 +59,7 @@ const styles = {
 const PedidosYApartados = () => {
     const navigate = useNavigate(); 
     
-    const { user: currentUser, clients, products: allProducts, token, allUsers } = useAuth();
+    const { currentUser, clients, products: allProducts, token } = useAuth();
     const [activeTab, setActiveTab] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -72,7 +71,10 @@ const PedidosYApartados = () => {
     
     const [modal, setModal] = useState({ name: null, props: {} });
     const [ticketData, setTicketData] = useState({ transaction: null, shouldOpen: false, printMode: '80' });
-    const [activeCajas, setActiveCajas] = useState([]); 
+    
+    // 🔑 NUEVO: ID de la caja activa del usuario (solo necesita uno)
+    const [cajaIdActual, setCajaIdActual] = useState(null); 
+    
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [paymentModal, setPaymentModal] = useState({ open: false, order: null });
 
@@ -152,7 +154,7 @@ const PedidosYApartados = () => {
 
     }, [openTicketWithOrder]);
 
-    /* ---- CARGA DE DATOS ---- */
+    /* ---- CARGA DE DATOS Y ESTADO DE CAJA ---- */
 
     // 1. Cargar Órdenes
     const loadOrders = useCallback(async () => {
@@ -170,23 +172,32 @@ const PedidosYApartados = () => {
         }
     }, [token]);
 
-    // 2. Cargar Cajas Activas
+    // 2. Cargar Cajas Activas y ASIGNAR ID (solo la del usuario)
     const loadActiveCajas = useCallback(async () => {
         if (!token || !isCajeroOrAdmin) return;
         try {
             const response = await axios.get(ENDPOINT_ABIERTAS_ACTIVAS, { 
                 headers: { 'Authorization': `Bearer ${token}` } 
             });
-            const cajas = (response.data?.abiertas || []).map(caja => ({
-                id_caja: caja.id,
-                nombre_cajero: resolveName(caja.openedBy) || caja.abierta_por,
-                hora_apertura: caja.openedAt || caja.hora_apertura,
-            }));
-            setActiveCajas(cajas);
+            const cajas = response.data?.abiertas || [];
+            
+            // Asignar el ID de caja del usuario logueado
+            const cajaDelUsuario = cajas.find(c => c.openedBy?.id === currentUser?.id_usuario);
+            
+            if (cajaDelUsuario) {
+                setCajaIdActual(cajaDelUsuario.id); // Guardamos el ID de la caja del usuario
+            } else if (cajas.length > 0) {
+                 // Si el usuario no tiene caja propia, usamos la primera si estamos en modo Caja
+                setCajaIdActual(cajas[0].id); 
+            } else {
+                setCajaIdActual(null);
+            }
+
         } catch (error) {
             console.error('Error cargando cajas activas:', error);
+            setCajaIdActual(null);
         }
-    }, [token, isCajeroOrAdmin]);
+    }, [token, isCajeroOrAdmin, currentUser]);
 
     useEffect(() => {
         if (isCajeroOrAdmin) {
@@ -219,7 +230,7 @@ const PedidosYApartados = () => {
     }, [allOrders, canViewAllOrders, currentUser?.id_usuario]);
 
 
-    /* ---- Handlers (se mantienen) ---- */
+    /* ---- Handlers de Interacción (se mantienen) ---- */
     const filteredProducts = useMemo(() => allProducts.filter(product =>
         product.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.codigo?.toString().includes(searchTerm)
@@ -279,7 +290,7 @@ const PedidosYApartados = () => {
         );
     }, [allProducts]);
 
-    /* ---- Lógica de Creación de Pedido con Nombre y Caja (Flujo principal) ---- */
+    /* ---- Lógica de Creación de Pedido con Nombre (Flujo principal simplificado) ---- */
     const handleCreateOrderFlow = () => {
         if (!isCajeroOrAdmin) {
              alert('Acceso Denegado: Solo Cajeros o Administradores pueden crear pedidos.');
@@ -293,8 +304,9 @@ const PedidosYApartados = () => {
             alert('Agrega productos al carrito');
             return;
         }
-        if (activeCajas.length === 0) {
-             alert('No hay cajas activas en este momento. Abre una caja antes de crear el pedido.');
+        // 🛑 VALIDACIÓN CRÍTICA: La caja debe estar asignada
+        if (!cajaIdActual) {
+             alert('ERROR: Debes tener una caja activa asignada a tu usuario para crear tickets.');
              return;
         }
         
@@ -307,39 +319,15 @@ const PedidosYApartados = () => {
                 initialValue: selectedCustomer.nombre + ' - ' + new Date().toLocaleTimeString(),
                 inputType: 'text',
                 onConfirm: (pedidoName) => {
-                    // 2. Solicitar Selección de Caja
-                    promptForCajaSelection(pedidoName.trim());
+                    // LLAMADA DIRECTA: Usamos cajaIdActual
+                    handleCreateOrder('pedido', pedidoName.trim(), cajaIdActual);
                 },
                 onClose: closeGenericModal // Permitir cerrar
             }
         });
     };
 
-    // Función para solicitar la caja activa (usa el PromptModal existente)
-    const promptForCajaSelection = (pedidoName) => {
-        const options = activeCajas.map(caja => ({
-            value: caja.id_caja,
-            label: `${caja.nombre_cajero} (Abierta: ${new Date(caja.hora_apertura).toLocaleTimeString()})`
-        }));
-
-        setModal({
-            name: 'prompt_caja',
-            props: {
-                title: 'Asignar Pedido a Caja',
-                message: 'Selecciona la caja activa a la que se asociará el ticket:',
-                inputType: 'select',
-                options: options,
-                initialValue: options[0]?.value,
-                onConfirm: (cajaId) => {
-                    // 3. Crear el Pedido final
-                    handleCreateOrder('pedido', pedidoName, cajaId);
-                },
-                onClose: closeGenericModal // Permitir cerrar
-            }
-        });
-    }
-
-    /* ---- Crear Orden (Función Final) ---- */
+    /* ---- Crear Orden (Función Final - ASIGNACIÓN A CAJA MANUAL) ---- */
     const handleCreateOrder = async (tipo, pedidoName, idCaja) => {
         try {
             const orderData = {
@@ -349,10 +337,11 @@ const PedidosYApartados = () => {
                 total: total,
                 subtotal: subtotal,
                 
+                // 🛑 Si el error persiste en el backend, es porque requiere un ID de caja válido
                 abonado: 0, 
                 etiqueta: temporaryTag || pedidoName, 
                 nombre_pedido: pedidoName, 
-                id_caja: idCaja, 
+                id_caja: idCaja, // Usamos el ID de la caja del usuario
                 
                 items: cart.map(item => ({
                     producto_id: item.id_producto,
@@ -370,7 +359,7 @@ const PedidosYApartados = () => {
 
             const createdOrder = await api.createOrder(orderData, token);
             
-            alert(`Pedido #${createdOrder.id_pedido} creado exitosamente y asignado a caja.`);
+            alert(`Pedido #${createdOrder.id_pedido} creado exitosamente.`);
             
             const orderWithDetails = { 
                 ...orderData, 
@@ -388,7 +377,7 @@ const PedidosYApartados = () => {
         } catch (error) {
             let errorMessage = 'Error desconocido.';
             if (error.message && (error.message.includes('abonado') || error.message.includes('NULL'))) {
-                errorMessage = "Error de BD: Falta el campo 'abonado' o es nulo. **¡Este error es de tu servidor (backend)!**";
+                errorMessage = "Error de BD: Falta el campo 'abonado'. **Tu backend sigue con la configuración SQL incorrecta.**";
             } else if (error.message) {
                 errorMessage = error.message;
             }
@@ -485,7 +474,7 @@ const PedidosYApartados = () => {
                     <FaClipboardList /> Gestión de Órdenes
                 </h1>
                 <span style={{ background: '#28a745', color: 'white', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
-                    MODO CAJA
+                    MODO CAJA {cajaIdActual ? `(Caja ID: ${cajaIdActual})` : '— SIN CAJA ACTIVA —'}
                 </span>
             </div>
 
@@ -626,7 +615,7 @@ const PedidosYApartados = () => {
                             <button
                                 style={{...styles.button, ...styles.primaryButton, flex: 1}}
                                 onClick={handleCreateOrderFlow}
-                                disabled={!selectedCustomer || cart.length === 0}
+                                disabled={!selectedCustomer || cart.length === 0 || !cajaIdActual}
                             >
                                 <FaFileInvoiceDollar /> Crear Pedido (Ticket)
                             </button>
