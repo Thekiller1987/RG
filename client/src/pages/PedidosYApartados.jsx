@@ -773,6 +773,6 @@ const PedidosYApartados = () => {
             )}
         </div>
     );
-};
+}
 
 export default PedidosYApartados;
