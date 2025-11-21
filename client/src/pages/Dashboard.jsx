@@ -195,7 +195,7 @@ const Dashboard = () => {
                     {canAccessOrders && (
                         <Card to="/orders" color="#ffc107"> 
                             <CardIcon color="#ffc107"><FaFileInvoice /></CardIcon> 
-                            <h2>Pedidos y Apartados prueba responsividad</h2> 
+                            <h2>Pedidos y Apartados</h2> 
                             <p>Administra pedidos de clientes y artículos reservados.</p> 
                         </Card>
                     )}
