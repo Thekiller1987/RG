@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import * as api from '../service/api.js';
-import { FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, FaMoneyBillWave, FaBoxOpen, FaEye, FaUsers } from 'react-icons/fa';
+import { FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, FaMoneyBillWave, FaBoxOpen, FaEye, FaUsers, FaTag } from 'react-icons/fa';
 import PaymentModal from './pos/components/PaymentModal.jsx'; 
 
 /* =======================================
@@ -23,8 +23,10 @@ const styles = {
     },
     card: { border: '1px solid #ddd', borderRadius: '8px', padding: '15px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
     input: { width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '15px', boxSizing: 'border-box' },
-    button: { padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', margin: '5px 0', fontSize: '15px', fontWeight: 'bold', transition: 'all 0.2s ease', whiteSpace: 'nowrap' },
+    button: { padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', margin: '5px 0', fontSize: '15px', fontWeight: 'bold', transition: 'all 0.2s ease' },
     // Específicos
+    productContainer: { maxHeight: '35vh', overflowY: 'auto', marginTop: '10px' },
+    clientContainer: { maxHeight: '20vh', overflowY: 'auto' },
     productItem: { padding: '10px', marginBottom: '6px', borderRadius: '5px', cursor: 'pointer', background: '#f9f9f9', borderLeft: '4px solid #007bff00' },
     cartItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', borderBottom: '1px solid #eee', background: '#fafafa', borderRadius: '4px' },
     totalBar: { background: '#007bff', color: 'white', padding: '15px', borderRadius: '8px', marginTop: '15px', fontSize: '1.2rem' },
@@ -46,11 +48,13 @@ const PedidosYApartados = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [cart, setCart] = useState([]);
-    const [allOrders, setAllOrders] = useState([]); // Almacena todas las órdenes
-    const [filteredOrders, setFilteredOrders] = useState([]); // Almacena órdenes filtradas para la vista
+    const [allOrders, setAllOrders] = useState([]);
+    const [filteredOrders, setFilteredOrders] = useState([]);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [paymentModal, setPaymentModal] = useState({ open: false, order: null });
     const [loading, setLoading] = useState(false);
+    // NUEVO: Etiqueta temporal para el pedido
+    const [temporaryTag, setTemporaryTag] = useState(''); 
     
     const tasaDolar = 1; 
 
@@ -64,7 +68,12 @@ const PedidosYApartados = () => {
         setLoading(true);
         try {
             const ordersData = await api.fetchOrders(token);
-            setAllOrders(ordersData || []);
+            
+            // --- CORRECCIÓN DE ÓRDENES FANTASMA: Se filtran las órdenes con datos esenciales faltantes ---
+            const validOrders = (ordersData || []).filter(order => 
+                order.cliente_nombre && order.vendedor && order.total > 0
+            );
+            setAllOrders(validOrders);
         } catch (error) {
             console.error('Error cargando órdenes:', error);
         } finally {
@@ -76,16 +85,23 @@ const PedidosYApartados = () => {
         loadOrders();
     }, [loadOrders]);
 
-    /* ---- FILTRO DE ÓRDENES POR USUARIO (Implementación) ---- */
+    /* ---- AUTOSLECCIÓN DE CLIENTE CONTADO ---- */
     useEffect(() => {
-        // Filtra para que solo se muestren órdenes pendientes
+        if (clients.length > 0 && !selectedCustomer) {
+            const contado = clients.find(c => (c.nombre || '').toLowerCase().includes('contado'));
+            if (contado) {
+                setSelectedCustomer(contado);
+            }
+        }
+    }, [clients, selectedCustomer]);
+
+    /* ---- FILTRO DE ÓRDENES POR USUARIO ---- */
+    useEffect(() => {
         const pendingOrders = allOrders.filter(o => o.estado !== 'completado');
 
         if (canViewAllOrders) {
-            // Si tiene rol administrativo/caja, ve todas las órdenes pendientes
             setFilteredOrders(pendingOrders);
         } else {
-            // Si es un vendedor normal, solo ve sus propias órdenes pendientes
             setFilteredOrders(
                 pendingOrders.filter(order => order.usuario_id === currentUser?.id_usuario)
             );
@@ -172,9 +188,11 @@ const PedidosYApartados = () => {
                 estado: 'pendiente',
                 total: total,
                 subtotal: subtotal,
-                // === CORRECCIÓN DEL ERROR DE LA BASE DE DATOS ===
-                abonado: 0, // Se inicializa a 0 para satisfacer la restricción 'cannot be null'
-                // ===============================================
+                // --- CORRECCIÓN FINAL: Aseguramos el valor 0 para 'abonado'
+                abonado: 0, 
+                // --- NUEVO: Etiqueta/Nota Temporal ---
+                etiqueta: temporaryTag,
+                // ------------------------------------
                 items: cart.map(item => ({
                     producto_id: item.id_producto,
                     cantidad: item.cantidad,
@@ -192,23 +210,29 @@ const PedidosYApartados = () => {
             alert(`${tipo === 'pedido' ? 'Pedido' : 'Apartado'} #${createdOrder.id_pedido} creado exitosamente.`);
             
             setCart([]);
-            setSelectedCustomer(null);
+            setTemporaryTag(''); // Limpia la etiqueta después de crear
             loadOrders();
             setActiveTab(1);
             
         } catch (error) {
-            alert('Error al crear la orden: ' + (error.message || 'Error desconocido'));
+            // Manejo de errores más específico para el problema de la BD
+            let errorMessage = 'Error desconocido.';
+            if (error.message && error.message.includes('Column \'abonado\' cannot be null')) {
+                errorMessage = 'Error de BD: Falta el campo "abonado" o es nulo. Asegúrate de que tu backend use el valor enviado.';
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            alert('Error al crear la orden: ' + errorMessage);
         }
     };
 
     /* ---- ELIMINAR/CANCELAR ORDEN (Ajustado a api.cancelOrder) ---- */
     const handleDeleteOrder = async (orderId) => {
-        if (!window.confirm(`⚠️ ¿Estás seguro de que quieres CANCELAR la Orden #${orderId}? Esta acción no se puede deshacer y borrará el ticket del vendedor.`)) {
+        if (!window.confirm(`⚠️ ¿Estás seguro de que quieres CANCELAR la Orden #${orderId}? Esta acción no se puede deshacer y borrará el ticket.`)) {
             return;
         }
         setLoading(true);
         try {
-            // Utilizamos api.cancelOrder que es la función disponible en tu api.js para eliminar/cancelar una orden.
             await api.cancelOrder(orderId, token); 
             alert(`Orden #${orderId} cancelada/eliminada correctamente.`);
             loadOrders();
@@ -231,7 +255,6 @@ const PedidosYApartados = () => {
                 totalVenta: orderToProcess.total,
                 subtotal: orderToProcess.subtotal,
                 descuento: 0, 
-                // Los items deberían venir ya desde la orden, pero los mapeamos para la estructura de venta:
                 items: orderToProcess.items.map(item => ({
                     id: item.producto_id,
                     quantity: item.cantidad,
@@ -245,15 +268,11 @@ const PedidosYApartados = () => {
                 userId: currentUser.id_usuario,
                 clientId: orderToProcess.cliente_id,
                 origen: orderToProcess.tipo === 'apartado' ? 'apartado' : 'pedido',
-                pedido_id: orderToProcess.id_pedido // Usamos el ID del pedido/orden
+                pedido_id: orderToProcess.id_pedido
             };
 
-            // 1. Crear la Venta (asumo que esto también liquida la orden en el backend)
             await api.createSale(saleData, token);
             
-            // NOTA: No se usa api.updateOrderStatus porque no está en tu api.js.
-            // Se asume que api.createSale marca la orden como completada en el backend.
-
             alert('✅ Pago procesado exitosamente. Venta registrada en el sistema.');
             
             setPaymentModal({ open: false, order: null });
@@ -298,7 +317,7 @@ const PedidosYApartados = () => {
                     style={{...styles.tab, ...(activeTab === 1 ? styles.activeTab : {})}}
                     onClick={() => setActiveTab(1)}
                 >
-                    <FaBoxOpen /> Órdenes Existentes ({filteredOrders.filter(o => o.estado !== 'completado').length})
+                    <FaBoxOpen /> Órdenes Pendientes ({filteredOrders.length})
                 </div>
             </div>
 
@@ -317,7 +336,7 @@ const PedidosYApartados = () => {
                                 style={styles.input}
                             />
                             
-                            <div style={{ maxHeight: '250px', overflowY: 'auto', marginTop: '10px' }}>
+                            <div style={styles.productContainer}>
                                 {filteredProducts.map(product => (
                                     <div
                                         key={product.id_producto}
@@ -335,7 +354,7 @@ const PedidosYApartados = () => {
 
                         <div style={styles.card}>
                             <h3 style={{ marginTop: 0, color: '#333' }}><FaUserTag /> Seleccionar Cliente</h3>
-                            <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                            <div style={styles.clientContainer}>
                                 {clients.map(client => (
                                     <div
                                         key={client.id_cliente}
@@ -356,6 +375,17 @@ const PedidosYApartados = () => {
 
                     {/* Columna Derecha (Carrito y Totales) */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        <div style={{...styles.card, flexGrow: 1}}>
+                            <h3 style={{ marginTop: 0, color: '#333' }}><FaTag /> Etiqueta/Nota Temporal</h3>
+                            <input
+                                type="text"
+                                placeholder="Ej: Pago pendiente, Llama antes de entregar..."
+                                value={temporaryTag}
+                                onChange={(e) => setTemporaryTag(e.target.value)}
+                                style={styles.input}
+                            />
+                        </div>
+
                         <div style={{...styles.card, flexGrow: 1}}>
                             <h3 style={{ marginTop: 0, color: '#333' }}><FaShoppingCart /> Carrito</h3>
                             <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
@@ -454,6 +484,11 @@ const PedidosYApartados = () => {
                                             <strong style={{ fontSize: '1.1rem' }}>{order.tipo?.toUpperCase()} #{order.id_pedido}</strong>
                                             <div style={{ fontSize: '14px', color: '#666', lineHeight: '1.4' }}>
                                                 Cliente: <strong>{order.cliente_nombre}</strong> | Total: <strong>{fmt(order.total)}</strong> | Vendedor: {order.vendedor}
+                                                {order.etiqueta && (
+                                                    <span style={{ display: 'block', color: '#007bff', fontWeight: 'bold', fontSize: '12px' }}>
+                                                        <FaTag /> {order.etiqueta}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                         <div style={{ display: 'flex', gap: '5px' }}>
@@ -501,6 +536,7 @@ const PedidosYApartados = () => {
                         <div style={styles.card}>
                             <p><strong>Cliente:</strong> {selectedOrder.cliente_nombre}</p>
                             <p><strong>Total:</strong> {fmt(selectedOrder.total)}</p>
+                            <p><strong>Etiqueta/Nota:</strong> {selectedOrder.etiqueta || 'N/A'}</p>
                             <p><strong>Fecha:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
                         </div>
                         
