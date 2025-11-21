@@ -20,19 +20,19 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 import InventoryUpload from './pages/InventoryUpload.jsx';
 import CashReport from './pages/CashReport.jsx';
 
-// Mapa de roles
+// Mapa de roles - AGREGA CONTADOR
 const ROLES = {
   ADMIN: 'Administrador',
   VENDEDOR: 'Vendedor',
   INVENTARIO: 'Encargado de Inventario',
   FINANZAS: 'Encargado de Finanzas',
   GERENTE: 'Gerente',
+  CONTADOR: 'Contador' // ← AGREGA ESTA LÍNEA
 };
 
 function App() {
   const { user, isLoading } = useAuth();
 
-  // Evitar parpadeo mientras auth carga
   if (isLoading) return null;
 
   return (
@@ -54,7 +54,7 @@ function App() {
       <Route
         path="/pos"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS]}>
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS, ROLES.CONTADOR]}>
             <POS />
           </ProtectedRoute>
         }
@@ -69,20 +69,20 @@ function App() {
         }
       />
 
+      {/* ACTUALIZA ESTA RUTA - permite a Contador cobrar */}
       <Route
         path="/orders"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR]}>
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.FINANZAS, ROLES.CONTADOR]}>
             <PedidosYApartados />
           </ProtectedRoute>
         }
       />
 
-      {/* Alineado con Dashboard: también VENDEDOR */}
       <Route
         path="/credits"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.FINANZAS]}>
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.FINANZAS, ROLES.CONTADOR]}>
             <ClientesYCreditos />
           </ProtectedRoute>
         }
@@ -91,17 +91,16 @@ function App() {
       <Route
         path="/finances"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS]}>
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS, ROLES.CONTADOR]}>
             <Finances />
           </ProtectedRoute>
         }
       />
 
-      {/* Alineado con Dashboard: ADMIN, GERENTE y FINANZAS */}
       <Route
         path="/reports"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS, ROLES.CONTADOR]}>
             <Reports />
           </ProtectedRoute>
         }
@@ -116,7 +115,6 @@ function App() {
         }
       />
 
-      {/* ✅ Ruta que faltaba para tu card de Dashboard */}
       <Route
         path="/upload/inventory"
         element={
@@ -126,11 +124,10 @@ function App() {
         }
       />
 
-      {/* Gestión de Cajas */}
       <Route
         path="/cash-report"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS, ROLES.CONTADOR]}>
             <CashReport />
           </ProtectedRoute>
         }

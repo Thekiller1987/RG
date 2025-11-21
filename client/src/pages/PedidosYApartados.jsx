@@ -47,8 +47,7 @@ const PedidosYApartados = () => {
   const [loading, setLoading] = useState(false);
 
   // Verificar si usuario puede cobrar
-  const canCollectPayment = ['Administrador', 'Contador'].includes(currentUser?.rol);
-
+const canCollectPayment = ['Administrador', 'Contador', 'Encargado de Finanzas'].includes(currentUser?.rol);
   // Filtrar productos
   const filteredProducts = allProducts.filter(product =>
     product.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
