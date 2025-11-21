@@ -24,7 +24,11 @@ const styles = {
     tabs: { display: 'flex', marginBottom: '15px', background: 'white', padding: '5px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', overflowX: 'auto' },
     tab: { padding: '10px 15px', cursor: 'pointer', borderRadius: '6px', marginRight: '5px', transition: 'all 0.3s ease', whiteSpace: 'nowrap' },
     activeTab: { background: '#007bff', color: 'white', fontWeight: 'bold' },
-    panel: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' },
+    panel: { 
+        display: 'grid', 
+        gridTemplateColumns: '1fr 1fr', 
+        gap: '15px', 
+    },
     card: { border: '1px solid #ddd', borderRadius: '8px', padding: '15px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
     input: { width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '15px', boxSizing: 'border-box' },
     button: { padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', margin: '5px 0', fontSize: '15px', fontWeight: 'bold', transition: 'all 0.2s ease' },
@@ -76,12 +80,12 @@ const PedidosYApartados = () => {
 
     const tasaDolar = 1; 
 
-    // Define roles
+    // Define roles (se mantienen para control de cobro/vista, pero no para creación)
     const rolesCajeroAdmin = useMemo(() => ['Administrador', 'Contador', 'Encargado de Finanzas', 'Cajero'], []);
     const canCollectPayment = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser]);
     const canViewAllOrders = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser]);
-    // Permite la creación si es cualquier rol definido en rolesCajeroAdmin
-    const isCajeroOrAdmin = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser]); 
+    // Cualquier usuario logueado puede crear un pedido siempre que haya una caja abierta.
+    const canCreateOrder = useMemo(() => currentUser?.id_usuario != null, [currentUser]); 
 
     // Helper para cerrar el modal genérico
     const closeGenericModal = () => setModal({ name: null, props: {} });
@@ -171,21 +175,16 @@ const PedidosYApartados = () => {
 
     // 2. Cargar Cajas Activas y ASIGNAR ID ÚNICO
     const loadActiveCajas = useCallback(async () => {
-        if (!token || !isCajeroOrAdmin) return;
+        if (!token) return;
         try {
             const response = await axios.get(ENDPOINT_ABIERTAS_ACTIVAS, { 
                 headers: { 'Authorization': `Bearer ${token}` } 
             });
             const cajas = response.data?.abiertas || [];
             
-            // Asignar el ID de caja del usuario logueado o la primera disponible
-            const cajaDelUsuario = cajas.find(c => c.openedBy?.id === currentUser?.id_usuario);
-            
-            if (cajaDelUsuario) {
-                setCajaIdActual(cajaDelUsuario.id); 
-            } else if (cajas.length > 0) {
-                 // Si no encuentra la del usuario, usa la primera disponible (para cumplir el requisito de 1 caja)
-                setCajaIdActual(cajas[0].id); 
+            // 🔑 SIMPLIFICACIÓN: Si existe alguna caja abierta, usamos la primera.
+            if (cajas.length > 0) {
+                 setCajaIdActual(cajas[0].id); 
             } else {
                 setCajaIdActual(null);
             }
@@ -194,14 +193,14 @@ const PedidosYApartados = () => {
             console.error('Error cargando cajas activas:', error);
             setCajaIdActual(null);
         }
-    }, [token, isCajeroOrAdmin, currentUser]);
+    }, [token]);
 
     useEffect(() => {
-        if (isCajeroOrAdmin) {
+        if (currentUser) {
             loadOrders();
             loadActiveCajas(); 
         }
-    }, [loadOrders, loadActiveCajas, isCajeroOrAdmin]);
+    }, [loadOrders, loadActiveCajas, currentUser]);
 
     /* ---- AUTOSLECCIÓN DE CLIENTE CONTADO ---- */
     useEffect(() => {
@@ -220,6 +219,7 @@ const PedidosYApartados = () => {
         if (canViewAllOrders) {
             setFilteredOrders(pendingOrders);
         } else {
+            // Si el usuario no es de Caja/Admin, solo ve sus propias órdenes
             setFilteredOrders(
                 pendingOrders.filter(order => order.usuario_id === currentUser?.id_usuario)
             );
@@ -289,11 +289,7 @@ const PedidosYApartados = () => {
 
     /* ---- Lógica de Creación de Pedido con Nombre (Flujo principal simplificado) ---- */
     const handleCreateOrderFlow = () => {
-        // 🛑 Permite la creación si es cualquier rol de caja
-        if (!isCajeroOrAdmin) {
-             alert('Acceso Denegado: Solo roles de caja (Cajero/Admin/Finanzas/Contador) pueden crear pedidos.');
-             return;
-        }
+        // 🛑 NO RESTRIJAS POR ROL: Cualquiera puede crear si hay caja y carrito.
         if (!selectedCustomer) {
             alert('Selecciona un cliente primero');
             return;
@@ -304,7 +300,7 @@ const PedidosYApartados = () => {
         }
         // 🛑 VALIDACIÓN CRÍTICA: La caja debe estar asignada
         if (!cajaIdActual) {
-             alert('ERROR: Debes tener una caja activa asignada a tu usuario para crear tickets.');
+             alert('ERROR: Debes tener una caja activa asignada (al menos una caja debe estar abierta en el sistema).');
              return;
         }
         
@@ -338,7 +334,7 @@ const PedidosYApartados = () => {
                 abonado: 0, 
                 etiqueta: temporaryTag || pedidoName, 
                 nombre_pedido: pedidoName, 
-                id_caja: idCaja, // Usamos el ID de la caja del usuario
+                id_caja: idCaja, // Usamos el ID de la caja del usuario (o la primera activa)
                 
                 items: cart.map(item => ({
                     producto_id: item.id_producto,
@@ -443,20 +439,6 @@ const PedidosYApartados = () => {
     /* =======================================
      * 3. RENDERIZADO DEL COMPONENTE
      * ======================================= */
-    if (!isCajeroOrAdmin) {
-        return (
-            <div style={{ ...styles.container, textAlign: 'center', padding: '50px' }}>
-                <h1 style={{ color: '#dc3545' }}>Acceso Restringido ⛔</h1>
-                <p>Solo usuarios con rol de **Cajero, Administrador o Encargado de Finanzas** pueden gestionar pedidos y cobros.</p>
-                <button 
-                    style={{...styles.button, ...styles.primaryButton, marginTop: '20px'}} 
-                    onClick={() => navigate('/dashboard')}
-                >
-                    <FaArrowLeft /> Volver al Dashboard
-                </button>
-            </div>
-        );
-    }
     
     return (
         <div style={styles.container}>
@@ -762,7 +744,7 @@ const PedidosYApartados = () => {
             )}
             
             {/* Modal de Prompt (Nombrar Pedido/Seleccionar Caja) */}
-            {(modal.name === 'prompt_name' || modal.name === 'prompt_caja') && (
+            {modal.name === 'prompt_name' && (
                 <PromptModal
                     isOpen={true}
                     onClose={closeGenericModal}
@@ -782,7 +764,7 @@ const PedidosYApartados = () => {
                     transaction={ticketData.transaction}
                     creditStatus={null}
                     clients={clients}
-                    users={allUsers}
+                    users={null} // Asumo que no necesitas allUsers aquí
                     isOpen={ticketData.shouldOpen}
                     onClose={() => setTicketData({ transaction: null, shouldOpen: false })}
                     printMode={ticketData.printMode}
