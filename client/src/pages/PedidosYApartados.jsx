@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import * as api from '../service/api.js';
-import { FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, FaMoneyBillWave, FaBoxOpen, FaEye, FaUsers, FaTag, FaArrowLeft, FaFileInvoiceDollar, FaCheckCircle } from 'react-icons/fa';
+import { 
+    FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, 
+    FaMoneyBillWave, FaBoxOpen, FaEye, FaTag, FaArrowLeft, FaFileInvoiceDollar, 
+    FaCheckCircle, FaClipboardCheck
+} from 'react-icons/fa';
 import PaymentModal from './pos/components/PaymentModal.jsx'; 
 import ConfirmationModal from './pos/components/ConfirmationModal.jsx'; 
 import TicketModal from './pos/components/TicketModal.jsx'; 
@@ -28,6 +32,9 @@ const styles = {
         display: 'grid', 
         gridTemplateColumns: '1fr 1fr', 
         gap: '15px', 
+        '@media (max-width: 768px)': { 
+            gridTemplateColumns: '1fr' 
+        }
     },
     card: { border: '1px solid #ddd', borderRadius: '8px', padding: '15px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
     input: { width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '15px', boxSizing: 'border-box' },
@@ -44,17 +51,18 @@ const styles = {
     successButton: { background: '#28a745', color: 'white', '&:hover': { background: '#1e7e34' } },
     dangerButton: { background: '#dc3545', color: 'white', '&:hover': { background: '#bd2130' } },
     modalOverlay: {
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', 
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-    },
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', 
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+    },
     modalContent: {
-      background: 'white', padding: '20px', borderRadius: '8px', maxWidth: '500px', 
-      width: '90%', maxHeight: '80vh', overflow: 'auto', boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
-    },
+      background: 'white', padding: '20px', borderRadius: '8px', maxWidth: '500px', 
+      width: '90%', maxHeight: '80vh', overflow: 'auto', boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
+    },
 };
 
+
 /* =======================================
- * 2. COMPONENTE PRINCIPAL
+ * 2. COMPONENTE PRINCIPAL PedidosYApartados
  * ======================================= */
 const PedidosYApartados = () => {
     const navigate = useNavigate(); 
@@ -72,7 +80,8 @@ const PedidosYApartados = () => {
     const [modal, setModal] = useState({ name: null, props: {} });
     const [ticketData, setTicketData] = useState({ transaction: null, shouldOpen: false, printMode: '80' });
     
-    const [cajaIdActual, setCajaIdActual] = useState(null); 
+    // Lista de todas las cajas activas disponibles para seleccionar
+    const [activeCajas, setActiveCajas] = useState([]); 
     
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [paymentModal, setPaymentModal] = useState({ open: false, order: null });
@@ -87,8 +96,12 @@ const PedidosYApartados = () => {
 
     // Helper para cerrar el modal genérico
     const closeGenericModal = () => setModal({ name: null, props: {} });
+    
+    // Helper para mostrar alertas
+    const showAlert = useCallback((props) => setModal({ name: 'alert', props }), []);
 
-    // Helper para abrir el TicketModal (basado en POS.jsx)
+    /* ---- TICKET/IMPRESIÓN LOGIC ---- */
+
     const openTicketWithOrder = useCallback((order, printMode = '80') => {
         const transaction = {
             id: order.id_pedido, 
@@ -115,17 +128,11 @@ const PedidosYApartados = () => {
         });
     }, [tasaDolar]);
 
-    // Función que pregunta por el formato de impresión
     const askForPrintOrder = useCallback((order) => {
-        const orderType = 'Pedido';
+        const orderType = order.tipo || 'Pedido';
         const saleId = order.id_pedido;
 
         const closeModals = () => setTicketData({ transaction: null, shouldOpen: false });
-
-        const showAlert = (props) => {
-            setTicketData(prev => ({ ...prev, shouldOpen: false }));
-            setModal({ name: 'alert', props });
-        };
         
         showAlert({
             title: `Imprimir ${orderType} #${saleId}`,
@@ -136,7 +143,7 @@ const PedidosYApartados = () => {
                     label: "80 mm (Recibo)", 
                     action: () => {
                         openTicketWithOrder(order, '80');
-                        setModal({ name: null, props: {} });
+                        closeGenericModal();
                     }, 
                     isPrimary: true 
                 },
@@ -144,14 +151,14 @@ const PedidosYApartados = () => {
                     label: "A4 (Completo)", 
                     action: () => {
                         openTicketWithOrder(order, 'A4');
-                        setModal({ name: null, props: {} });
+                        closeGenericModal();
                     } 
                 },
                 { label: "No / Cerrar", action: closeModals, isCancel: true }
             ]
         });
 
-    }, [openTicketWithOrder]);
+    }, [openTicketWithOrder, showAlert]);
 
     /* ---- CARGA DE DATOS Y ESTADO DE CAJA ---- */
 
@@ -165,31 +172,34 @@ const PedidosYApartados = () => {
             setAllOrders(validOrders);
         } catch (error) {
             console.error('Error cargando órdenes:', error);
+            showAlert({ title: "Error", message: "No se pudieron cargar las órdenes pendientes." });
         } finally {
             setLoading(false);
         }
-    }, [token]);
+    }, [token, showAlert]);
 
+    // Función para cargar TODAS las cajas activas disponibles para selección
     const loadActiveCajas = useCallback(async () => {
         if (!token) return;
         try {
             const response = await axios.get(ENDPOINT_ABIERTAS_ACTIVAS, { 
                 headers: { 'Authorization': `Bearer ${token}` } 
             });
-            const cajas = response.data?.abiertas || [];
+            // Adaptar la respuesta del servidor al formato de opciones para el modal
+            const cajas = (response.data?.abiertas || [])
+                .filter(c => !c.closedAt) // Solo cajas abiertas
+                .map(c => ({
+                    value: String(c.id_caja || c.id), // Asegurar que sea string para el select
+                    label: `Caja #${c.id_caja || c.id} - ${resolveName(c.openedBy)}`
+                }));
             
-            // Si existe alguna caja abierta, usamos la primera.
-            if (cajas.length > 0) {
-                 setCajaIdActual(cajas[0].id); 
-            } else {
-                setCajaIdActual(null);
-            }
-
+            setActiveCajas(cajas);
         } catch (error) {
             console.error('Error cargando cajas activas:', error);
-            setCajaIdActual(null);
+            showAlert({ title: "Error", message: "No se pudo cargar la lista de cajas activas. No podrá crear pedidos." });
+            setActiveCajas([]);
         }
-    }, [token]);
+    }, [token, showAlert]);
 
     useEffect(() => {
         if (currentUser) {
@@ -201,7 +211,7 @@ const PedidosYApartados = () => {
     /* ---- AUTOSLECCIÓN DE CLIENTE CONTADO ---- */
     useEffect(() => {
         if (clients.length > 0 && !selectedCustomer) {
-            const contado = clients.find(c => (c.nombre || '').toLowerCase().includes('contado'));
+            const contado = clients.find(c => (c.nombre || '').toLowerCase().includes('final') || (c.nombre || '').toLowerCase().includes('contado'));
             if (contado) {
                 setSelectedCustomer(contado);
             }
@@ -216,13 +226,14 @@ const PedidosYApartados = () => {
             setFilteredOrders(pendingOrders);
         } else {
             setFilteredOrders(
-                pendingOrders.filter(order => order.usuario_id === currentUser?.id_usuario)
+                pendingOrders.filter(order => String(order.usuario_id) === String(currentUser?.id_usuario))
             );
         }
     }, [allOrders, canViewAllOrders, currentUser?.id_usuario]);
 
 
-    /* ---- Handlers de Interacción ---- */
+    /* ---- Handlers de Interacción / Carrito ---- */
+    
     const filteredProducts = useMemo(() => allProducts.filter(product =>
         product.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.codigo?.toString().includes(searchTerm)
@@ -231,93 +242,146 @@ const PedidosYApartados = () => {
     const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.precio_unitario * item.cantidad), 0), [cart]);
     const total = subtotal; 
 
-    // 🔑 CORRECCIÓN: Lógica para agregar múltiples items únicos al carrito
+    // **LÓGICA DE CARRITO CORREGIDA Y SIMPLIFICADA**
     const handleAddToCart = useCallback((product) => {
-        if ((product.existencia ?? 0) <= 0) {
-            alert('Producto agotado');
+        const stock = product.existencia ?? 0;
+        if (stock <= 0) {
+            showAlert({ title: 'Producto Agotado', message: 'No hay stock disponible para este producto.' });
             return;
         }
         
-        const productIdKey = product.id_producto; // Usamos el ID de producto como clave única
-        const stock = product.existencia ?? 0;
+        const productIdKey = product.id_producto; 
         const price = product.precio_venta ?? product.precio ?? 0;
 
         setCart(prev => {
-            // Buscamos el ítem existente usando la clave única
-            const existing = prev.find(item => item.id_producto === productIdKey);
-
-            if (existing) {
-                // Si ya existe, actualizamos la cantidad (si hay stock)
-                if (existing.cantidad >= stock) {
-                    alert('No hay suficiente stock');
+            const existingIndex = prev.findIndex(item => item.id_producto === productIdKey);
+            
+            if (existingIndex !== -1) {
+                const existing = prev[existingIndex];
+                const newQuantity = existing.cantidad + 1;
+                
+                if (newQuantity > stock) {
+                    showAlert({ title: 'Stock Insuficiente', message: `Máximo ${stock} unidades.` });
                     return prev;
                 }
-                return prev.map(item =>
-                    item.id_producto === productIdKey
-                        ? { ...item, cantidad: item.cantidad + 1 }
+                
+                return prev.map((item, index) =>
+                    index === existingIndex
+                        ? { ...item, cantidad: newQuantity }
                         : item
                 );
             }
-            // Si es un ítem nuevo, lo agregamos
+            // Si es un ítem nuevo
             return [...prev, {
                 ...product,
                 cantidad: 1,
                 precio_unitario: price,
-                id_producto: productIdKey // Aseguramos que la clave esté en el objeto del carrito
+                id_producto: productIdKey,
+                // Normaliza campos para el backend:
+                nombre: product.nombre,
+                // Asegura que el precio de venta sea el que usamos
+                precio: price 
             }];
         });
-    }, []);
+    }, [showAlert]);
 
-    // 🔑 CORRECCIÓN: Lógica para actualizar cantidad del carrito
+    // Lógica para actualizar cantidad del carrito
     const handleUpdateQuantity = useCallback((productId, newQuantity) => {
-        if (newQuantity < 1) {
+        const numQuantity = parseInt(newQuantity, 10) || 0;
+
+        if (numQuantity < 1) {
             setCart(prev => prev.filter(item => item.id_producto !== productId));
             return;
         }
 
         const productData = allProducts.find(p => p.id_producto === productId);
-        if (newQuantity > (productData?.existencia ?? 0)) {
-            alert(`Máximo ${productData.existencia} unidades disponibles`);
+        if (numQuantity > (productData?.existencia ?? 0)) {
+            showAlert({ title: "Stock Insuficiente", message: `Máximo ${productData.existencia} unidades disponibles.` });
             return;
         }
 
         setCart(prev =>
             prev.map(item =>
                 item.id_producto === productId
-                    ? { ...item, cantidad: newQuantity }
+                    ? { ...item, cantidad: numQuantity, subtotal: item.precio_unitario * numQuantity }
                     : item
             )
         );
-    }, [allProducts]);
+    }, [allProducts, showAlert]);
 
-    /* ---- Lógica de Creación de Pedido con Nombre (Flujo principal simplificado) ---- */
+    /* ---- Lógica de Creación de Pedido Personalizado (Función Principal) ---- */
+    
     const handleCreateOrderFlow = () => {
         if (!selectedCustomer) {
-            alert('Selecciona un cliente primero');
+            showAlert({ title: 'Cliente Requerido', message: 'Selecciona un cliente para crear el pedido.' });
             return;
         }
         if (cart.length === 0) {
-            alert('Agrega productos al carrito');
+            showAlert({ title: 'Carrito Vacío', message: 'Agrega productos al carrito primero.' });
             return;
         }
-        if (!cajaIdActual) {
-             alert('ERROR: Debes tener una caja activa asignada (al menos una caja debe estar abierta en el sistema).');
+        if (activeCajas.length === 0) {
+             showAlert({ title: 'Caja Inactiva', message: 'No hay cajas activas disponibles. Por favor, abre una caja en el POS principal.' });
              return;
         }
         
-        // 1. Solicitar Nombre del Pedido (único modal)
+        // 1. Abrir Modal de Selección de Caja y Nombre
         setModal({
-            name: 'prompt_name',
+            name: 'prompt_name_caja',
             props: {
-                title: 'Nombrar Nuevo Pedido',
-                message: 'Ingrese un nombre o referencia para este ticket:',
-                initialValue: selectedCustomer.nombre + ' - ' + new Date().toLocaleTimeString(),
-                inputType: 'text',
-                onConfirm: (pedidoName) => {
-                    // LLAMADA DIRECTA: Usamos cajaIdActual
-                    handleCreateOrder('pedido', pedidoName.trim(), cajaIdActual);
+                title: 'Crear Ticket Personalizado',
+                message: (
+                    <>
+                        <p style={{marginBottom: '15px'}}>Selecciona una caja activa y asigna un nombre/referencia al ticket.</p>
+                        
+                        <label htmlFor="cajaSelect" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                            Caja a Asignar:
+                        </label>
+                        <select 
+                            id="cajaSelect" 
+                            style={styles.input}
+                            defaultValue={activeCajas[0]?.value} 
+                        >
+                            {activeCajas.map(opt => (
+                                <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                </option>
+                            ))}
+                        </select>
+
+                        <label htmlFor="ticketName" style={{ display: 'block', margin: '15px 0 5px', fontWeight: 'bold' }}>
+                            Nombre del Ticket/Referencia:
+                        </label>
+                        <input 
+                            type="text" 
+                            id="ticketName" 
+                            placeholder={`Ej: ${selectedCustomer.nombre} - ${new Date().toLocaleTimeString()}`} 
+                            defaultValue={selectedCustomer.nombre || ''}
+                            style={styles.input}
+                        />
+                    </>
+                ),
+                // Usamos onConfirm para manejar la lógica de los campos
+                onConfirm: (value) => {
+                    // Accedemos a los valores del DOM dentro de onConfirm (Necesario cuando PromptModal es genérico)
+                    const nameInput = document.getElementById('ticketName');
+                    const cajaSelect = document.getElementById('cajaSelect');
+
+                    const newName = nameInput?.value?.trim() || `Pedido para ${selectedCustomer.nombre}`;
+                    const selectedCajaId = Number(cajaSelect?.value);
+
+                    if (!selectedCajaId) {
+                         showAlert({ title: "Error", message: "Debes seleccionar una caja activa." });
+                         return;
+                    }
+                    
+                    // Llamada a la función final de creación
+                    handleCreateOrder('pedido', newName, selectedCajaId);
+                    closeGenericModal();
                 },
-                onClose: closeGenericModal 
+                inputType: 'custom',
+                closeLabel: 'Cancelar',
+                confirmLabel: 'Crear Pedido'
             }
         });
     };
@@ -332,11 +396,11 @@ const PedidosYApartados = () => {
                 total: total,
                 subtotal: subtotal,
                 
-                // Estos campos son sensibles al backend
+                // Nuevos/Corregidos campos sensibles al backend
                 abonado: 0, 
                 etiqueta: temporaryTag || pedidoName, 
                 nombre_pedido: pedidoName, 
-                id_caja: idCaja, 
+                id_caja: idCaja, // <--- ID de Caja seleccionado
                 
                 items: cart.map(item => ({
                     producto_id: item.id_producto,
@@ -350,11 +414,9 @@ const PedidosYApartados = () => {
                 cliente_nombre: selectedCustomer.nombre
             };
 
-            closeGenericModal(); 
-
             const createdOrder = await api.createOrder(orderData, token);
             
-            alert(`Pedido #${createdOrder.id_pedido} creado exitosamente.`);
+            showAlert({ title: "Éxito", message: `Pedido #${createdOrder.id_pedido} creado exitosamente.` });
             
             const orderWithDetails = { 
                 ...orderData, 
@@ -370,18 +432,12 @@ const PedidosYApartados = () => {
             setActiveTab(1);
             
         } catch (error) {
-            let errorMessage = 'Error desconocido.';
-            if (error.message && (error.message.includes('abonado') || error.message.includes('id_caja'))) {
-                errorMessage = "Error de BD: El servidor no está recibiendo correctamente 'abonado' o 'id_caja'. **¡Tu backend necesita la corrección final!**";
-            } else if (error.message) {
-                errorMessage = error.message;
-            }
-            alert('Error al crear la orden: ' + errorMessage);
-            closeGenericModal(); 
+            let errorMessage = error.response?.data?.message || error.message || 'Error desconocido.';
+            showAlert({ title: 'Error al crear la orden', message: errorMessage });
         }
     };
 
-    /* ---- [handleDeleteOrder y handleFinishSaleFromModal se mantienen] ---- */
+    /* ---- Handlers de Órdenes Existentes ---- */
     const handleDeleteOrder = async (orderId) => {
         if (!window.confirm(`⚠️ ¿Estás seguro de que quieres CANCELAR la Orden #${orderId}? Esta acción no se puede deshacer y borrará el ticket.`)) {
             return;
@@ -389,11 +445,11 @@ const PedidosYApartados = () => {
         setLoading(true);
         try {
             await api.cancelOrder(orderId, token); 
-            alert(`Orden #${orderId} cancelada/eliminada correctamente.`);
+            showAlert({ title: "Cancelado", message: `Orden #${orderId} cancelada/eliminada correctamente.` });
             loadOrders();
         } catch (error) {
             console.error('Error al cancelar orden:', error);
-            alert('Error al cancelar la orden: ' + (error.message || 'Desconocido'));
+            showAlert({ title: "Error", message: 'Error al cancelar la orden: ' + (error.message || 'Desconocido') });
         } finally {
             setLoading(false);
         }
@@ -418,6 +474,8 @@ const PedidosYApartados = () => {
                     ...pagoDetalles,
                     clientId: orderToProcess.cliente_id,
                     userId: currentUser.id_usuario,
+                    // Asegurar que la caja se pase desde la orden para la transacción
+                    id_caja: orderToProcess.id_caja 
                 },
                 userId: currentUser.id_usuario,
                 clientId: orderToProcess.cliente_id,
@@ -425,15 +483,15 @@ const PedidosYApartados = () => {
                 pedido_id: orderToProcess.id_pedido
             };
 
-            await api.createSale(saleData, token);
-            
-            alert('✅ Pago procesado exitosamente. Venta registrada en el sistema.');
+            const response = await api.createSale(saleData, token);
             
             setPaymentModal({ open: false, order: null });
+            showAlert({ title: 'Cobro Exitoso', message: 'Venta registrada en el sistema.' });
             loadOrders();
 
         } catch (error) {
             console.error('Error al procesar pago:', error);
+            showAlert({ title: "Error en el Pago", message: 'No se pudo registrar la venta: ' + (error.message || 'Desconocido') });
             throw new Error('Error al registrar la venta en el sistema: ' + (error.message || 'Desconocido'));
         }
     };
@@ -442,8 +500,11 @@ const PedidosYApartados = () => {
      * 3. RENDERIZADO DEL COMPONENTE
      * ======================================= */
     
+    const currentCajaStatus = activeCajas.find(c => String(c.value) === String(currentUser?.caja_activa)) || activeCajas[0]; // Intenta usar la caja activa del usuario (si está en el contexto) o la primera disponible.
+
     return (
         <div style={styles.container}>
+            
             <div style={styles.header}>
                 <button 
                     style={{...styles.button, ...styles.primaryButton, padding: '10px 15px', marginRight: '10px'}} 
@@ -452,10 +513,13 @@ const PedidosYApartados = () => {
                     <FaArrowLeft /> Dashboard
                 </button>
                 <h1 style={{ margin: 0, color: '#333', fontSize: '1.5rem' }}>
-                    <FaClipboardList /> Gestión de Órdenes
+                    <FaClipboardList /> Gestión de Órdenes (Pedidos)
                 </h1>
-                <span style={{ background: '#28a745', color: 'white', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
-                    MODO CAJA {cajaIdActual ? `(Caja ID: ${cajaIdActual})` : '— SIN CAJA ACTIVA —'}
+                <span style={{ 
+                    background: activeCajas.length > 0 ? '#28a745' : '#dc3545', 
+                    color: 'white', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold' 
+                }}>
+                    CAJAS ACTIVAS: {activeCajas.length}
                 </span>
             </div>
 
@@ -476,7 +540,7 @@ const PedidosYApartados = () => {
 
             {/* Panel de Nuevo Ticket */}
             {activeTab === 0 && (
-                <div style={{...styles.panel, '@media (max-width: 768px)': { gridTemplateColumns: '1fr' }}}>
+                <div style={styles.panel}>
                     
                     {/* Columna Izquierda (Productos y Clientes) */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -596,7 +660,7 @@ const PedidosYApartados = () => {
                             <button
                                 style={{...styles.button, ...styles.primaryButton, flex: 1}}
                                 onClick={handleCreateOrderFlow}
-                                disabled={!selectedCustomer || cart.length === 0 || !cajaIdActual}
+                                disabled={!selectedCustomer || cart.length === 0 || activeCajas.length === 0}
                             >
                                 <FaFileInvoiceDollar /> Crear Pedido (Ticket)
                             </button>
@@ -605,7 +669,7 @@ const PedidosYApartados = () => {
                 </div>
             )}
 
-            {/* Panel de Órdenes Existentes (se mantiene) */}
+            {/* Panel de Órdenes Existentes */}
             {activeTab === 1 && (
                 <div style={styles.card}>
                     <h3 style={{ marginTop: 0, color: '#333' }}><FaBoxOpen /> Órdenes Pendientes</h3>
@@ -638,6 +702,11 @@ const PedidosYApartados = () => {
                                                 {order.etiqueta && (
                                                     <span style={{ display: 'block', color: '#007bff', fontWeight: 'bold', fontSize: '12px' }}>
                                                         <FaTag /> {order.etiqueta}
+                                                    </span>
+                                                )}
+                                                {order.id_caja && (
+                                                    <span style={{ display: 'block', color: '#28a745', fontWeight: 'bold', fontSize: '12px' }}>
+                                                        <FaClipboardCheck /> Caja ID: {order.id_caja}
                                                     </span>
                                                 )}
                                             </div>
@@ -675,7 +744,7 @@ const PedidosYApartados = () => {
                 </div>
             )}
 
-            {/* Modal de Detalles (se mantiene) */}
+            {/* Modal de Detalles */}
             {selectedOrder && (
                 <div style={styles.modalOverlay} onClick={() => setSelectedOrder(null)}>
                     <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
@@ -686,6 +755,7 @@ const PedidosYApartados = () => {
                         <div style={styles.card}>
                             <p><strong>Cliente:</strong> {selectedOrder.cliente_nombre}</p>
                             <p><strong>Total:</strong> {fmt(selectedOrder.total)}</p>
+                            <p><strong>Caja Asignada:</strong> {selectedOrder.id_caja || 'N/A'}</p>
                             <p><strong>Etiqueta/Nota:</strong> {selectedOrder.etiqueta || 'N/A'}</p>
                             <p><strong>Fecha:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
                         </div>
@@ -720,7 +790,7 @@ const PedidosYApartados = () => {
 
             {/* MODALES GENÉRICOS/TRANSACCIONALES */}
 
-            {/* Modal de Pago (se mantiene) */}
+            {/* Modal de Pago */}
             {paymentModal.open && paymentModal.order && (
                 <PaymentModal
                     total={paymentModal.order.total}
@@ -732,11 +802,11 @@ const PedidosYApartados = () => {
                     currentUserId={currentUser.id_usuario}
                     initialClientId={String(paymentModal.order.cliente_id)}
                     orderSubtotal={paymentModal.order.subtotal}
-                    showAlert={({ title, message, type }) => setModal({ name: 'alert', props: { title, message, type, onClose: closeGenericModal }})}
+                    showAlert={showAlert}
                 />
             )}
             
-            {/* Modal de Alerta de Impresión/Confirmación */}
+            {/* Modal de Alerta/Confirmación (usado para impresión y errores) */}
             {modal.name === 'alert' && (
                 <ConfirmationModal
                     isOpen={true}
@@ -746,17 +816,17 @@ const PedidosYApartados = () => {
             )}
             
             {/* Modal de Prompt (Nombrar Pedido/Seleccionar Caja) */}
-            {modal.name === 'prompt_name' && (
+            {modal.name === 'prompt_name_caja' && (
                 <PromptModal
                     isOpen={true}
                     onClose={closeGenericModal}
+                    // Importante: No pasamos 'value' aquí, ya que los campos son custom
                     onConfirm={modal.props.onConfirm}
-                    // Mapeo de props
                     title={modal.props.title}
                     message={modal.props.message}
-                    initialValue={modal.props.initialValue}
                     inputType={modal.props.inputType}
-                    options={modal.props.options}
+                    closeLabel={modal.props.closeLabel}
+                    confirmLabel={modal.props.confirmLabel}
                 />
             )}
 
@@ -766,7 +836,7 @@ const PedidosYApartados = () => {
                     transaction={ticketData.transaction}
                     creditStatus={null}
                     clients={clients}
-                    users={null} // Asumo que no necesitas allUsers aquí
+                    users={null} 
                     isOpen={ticketData.shouldOpen}
                     onClose={() => setTicketData({ transaction: null, shouldOpen: false })}
                     printMode={ticketData.printMode}
