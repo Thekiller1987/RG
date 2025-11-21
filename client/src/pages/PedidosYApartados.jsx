@@ -1,20 +1,26 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import * as api from '../service/api.js';
-import { FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, FaMoneyBillWave, FaBoxOpen, FaEye, FaUsers, FaTag } from 'react-icons/fa';
+import { FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, FaMoneyBillWave, FaBoxOpen, FaEye, FaUsers, FaTag, FaArrowLeft, FaFileInvoiceDollar } from 'react-icons/fa';
 import PaymentModal from './pos/components/PaymentModal.jsx'; 
+import ConfirmationModal from './pos/components/ConfirmationModal.jsx'; 
+import TicketModal from './pos/components/TicketModal.jsx'; 
+import PromptModal from './pos/components/PromptModal.jsx'; 
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios'; 
 
 /* =======================================
- * 1. ESTILOS RESPONSIVE (PWA)
+ * CONFIGURACIÓN Y ESTILOS
  * ======================================= */
-const styles = {
-    // Estilos Base
+const API_URL = '/api'; // Asegúrate de que esta URL base sea correcta
+const ENDPOINT_ABIERTAS_ACTIVAS = `${API_URL}/caja/abiertas/activas`;
+
+const styles = { 
     container: { padding: '10px', fontFamily: 'Roboto, sans-serif', background: '#e9ecef', minHeight: '100vh' },
     header: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', padding: '10px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
     tabs: { display: 'flex', marginBottom: '15px', background: 'white', padding: '5px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', overflowX: 'auto' },
     tab: { padding: '10px 15px', cursor: 'pointer', borderRadius: '6px', marginRight: '5px', transition: 'all 0.3s ease', whiteSpace: 'nowrap' },
     activeTab: { background: '#007bff', color: 'white', fontWeight: 'bold' },
-    // Media Query para Responsiveness (Grid 2 columnas -> 1 columna)
     panel: { 
         display: 'grid', 
         gridTemplateColumns: '1fr 1fr', 
@@ -24,26 +30,49 @@ const styles = {
     card: { border: '1px solid #ddd', borderRadius: '8px', padding: '15px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
     input: { width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '15px', boxSizing: 'border-box' },
     button: { padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', margin: '5px 0', fontSize: '15px', fontWeight: 'bold', transition: 'all 0.2s ease' },
-    // Específicos
     productContainer: { maxHeight: '35vh', overflowY: 'auto', marginTop: '10px' },
     clientContainer: { maxHeight: '20vh', overflowY: 'auto' },
     productItem: { padding: '10px', marginBottom: '6px', borderRadius: '5px', cursor: 'pointer', background: '#f9f9f9', borderLeft: '4px solid #007bff00' },
     cartItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', borderBottom: '1px solid #eee', background: '#fafafa', borderRadius: '4px' },
     totalBar: { background: '#007bff', color: 'white', padding: '15px', borderRadius: '8px', marginTop: '15px', fontSize: '1.2rem' },
-    // Colores de Botones
     primaryButton: { background: '#007bff', color: 'white', '&:hover': { background: '#0056b3' } },
     successButton: { background: '#28a745', color: 'white', '&:hover': { background: '#1e7e34' } },
     dangerButton: { background: '#dc3545', color: 'white', '&:hover': { background: '#bd2130' } },
+    modalOverlay: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000
+    },
+    modalContent: {
+      background: 'white',
+      padding: '20px',
+      borderRadius: '8px',
+      maxWidth: '500px',
+      width: '90%',
+      maxHeight: '80vh',
+      overflow: 'auto',
+      boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
+    },
 };
 
-// Función para formatear moneda de forma segura
 const fmt = (n) => `C$${Number(n ?? 0).toFixed(2)}`;
+const resolveName = (x) => (x?.name || x?.nombre || x?.nombre_usuario || 'Usuario');
+// ----------------------------------------------------------------------------------
 
 /* =======================================
  * 2. COMPONENTE PRINCIPAL
  * ======================================= */
 const PedidosYApartados = () => {
-    const { user: currentUser, clients, products: allProducts, token } = useAuth();
+    const navigate = useNavigate(); 
+    
+    const { user: currentUser, clients, products: allProducts, token, allUsers } = useAuth();
     const [activeTab, setActiveTab] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -55,20 +84,94 @@ const PedidosYApartados = () => {
     const [loading, setLoading] = useState(false);
     const [temporaryTag, setTemporaryTag] = useState(''); 
     
+    const [modal, setModal] = useState({ name: null, props: {} });
+    const [ticketData, setTicketData] = useState({ transaction: null, shouldOpen: false, printMode: '80' });
+    
+    const [activeCajas, setActiveCajas] = useState([]); 
+    
     const tasaDolar = 1; 
 
     // Define roles
     const rolesCajeroAdmin = useMemo(() => ['Administrador', 'Contador', 'Encargado de Finanzas', 'Cajero'], []);
     const canCollectPayment = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser, rolesCajeroAdmin]);
     const canViewAllOrders = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser, rolesCajeroAdmin]);
+    const isCajeroOrAdmin = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser]);
 
-    /* ---- Cargar Órdenes ---- */
+    // Helper para cerrar el modal genérico
+    const closeGenericModal = () => setModal({ name: null, props: {} });
+
+    // Helper para abrir el TicketModal (basado en POS.jsx)
+    const openTicketWithOrder = useCallback((order, printMode = '80') => {
+        const transaction = {
+            id: order.id_pedido, 
+            saleId: order.id_pedido,
+            items: order.items,
+            subtotal: order.subtotal,
+            descuento: 0, 
+            total_venta: order.total,
+            clienteId: order.cliente_id,
+            clienteNombre: order.cliente_nombre,
+            usuarioNombre: order.vendedor,
+            tipoVenta: order.tipo,
+            tasaDolarAlMomento: tasaDolar,
+            isProforma: order.tipo === 'apartado' || order.tipo === 'pedido',
+            pagoDetalles: { efectivo: 0, tarjeta: 0, credito: 0, cambio: 0, ingresoCaja: 0 },
+            notes: order.etiqueta || '',
+            at: order.created_at || new Date().toISOString() 
+        };
+
+        setTicketData({ 
+            transaction, 
+            shouldOpen: true, 
+            printMode 
+        });
+    }, [tasaDolar]);
+
+    // Función que pregunta por el formato de impresión
+    const askForPrintOrder = useCallback((order) => {
+        const orderType = order.tipo === 'apartado' ? 'Apartado' : 'Pedido';
+        const saleId = order.id_pedido;
+
+        const closeModals = () => setTicketData({ transaction: null, shouldOpen: false });
+
+        const showAlert = (props) => {
+            setTicketData(prev => ({ ...prev, shouldOpen: false }));
+            setModal({ name: 'alert', props });
+        };
+        
+        showAlert({
+            title: `Imprimir ${orderType} #${saleId}`,
+            message: "¿Desea imprimir el comprobante de este pedido?",
+            type: "custom",
+            buttons: [
+                { 
+                    label: "80 mm (Recibo)", 
+                    action: () => {
+                        openTicketWithOrder(order, '80');
+                        setModal({ name: null, props: {} });
+                    }, 
+                    isPrimary: true 
+                },
+                { 
+                    label: "A4 (Completo)", 
+                    action: () => {
+                        openTicketWithOrder(order, 'A4');
+                        setModal({ name: null, props: {} });
+                    } 
+                },
+                { label: "No / Cerrar", action: closeModals, isCancel: true }
+            ]
+        });
+
+    }, [openTicketWithOrder]);
+
+    /* ---- CARGA DE DATOS ---- */
+
+    // 1. Cargar Órdenes
     const loadOrders = useCallback(async () => {
         setLoading(true);
         try {
             const ordersData = await api.fetchOrders(token);
-            
-            // --- CORRECCIÓN DE ÓRDENES FANTASMA: Se filtran las órdenes con datos esenciales faltantes ---
             const validOrders = (ordersData || []).filter(order => 
                 order.cliente_nombre && order.vendedor && order.total > 0
             );
@@ -80,9 +183,30 @@ const PedidosYApartados = () => {
         }
     }, [token]);
 
+    // 2. Cargar Cajas Activas
+    const loadActiveCajas = useCallback(async () => {
+        if (!token || !isCajeroOrAdmin) return;
+        try {
+            const response = await axios.get(ENDPOINT_ABIERTAS_ACTIVAS, { 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            const cajas = (response.data?.abiertas || []).map(caja => ({
+                id_caja: caja.id,
+                nombre_cajero: resolveName(caja.openedBy) || caja.abierta_por,
+                hora_apertura: caja.openedAt || caja.hora_apertura,
+            }));
+            setActiveCajas(cajas);
+        } catch (error) {
+            console.error('Error cargando cajas activas:', error);
+        }
+    }, [token, isCajeroOrAdmin]);
+
     useEffect(() => {
-        loadOrders();
-    }, [loadOrders]);
+        if (isCajeroOrAdmin) {
+            loadOrders();
+            loadActiveCajas(); 
+        }
+    }, [loadOrders, loadActiveCajas, isCajeroOrAdmin]);
 
     /* ---- AUTOSLECCIÓN DE CLIENTE CONTADO ---- */
     useEffect(() => {
@@ -94,7 +218,7 @@ const PedidosYApartados = () => {
         }
     }, [clients, selectedCustomer]);
 
-    /* ---- FILTRO DE ÓRDENES POR USUARIO ---- */
+    /* ---- FILTRO DE ÓRDENES POR USUARIO/ROL (se mantiene) ---- */
     useEffect(() => {
         const pendingOrders = allOrders.filter(o => o.estado !== 'completado');
 
@@ -108,7 +232,7 @@ const PedidosYApartados = () => {
     }, [allOrders, canViewAllOrders, currentUser?.id_usuario]);
 
 
-    /* ---- Derivados y Cálculos ---- */
+    /* ---- Handlers (se mantienen) ---- */
     const filteredProducts = useMemo(() => allProducts.filter(product =>
         product.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.codigo?.toString().includes(searchTerm)
@@ -117,7 +241,6 @@ const PedidosYApartados = () => {
     const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.precio_unitario * item.cantidad), 0), [cart]);
     const total = subtotal; 
 
-    /* ---- Manejo de Carrito (Lógica de añadir/quitar/actualizar) ---- */
     const handleAddToCart = useCallback((product) => {
         if ((product.existencia ?? 0) <= 0) {
             alert('Producto agotado');
@@ -169,8 +292,12 @@ const PedidosYApartados = () => {
         );
     }, [allProducts]);
 
-    /* ---- Crear Orden (Ticket/Pedido) ---- */
-    const handleCreateOrder = async (tipo = 'pedido') => {
+    /* ---- Lógica de Creación de Pedido con Nombre y Caja (Flujo principal) ---- */
+    const handleCreateOrderFlow = () => {
+        if (!isCajeroOrAdmin) {
+             alert('Acceso Denegado: Solo Cajeros o Administradores pueden crear pedidos.');
+             return;
+        }
         if (!selectedCustomer) {
             alert('Selecciona un cliente primero');
             return;
@@ -179,7 +306,54 @@ const PedidosYApartados = () => {
             alert('Agrega productos al carrito');
             return;
         }
+        if (activeCajas.length === 0) {
+             alert('No hay cajas activas en este momento. Abre una caja antes de crear el pedido.');
+             return;
+        }
+        
+        // 1. Solicitar Nombre del Pedido
+        setModal({
+            name: 'prompt_name',
+            props: {
+                title: 'Nombrar Nuevo Pedido',
+                message: 'Ingrese un nombre o referencia para este ticket:',
+                initialValue: selectedCustomer.nombre + ' - ' + new Date().toLocaleTimeString(),
+                inputType: 'text',
+                onConfirm: (pedidoName) => {
+                    // Cierre y siguiente paso dentro del PromptModal
+                    // 2. Solicitar Selección de Caja
+                    promptForCajaSelection(pedidoName.trim());
+                }
+            }
+        });
+    };
 
+    // Función para solicitar la caja activa (usa el PromptModal existente)
+    const promptForCajaSelection = (pedidoName) => {
+        const options = activeCajas.map(caja => ({
+            value: caja.id_caja,
+            label: `${caja.nombre_cajero} (Abierta: ${new Date(caja.hora_apertura).toLocaleTimeString()})`
+        }));
+
+        setModal({
+            name: 'prompt_caja',
+            props: {
+                title: 'Asignar Pedido a Caja',
+                message: 'Selecciona la caja activa a la que se asociará el ticket:',
+                inputType: 'select',
+                options: options,
+                initialValue: options[0]?.value,
+                onConfirm: (cajaId) => {
+                    // Cierre y siguiente paso dentro del PromptModal
+                    // 3. Crear el Pedido final
+                    handleCreateOrder('pedido', pedidoName, cajaId);
+                }
+            }
+        });
+    }
+
+    /* ---- Crear Orden (Función Final) ---- */
+    const handleCreateOrder = async (tipo, pedidoName, idCaja) => {
         try {
             const orderData = {
                 cliente_id: selectedCustomer.id_cliente,
@@ -188,13 +362,10 @@ const PedidosYApartados = () => {
                 total: total,
                 subtotal: subtotal,
                 
-                // === CORRECCIÓN FINAL: Redundancia para forzar el valor 0 en el backend ===
                 abonado: 0, 
-                abono_inicial: 0, // Nombre alternativo
-                pagado_inicial: 0, // Nombre alternativo
-                // ========================================================================
-                
-                etiqueta: temporaryTag,
+                etiqueta: temporaryTag || pedidoName, 
+                nombre_pedido: pedidoName, 
+                id_caja: idCaja, 
                 
                 items: cart.map(item => ({
                     producto_id: item.id_producto,
@@ -208,28 +379,39 @@ const PedidosYApartados = () => {
                 cliente_nombre: selectedCustomer.nombre
             };
 
+            // Cierra el modal de prompt antes de hacer la llamada a la API
+            closeGenericModal(); 
+
             const createdOrder = await api.createOrder(orderData, token);
             
-            alert(`${tipo === 'pedido' ? 'Pedido' : 'Apartado'} #${createdOrder.id_pedido} creado exitosamente.`);
+            alert(`Pedido #${createdOrder.id_pedido} creado exitosamente y asignado a caja.`);
             
+            const orderWithDetails = { 
+                ...orderData, 
+                id_pedido: createdOrder.id_pedido, 
+                created_at: new Date().toISOString(), 
+                tipo 
+            };
+            askForPrintOrder(orderWithDetails); 
+
             setCart([]);
             setTemporaryTag(''); 
             loadOrders();
             setActiveTab(1);
             
         } catch (error) {
-            // Manejo de errores más específico para el problema de la BD
             let errorMessage = 'Error desconocido.';
             if (error.message && (error.message.includes('abonado') || error.message.includes('NULL'))) {
-                errorMessage = "Error de BD: Falta el campo 'abonado' o es nulo. Este es un problema de configuración en el servidor. Revisa que el campo 'abonado' en el backend tenga DEFAULT 0.";
+                errorMessage = "Error de BD: Falta el campo 'abonado' o es nulo. ¡Asegúrate de haber REINICIADO el servidor de DigitalOcean!";
             } else if (error.message) {
                 errorMessage = error.message;
             }
             alert('Error al crear la orden: ' + errorMessage);
+            closeGenericModal(); 
         }
     };
 
-    /* ---- ELIMINAR/CANCELAR ORDEN (Ajustado a api.cancelOrder) ---- */
+    /* ---- [handleDeleteOrder y handleFinishSaleFromModal se mantienen] ---- */
     const handleDeleteOrder = async (orderId) => {
         if (!window.confirm(`⚠️ ¿Estás seguro de que quieres CANCELAR la Orden #${orderId}? Esta acción no se puede deshacer y borrará el ticket.`)) {
             return;
@@ -246,8 +428,7 @@ const PedidosYApartados = () => {
             setLoading(false);
         }
     };
-
-    /* ---- Finalizar Venta desde Modal (Facturar Ticket) ---- */
+    
     const handleFinishSaleFromModal = async (pagoDetalles) => {
         const orderToProcess = paymentModal.order;
 
@@ -287,26 +468,39 @@ const PedidosYApartados = () => {
         }
     };
 
-
     /* =======================================
      * 3. RENDERIZADO DEL COMPONENTE
      * ======================================= */
+    if (!isCajeroOrAdmin) {
+        return (
+            <div style={{ ...styles.container, textAlign: 'center', padding: '50px' }}>
+                <h1 style={{ color: '#dc3545' }}>Acceso Restringido ⛔</h1>
+                <p>Solo usuarios con rol de **Cajero, Administrador o Encargado de Finanzas** pueden gestionar pedidos y cobros.</p>
+                <button 
+                    style={{...styles.button, ...styles.primaryButton, marginTop: '20px'}} 
+                    onClick={() => navigate('/dashboard')}
+                >
+                    <FaArrowLeft /> Volver al Dashboard
+                </button>
+            </div>
+        );
+    }
+    
     return (
         <div style={styles.container}>
             <div style={styles.header}>
+                <button 
+                    style={{...styles.button, ...styles.primaryButton, padding: '10px 15px', marginRight: '10px'}} 
+                    onClick={() => navigate('/dashboard')}
+                >
+                    <FaArrowLeft /> Dashboard
+                </button>
                 <h1 style={{ margin: 0, color: '#333', fontSize: '1.5rem' }}>
                     <FaClipboardList /> Gestión de Órdenes
                 </h1>
-                {canCollectPayment && (
-                    <span style={{ background: '#28a745', color: 'white', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
-                        MODO CAJA
-                    </span>
-                )}
-                {!canViewAllOrders && (
-                    <span style={{ background: '#007bff', color: 'white', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
-                        <FaUsers /> MODO VENDEDOR
-                    </span>
-                )}
+                <span style={{ background: '#28a745', color: 'white', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
+                    MODO CAJA
+                </span>
             </div>
 
             <div style={styles.tabs}>
@@ -314,7 +508,7 @@ const PedidosYApartados = () => {
                     style={{...styles.tab, ...(activeTab === 0 ? styles.activeTab : {})}}
                     onClick={() => setActiveTab(0)}
                 >
-                    <FaShoppingCart /> Nuevo Ticket (Pedido/Apartado)
+                    <FaShoppingCart /> Nuevo Ticket (Pedido)
                 </div>
                 <div 
                     style={{...styles.tab, ...(activeTab === 1 ? styles.activeTab : {})}}
@@ -376,7 +570,7 @@ const PedidosYApartados = () => {
                         </div>
                     </div>
 
-                    {/* Columna Derecha (Carrito y Totales) */}
+                    {/* Columna Derecha (Etiqueta, Carrito y Totales) */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                         <div style={{...styles.card, flexGrow: 1}}>
                             <h3 style={{ marginTop: 0, color: '#333' }}><FaTag /> Etiqueta/Nota Temporal</h3>
@@ -440,24 +634,17 @@ const PedidosYApartados = () => {
                         <div style={{ display: 'flex', gap: '10px' }}>
                             <button
                                 style={{...styles.button, ...styles.primaryButton, flex: 1}}
-                                onClick={() => handleCreateOrder('pedido')}
+                                onClick={handleCreateOrderFlow}
                                 disabled={!selectedCustomer || cart.length === 0}
                             >
-                                Crear Pedido (Venta)
-                            </button>
-                            <button
-                                style={{...styles.button, flex: 1, background: '#6c757d', color: 'white'}}
-                                onClick={() => handleCreateOrder('apartado')}
-                                disabled={!selectedCustomer || cart.length === 0}
-                            >
-                                Crear Apartado
+                                <FaFileInvoiceDollar /> Crear Pedido (Ticket)
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Panel de Órdenes Existentes */}
+            {/* Panel de Órdenes Existentes (se mantiene) */}
             {activeTab === 1 && (
                 <div style={styles.card}>
                     <h3 style={{ marginTop: 0, color: '#333' }}><FaBoxOpen /> Órdenes Pendientes</h3>
@@ -502,7 +689,6 @@ const PedidosYApartados = () => {
                                             >
                                                 <FaEye />
                                             </button>
-                                            {/* Botón de CANCELAR (ELIMINAR) */}
                                             <button 
                                                 style={{...styles.button, background: '#dc3545', color: 'white', padding: '8px'}}
                                                 onClick={() => handleDeleteOrder(order.id_pedido)}
@@ -528,7 +714,7 @@ const PedidosYApartados = () => {
                 </div>
             )}
 
-            {/* Modal de Detalles (Mantengo tu estructura original) */}
+            {/* Modal de Detalles (se mantiene) */}
             {selectedOrder && (
                 <div style={styles.modalOverlay} onClick={() => setSelectedOrder(null)}>
                     <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
@@ -571,7 +757,9 @@ const PedidosYApartados = () => {
                 </div>
             )}
 
-            {/* Modal de Pago (Usando tu componente PaymentModal) */}
+            {/* MODALES GENÉRICOS/TRANSACCIONALES */}
+
+            {/* Modal de Pago (se mantiene) */}
             {paymentModal.open && paymentModal.order && (
                 <PaymentModal
                     total={paymentModal.order.total}
@@ -583,7 +771,45 @@ const PedidosYApartados = () => {
                     currentUserId={currentUser.id_usuario}
                     initialClientId={String(paymentModal.order.cliente_id)}
                     orderSubtotal={paymentModal.order.subtotal}
-                    showAlert={({ title, message, type }) => alert(`${type.toUpperCase()}: ${title} - ${message}`)}
+                    showAlert={({ title, message, type }) => setModal({ name: 'alert', props: { title, message, type, onClose: closeGenericModal }})}
+                />
+            )}
+            
+            {/* Modal de Alerta de Impresión/Confirmación */}
+            {modal.name === 'alert' && (
+                <ConfirmationModal
+                    isOpen={true}
+                    onClose={closeGenericModal}
+                    {...modal.props}
+                />
+            )}
+            
+            {/* Modal de Prompt (Nombrar Pedido/Seleccionar Caja) */}
+            {(modal.name === 'prompt_name' || modal.name === 'prompt_caja') && (
+                <PromptModal
+                    isOpen={true}
+                    onClose={closeGenericModal}
+                    onConfirm={modal.props.onConfirm}
+                    // Mapeo de props
+                    title={modal.props.title}
+                    message={modal.props.message}
+                    initialValue={modal.props.initialValue}
+                    inputType={modal.props.inputType}
+                    options={modal.props.options}
+                />
+            )}
+
+            {/* Modal de Ticket (Vista Previa de Impresión) */}
+            {ticketData.transaction && (
+                <TicketModal
+                    transaction={ticketData.transaction}
+                    creditStatus={null}
+                    clients={clients}
+                    users={allUsers}
+                    isOpen={ticketData.shouldOpen}
+                    onClose={() => setTicketData({ transaction: null, shouldOpen: false })}
+                    printMode={ticketData.printMode}
+                    currentUser={currentUser}
                 />
             )}
         </div>
