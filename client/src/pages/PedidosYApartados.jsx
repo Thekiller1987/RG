@@ -1,7 +1,7 @@
 // client/src/pages/PedidosYApartados.jsx
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext.jsx';
-import * as api from '../../service/api.js';
+import { useAuth } from '../context/AuthContext.jsx';
+import * as api from '../service/api.js';
 
 const PedidosYApartados = () => {
   const { user: currentUser, clients, products: allProducts, token } = useAuth();
@@ -20,19 +20,27 @@ const PedidosYApartados = () => {
 
   // Estilos simples
   const styles = {
-    container: { padding: '20px', fontFamily: 'Arial, sans-serif' },
+    container: { padding: '20px', fontFamily: 'Arial, sans-serif', background: '#f5f5f5', minHeight: '100vh' },
     header: { 
       display: 'flex', 
       alignItems: 'center', 
       gap: '10px', 
       marginBottom: '20px',
       borderBottom: '2px solid #ddd',
-      paddingBottom: '10px'
+      paddingBottom: '10px',
+      background: 'white',
+      padding: '15px',
+      borderRadius: '8px',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
     },
     tabs: { 
       display: 'flex', 
       marginBottom: '20px',
-      borderBottom: '1px solid #ccc'
+      borderBottom: '1px solid #ccc',
+      background: 'white',
+      padding: '10px',
+      borderRadius: '8px',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
     },
     tab: { 
       padding: '10px 20px', 
@@ -41,7 +49,8 @@ const PedidosYApartados = () => {
       borderBottom: 'none',
       borderRadius: '5px 5px 0 0',
       marginRight: '5px',
-      background: '#f5f5f5'
+      background: '#f5f5f5',
+      transition: 'all 0.3s ease'
     },
     activeTab: { 
       background: '#007bff', 
@@ -66,7 +75,8 @@ const PedidosYApartados = () => {
       marginBottom: '8px',
       borderRadius: '5px',
       cursor: 'pointer',
-      background: '#f9f9f9'
+      background: '#f9f9f9',
+      transition: 'background 0.2s ease'
     },
     productItemHover: { background: '#e3f2fd' },
     cartItem: {
@@ -74,14 +84,20 @@ const PedidosYApartados = () => {
       justifyContent: 'space-between',
       alignItems: 'center',
       padding: '8px',
-      borderBottom: '1px solid #eee'
+      borderBottom: '1px solid #eee',
+      background: '#fafafa',
+      marginBottom: '5px',
+      borderRadius: '4px'
     },
     button: {
       padding: '8px 16px',
       border: 'none',
       borderRadius: '4px',
       cursor: 'pointer',
-      margin: '2px'
+      margin: '2px',
+      fontSize: '14px',
+      fontWeight: 'bold',
+      transition: 'all 0.2s ease'
     },
     primaryButton: { background: '#007bff', color: 'white' },
     successButton: { background: '#28a745', color: 'white' },
@@ -105,7 +121,32 @@ const PedidosYApartados = () => {
       maxWidth: '500px',
       width: '90%',
       maxHeight: '80vh',
-      overflow: 'auto'
+      overflow: 'auto',
+      boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
+    },
+    input: {
+      width: '100%',
+      padding: '8px',
+      border: '1px solid #ddd',
+      borderRadius: '4px',
+      fontSize: '14px'
+    },
+    badge: {
+      background: '#28a745',
+      color: 'white',
+      padding: '4px 8px',
+      borderRadius: '12px',
+      fontSize: '12px',
+      fontWeight: 'bold',
+      marginLeft: '10px'
+    },
+    infoAlert: {
+      background: '#d1ecf1',
+      border: '1px solid #bee5eb',
+      color: '#0c5460',
+      padding: '10px',
+      borderRadius: '5px',
+      marginBottom: '15px'
     }
   };
 
@@ -236,6 +277,8 @@ const PedidosYApartados = () => {
     if (!paymentModal.order) return;
 
     try {
+      const totalPagado = Number(paymentData.efectivo) + Number(paymentData.tarjeta) + Number(paymentData.transferencia);
+      
       const saleData = {
         totalVenta: paymentModal.order.total,
         subtotal: paymentModal.order.subtotal,
@@ -262,7 +305,7 @@ const PedidosYApartados = () => {
       await api.createSale(saleData, token);
       await api.updateOrderStatus(paymentModal.order.id_pedido, 'completado', token);
 
-      alert('✅ Pago procesado exitosamente');
+      alert('✅ Pago procesado exitosamente. Venta registrada en el sistema.');
       setPaymentModal({ open: false, order: null });
       setPaymentData({ efectivo: 0, tarjeta: 0, transferencia: 0 });
       loadOrders();
@@ -275,31 +318,17 @@ const PedidosYApartados = () => {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <h1 style={{ margin: 0 }}>🛒 Pedidos y Apartados</h1>
+        <h1 style={{ margin: 0, color: '#333' }}>🛒 Pedidos y Apartados</h1>
         {canCollectPayment && (
-          <span style={{ 
-            background: '#28a745', 
-            color: 'white', 
-            padding: '5px 10px', 
-            borderRadius: '15px',
-            fontSize: '14px',
-            fontWeight: 'bold'
-          }}>
+          <span style={styles.badge}>
             MODO COBRO
           </span>
         )}
       </div>
 
       {!canCollectPayment && (
-        <div style={{ 
-          background: '#d1ecf1', 
-          border: '1px solid #bee5eb',
-          color: '#0c5460',
-          padding: '10px',
-          borderRadius: '5px',
-          marginBottom: '15px'
-        }}>
-          Modo Vendedor: Solo puedes crear pedidos. Los administradores procesarán los pagos.
+        <div style={styles.infoAlert}>
+          <strong>Modo Vendedor:</strong> Solo puedes crear pedidos. Los administradores procesarán los pagos.
         </div>
       )}
 
@@ -323,26 +352,28 @@ const PedidosYApartados = () => {
           {/* Columna Izquierda */}
           <div>
             <div style={styles.card}>
-              <h3>🔍 Buscar Productos</h3>
+              <h3 style={{ marginTop: 0, color: '#333' }}>🔍 Buscar Productos</h3>
               <input
                 type="text"
                 placeholder="Buscar por nombre o código..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ width: '100%', padding: '8px', marginBottom: '10px' }}
+                style={styles.input}
               />
               
-              <div style={{ maxHeight: '400px', overflow: 'auto' }}>
+              <div style={{ maxHeight: '400px', overflow: 'auto', marginTop: '10px' }}>
                 {filteredProducts.map(product => (
                   <div
                     key={product.id_producto}
                     style={styles.productItem}
                     onClick={() => handleAddToCart(product)}
+                    onMouseEnter={(e) => e.target.style.background = '#e3f2fd'}
+                    onMouseLeave={(e) => e.target.style.background = '#f9f9f9'}
                   >
-                    <div><strong>{product.nombre}</strong></div>
+                    <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>{product.nombre}</div>
                     <div style={{ fontSize: '14px', color: '#666' }}>
                       Código: {product.codigo} | Stock: {product.existencia} | 
-                      Precio: C${product.precio_venta || product.precio}
+                      Precio: C${(product.precio_venta || product.precio)?.toFixed(2)}
                     </div>
                   </div>
                 ))}
@@ -350,18 +381,19 @@ const PedidosYApartados = () => {
             </div>
 
             <div style={styles.card}>
-              <h3>👥 Seleccionar Cliente</h3>
+              <h3 style={{ marginTop: 0, color: '#333' }}>👥 Seleccionar Cliente</h3>
               <div style={{ maxHeight: '200px', overflow: 'auto' }}>
                 {clients.map(client => (
                   <div
                     key={client.id_cliente}
                     style={{
                       ...styles.productItem,
-                      background: selectedCustomer?.id_cliente === client.id_cliente ? '#e3f2fd' : '#f9f9f9'
+                      background: selectedCustomer?.id_cliente === client.id_cliente ? '#e3f2fd' : '#f9f9f9',
+                      border: selectedCustomer?.id_cliente === client.id_cliente ? '2px solid #007bff' : '1px solid #eee'
                     }}
                     onClick={() => setSelectedCustomer(client)}
                   >
-                    <div><strong>{client.nombre}</strong></div>
+                    <div style={{ fontWeight: 'bold' }}>{client.nombre}</div>
                     <div style={{ fontSize: '14px', color: '#666' }}>
                       {client.telefono} | {client.direccion}
                     </div>
@@ -374,10 +406,10 @@ const PedidosYApartados = () => {
           {/* Columna Derecha */}
           <div>
             <div style={styles.card}>
-              <h3>🛒 Carrito de Compra</h3>
+              <h3 style={{ marginTop: 0, color: '#333' }}>🛒 Carrito de Compra</h3>
               
               {cart.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#666', padding: '20px' }}>
+                <div style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
                   El carrito está vacío
                 </div>
               ) : (
@@ -385,9 +417,9 @@ const PedidosYApartados = () => {
                   {cart.map(item => (
                     <div key={item.id_producto} style={styles.cartItem}>
                       <div style={{ flex: 1 }}>
-                        <div><strong>{item.nombre}</strong></div>
+                        <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>{item.nombre}</div>
                         <div style={{ fontSize: '14px', color: '#666' }}>
-                          C${item.precio_unitario} x {item.cantidad} = C${(item.precio_unitario * item.cantidad).toFixed(2)}
+                          C${item.precio_unitario?.toFixed(2)} x {item.cantidad} = C${(item.precio_unitario * item.cantidad).toFixed(2)}
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -397,7 +429,7 @@ const PedidosYApartados = () => {
                         >
                           -
                         </button>
-                        <span>{item.cantidad}</span>
+                        <span style={{ minWidth: '30px', textAlign: 'center', fontWeight: 'bold' }}>{item.cantidad}</span>
                         <button 
                           style={{...styles.button, ...styles.successButton}}
                           onClick={() => handleUpdateQuantity(item.id_producto, item.cantidad + 1)}
@@ -418,15 +450,15 @@ const PedidosYApartados = () => {
             </div>
 
             <div style={styles.card}>
-              <h3>📊 Resumen</h3>
+              <h3 style={{ marginTop: 0, color: '#333' }}>📊 Resumen</h3>
               
               <div style={{ marginBottom: '15px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
                   <span>Subtotal:</span>
                   <span>C${subtotal.toFixed(2)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-                  <strong>Total:</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', paddingTop: '10px', borderTop: '1px solid #eee' }}>
+                  <strong style={{ fontSize: '18px' }}>Total:</strong>
                   <strong style={{ color: '#007bff', fontSize: '18px' }}>C${total.toFixed(2)}</strong>
                 </div>
               </div>
@@ -440,7 +472,7 @@ const PedidosYApartados = () => {
                   Crear Pedido
                 </button>
                 <button
-                  style={{...styles.button, ...styles.button, flex: 1, border: '1px solid #6c757d', background: 'transparent'}}
+                  style={{...styles.button, flex: 1, border: '1px solid #6c757d', background: 'transparent', color: '#6c757d'}}
                   onClick={() => handleCreateOrder('apartado')}
                   disabled={!selectedCustomer || cart.length === 0}
                 >
@@ -454,12 +486,12 @@ const PedidosYApartados = () => {
 
       {activeTab === 1 && (
         <div style={styles.card}>
-          <h3>📋 Órdenes Existentes</h3>
+          <h3 style={{ marginTop: 0, color: '#333' }}>📋 Órdenes Existentes</h3>
           
           {loading ? (
-            <div style={{ textAlign: 'center' }}>Cargando...</div>
+            <div style={{ textAlign: 'center', padding: '20px' }}>Cargando órdenes...</div>
           ) : orders.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#666', padding: '20px' }}>
+            <div style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
               No hay órdenes registradas
             </div>
           ) : (
@@ -469,22 +501,24 @@ const PedidosYApartados = () => {
                   key={order.id_pedido}
                   style={{
                     border: '1px solid #ddd',
-                    borderRadius: '5px',
-                    padding: '10px',
+                    borderRadius: '8px',
+                    padding: '15px',
                     marginBottom: '10px',
-                    background: 'white'
+                    background: 'white',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px' }}>
-                        <strong>Orden #{order.id_pedido}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                        <strong style={{ fontSize: '16px' }}>Orden #{order.id_pedido}</strong>
                         <span style={{
                           background: order.tipo === 'pedido' ? '#007bff' : '#6c757d',
                           color: 'white',
                           padding: '2px 8px',
                           borderRadius: '10px',
-                          fontSize: '12px'
+                          fontSize: '12px',
+                          fontWeight: 'bold'
                         }}>
                           {order.tipo}
                         </span>
@@ -495,22 +529,24 @@ const PedidosYApartados = () => {
                           color: 'white',
                           padding: '2px 8px',
                           borderRadius: '10px',
-                          fontSize: '12px'
+                          fontSize: '12px',
+                          fontWeight: 'bold'
                         }}>
                           {order.estado}
                         </span>
                       </div>
-                      <div style={{ fontSize: '14px', color: '#666' }}>
-                        Cliente: {order.cliente_nombre} | 
-                        Vendedor: {order.vendedor || 'N/A'} |
-                        Total: C${order.total} | 
-                        Fecha: {new Date(order.created_at).toLocaleDateString()}
+                      <div style={{ fontSize: '14px', color: '#666', lineHeight: '1.4' }}>
+                        <strong>Cliente:</strong> {order.cliente_nombre} | 
+                        <strong> Vendedor:</strong> {order.vendedor || 'N/A'} |
+                        <strong> Total:</strong> C${order.total?.toFixed(2)} | 
+                        <strong> Fecha:</strong> {new Date(order.created_at).toLocaleDateString()}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '5px' }}>
                       <button 
                         style={{...styles.button, ...styles.primaryButton}}
                         onClick={() => setSelectedOrder(order)}
+                        title="Ver detalles"
                       >
                         👁️
                       </button>
@@ -518,6 +554,7 @@ const PedidosYApartados = () => {
                         <button 
                           style={{...styles.button, ...styles.successButton}}
                           onClick={() => setPaymentModal({ open: true, order })}
+                          title="Procesar pago"
                         >
                           💳
                         </button>
@@ -535,28 +572,48 @@ const PedidosYApartados = () => {
       {selectedOrder && (
         <div style={styles.modalOverlay} onClick={() => setSelectedOrder(null)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h2>Detalles de Orden #{selectedOrder.id_pedido}</h2>
+            <h2 style={{ marginTop: 0, color: '#333', borderBottom: '2px solid #007bff', paddingBottom: '10px' }}>
+              Detalles de Orden #{selectedOrder.id_pedido}
+            </h2>
             
             <div style={styles.card}>
               <p><strong>Cliente:</strong> {selectedOrder.cliente_nombre}</p>
               <p><strong>Tipo:</strong> {selectedOrder.tipo}</p>
-              <p><strong>Estado:</strong> {selectedOrder.estado}</p>
+              <p><strong>Estado:</strong> 
+                <span style={{
+                  color: selectedOrder.estado === 'completado' ? '#28a745' : 
+                         selectedOrder.estado === 'pendiente' ? '#ffc107' : '#6c757d',
+                  fontWeight: 'bold',
+                  marginLeft: '5px'
+                }}>
+                  {selectedOrder.estado}
+                </span>
+              </p>
               <p><strong>Vendedor:</strong> {selectedOrder.vendedor || 'N/A'}</p>
-              <p><strong>Total:</strong> C${selectedOrder.total}</p>
+              <p><strong>Total:</strong> C${selectedOrder.total?.toFixed(2)}</p>
               <p><strong>Fecha:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
             </div>
 
-            <h3>Productos:</h3>
-            <div>
+            <h3 style={{ color: '#333' }}>Productos:</h3>
+            <div style={styles.card}>
               {selectedOrder.items?.map((item, index) => (
-                <div key={index} style={{ padding: '5px 0', borderBottom: '1px solid #eee' }}>
-                  {item.nombre} - {item.cantidad} x C${item.precio_unitario} = C${item.subtotal}
+                <div key={index} style={{ 
+                  padding: '8px 0', 
+                  borderBottom: '1px solid #eee',
+                  display: 'flex',
+                  justifyContent: 'space-between'
+                }}>
+                  <span>{item.nombre}</span>
+                  <span>
+                    {item.cantidad} x C${item.precio_unitario?.toFixed(2)} = 
+                    <strong> C${item.subtotal?.toFixed(2)}</strong>
+                  </span>
                 </div>
               ))}
             </div>
 
             <button
-              style={{...styles.button, ...styles.primaryButton, marginTop: '15px'}}
+              style={{...styles.button, ...styles.primaryButton, marginTop: '15px', width: '100%'}}
               onClick={() => setSelectedOrder(null)}
             >
               Cerrar
@@ -566,59 +623,72 @@ const PedidosYApartados = () => {
       )}
 
       {/* Modal de Pago */}
-      {paymentModal.open && (
+      {paymentModal.open && paymentModal.order && (
         <div style={styles.modalOverlay} onClick={() => setPaymentModal({ open: false, order: null })}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h2>💳 Procesar Pago - Pedido #{paymentModal.order.id_pedido}</h2>
+            <h2 style={{ marginTop: 0, color: '#333', borderBottom: '2px solid #28a745', paddingBottom: '10px' }}>
+              💳 Procesar Pago - Pedido #{paymentModal.order.id_pedido}
+            </h2>
             
-            <div style={{ marginBottom: '15px' }}>
-              <h3>Total a Pagar: <strong style={{ color: '#007bff' }}>C${paymentModal.order.total?.toFixed(2)}</strong></h3>
+            <div style={{ marginBottom: '20px', background: '#f8f9fa', padding: '15px', borderRadius: '5px' }}>
+              <h3 style={{ margin: '0 0 10px 0', color: '#333' }}>
+                Total a Pagar: <strong style={{ color: '#007bff', fontSize: '24px' }}>C${paymentModal.order.total?.toFixed(2)}</strong>
+              </h3>
             </div>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div>
-                <label>Efectivo:</label>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Efectivo:</label>
                 <input
                   type="number"
                   value={paymentData.efectivo}
                   onChange={(e) => setPaymentData({...paymentData, efectivo: e.target.value})}
-                  style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+                  style={styles.input}
+                  placeholder="0.00"
+                  step="0.01"
                 />
               </div>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                 <div>
-                  <label>Tarjeta:</label>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Tarjeta:</label>
                   <input
                     type="number"
                     value={paymentData.tarjeta}
                     onChange={(e) => setPaymentData({...paymentData, tarjeta: e.target.value})}
-                    style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+                    style={styles.input}
+                    placeholder="0.00"
+                    step="0.01"
                   />
                 </div>
                 <div>
-                  <label>Transferencia:</label>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Transferencia:</label>
                   <input
                     type="number"
                     value={paymentData.transferencia}
                     onChange={(e) => setPaymentData({...paymentData, transferencia: e.target.value})}
-                    style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+                    style={styles.input}
+                    placeholder="0.00"
+                    step="0.01"
                   />
                 </div>
               </div>
               
               <div style={styles.card}>
-                <p><strong>Total Pagado:</strong> C${(Number(paymentData.efectivo) + Number(paymentData.tarjeta) + Number(paymentData.transferencia)).toFixed(2)}</p>
-                <p style={{ color: '#28a745' }}>
+                <p style={{ margin: '5px 0' }}><strong>Total Pagado:</strong> C${(Number(paymentData.efectivo) + Number(paymentData.tarjeta) + Number(paymentData.transferencia)).toFixed(2)}</p>
+                <p style={{ margin: '5px 0', color: '#28a745', fontWeight: 'bold' }}>
                   <strong>Cambio:</strong> C${Math.max(0, Number(paymentData.efectivo) - paymentModal.order.total).toFixed(2)}
                 </p>
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
               <button
-                style={{...styles.button, flex: 1}}
-                onClick={() => setPaymentModal({ open: false, order: null })}
+                style={{...styles.button, flex: 1, background: '#6c757d', color: 'white'}}
+                onClick={() => {
+                  setPaymentModal({ open: false, order: null });
+                  setPaymentData({ efectivo: 0, tarjeta: 0, transferencia: 0 });
+                }}
               >
                 Cancelar
               </button>
