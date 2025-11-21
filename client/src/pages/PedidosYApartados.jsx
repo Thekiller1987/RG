@@ -53,7 +53,6 @@ const PedidosYApartados = () => {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [paymentModal, setPaymentModal] = useState({ open: false, order: null });
     const [loading, setLoading] = useState(false);
-    // NUEVO: Etiqueta temporal para el pedido
     const [temporaryTag, setTemporaryTag] = useState(''); 
     
     const tasaDolar = 1; 
@@ -188,11 +187,15 @@ const PedidosYApartados = () => {
                 estado: 'pendiente',
                 total: total,
                 subtotal: subtotal,
-                // --- CORRECCIÓN FINAL: Aseguramos el valor 0 para 'abonado'
+                
+                // === CORRECCIÓN FINAL: Redundancia para forzar el valor 0 en el backend ===
                 abonado: 0, 
-                // --- NUEVO: Etiqueta/Nota Temporal ---
+                abono_inicial: 0, // Nombre alternativo
+                pagado_inicial: 0, // Nombre alternativo
+                // ========================================================================
+                
                 etiqueta: temporaryTag,
-                // ------------------------------------
+                
                 items: cart.map(item => ({
                     producto_id: item.id_producto,
                     cantidad: item.cantidad,
@@ -210,15 +213,15 @@ const PedidosYApartados = () => {
             alert(`${tipo === 'pedido' ? 'Pedido' : 'Apartado'} #${createdOrder.id_pedido} creado exitosamente.`);
             
             setCart([]);
-            setTemporaryTag(''); // Limpia la etiqueta después de crear
+            setTemporaryTag(''); 
             loadOrders();
             setActiveTab(1);
             
         } catch (error) {
             // Manejo de errores más específico para el problema de la BD
             let errorMessage = 'Error desconocido.';
-            if (error.message && error.message.includes('Column \'abonado\' cannot be null')) {
-                errorMessage = 'Error de BD: Falta el campo "abonado" o es nulo. Asegúrate de que tu backend use el valor enviado.';
+            if (error.message && (error.message.includes('abonado') || error.message.includes('NULL'))) {
+                errorMessage = "Error de BD: Falta el campo 'abonado' o es nulo. Este es un problema de configuración en el servidor. Revisa que el campo 'abonado' en el backend tenga DEFAULT 0.";
             } else if (error.message) {
                 errorMessage = error.message;
             }
