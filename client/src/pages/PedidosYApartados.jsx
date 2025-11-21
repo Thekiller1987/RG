@@ -12,7 +12,7 @@ import axios from 'axios';
 /* =======================================
  * CONFIGURACIÓN Y ESTILOS
  * ======================================= */
-const API_URL = '/api'; // Asegúrate de que esta URL base sea correcta
+const API_URL = '/api'; 
 const ENDPOINT_ABIERTAS_ACTIVAS = `${API_URL}/caja/abiertas/activas`;
 
 const styles = { 
@@ -21,17 +21,20 @@ const styles = {
     tabs: { display: 'flex', marginBottom: '15px', background: 'white', padding: '5px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', overflowX: 'auto' },
     tab: { padding: '10px 15px', cursor: 'pointer', borderRadius: '6px', marginRight: '5px', transition: 'all 0.3s ease', whiteSpace: 'nowrap' },
     activeTab: { background: '#007bff', color: 'white', fontWeight: 'bold' },
+    // ** DISEÑO RESPONSIVE **
     panel: { 
         display: 'grid', 
         gridTemplateColumns: '1fr 1fr', 
         gap: '15px', 
-        '@media (max-width: 768px)': { gridTemplateColumns: '1fr' } 
+        '@media (max-width: 768px)': { 
+            gridTemplateColumns: '1fr', // 1 columna en móvil
+        } 
     },
     card: { border: '1px solid #ddd', borderRadius: '8px', padding: '15px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
     input: { width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '15px', boxSizing: 'border-box' },
     button: { padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', margin: '5px 0', fontSize: '15px', fontWeight: 'bold', transition: 'all 0.2s ease' },
-    productContainer: { maxHeight: '35vh', overflowY: 'auto', marginTop: '10px' },
-    clientContainer: { maxHeight: '20vh', overflowY: 'auto' },
+    productContainer: { maxHeight: '35vh', overflowY: 'auto', marginTop: '10px' }, // Alto fijo para productos
+    clientContainer: { maxHeight: '20vh', overflowY: 'auto' }, // Alto fijo para clientes
     productItem: { padding: '10px', marginBottom: '6px', borderRadius: '5px', cursor: 'pointer', background: '#f9f9f9', borderLeft: '4px solid #007bff00' },
     cartItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', borderBottom: '1px solid #eee', background: '#fafafa', borderRadius: '4px' },
     totalBar: { background: '#007bff', color: 'white', padding: '15px', borderRadius: '8px', marginTop: '15px', fontSize: '1.2rem' },
@@ -320,10 +323,10 @@ const PedidosYApartados = () => {
                 initialValue: selectedCustomer.nombre + ' - ' + new Date().toLocaleTimeString(),
                 inputType: 'text',
                 onConfirm: (pedidoName) => {
-                    // Cierre y siguiente paso dentro del PromptModal
                     // 2. Solicitar Selección de Caja
                     promptForCajaSelection(pedidoName.trim());
-                }
+                },
+                onClose: closeGenericModal // Permitir cerrar
             }
         });
     };
@@ -344,10 +347,10 @@ const PedidosYApartados = () => {
                 options: options,
                 initialValue: options[0]?.value,
                 onConfirm: (cajaId) => {
-                    // Cierre y siguiente paso dentro del PromptModal
                     // 3. Crear el Pedido final
                     handleCreateOrder('pedido', pedidoName, cajaId);
-                }
+                },
+                onClose: closeGenericModal // Permitir cerrar
             }
         });
     }
@@ -402,7 +405,7 @@ const PedidosYApartados = () => {
         } catch (error) {
             let errorMessage = 'Error desconocido.';
             if (error.message && (error.message.includes('abonado') || error.message.includes('NULL'))) {
-                errorMessage = "Error de BD: Falta el campo 'abonado' o es nulo. ¡Asegúrate de haber REINICIADO el servidor de DigitalOcean!";
+                errorMessage = "Error de BD: Falta el campo 'abonado' o es nulo. **¡Este error es de tu servidor (backend)!**";
             } else if (error.message) {
                 errorMessage = error.message;
             }

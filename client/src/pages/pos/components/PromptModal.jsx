@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FaQuestionCircle } from 'react-icons/fa';
 import { ModalOverlay, ModalContent, Button, SearchInput } from '../POS.styles.jsx'; 
 
 const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = 'text', initialValue = '', options = [] }) => {
-    // Usamos el estado interno para el valor del input/select
+    // 1. Inicialización de estado y referencia
     const [inputValue, setInputValue] = useState(initialValue);
+    const inputRef = useRef(null);
 
-    // ************ CORRECCIÓN CLAVE ************
-    // Actualiza el estado interno cada vez que la prop initialValue cambia y el modal está abierto
+    // 2. Sincronización y Enfoque (para asegurar edición)
     useEffect(() => {
         if (isOpen) {
             let initial = initialValue;
             
-            // Si es un selector y tiene opciones, asegúrate de que el valor inicial es válido.
+            // Lógica para inicializar el select con un valor válido
             if (inputType === 'select' && options.length > 0) {
                 const isValid = options.some(opt => String(opt.value) === String(initialValue));
                 if (!isValid) {
@@ -21,6 +21,16 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
             }
             
             setInputValue(initial);
+
+            // Forzar enfoque del input/select después de un pequeño retraso
+            const timeoutId = setTimeout(() => {
+                if (inputRef.current) {
+                    inputRef.current.focus();
+                }
+            }, 50); 
+            
+            return () => clearTimeout(timeoutId);
+
         }
     }, [isOpen, initialValue, inputType, options]);
 
@@ -34,8 +44,7 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
             if (isNaN(finalValue)) finalValue = 0;
         }
 
-        // Si es texto, asegúrate de que no esté vacío.
-        if (inputType === 'text' && !finalValue.trim()) {
+        if (inputType === 'text' && !String(finalValue).trim()) {
             alert("El nombre no puede estar vacío.");
             return;
         }
@@ -43,7 +52,6 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
         onConfirm(finalValue);
     };
 
-    // Renderizado del campo de entrada o selector
     const renderInput = () => {
         if (inputType === 'select') {
             return (
@@ -51,7 +59,7 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
                     as="select" 
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
-                    autoFocus
+                    ref={inputRef}
                     style={{ height: '40px', fontSize: '1rem', padding: '0 8px' }} 
                 >
                     {options.map((opt, index) => (
@@ -63,13 +71,12 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
             );
         }
         
-        // Renderizado normal (text o number)
         return (
             <SearchInput
                 type={inputType}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                autoFocus
+                ref={inputRef}
                 style={{ height: '40px', fontSize: '1rem' }}
             />
         );
