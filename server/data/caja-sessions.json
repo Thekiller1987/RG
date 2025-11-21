@@ -1018,6 +1018,115 @@
           }
         }
       ],
+      "closedAt": "2025-10-23T07:10:11.875Z",
+      "closedBy": {
+        "id": "3",
+        "name": "waskar"
+      },
+      "countedAmount": 123,
+      "difference": 0,
+      "notes": "",
+      "tasaDolar": 36.6
+    },
+    {
+      "id": "caja-2-1761203350522",
+      "openedAt": "2025-10-23T07:09:10.519Z",
+      "openedBy": {
+        "id": "2",
+        "name": "admin"
+      },
+      "initialAmount": 1,
+      "transactions": [],
+      "closedAt": "2025-10-23T07:09:30.798Z",
+      "closedBy": {
+        "id": "2",
+        "name": "admin"
+      },
+      "countedAmount": 1,
+      "difference": 0,
+      "notes": "",
+      "tasaDolar": 36.6
+    },
+    {
+      "id": "caja-3-1761265466157",
+      "openedAt": "2025-10-24T00:24:25.875Z",
+      "openedBy": {
+        "id": "3",
+        "name": "waskar"
+      },
+      "initialAmount": 1,
+      "transactions": [
+        {
+          "id": "venta-100",
+          "type": "venta_contado",
+          "amount": 3,
+          "note": "Venta #100 ",
+          "at": "2025-10-24T00:24:50.998Z",
+          "pagoDetalles": {
+            "totalVenta": 3,
+            "efectivo": 3,
+            "tarjeta": 0,
+            "transferencia": 0,
+            "dolares": 0,
+            "tasaDolarAlMomento": 36.6,
+            "referenciaTarjeta": null,
+            "credito": 0,
+            "clienteId": 1,
+            "tipoVenta": "contado",
+            "cambio": 0,
+            "ingresoCaja": 3,
+            "shouldPrintNow": true
+          }
+        }
+      ],
+      "closedAt": null,
+      "closedBy": null,
+      "countedAmount": null,
+      "difference": null,
+      "notes": "",
+      "tasaDolar": 36.6
+    },
+    {
+      "id": "caja-8-1761265850173",
+      "openedAt": "2025-10-24T00:30:49.907Z",
+      "openedBy": {
+        "id": "8",
+        "name": "caja"
+      },
+      "initialAmount": 1,
+      "transactions": [],
+      "closedAt": null,
+      "closedBy": null,
+      "countedAmount": null,
+      "difference": null,
+      "notes": "",
+      "tasaDolar": 36.6
+    },
+    {
+      "id": "caja-7-1761320453013",
+      "openedAt": "2025-10-24T15:40:52.374Z",
+      "openedBy": {
+        "id": "7",
+        "name": "WALTERRP"
+      },
+      "initialAmount": 100,
+      "transactions": [],
+      "closedAt": null,
+      "closedBy": null,
+      "countedAmount": null,
+      "difference": null,
+      "notes": "",
+      "tasaDolar": 36.55
+    },
+    {
+      "id": "caja-5-1761683170198",
+      "openedAt": "2025-10-28T20:26:08.944Z",
+      "openedBy": {
+        "id": "5",
+        "name": "RG7"
+      },
+      "initialAmount": 100,
+      "transactions": [],
       "closedAt": null,
       "closedBy": null,
       "countedAmount": null,
