@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import * as api from '../service/api.js';
-import { FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, FaMoneyBillWave, FaBoxOpen } from 'react-icons/fa';
-import PaymentModal from './pos/components/PaymentModal.jsx'; // 👈 Importamos tu modal de pago
+import { FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, FaMoneyBillWave, FaBoxOpen, FaEye, FaUsers } from 'react-icons/fa';
+import PaymentModal from './pos/components/PaymentModal.jsx'; 
 
 /* =======================================
  * 1. ESTILOS RESPONSIVE (PWA)
@@ -14,13 +14,18 @@ const styles = {
     tabs: { display: 'flex', marginBottom: '15px', background: 'white', padding: '5px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', overflowX: 'auto' },
     tab: { padding: '10px 15px', cursor: 'pointer', borderRadius: '6px', marginRight: '5px', transition: 'all 0.3s ease', whiteSpace: 'nowrap' },
     activeTab: { background: '#007bff', color: 'white', fontWeight: 'bold' },
-    panel: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', '@media (max-width: 768px)': { gridTemplateColumns: '1fr' } }, // 👈 Responsive
+    // Media Query para Responsiveness (Grid 2 columnas -> 1 columna)
+    panel: { 
+        display: 'grid', 
+        gridTemplateColumns: '1fr 1fr', 
+        gap: '15px', 
+        '@media (max-width: 768px)': { gridTemplateColumns: '1fr' } 
+    },
     card: { border: '1px solid #ddd', borderRadius: '8px', padding: '15px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
     input: { width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '15px', boxSizing: 'border-box' },
     button: { padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', margin: '5px 0', fontSize: '15px', fontWeight: 'bold', transition: 'all 0.2s ease', whiteSpace: 'nowrap' },
     // Específicos
     productItem: { padding: '10px', marginBottom: '6px', borderRadius: '5px', cursor: 'pointer', background: '#f9f9f9', borderLeft: '4px solid #007bff00' },
-    productItemHover: { background: '#e3f2fd', borderLeft: '4px solid #007bff' },
     cartItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', borderBottom: '1px solid #eee', background: '#fafafa', borderRadius: '4px' },
     totalBar: { background: '#007bff', color: 'white', padding: '15px', borderRadius: '8px', marginTop: '15px', fontSize: '1.2rem' },
     // Colores de Botones
@@ -29,7 +34,7 @@ const styles = {
     dangerButton: { background: '#dc3545', color: 'white', '&:hover': { background: '#bd2130' } },
 };
 
-// Función para formatear moneda
+// Función para formatear moneda de forma segura
 const fmt = (n) => `C$${Number(n ?? 0).toFixed(2)}`;
 
 /* =======================================
@@ -41,23 +46,25 @@ const PedidosYApartados = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [cart, setCart] = useState([]);
-    const [orders, setOrders] = useState([]);
+    const [allOrders, setAllOrders] = useState([]); // Almacena todas las órdenes
+    const [filteredOrders, setFilteredOrders] = useState([]); // Almacena órdenes filtradas para la vista
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [paymentModal, setPaymentModal] = useState({ open: false, order: null });
     const [loading, setLoading] = useState(false);
     
-    // Asumo que la tasa de dólar debe ser pasada al modal de pago (si no tienes un contexto para eso, es 1)
     const tasaDolar = 1; 
 
-    // Verificar roles de cobro (Cajero)
-    const canCollectPayment = useMemo(() => ['Administrador', 'Contador', 'Encargado de Finanzas', 'Cajero'].includes(currentUser?.rol), [currentUser]);
+    // Define roles
+    const rolesCajeroAdmin = useMemo(() => ['Administrador', 'Contador', 'Encargado de Finanzas', 'Cajero'], []);
+    const canCollectPayment = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser, rolesCajeroAdmin]);
+    const canViewAllOrders = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser, rolesCajeroAdmin]);
 
     /* ---- Cargar Órdenes ---- */
     const loadOrders = useCallback(async () => {
         setLoading(true);
         try {
             const ordersData = await api.fetchOrders(token);
-            setOrders(ordersData || []);
+            setAllOrders(ordersData || []);
         } catch (error) {
             console.error('Error cargando órdenes:', error);
         } finally {
@@ -69,6 +76,23 @@ const PedidosYApartados = () => {
         loadOrders();
     }, [loadOrders]);
 
+    /* ---- FILTRO DE ÓRDENES POR USUARIO (Implementación) ---- */
+    useEffect(() => {
+        // Filtra para que solo se muestren órdenes pendientes
+        const pendingOrders = allOrders.filter(o => o.estado !== 'completado');
+
+        if (canViewAllOrders) {
+            // Si tiene rol administrativo/caja, ve todas las órdenes pendientes
+            setFilteredOrders(pendingOrders);
+        } else {
+            // Si es un vendedor normal, solo ve sus propias órdenes pendientes
+            setFilteredOrders(
+                pendingOrders.filter(order => order.usuario_id === currentUser?.id_usuario)
+            );
+        }
+    }, [allOrders, canViewAllOrders, currentUser?.id_usuario]);
+
+
     /* ---- Derivados y Cálculos ---- */
     const filteredProducts = useMemo(() => allProducts.filter(product =>
         product.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -78,7 +102,7 @@ const PedidosYApartados = () => {
     const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.precio_unitario * item.cantidad), 0), [cart]);
     const total = subtotal; 
 
-    /* ---- Manejo de Carrito ---- */
+    /* ---- Manejo de Carrito (Lógica de añadir/quitar/actualizar) ---- */
     const handleAddToCart = useCallback((product) => {
         if ((product.existencia ?? 0) <= 0) {
             alert('Producto agotado');
@@ -88,7 +112,7 @@ const PedidosYApartados = () => {
         setCart(prev => {
             const existing = prev.find(item => item.id_producto === product.id_producto);
             const stock = product.existencia ?? 0;
-            const price = product.precio_venta ?? product.precio ?? 0; // 👈 Corrección de posible null/undefined
+            const price = product.precio_venta ?? product.precio ?? 0;
 
             if (existing) {
                 if (existing.cantidad >= stock) {
@@ -104,7 +128,7 @@ const PedidosYApartados = () => {
             return [...prev, {
                 ...product,
                 cantidad: 1,
-                precio_unitario: price // Usar el precio corregido
+                precio_unitario: price
             }];
         });
     }, []);
@@ -148,33 +172,55 @@ const PedidosYApartados = () => {
                 estado: 'pendiente',
                 total: total,
                 subtotal: subtotal,
+                // === CORRECCIÓN DEL ERROR DE LA BASE DE DATOS ===
+                abonado: 0, // Se inicializa a 0 para satisfacer la restricción 'cannot be null'
+                // ===============================================
                 items: cart.map(item => ({
                     producto_id: item.id_producto,
                     cantidad: item.cantidad,
                     precio_unitario: item.precio_unitario,
                     subtotal: item.precio_unitario * item.cantidad,
-                    nombre: item.nombre // Incluir nombre para el modal de pago/detalle
+                    nombre: item.nombre
                 })),
                 usuario_id: currentUser.id_usuario,
                 vendedor: currentUser.nombre_usuario,
-                cliente_nombre: selectedCustomer.nombre // Para mostrar en la lista de órdenes
+                cliente_nombre: selectedCustomer.nombre
             };
 
-            const createdOrder = await api.createOrder(orderData, token); // Asumo que devuelve la orden creada
+            const createdOrder = await api.createOrder(orderData, token);
             
             alert(`${tipo === 'pedido' ? 'Pedido' : 'Apartado'} #${createdOrder.id_pedido} creado exitosamente.`);
             
             setCart([]);
             setSelectedCustomer(null);
             loadOrders();
-            setActiveTab(1); // Mover a la pestaña de órdenes existentes
+            setActiveTab(1);
             
         } catch (error) {
             alert('Error al crear la orden: ' + (error.message || 'Error desconocido'));
         }
     };
 
-    /* ---- Finalizar Venta desde Modal (Manejador del PaymentModal) ---- */
+    /* ---- ELIMINAR/CANCELAR ORDEN (Ajustado a api.cancelOrder) ---- */
+    const handleDeleteOrder = async (orderId) => {
+        if (!window.confirm(`⚠️ ¿Estás seguro de que quieres CANCELAR la Orden #${orderId}? Esta acción no se puede deshacer y borrará el ticket del vendedor.`)) {
+            return;
+        }
+        setLoading(true);
+        try {
+            // Utilizamos api.cancelOrder que es la función disponible en tu api.js para eliminar/cancelar una orden.
+            await api.cancelOrder(orderId, token); 
+            alert(`Orden #${orderId} cancelada/eliminada correctamente.`);
+            loadOrders();
+        } catch (error) {
+            console.error('Error al cancelar orden:', error);
+            alert('Error al cancelar la orden: ' + (error.message || 'Desconocido'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    /* ---- Finalizar Venta desde Modal (Facturar Ticket) ---- */
     const handleFinishSaleFromModal = async (pagoDetalles) => {
         const orderToProcess = paymentModal.order;
 
@@ -185,6 +231,7 @@ const PedidosYApartados = () => {
                 totalVenta: orderToProcess.total,
                 subtotal: orderToProcess.subtotal,
                 descuento: 0, 
+                // Los items deberían venir ya desde la orden, pero los mapeamos para la estructura de venta:
                 items: orderToProcess.items.map(item => ({
                     id: item.producto_id,
                     quantity: item.cantidad,
@@ -192,25 +239,23 @@ const PedidosYApartados = () => {
                 })),
                 pagoDetalles: {
                     ...pagoDetalles,
-                    // Asegurar que el id del cliente y vendedor estén en los detalles
                     clientId: orderToProcess.cliente_id,
                     userId: currentUser.id_usuario,
                 },
                 userId: currentUser.id_usuario,
                 clientId: orderToProcess.cliente_id,
                 origen: orderToProcess.tipo === 'apartado' ? 'apartado' : 'pedido',
-                pedido_id: orderToProcess.id_pedido
+                pedido_id: orderToProcess.id_pedido // Usamos el ID del pedido/orden
             };
 
-            // 1. Crear la Venta
+            // 1. Crear la Venta (asumo que esto también liquida la orden en el backend)
             await api.createSale(saleData, token);
-
-            // 2. Actualizar el estado de la Orden a 'completado'
-            await api.updateOrderStatus(orderToProcess.id_pedido, 'completado', token);
+            
+            // NOTA: No se usa api.updateOrderStatus porque no está en tu api.js.
+            // Se asume que api.createSale marca la orden como completada en el backend.
 
             alert('✅ Pago procesado exitosamente. Venta registrada en el sistema.');
             
-            // Limpiar y Recargar
             setPaymentModal({ open: false, order: null });
             loadOrders();
 
@@ -231,8 +276,13 @@ const PedidosYApartados = () => {
                     <FaClipboardList /> Gestión de Órdenes
                 </h1>
                 {canCollectPayment && (
-                    <span style={{ ...styles.badge, background: '#28a745' }}>
+                    <span style={{ background: '#28a745', color: 'white', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
                         MODO CAJA
+                    </span>
+                )}
+                {!canViewAllOrders && (
+                    <span style={{ background: '#007bff', color: 'white', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
+                        <FaUsers /> MODO VENDEDOR
                     </span>
                 )}
             </div>
@@ -248,7 +298,7 @@ const PedidosYApartados = () => {
                     style={{...styles.tab, ...(activeTab === 1 ? styles.activeTab : {})}}
                     onClick={() => setActiveTab(1)}
                 >
-                    <FaBoxOpen /> Órdenes Existentes
+                    <FaBoxOpen /> Órdenes Existentes ({filteredOrders.filter(o => o.estado !== 'completado').length})
                 </div>
             </div>
 
@@ -377,17 +427,17 @@ const PedidosYApartados = () => {
             {/* Panel de Órdenes Existentes */}
             {activeTab === 1 && (
                 <div style={styles.card}>
-                    <h3 style={{ marginTop: 0, color: '#333' }}><FaBoxOpen /> Órdenes Existentes</h3>
+                    <h3 style={{ marginTop: 0, color: '#333' }}><FaBoxOpen /> Órdenes Pendientes</h3>
                     
                     {loading ? (
                         <div style={{ textAlign: 'center', padding: '20px' }}>Cargando órdenes...</div>
-                    ) : orders.filter(o => o.estado !== 'completado').length === 0 ? (
+                    ) : filteredOrders.length === 0 ? (
                         <div style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
-                            No hay órdenes pendientes
+                            No hay órdenes pendientes asignadas.
                         </div>
                     ) : (
                         <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                            {orders.filter(o => o.estado !== 'completado').map(order => (
+                            {filteredOrders.map(order => (
                                 <div
                                     key={order.id_pedido}
                                     style={{
@@ -403,7 +453,7 @@ const PedidosYApartados = () => {
                                         <div style={{ flex: 1 }}>
                                             <strong style={{ fontSize: '1.1rem' }}>{order.tipo?.toUpperCase()} #{order.id_pedido}</strong>
                                             <div style={{ fontSize: '14px', color: '#666', lineHeight: '1.4' }}>
-                                                Cliente: <strong>{order.cliente_nombre}</strong> | Total: <strong>{fmt(order.total)}</strong>
+                                                Cliente: <strong>{order.cliente_nombre}</strong> | Total: <strong>{fmt(order.total)}</strong> | Vendedor: {order.vendedor}
                                             </div>
                                         </div>
                                         <div style={{ display: 'flex', gap: '5px' }}>
@@ -412,7 +462,15 @@ const PedidosYApartados = () => {
                                                 onClick={() => setSelectedOrder(order)}
                                                 title="Ver detalles"
                                             >
-                                                👁️
+                                                <FaEye />
+                                            </button>
+                                            {/* Botón de CANCELAR (ELIMINAR) */}
+                                            <button 
+                                                style={{...styles.button, background: '#dc3545', color: 'white', padding: '8px'}}
+                                                onClick={() => handleDeleteOrder(order.id_pedido)}
+                                                title="Cancelar/Eliminar orden"
+                                            >
+                                                <FaTrashAlt />
                                             </button>
                                             {canCollectPayment && order.estado === 'pendiente' && (
                                                 <button 
@@ -434,8 +492,6 @@ const PedidosYApartados = () => {
 
             {/* Modal de Detalles (Mantengo tu estructura original) */}
             {selectedOrder && (
-                 // ... [Tu código original para el Modal de Detalles aquí] ...
-                 // Para mantenerlo conciso, asumo que este modal está bien y no requiere cambios
                 <div style={styles.modalOverlay} onClick={() => setSelectedOrder(null)}>
                     <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
                         <h2 style={{ marginTop: 0, color: '#333', borderBottom: '2px solid #007bff', paddingBottom: '10px' }}>
@@ -484,12 +540,10 @@ const PedidosYApartados = () => {
                     onClose={() => setPaymentModal({ open: false, order: null })}
                     onFinishSale={handleFinishSaleFromModal}
                     clientes={clients}
-                    // Provee un snapshot del carrito para coherencia en el modal de pago
                     cartSnapshot={paymentModal.order.items} 
                     currentUserId={currentUser.id_usuario}
                     initialClientId={String(paymentModal.order.cliente_id)}
                     orderSubtotal={paymentModal.order.subtotal}
-                    // Simulación de función showAlert si tu PaymentModal la espera
                     showAlert={({ title, message, type }) => alert(`${type.toUpperCase()}: ${title} - ${message}`)}
                 />
             )}
