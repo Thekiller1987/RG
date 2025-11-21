@@ -1,22 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { FaQuestionCircle } from 'react-icons/fa';
-// Asumo que ModalOverlay, ModalContent, Button, SearchInput vienen de aquí o están definidas globalmente
-// Si no, debes asegurar que estas importaciones son correctas para tu proyecto
 import { ModalOverlay, ModalContent, Button, SearchInput } from '../POS.styles.jsx'; 
 
 const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = 'text', initialValue = '', options = [] }) => {
-    // Estado interno para el valor del input/select
+    // Usamos el estado interno para el valor del input/select
     const [inputValue, setInputValue] = useState(initialValue);
 
-    // Inicializa el valor al abrir el modal
+    // ************ CORRECCIÓN CLAVE ************
+    // Actualiza el estado interno cada vez que la prop initialValue cambia y el modal está abierto
     useEffect(() => {
         if (isOpen) {
-            // Si es un selector y tiene opciones, usa el initialValue o el primer valor
+            let initial = initialValue;
+            
+            // Si es un selector y tiene opciones, asegúrate de que el valor inicial es válido.
             if (inputType === 'select' && options.length > 0) {
-                setInputValue(initialValue || options[0].value);
-            } else {
-                setInputValue(initialValue);
+                const isValid = options.some(opt => String(opt.value) === String(initialValue));
+                if (!isValid) {
+                    initial = options[0].value;
+                }
             }
+            
+            setInputValue(initial);
         }
     }, [isOpen, initialValue, inputType, options]);
 
@@ -25,12 +29,17 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
     const handleConfirm = () => {
         let finalValue = inputValue;
         
-        // Si es un número, intentamos parsear para enviar un número limpio
         if (inputType === 'number') {
-            finalValue = parseFloat(inputValue) || 0;
+            finalValue = parseFloat(inputValue);
+            if (isNaN(finalValue)) finalValue = 0;
         }
 
-        // Llamamos a la función de confirmación y cerramos
+        // Si es texto, asegúrate de que no esté vacío.
+        if (inputType === 'text' && !finalValue.trim()) {
+            alert("El nombre no puede estar vacío.");
+            return;
+        }
+
         onConfirm(finalValue);
     };
 
@@ -39,7 +48,7 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
         if (inputType === 'select') {
             return (
                 <SearchInput
-                    as="select" // Renderiza un elemento <select>
+                    as="select" 
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     autoFocus
