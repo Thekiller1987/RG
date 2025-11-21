@@ -26,7 +26,7 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
             const timeoutId = setTimeout(() => {
                 if (inputRef.current) {
                     inputRef.current.focus();
-                    // Seleccionar todo el texto si es para renombrar
+                    // Seleccionar todo el texto si es para renombrar (facilita la edición)
                     if (inputType === 'text' && inputRef.current.select) {
                         inputRef.current.select();
                     }
@@ -75,7 +75,6 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
             );
         }
         
-        // Renderizado normal (text o number)
         return (
             <SearchInput
                 type={inputType}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import * as api from '../service/api.js';
-import { FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, FaMoneyBillWave, FaBoxOpen, FaEye, FaUsers, FaTag, FaArrowLeft, FaFileInvoiceDollar, FaRegWindowClose } from 'react-icons/fa';
+import { FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, FaMoneyBillWave, FaBoxOpen, FaEye, FaUsers, FaTag, FaArrowLeft, FaFileInvoiceDollar, FaCheckCircle } from 'react-icons/fa';
 import PaymentModal from './pos/components/PaymentModal.jsx'; 
 import ConfirmationModal from './pos/components/ConfirmationModal.jsx'; 
 import TicketModal from './pos/components/TicketModal.jsx'; 
@@ -29,7 +29,6 @@ const styles = {
         display: 'grid', 
         gridTemplateColumns: '1fr 1fr', 
         gap: '15px', 
-        // Nota: El uso de @media requiere styled-components, pero se deja el grid para la estructura JSX
     },
     card: { border: '1px solid #ddd', borderRadius: '8px', padding: '15px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
     input: { width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '15px', boxSizing: 'border-box' },
