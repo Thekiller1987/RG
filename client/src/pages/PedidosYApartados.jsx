@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import * as api from '../service/api.js';
-import { FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, FaMoneyBillWave, FaBoxOpen, FaEye, FaUsers, FaTag, FaArrowLeft, FaFileInvoiceDollar } from 'react-icons/fa';
+import { FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, FaMoneyBillWave, FaBoxOpen, FaEye, FaUsers, FaTag, FaArrowLeft, FaFileInvoiceDollar, FaRegWindowClose } from 'react-icons/fa';
 import PaymentModal from './pos/components/PaymentModal.jsx'; 
 import ConfirmationModal from './pos/components/ConfirmationModal.jsx'; 
 import TicketModal from './pos/components/TicketModal.jsx'; 
@@ -15,6 +15,9 @@ import axios from 'axios';
 const API_URL = '/api'; 
 const ENDPOINT_ABIERTAS_ACTIVAS = `${API_URL}/caja/abiertas/activas`;
 
+const fmt = (n) => `C$${Number(n ?? 0).toFixed(2)}`;
+const resolveName = (x) => (x?.name || x?.nombre || x?.nombre_usuario || 'Usuario');
+
 const styles = { 
     container: { padding: '10px', fontFamily: 'Roboto, sans-serif', background: '#e9ecef', minHeight: '100vh' },
     header: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', padding: '10px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
@@ -26,48 +29,31 @@ const styles = {
         display: 'grid', 
         gridTemplateColumns: '1fr 1fr', 
         gap: '15px', 
-        '@media (max-width: 768px)': { 
-            gridTemplateColumns: '1fr', // 1 columna en móvil
-        } 
+        // Nota: El uso de @media requiere styled-components, pero se deja el grid para la estructura JSX
     },
     card: { border: '1px solid #ddd', borderRadius: '8px', padding: '15px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
     input: { width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '15px', boxSizing: 'border-box' },
     button: { padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', margin: '5px 0', fontSize: '15px', fontWeight: 'bold', transition: 'all 0.2s ease' },
-    productContainer: { maxHeight: '35vh', overflowY: 'auto', marginTop: '10px' }, // Alto fijo para productos
-    clientContainer: { maxHeight: '20vh', overflowY: 'auto' }, // Alto fijo para clientes
-    productItem: { padding: '10px', marginBottom: '6px', borderRadius: '5px', cursor: 'pointer', background: '#f9f9f9', borderLeft: '4px solid #007bff00' },
-    cartItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', borderBottom: '1px solid #eee', background: '#fafafa', borderRadius: '4px' },
-    totalBar: { background: '#007bff', color: 'white', padding: '15px', borderRadius: '8px', marginTop: '15px', fontSize: '1.2rem' },
+    productContainer: { maxHeight: '35vh', overflowY: 'auto', marginTop: '10px', paddingRight: '5px' },
+    clientContainer: { maxHeight: '20vh', overflowY: 'auto', paddingRight: '5px' },
+    productItem: { 
+        padding: '10px', marginBottom: '6px', borderRadius: '5px', cursor: 'pointer', background: '#f9f9f9', 
+        borderLeft: '4px solid #007bff00', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+    },
+    cartItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 8px', borderBottom: '1px solid #eee', background: '#fafafa', borderRadius: '4px' },
+    totalBar: { background: '#007bff', color: 'white', padding: '15px', borderRadius: '8px', marginTop: '15px', fontSize: '1.2rem', fontWeight: 'bold' },
     primaryButton: { background: '#007bff', color: 'white', '&:hover': { background: '#0056b3' } },
     successButton: { background: '#28a745', color: 'white', '&:hover': { background: '#1e7e34' } },
     dangerButton: { background: '#dc3545', color: 'white', '&:hover': { background: '#bd2130' } },
     modalOverlay: {
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0,0,0,0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', 
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
     },
     modalContent: {
-      background: 'white',
-      padding: '20px',
-      borderRadius: '8px',
-      maxWidth: '500px',
-      width: '90%',
-      maxHeight: '80vh',
-      overflow: 'auto',
-      boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
+      background: 'white', padding: '20px', borderRadius: '8px', maxWidth: '500px', 
+      width: '90%', maxHeight: '80vh', overflow: 'auto', boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
     },
 };
-
-const fmt = (n) => `C$${Number(n ?? 0).toFixed(2)}`;
-const resolveName = (x) => (x?.name || x?.nombre || x?.nombre_usuario || 'Usuario');
-// ----------------------------------------------------------------------------------
 
 /* =======================================
  * 2. COMPONENTE PRINCIPAL
@@ -82,22 +68,21 @@ const PedidosYApartados = () => {
     const [cart, setCart] = useState([]);
     const [allOrders, setAllOrders] = useState([]);
     const [filteredOrders, setFilteredOrders] = useState([]);
-    const [selectedOrder, setSelectedOrder] = useState(null);
-    const [paymentModal, setPaymentModal] = useState({ open: false, order: null });
     const [loading, setLoading] = useState(false);
     const [temporaryTag, setTemporaryTag] = useState(''); 
     
     const [modal, setModal] = useState({ name: null, props: {} });
     const [ticketData, setTicketData] = useState({ transaction: null, shouldOpen: false, printMode: '80' });
-    
     const [activeCajas, setActiveCajas] = useState([]); 
-    
+    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [paymentModal, setPaymentModal] = useState({ open: false, order: null });
+
     const tasaDolar = 1; 
 
     // Define roles
     const rolesCajeroAdmin = useMemo(() => ['Administrador', 'Contador', 'Encargado de Finanzas', 'Cajero'], []);
-    const canCollectPayment = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser, rolesCajeroAdmin]);
-    const canViewAllOrders = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser, rolesCajeroAdmin]);
+    const canCollectPayment = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser]);
+    const canViewAllOrders = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser]);
     const isCajeroOrAdmin = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser]);
 
     // Helper para cerrar el modal genérico
@@ -132,7 +117,7 @@ const PedidosYApartados = () => {
 
     // Función que pregunta por el formato de impresión
     const askForPrintOrder = useCallback((order) => {
-        const orderType = order.tipo === 'apartado' ? 'Apartado' : 'Pedido';
+        const orderType = 'Pedido';
         const saleId = order.id_pedido;
 
         const closeModals = () => setTicketData({ transaction: null, shouldOpen: false });
@@ -382,7 +367,6 @@ const PedidosYApartados = () => {
                 cliente_nombre: selectedCustomer.nombre
             };
 
-            // Cierra el modal de prompt antes de hacer la llamada a la API
             closeGenericModal(); 
 
             const createdOrder = await api.createOrder(orderData, token);
@@ -523,10 +507,11 @@ const PedidosYApartados = () => {
 
             {/* Panel de Nuevo Ticket */}
             {activeTab === 0 && (
-                <div style={styles.panel}>
+                <div style={{...styles.panel, '@media (max-width: 768px)': { gridTemplateColumns: '1fr' }}}>
+                    
                     {/* Columna Izquierda (Productos y Clientes) */}
-                    <div>
-                        <div style={{...styles.card, marginBottom: '15px'}}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        <div style={styles.card}>
                             <h3 style={{ marginTop: 0, color: '#333' }}><FaSearch /> Buscar Productos</h3>
                             <input
                                 type="text"
@@ -543,9 +528,10 @@ const PedidosYApartados = () => {
                                         style={styles.productItem}
                                         onClick={() => handleAddToCart(product)}
                                     >
-                                        <div style={{ fontWeight: 'bold' }}>{product.nombre}</div>
-                                        <div style={{ fontSize: '12px', color: '#666' }}>
-                                            Stock: {product.existencia ?? 0} | Precio: {fmt(product.precio_venta || product.precio)}
+                                        <div style={{ fontWeight: 'bold', fontSize: '15px' }}>{product.nombre}</div>
+                                        <div style={{ textAlign: 'right', fontSize: '13px' }}>
+                                            <span style={{ color: '#007bff', fontWeight: 'bold' }}>{fmt(product.precio_venta || product.precio)}</span>
+                                            <span style={{ color: '#666', marginLeft: '10px' }}>Stock: {product.existencia ?? 0}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -553,20 +539,23 @@ const PedidosYApartados = () => {
                         </div>
 
                         <div style={styles.card}>
-                            <h3 style={{ marginTop: 0, color: '#333' }}><FaUserTag /> Seleccionar Cliente</h3>
+                            <h3 style={{ marginTop: 0, color: '#333' }}><FaUserTag /> Cliente Seleccionado</h3>
                             <div style={styles.clientContainer}>
                                 {clients.map(client => (
                                     <div
                                         key={client.id_cliente}
                                         style={{
                                             ...styles.productItem,
+                                            justifyContent: 'flex-start',
+                                            gap: '10px',
                                             background: selectedCustomer?.id_cliente === client.id_cliente ? '#e3f2fd' : '#f9f9f9',
                                             borderLeft: selectedCustomer?.id_cliente === client.id_cliente ? '4px solid #007bff' : '4px solid #007bff00'
                                         }}
                                         onClick={() => setSelectedCustomer(client)}
                                     >
+                                        <FaCheckCircle color={selectedCustomer?.id_cliente === client.id_cliente ? '#28a745' : '#ccc'} size="1.2em" />
                                         <div style={{ fontWeight: 'bold' }}>{client.nombre}</div>
-                                        <div style={{ fontSize: '12px', color: '#666' }}>{client.telefono}</div>
+                                        <span style={{ fontSize: '12px', color: '#666' }}>({client.telefono})</span>
                                     </div>
                                 ))}
                             </div>
@@ -575,7 +564,7 @@ const PedidosYApartados = () => {
 
                     {/* Columna Derecha (Etiqueta, Carrito y Totales) */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        <div style={{...styles.card, flexGrow: 1}}>
+                        <div style={styles.card}>
                             <h3 style={{ marginTop: 0, color: '#333' }}><FaTag /> Etiqueta/Nota Temporal</h3>
                             <input
                                 type="text"
@@ -591,27 +580,27 @@ const PedidosYApartados = () => {
                             <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                                 {cart.length === 0 ? (
                                     <div style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
-                                        Agrega productos al ticket
+                                        El carrito está vacío. Agrega productos.
                                     </div>
                                 ) : (
                                     cart.map(item => (
                                         <div key={item.id_producto} style={styles.cartItem}>
                                             <div style={{ flex: 1 }}>
-                                                <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{item.nombre}</div>
+                                                <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>{item.nombre}</div>
                                                 <div style={{ fontSize: '12px', color: '#666' }}>
-                                                    {fmt(item.precio_unitario)} x {item.cantidad} = {fmt(item.precio_unitario * item.cantidad)}
+                                                    {fmt(item.precio_unitario)} x {item.cantidad} = <strong style={{ color: '#333' }}>{fmt(item.precio_unitario * item.cantidad)}</strong>
                                                 </div>
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                                 <button 
-                                                    style={{...styles.button, background: '#dc3545', color: 'white', padding: '5px 10px'}}
+                                                    style={{...styles.button, background: '#dc3545', color: 'white', padding: '5px 10px', width: '30px', height: '30px'}}
                                                     onClick={() => handleUpdateQuantity(item.id_producto, item.cantidad - 1)}
                                                 >
                                                     <FaMinus />
                                                 </button>
-                                                <span style={{ minWidth: '20px', textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>{item.cantidad}</span>
+                                                <span style={{ minWidth: '25px', textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>{item.cantidad}</span>
                                                 <button 
-                                                    style={{...styles.button, background: '#28a745', color: 'white', padding: '5px 10px'}}
+                                                    style={{...styles.button, background: '#28a745', color: 'white', padding: '5px 10px', width: '30px', height: '30px'}}
                                                     onClick={() => handleUpdateQuantity(item.id_producto, item.cantidad + 1)}
                                                 >
                                                     <FaPlus />
@@ -628,7 +617,7 @@ const PedidosYApartados = () => {
                                 <span>Subtotal:</span>
                                 <span>{fmt(subtotal)}</span>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.5rem', marginTop: '5px' }}>
                                 <span>TOTAL:</span>
                                 <span>{fmt(total)}</span>
                             </div>
