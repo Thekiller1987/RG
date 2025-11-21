@@ -24,11 +24,7 @@ const styles = {
     tabs: { display: 'flex', marginBottom: '15px', background: 'white', padding: '5px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', overflowX: 'auto' },
     tab: { padding: '10px 15px', cursor: 'pointer', borderRadius: '6px', marginRight: '5px', transition: 'all 0.3s ease', whiteSpace: 'nowrap' },
     activeTab: { background: '#007bff', color: 'white', fontWeight: 'bold' },
-    panel: { 
-        display: 'grid', 
-        gridTemplateColumns: '1fr 1fr', 
-        gap: '15px', 
-    },
+    panel: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' },
     card: { border: '1px solid #ddd', borderRadius: '8px', padding: '15px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
     input: { width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '15px', boxSizing: 'border-box' },
     button: { padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', margin: '5px 0', fontSize: '15px', fontWeight: 'bold', transition: 'all 0.2s ease' },
@@ -72,7 +68,7 @@ const PedidosYApartados = () => {
     const [modal, setModal] = useState({ name: null, props: {} });
     const [ticketData, setTicketData] = useState({ transaction: null, shouldOpen: false, printMode: '80' });
     
-    // 🔑 NUEVO: ID de la caja activa del usuario (solo necesita uno)
+    // 🔑 ID de la caja activa del usuario (solo necesita uno)
     const [cajaIdActual, setCajaIdActual] = useState(null); 
     
     const [selectedOrder, setSelectedOrder] = useState(null);
@@ -84,7 +80,8 @@ const PedidosYApartados = () => {
     const rolesCajeroAdmin = useMemo(() => ['Administrador', 'Contador', 'Encargado de Finanzas', 'Cajero'], []);
     const canCollectPayment = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser]);
     const canViewAllOrders = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser]);
-    const isCajeroOrAdmin = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser]);
+    // Permite la creación si es cualquier rol definido en rolesCajeroAdmin
+    const isCajeroOrAdmin = useMemo(() => rolesCajeroAdmin.includes(currentUser?.rol), [currentUser]); 
 
     // Helper para cerrar el modal genérico
     const closeGenericModal = () => setModal({ name: null, props: {} });
@@ -172,7 +169,7 @@ const PedidosYApartados = () => {
         }
     }, [token]);
 
-    // 2. Cargar Cajas Activas y ASIGNAR ID (solo la del usuario)
+    // 2. Cargar Cajas Activas y ASIGNAR ID ÚNICO
     const loadActiveCajas = useCallback(async () => {
         if (!token || !isCajeroOrAdmin) return;
         try {
@@ -181,13 +178,13 @@ const PedidosYApartados = () => {
             });
             const cajas = response.data?.abiertas || [];
             
-            // Asignar el ID de caja del usuario logueado
+            // Asignar el ID de caja del usuario logueado o la primera disponible
             const cajaDelUsuario = cajas.find(c => c.openedBy?.id === currentUser?.id_usuario);
             
             if (cajaDelUsuario) {
-                setCajaIdActual(cajaDelUsuario.id); // Guardamos el ID de la caja del usuario
+                setCajaIdActual(cajaDelUsuario.id); 
             } else if (cajas.length > 0) {
-                 // Si el usuario no tiene caja propia, usamos la primera si estamos en modo Caja
+                 // Si no encuentra la del usuario, usa la primera disponible (para cumplir el requisito de 1 caja)
                 setCajaIdActual(cajas[0].id); 
             } else {
                 setCajaIdActual(null);
@@ -292,8 +289,9 @@ const PedidosYApartados = () => {
 
     /* ---- Lógica de Creación de Pedido con Nombre (Flujo principal simplificado) ---- */
     const handleCreateOrderFlow = () => {
+        // 🛑 Permite la creación si es cualquier rol de caja
         if (!isCajeroOrAdmin) {
-             alert('Acceso Denegado: Solo Cajeros o Administradores pueden crear pedidos.');
+             alert('Acceso Denegado: Solo roles de caja (Cajero/Admin/Finanzas/Contador) pueden crear pedidos.');
              return;
         }
         if (!selectedCustomer) {
@@ -310,7 +308,7 @@ const PedidosYApartados = () => {
              return;
         }
         
-        // 1. Solicitar Nombre del Pedido
+        // 1. Solicitar Nombre del Pedido (único modal)
         setModal({
             name: 'prompt_name',
             props: {
@@ -337,7 +335,6 @@ const PedidosYApartados = () => {
                 total: total,
                 subtotal: subtotal,
                 
-                // 🛑 Si el error persiste en el backend, es porque requiere un ID de caja válido
                 abonado: 0, 
                 etiqueta: temporaryTag || pedidoName, 
                 nombre_pedido: pedidoName, 

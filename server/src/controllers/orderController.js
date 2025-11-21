@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 
-/* ───────────────────────── getOrders (ACTUALIZADO para nuevos campos) ───────────────────────── */
+/* ───────────────────────── getOrders ───────────────────────── */
 const getOrders = async (req, res) => {
     try {
         const userId = req.user?.id;
@@ -29,7 +29,7 @@ const getOrders = async (req, res) => {
                 o.etiqueta,      
                 o.nombre_pedido, 
                 o.tipo,
-                o.id_caja        /* Aseguramos que el ID de la caja se extrae */
+                o.id_caja        
             FROM pedidos o
             WHERE ${whereClause}
             ORDER BY o.fecha_creacion DESC
@@ -42,19 +42,18 @@ const getOrders = async (req, res) => {
     }
 };
 
-/* ───────────────────────── createOrder (CORREGIDO FINAL para inserción) ───────────────────────── */
+/* ───────────────────────── createOrder (CORRECCIÓN FINAL) ───────────────────────── */
 const createOrder = async (req, res) => {
     const { 
         items, total, subtotal, pagoDetalles, 
         
-        // 🔑 CORRECCIÓN CLAVE: Extraemos todos los campos que React envía con sus nombres
+        // Extracción de todos los campos que React envía
         id_cliente, cliente_nombre, id_usuario, vendedor, 
         abonado, id_caja, nombre_pedido, etiqueta,
-        tipo
+        tipo // <--- Campo 'tipo'
         
     } = req.body;
     
-    // Si el usuario no está en req.body, lo tomamos del token (req.user)
     const userId = id_usuario || req.user?.id; 
     const connection = await pool.getConnection();
     
@@ -63,21 +62,24 @@ const createOrder = async (req, res) => {
 
         // 1. Mapeamos abonado a un número seguro (0)
         const montoAbonado = Number(abonado) || 0; 
-        const estadoInicial = montoAbonado > 0 ? 'APARTADO' : 'PENDIENTE';
+        
+        // Determinar estado basado en el tipo (siempre PENDIENTE para un ticket recién creado)
+        const estadoInicial = 'PENDIENTE';
+        const tipoPedido = tipo || 'pedido'; // Aseguramos que el tipo no sea nulo
 
-        // 2. Construimos el objeto de inserción para la tabla `pedidos`
+        // 2. Construimos el objeto de inserción
         const pedidoData = {
             id_cliente: id_cliente || null,
             nombre_cliente: cliente_nombre || 'Consumidor Final',
             total_pedido: total,
             subtotal: subtotal,
             
-            // ✅ CAMPOS REQUERIDOS: Abonado, ID de Caja, Nombre y Etiqueta
+            // ✅ CAMPOS CORREGIDOS
             abonado: montoAbonado, 
             estado: estadoInicial,
-            tipo: tipo || 'pedido',
+            tipo: tipoPedido,
             
-            id_caja: id_caja, // ¡Ahora se extrae correctamente!
+            id_caja: id_caja, 
             nombre_pedido: nombre_pedido || null,
             etiqueta: etiqueta || null,
             
@@ -95,7 +97,6 @@ const createOrder = async (req, res) => {
         
         // 3. Insertar Detalle_pedidos y actualizar stock/reservado
         for (const item of items) {
-            // Aseguramos que solo usamos el ID del producto y no el objeto completo
             const productoId = item.producto_id || item.id_producto; 
             
             await connection.query(
@@ -110,7 +111,7 @@ const createOrder = async (req, res) => {
             );
         }
 
-        // 4. Registrar Abono (si aplica)
+        // 4. Registrar Abono (si aplica, aunque el frontend ahora solo envía 0)
         if (montoAbonado > 0) {
             await connection.query(
                 "INSERT INTO ventas (fecha, total_venta, estado, id_usuario, pago_detalles, tipo_venta, referencia_pedido) VALUES (NOW(), ?, 'ABONO', ?, ?, 'PEDIDO', ?)",
@@ -130,8 +131,8 @@ const createOrder = async (req, res) => {
         console.error('❌ ERROR CRÍTICO al crear pedido:', error);
         
         let msg = error.message || 'Error al crear el pedido';
-        if (msg.includes('id_caja')) {
-             msg = "Error de BD: Falta el campo 'id_caja'. Asegúrate de seleccionar una caja abierta.";
+        if (msg.includes('id_caja') || msg.includes('abonado')) {
+             msg = "Error de BD: El servidor falló al mapear un campo NOT NULL. Revise la definición de la tabla 'pedidos' y reinicie el servicio.";
         }
         
         res.status(500).json({ 
@@ -142,7 +143,7 @@ const createOrder = async (req, res) => {
     }
 };
 
-/* ───────────────────────── getOrderDetails (ACTUALIZADO para nuevos campos) ───────────────────────── */
+/* ───────────────────────── getOrderDetails ───────────────────────── */
 const getOrderDetails = async (req, res) => {
     const { id } = req.params;
     const { search } = req.query;
@@ -204,7 +205,7 @@ const getOrderDetails = async (req, res) => {
     }
 };
 
-/* ───────────────────────── addAbono, liquidarOrder, cancelOrder (Se mantienen) ───────────────────────── */
+/* ───────────────────────── addAbono ───────────────────────── */
 const addAbono = async (req, res) => {
     const { id } = req.params;
     const { monto, pagoDetalles } = req.body;
@@ -212,7 +213,7 @@ const addAbono = async (req, res) => {
     
     try {
         await connection.beginTransaction();
-        const [orderRows] = await connection.query('SELECT * FROM pedidos WHERE id_pedido = ? FOR UPDATE', [id]);
+        const [orderRows] = await pool.query('SELECT * FROM pedidos WHERE id_pedido = ? FOR UPDATE', [id]);
         
         if (orderRows.length === 0) {
             throw new Error('Pedido no encontrado');
@@ -226,9 +227,9 @@ const addAbono = async (req, res) => {
         }
         
         const nuevoAbonado = parseFloat(order.abonado) + parseFloat(monto);
-        await connection.query('UPDATE pedidos SET abonado = ? WHERE id_pedido = ?', [nuevoAbonado, id]);
+        await pool.query('UPDATE pedidos SET abonado = ? WHERE id_pedido = ?', [nuevoAbonado, id]);
         
-        await connection.query(
+        await pool.query(
             "INSERT INTO ventas (fecha, total_venta, estado, id_usuario, pago_detalles, tipo_venta, referencia_pedido) VALUES (NOW(), ?, 'ABONO', ?, ?, 'PEDIDO', ?)",
             [monto, req.user.id, JSON.stringify(pagoDetalles), id]
         );
@@ -245,6 +246,7 @@ const addAbono = async (req, res) => {
     }
 };
 
+/* ───────────────────────── liquidarOrder ───────────────────────── */
 const liquidarOrder = async (req, res) => {
     const { id } = req.params;
     const { pagoDetalles } = req.body;
@@ -252,7 +254,7 @@ const liquidarOrder = async (req, res) => {
     
     try {
         await connection.beginTransaction();
-        const [orderRows] = await connection.query('SELECT * FROM pedidos WHERE id_pedido = ? FOR UPDATE', [id]);
+        const [orderRows] = await pool.query('SELECT * FROM pedidos WHERE id_pedido = ? FOR UPDATE', [id]);
         
         if (orderRows.length === 0) {
             throw new Error('Pedido no encontrado');
@@ -261,12 +263,12 @@ const liquidarOrder = async (req, res) => {
         const order = orderRows[0];
         const saldoPendiente = parseFloat(order.total_pedido) - parseFloat(order.abonado);
         
-        await connection.query(
+        await pool.query(
             'UPDATE pedidos SET abonado = total_pedido, estado = "COMPLETADO" WHERE id_pedido = ?', 
             [id]
         );
         
-        await connection.query(
+        await pool.query(
             "INSERT INTO ventas (fecha, total_venta, estado, id_usuario, pago_detalles, tipo_venta, referencia_pedido) VALUES (NOW(), ?, 'LIQUIDACIÓN', ?, ?, 'PEDIDO', ?)",
             [saldoPendiente, req.user.id, JSON.stringify(pagoDetalles), id]
         );
@@ -291,13 +293,14 @@ const liquidarOrder = async (req, res) => {
     }
 };
 
+/* ───────────────────────── cancelOrder ───────────────────────── */
 const cancelOrder = async (req, res) => {
     const { id } = req.params;
     const connection = await pool.getConnection();
     
     try {
         await connection.beginTransaction();
-        const [orderRows] = await connection.query(
+        const [orderRows] = await pool.query(
             'SELECT * FROM pedidos WHERE id_pedido = ? AND estado != "CANCELADO"', 
             [id]
         );
@@ -311,13 +314,13 @@ const cancelOrder = async (req, res) => {
 
         const [items] = await pool.query('SELECT * FROM detalle_pedidos WHERE id_pedido = ?', [id]);
         for (const item of items) {
-            await connection.query(
+            await pool.query(
                 'UPDATE productos SET stock_reservado = stock_reservado - ?, existencia = existencia + ? WHERE id_producto = ?', 
                 [item.cantidad, item.cantidad, item.id_producto]
             );
         }
         
-        await connection.query(
+        await pool.query(
             'UPDATE pedidos SET estado = "CANCELADO" WHERE id_pedido = ?', 
             [id]
         );
@@ -337,6 +340,7 @@ const cancelOrder = async (req, res) => {
         if (connection) connection.release();
     }
 };
+
 
 module.exports = {
     getOrders,

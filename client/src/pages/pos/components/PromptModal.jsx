@@ -3,14 +3,15 @@ import { FaQuestionCircle } from 'react-icons/fa';
 import { ModalOverlay, ModalContent, Button, SearchInput } from '../POS.styles.jsx'; 
 
 const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = 'text', initialValue = '', options = [] }) => {
+    
     // 1. Inicialización de estado y referencia
-    const [inputValue, setInputValue] = useState(initialValue);
+    const [inputValue, setInputValue] = useState(initialValue || '');
     const inputRef = useRef(null);
 
     // 2. Sincronización y Enfoque (para asegurar edición)
     useEffect(() => {
         if (isOpen) {
-            let initial = initialValue;
+            let initial = initialValue || '';
             
             // Lógica para inicializar el select con un valor válido
             if (inputType === 'select' && options.length > 0) {
@@ -22,11 +23,10 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
             
             setInputValue(initial);
 
-            // Forzar enfoque del input/select después de un pequeño retraso
+            // Forzar enfoque del input/select
             const timeoutId = setTimeout(() => {
                 if (inputRef.current) {
                     inputRef.current.focus();
-                    // Seleccionar todo el texto si es para renombrar (facilita la edición)
                     if (inputType === 'text' && inputRef.current.select) {
                         inputRef.current.select();
                     }
@@ -61,7 +61,7 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
             return (
                 <SearchInput
                     as="select" 
-                    value={inputValue}
+                    value={inputValue || ''} 
                     onChange={(e) => setInputValue(e.target.value)}
                     ref={inputRef}
                     style={{ height: '40px', fontSize: '1rem', padding: '0 8px' }} 
