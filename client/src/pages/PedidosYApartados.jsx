@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import * as api from '../service/api.js';
 import { 
     FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, 
-    FaFileInvoiceDollar, FaCheckCircle, FaClipboardCheck, FaArrowLeft
+    FaFileInvoiceDollar, FaCheckCircle, FaArrowLeft, FaClipboardCheck
 } from 'react-icons/fa';
 // Importamos solo los modales necesarios para la creación
 import ConfirmationModal from './pos/components/ConfirmationModal.jsx'; 
@@ -25,10 +25,10 @@ const styles = {
     container: { padding: '10px', fontFamily: 'Roboto, sans-serif', background: '#e9ecef', minHeight: '100vh' },
     header: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', padding: '10px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
     
-    // Simplificamos el layout para una sola ventana POS de creación
+    // Panel Responsive: 2 columnas en desktop, 1 columna en móvil
     panel: { 
         display: 'grid', 
-        gridTemplateColumns: '1fr 1fr', 
+        gridTemplateColumns: 'minmax(300px, 1fr) 1fr', /* Ajuste para que la columna izquierda sea más flexible */
         gap: '15px', 
         '@media (max-width: 768px)': { 
             gridTemplateColumns: '1fr' 
@@ -64,7 +64,6 @@ const PedidosYApartados = () => {
     const navigate = useNavigate(); 
     
     const { currentUser, clients, products: allProducts, token } = useAuth();
-    // Eliminamos activeTab y el manejo de órdenes pendientes
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [cart, setCart] = useState([]); // Carrito activo
@@ -74,10 +73,9 @@ const PedidosYApartados = () => {
     const [modal, setModal] = useState({ name: null, props: {} });
     const [ticketData, setTicketData] = useState({ transaction: null, shouldOpen: false, printMode: '80' });
     
-    // Lista de todas las cajas activas disponibles para seleccionar
     const [activeCajas, setActiveCajas] = useState([]); 
     
-    const tasaDolar = 1; // Simplificamos la tasa
+    const tasaDolar = 1; 
     
     // Helper para cerrar el modal genérico
     const closeGenericModal = () => setModal({ name: null, props: {} });
@@ -127,7 +125,7 @@ const PedidosYApartados = () => {
         }
     }, [clients, selectedCustomer]);
 
-    /* ---------------------- CÁLCULOS Y LÓGICA DE CARRITO ---------------------- */
+    /* ---------------------- CÁLCULOS Y LÓGICA DE CARRITO (Autocontenido) ---------------------- */
 
     const filteredProducts = useMemo(() => allProducts.filter(product =>
         product.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -137,7 +135,7 @@ const PedidosYApartados = () => {
     const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.precio_unitario * item.cantidad), 0), [cart]);
     const total = subtotal; 
 
-    // Agrega o incrementa la cantidad de un producto
+    // 🔑 FUNCIÓN CORREGIDA: Agrega o incrementa la cantidad de un producto.
     const handleAddToCart = useCallback((product) => {
         const stock = product.existencia ?? 0;
         if (stock <= 0) {
@@ -152,6 +150,7 @@ const PedidosYApartados = () => {
             const existingIndex = prev.findIndex(item => item.id_producto === productIdKey);
             
             if (existingIndex !== -1) {
+                // Si ya existe, actualizamos la cantidad
                 const existing = prev[existingIndex];
                 const newQuantity = existing.cantidad + 1;
                 
@@ -166,7 +165,7 @@ const PedidosYApartados = () => {
                         : item
                 );
             }
-            // Si es un ítem nuevo
+            // Si es un ítem nuevo, lo agregamos
             return [...prev, {
                 ...product,
                 cantidad: 1,
@@ -178,7 +177,7 @@ const PedidosYApartados = () => {
         });
     }, [showAlert]);
 
-    // Actualiza cantidad o elimina si es <= 0
+    // 🔑 FUNCIÓN CORREGIDA: Actualiza cantidad o elimina si es <= 0.
     const handleUpdateQuantity = useCallback((productId, newQuantity) => {
         const numQuantity = parseInt(newQuantity, 10) || 0;
 
@@ -188,6 +187,8 @@ const PedidosYApartados = () => {
         }
 
         const productData = allProducts.find(p => p.id_producto === productId);
+        if (!productData) return; 
+        
         if (numQuantity > (productData?.existencia ?? 0)) {
             showAlert({ title: "Stock Insuficiente", message: `Máximo ${productData.existencia} unidades disponibles.` });
             return;
@@ -226,7 +227,7 @@ const PedidosYApartados = () => {
                 // Usamos JSX en el mensaje para inyectar los campos custom
                 message: (
                     <>
-                        <p style={{marginBottom: '15px'}}>Selecciona la caja de destino y asigna un nombre al ticket.</p>
+                        <p style={{marginBottom: '15px'}}>Selecciona la caja de destino y asigna un nombre/referencia al ticket.</p>
                         
                         <label htmlFor="cajaSelect" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
                             Caja a Asignar: <span style={{color: '#007bff'}}>(Hay {activeCajas.length} cajas activas)</span>
@@ -286,12 +287,12 @@ const PedidosYApartados = () => {
         try {
             const orderData = {
                 cliente_id: selectedCustomer.id_cliente,
-                tipo: tipo, // 'pedido'
+                tipo: tipo, 
                 estado: 'pendiente',
                 total: total,
                 subtotal: subtotal,
                 
-                // Datos requeridos por el backend para pedidos/tickets
+                // Datos requeridos por el backend
                 abonado: 0, 
                 etiqueta: temporaryTag || pedidoName, 
                 nombre_pedido: pedidoName, 
@@ -313,20 +314,19 @@ const PedidosYApartados = () => {
             
             showAlert({ title: "Ticket Guardado", message: `Ticket #${createdOrder.id_pedido} guardado con éxito y asignado a la Caja ID: ${idCaja}.` });
             
-            // Prepara los datos para la impresión (simulación de POS)
+            // Prepara los datos para la impresión 
             const orderWithDetails = { 
                 ...orderData, 
                 id_pedido: createdOrder.id_pedido, 
                 created_at: new Date().toISOString(), 
                 tipo,
-                id_caja: idCaja // Aseguramos que la caja esté en el objeto para el modal
+                id_caja: idCaja
             };
             askForPrintOrder(orderWithDetails); 
 
             // Limpiar y resetear el estado local
             setCart([]);
             setTemporaryTag(''); 
-            loadActiveCajas(); // Recargar cajas por si acaso (aunque no es estrictamente necesario aquí)
             
         } catch (error) {
             setLoading(false);
@@ -353,11 +353,11 @@ const PedidosYApartados = () => {
             usuarioNombre: order.vendedor,
             tipoVenta: order.tipo,
             tasaDolarAlMomento: tasaDolar,
-            isProforma: true, // Lo tratamos como un comprobante de orden/proforma
+            isProforma: true, 
             pagoDetalles: { efectivo: 0, tarjeta: 0, credito: 0, cambio: 0, ingresoCaja: 0 },
             notes: order.etiqueta || order.nombre_pedido || '',
             at: order.created_at || new Date().toISOString(),
-            cajaId: order.id_caja, // Mostramos la caja asignada en el ticket
+            cajaId: order.id_caja, 
         };
 
         setTicketData({ 
@@ -585,7 +585,7 @@ const PedidosYApartados = () => {
                     isOpen={true}
                     onClose={closeGenericModal}
                     onConfirm={(value) => {
-                        // El onConfirm del modal llama a la lógica de extracción del DOM y luego a handleCreateOrder
+                        // Llama a la lógica de extracción del DOM y confirmación
                         modal.props.onConfirm(value);
                     }}
                     title={modal.props.title}
