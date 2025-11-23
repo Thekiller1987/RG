@@ -5,7 +5,6 @@ import {
     FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, 
     FaFileInvoiceDollar, FaCheckCircle, FaArrowLeft, FaClipboardCheck
 } from 'react-icons/fa';
-// Importamos solo los modales necesarios para la creación
 import ConfirmationModal from './pos/components/ConfirmationModal.jsx'; 
 import TicketModal from './pos/components/TicketModal.jsx'; 
 import PromptModal from './pos/components/PromptModal.jsx'; 
@@ -25,10 +24,9 @@ const styles = {
     container: { padding: '10px', fontFamily: 'Roboto, sans-serif', background: '#e9ecef', minHeight: '100vh' },
     header: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', padding: '10px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
     
-    // Panel Responsive: 2 columnas en desktop, 1 columna en móvil
     panel: { 
         display: 'grid', 
-        gridTemplateColumns: 'minmax(300px, 1fr) 1fr', /* Ajuste para que la columna izquierda sea más flexible */
+        gridTemplateColumns: 'minmax(300px, 1fr) 1fr', 
         gap: '15px', 
         '@media (max-width: 768px)': { 
             gridTemplateColumns: '1fr' 
@@ -93,7 +91,6 @@ const PedidosYApartados = () => {
             const response = await axios.get(ENDPOINT_ABIERTAS_ACTIVAS, { 
                 headers: { 'Authorization': `Bearer ${token}` } 
             });
-            // Adaptar la respuesta del servidor al formato de opciones
             const cajas = (response.data?.abiertas || [])
                 .filter(c => !c.closedAt) 
                 .map(c => ({
@@ -125,7 +122,7 @@ const PedidosYApartados = () => {
         }
     }, [clients, selectedCustomer]);
 
-    /* ---------------------- CÁLCULOS Y LÓGICA DE CARRITO (Autocontenido) ---------------------- */
+    /* ---------------------- CÁLCULOS Y LÓGICA DE CARRITO (CORREGIDO CON CÓDIGO) ---------------------- */
 
     const filteredProducts = useMemo(() => allProducts.filter(product =>
         product.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -135,7 +132,11 @@ const PedidosYApartados = () => {
     const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.precio_unitario * item.cantidad), 0), [cart]);
     const total = subtotal; 
 
-    // 🔑 FUNCIÓN CORREGIDA: Agrega o incrementa la cantidad de un producto.
+    // **FUNCIÓN CORREGIDA:** Usa 'codigo' o 'codigo_barras' como clave UNICA para el carrito.
+    const getProductKey = (product) => {
+        return String(product.codigo || product.codigo_barras || product.id_producto);
+    };
+
     const handleAddToCart = useCallback((product) => {
         const stock = product.existencia ?? 0;
         if (stock <= 0) {
@@ -143,11 +144,13 @@ const PedidosYApartados = () => {
             return;
         }
         
-        const productIdKey = product.id_producto; 
+        // 🔑 CLAVE ÚNICA BASADA EN CÓDIGO:
+        const productKey = getProductKey(product);
         const price = product.precio_venta ?? product.precio ?? 0;
 
         setCart(prev => {
-            const existingIndex = prev.findIndex(item => item.id_producto === productIdKey);
+            // Busca la POSICIÓN usando la CLAVE ÚNICA (el código)
+            const existingIndex = prev.findIndex(item => item.productKey === productKey);
             
             if (existingIndex !== -1) {
                 // Si ya existe, actualizamos la cantidad
@@ -168,26 +171,31 @@ const PedidosYApartados = () => {
             // Si es un ítem nuevo, lo agregamos
             return [...prev, {
                 ...product,
+                productKey: productKey, // <-- CLAVE INTERNA PARA SEGUIMIENTO
                 cantidad: 1,
                 precio_unitario: price,
-                id_producto: productIdKey,
+                id_producto: product.id_producto, // Mantener id_producto para el backend
                 nombre: product.nombre,
                 precio: price 
             }];
         });
     }, [showAlert]);
 
-    // 🔑 FUNCIÓN CORREGIDA: Actualiza cantidad o elimina si es <= 0.
-    const handleUpdateQuantity = useCallback((productId, newQuantity) => {
+    // **FUNCIÓN CORREGIDA:** Actualiza cantidad o elimina, usando la CLAVE INTERNA (productKey).
+    const handleUpdateQuantity = useCallback((productKey, newQuantity) => {
         const numQuantity = parseInt(newQuantity, 10) || 0;
 
+        // Necesitamos encontrar el producto base para validar el stock
+        const cartItem = cart.find(item => item.productKey === productKey);
+        if (!cartItem) return;
+        
+        const productData = allProducts.find(p => String(p.id_producto) === String(cartItem.id_producto));
+        if (!productData) return; 
+
         if (numQuantity < 1) {
-            setCart(prev => prev.filter(item => item.id_producto !== productId));
+            setCart(prev => prev.filter(item => item.productKey !== productKey));
             return;
         }
-
-        const productData = allProducts.find(p => p.id_producto === productId);
-        if (!productData) return; 
         
         if (numQuantity > (productData?.existencia ?? 0)) {
             showAlert({ title: "Stock Insuficiente", message: `Máximo ${productData.existencia} unidades disponibles.` });
@@ -196,12 +204,12 @@ const PedidosYApartados = () => {
 
         setCart(prev =>
             prev.map(item =>
-                item.id_producto === productId
+                item.productKey === productKey
                     ? { ...item, cantidad: numQuantity, subtotal: item.precio_unitario * numQuantity }
                     : item
             )
         );
-    }, [allProducts, showAlert]);
+    }, [allProducts, showAlert, cart]);
 
     /* ---------------------- CREACIÓN DE TICKET (FUNCIÓN POS CLONADA) ---------------------- */
 
@@ -272,14 +280,13 @@ const PedidosYApartados = () => {
                     // Llama a la función final de guardado con los datos
                     handleCreateOrder('pedido', newName, selectedCajaId);
                 },
-                inputType: 'custom', // Indica a PromptModal que renderice el JSX en 'message'
+                inputType: 'custom', 
                 closeLabel: 'Cancelar',
                 confirmLabel: 'Guardar Ticket'
             }
         });
     };
 
-    /* ---- Crear Orden (Función Final - Similar a POS.jsx) ---- */
     const handleCreateOrder = async (tipo, pedidoName, idCaja) => {
         closeGenericModal();
         setLoading(true);
@@ -292,12 +299,12 @@ const PedidosYApartados = () => {
                 total: total,
                 subtotal: subtotal,
                 
-                // Datos requeridos por el backend
                 abonado: 0, 
                 etiqueta: temporaryTag || pedidoName, 
                 nombre_pedido: pedidoName, 
                 id_caja: idCaja, 
                 
+                // Mapeamos a la estructura del backend, usando id_producto y cantidad
                 items: cart.map(item => ({
                     producto_id: item.id_producto,
                     cantidad: item.cantidad,
@@ -314,7 +321,6 @@ const PedidosYApartados = () => {
             
             showAlert({ title: "Ticket Guardado", message: `Ticket #${createdOrder.id_pedido} guardado con éxito y asignado a la Caja ID: ${idCaja}.` });
             
-            // Prepara los datos para la impresión 
             const orderWithDetails = { 
                 ...orderData, 
                 id_pedido: createdOrder.id_pedido, 
@@ -324,7 +330,6 @@ const PedidosYApartados = () => {
             };
             askForPrintOrder(orderWithDetails); 
 
-            // Limpiar y resetear el estado local
             setCart([]);
             setTemporaryTag(''); 
             
@@ -340,7 +345,6 @@ const PedidosYApartados = () => {
     /* ---- LÓGICA DE IMPRESIÓN (copia del POS original) ---- */
 
     const openTicketWithOrder = useCallback((order, printMode = '80') => {
-        // Adaptación de los campos de orden a la estructura esperada por TicketModal
         const transaction = {
             id: order.id_pedido, 
             saleId: order.id_pedido,
@@ -441,7 +445,8 @@ const PedidosYApartados = () => {
                         <div style={styles.productContainer}>
                             {filteredProducts.map(product => (
                                 <div
-                                    key={product.id_producto}
+                                    // Usamos el ID del producto (aunque internamente se usa el código)
+                                    key={product.id_producto} 
                                     style={styles.productItem}
                                     onClick={() => handleAddToCart(product)}
                                 >
@@ -491,7 +496,7 @@ const PedidosYApartados = () => {
                                 </div>
                             ) : (
                                 cart.map(item => (
-                                    <div key={item.id_producto} style={styles.cartItem}>
+                                    <div key={item.productKey} style={styles.cartItem}>
                                         <div style={{ flex: 1 }}>
                                             <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>{item.nombre}</div>
                                             <div style={{ fontSize: '12px', color: '#666' }}>
@@ -502,20 +507,20 @@ const PedidosYApartados = () => {
                                             {/* Botones de Cantidad */}
                                             <button 
                                                 style={{...styles.button, background: '#dc3545', color: 'white', padding: '5px 10px', width: '30px', height: '30px'}}
-                                                onClick={() => handleUpdateQuantity(item.id_producto, item.cantidad - 1)}
+                                                onClick={() => handleUpdateQuantity(item.productKey, item.cantidad - 1)}
                                             >
                                                 <FaMinus />
                                             </button>
                                             <span style={{ minWidth: '25px', textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>{item.cantidad}</span>
                                             <button 
                                                 style={{...styles.button, background: '#28a745', color: 'white', padding: '5px 10px', width: '30px', height: '30px'}}
-                                                onClick={() => handleUpdateQuantity(item.id_producto, item.cantidad + 1)}
+                                                onClick={() => handleUpdateQuantity(item.productKey, item.cantidad + 1)}
                                             >
                                                 <FaPlus />
                                             </button>
                                             <button
                                                 style={{...styles.button, background: 'none', border: '1px solid #dc3545', color: '#dc3545', padding: '5px', width: '30px', height: '30px'}}
-                                                onClick={() => handleUpdateQuantity(item.id_producto, 0)} // Eliminar
+                                                onClick={() => handleUpdateQuantity(item.productKey, 0)} // Eliminar
                                             >
                                                 <FaTrashAlt size={12}/>
                                             </button>
@@ -585,7 +590,6 @@ const PedidosYApartados = () => {
                     isOpen={true}
                     onClose={closeGenericModal}
                     onConfirm={(value) => {
-                        // Llama a la lógica de extracción del DOM y confirmación
                         modal.props.onConfirm(value);
                     }}
                     title={modal.props.title}
