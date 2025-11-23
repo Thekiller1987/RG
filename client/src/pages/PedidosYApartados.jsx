@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useAuth } from '../../context/AuthContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx'; // Ruta de importación mantenida
 import * as api from '../../service/api.js';
 import { 
     FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, 
     FaFileInvoiceDollar, FaCheckCircle, FaArrowLeft, FaClipboardCheck, FaSignature
 } from 'react-icons/fa';
-import { Button, TotalsRow, SearchInput, PanelCard, CartItemWrapper } from './POS.styles.jsx'; 
+import { Button, TotalsRow, SearchInput, ModalOverlay, ModalContent, PanelCard, CartItemWrapper } from './POS.styles.jsx'; 
 import ConfirmationModal from './pos/components/ConfirmationModal.jsx'; 
 import TicketModal from './pos/components/TicketModal.jsx'; 
 import PromptModal from './pos/components/PromptModal.jsx'; 
@@ -29,9 +29,6 @@ const localStyles = {
         display: 'grid', 
         gridTemplateColumns: 'minmax(300px, 1fr) 1fr', 
         gap: '15px', 
-        '@media (max-width: 768px)': { 
-            gridTemplateColumns: '1fr' 
-        }
     },
 
     productContainer: { maxHeight: '60vh', overflowY: 'auto', marginTop: '10px', paddingRight: '5px' },
@@ -118,12 +115,10 @@ const PedidosYApartados = () => {
     
     /* ---------------------- LÓGICA DE CARRITO (CLAVE: CÓDIGO) ---------------------- */
 
-    // FUNCIÓN DE CLAVE ÚNICA: Usa 'codigo' o 'codigo_barras' como identificador
     const getProductKey = (product) => {
         return String(product.codigo || product.codigo_barras || product.id_producto || `temp-id-${Date.now()}`);
     };
 
-    // FUNCIÓN CORREGIDA: Añadir producto usando la CLAVE ÚNICA (CÓDIGO)
     const handleAddToCart = useCallback((product) => {
         const stock = product.existencia ?? 0;
         if (stock <= 0) {
@@ -164,7 +159,6 @@ const PedidosYApartados = () => {
         });
     }, [showAlert]);
 
-    // FUNCIÓN CORREGIDA: Actualiza cantidad usando la CLAVE INTERNA (productKey).
     const handleUpdateQuantity = useCallback((productKey, newQuantity) => {
         const numQuantity = parseInt(newQuantity, 10) || 0;
 
@@ -220,7 +214,7 @@ const PedidosYApartados = () => {
                 message: (
                     <>
                         <p style={{marginBottom: '10px', fontWeight: 600}}>
-                            <span style={{ color: '#007bff' }}>El ticket se asignará automáticamente a las {activeCajaIds.length} cajas activas.</span>
+                            <span style={{ color: '#007bff' }}>Este ticket se asignará automáticamente a las {activeCajaIds.length} cajas activas.</span>
                         </p>
                         <ul style={{ listStyleType: 'none', padding: 0, margin: '10px 0', fontSize: '0.85em', maxHeight: '100px', overflowY: 'auto', border: '1px solid #ddd', padding: '8px', borderRadius: '4px' }}>
                             {activeCajas.map(c => <li key={c.id} style={{ padding: '3px 0', color: '#333' }}>
@@ -552,7 +546,6 @@ const PedidosYApartados = () => {
                     isOpen={true}
                     onClose={closeGenericModal}
                     onConfirm={() => {
-                        // El padre lee el DOM y cierra el modal
                         modal.props.onConfirm();
                     }}
                     title={modal.props.title}

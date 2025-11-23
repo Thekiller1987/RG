@@ -3,11 +3,9 @@ import { FaQuestionCircle } from 'react-icons/fa';
 import { ModalOverlay, ModalContent, Button, SearchInput } from '../POS.styles.jsx'; 
 
 const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = 'text', initialValue = '', options = [], closeLabel = 'Cancelar', confirmLabel = 'Aceptar' }) => {
-    // Estado interno para inputs simples (text, number, select)
     const [inputValue, setInputValue] = useState(initialValue);
     const inputRef = useRef(null);
 
-    // Sincronización y Enfoque (Restablecer estado y enfocar input)
     useEffect(() => {
         if (isOpen) {
             let initial = initialValue;
@@ -26,7 +24,6 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
                         inputRef.current.select();
                     }
                 } else if (inputType === 'custom') {
-                    // Si es custom, intentamos enfocar el campo 'ticketName' que se inyecta
                     const customInput = document.getElementById('ticketName');
                     if (customInput) customInput.focus();
                 }
@@ -40,12 +37,10 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
 
     const handleConfirm = () => {
         if (inputType === 'custom') {
-            // Para inputs custom, llamamos a onConfirm. El componente padre maneja la extracción del DOM y el cierre.
             onConfirm(); 
             return;
         }
 
-        // Lógica para inputs simples (Resuelve el error de renombrar ticket)
         let finalValue = inputValue;
         
         if (inputType === 'number') {
@@ -58,14 +53,12 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
             return;
         }
 
-        // 🔑 Envía el valor y permite que el padre lo use.
         onConfirm(finalValue);
-        onClose(); // Cierra el modal después de la confirmación simple
+        onClose(); 
     };
 
     const renderContent = () => {
         if (inputType === 'custom') {
-            // Si es custom, renderizamos el JSX que viene en el message (Asignación de Caja/Nombre)
             return message;
         }
         
@@ -87,7 +80,6 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
             );
         }
         
-        // Default: text o number (usado para renombrar)
         return (
             <SearchInput
                 type={inputType}
@@ -106,11 +98,9 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
                 <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
                     <FaQuestionCircle size="2.5em" color="#007bff" />
                     <h2 style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>{title}</h2>
-                    {/* Si no es custom, mostramos el mensaje tradicional */}
                     {inputType !== 'custom' && <p style={{ color: '#6c757d' }}>{message}</p>}
                 </div>
                 
-                {/* Renderizamos el contenido, sea input simple o el JSX custom */}
                 <div style={{ marginBottom: inputType !== 'custom' ? '1rem' : '0' }}>
                     {renderContent()}
                 </div>
