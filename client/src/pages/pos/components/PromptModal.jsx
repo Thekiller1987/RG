@@ -3,39 +3,36 @@ import { FaQuestionCircle } from 'react-icons/fa';
 import { ModalOverlay, ModalContent, Button, SearchInput } from '../POS.styles.jsx'; 
 
 const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = 'text', initialValue = '', options = [], closeLabel = 'Cancelar', confirmLabel = 'Aceptar' }) => {
-    // 1. Inicialización de estado y referencia
+    // Estado interno para inputs simples (text, number, select)
     const [inputValue, setInputValue] = useState(initialValue);
     const inputRef = useRef(null);
 
-    // 2. Sincronización y Enfoque
+    // Sincronización y Enfoque (Restablecer estado y enfocar input)
     useEffect(() => {
         if (isOpen) {
             let initial = initialValue;
             
-            if (inputType !== 'custom') {
-                 // Si no es custom, gestionamos el valor del campo
-                if (inputType === 'select' && options.length > 0) {
-                    const isValid = options.some(opt => String(opt.value) === String(initialValue));
-                    if (!isValid) initial = options[0].value;
-                }
-                setInputValue(initial);
-
-                // Enfoque solo si no es 'custom' (donde el input real está en el message)
-                const timeoutId = setTimeout(() => {
-                    if (inputRef.current) {
-                        inputRef.current.focus();
-                        if (inputType === 'text' && inputRef.current.select) {
-                            inputRef.current.select();
-                        }
-                    }
-                }, 50); 
-                return () => clearTimeout(timeoutId);
-            } else {
-                // Si es custom, intentamos enfocar el campo 'ticketName' si existe
-                const customInput = document.getElementById('ticketName');
-                 if (customInput) customInput.focus();
+            if (inputType === 'select' && options.length > 0) {
+                const isValid = options.some(opt => String(opt.value) === String(initialValue));
+                if (!isValid) initial = options[0].value;
             }
+            
+            setInputValue(initial);
 
+            const timeoutId = setTimeout(() => {
+                if (inputRef.current) {
+                    inputRef.current.focus();
+                    if (inputType === 'text' && inputRef.current.select) {
+                        inputRef.current.select();
+                    }
+                } else if (inputType === 'custom') {
+                    // Si es custom, intentamos enfocar el campo 'ticketName' que se inyecta
+                    const customInput = document.getElementById('ticketName');
+                    if (customInput) customInput.focus();
+                }
+            }, 50); 
+            
+            return () => clearTimeout(timeoutId);
         }
     }, [isOpen, initialValue, inputType, options]);
 
@@ -43,12 +40,12 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
 
     const handleConfirm = () => {
         if (inputType === 'custom') {
-            // Cuando es custom, la lógica de validación y extracción está en el componente padre.
-            onConfirm(); // Llamamos al padre sin pasar valor, el padre lee el DOM.
+            // Para inputs custom, llamamos a onConfirm. El componente padre maneja la extracción del DOM y el cierre.
+            onConfirm(); 
             return;
         }
 
-        // Lógica para inputs simples (text, number, select)
+        // Lógica para inputs simples (Resuelve el error de renombrar ticket)
         let finalValue = inputValue;
         
         if (inputType === 'number') {
@@ -57,19 +54,18 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
         }
 
         if (inputType === 'text' && !String(finalValue).trim()) {
-            // Usamos el mecanismo de alerta interna para evitar la función nativa alert()
-            // Suponiendo que el ConfirmationModal tiene un mecanismo para mostrar alertas simples
-            console.error("Error: El campo de texto no puede estar vacío."); 
-            // Podrías necesitar un componente AlertModal dedicado aquí, pero por ahora usamos consola
+            console.error("Error de validación: El campo de texto no puede estar vacío."); 
             return;
         }
 
+        // 🔑 Envía el valor y permite que el padre lo use.
         onConfirm(finalValue);
+        onClose(); // Cierra el modal después de la confirmación simple
     };
 
     const renderContent = () => {
         if (inputType === 'custom') {
-            // Si es custom, renderizamos el JSX que viene en el message
+            // Si es custom, renderizamos el JSX que viene en el message (Asignación de Caja/Nombre)
             return message;
         }
         
@@ -91,7 +87,7 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
             );
         }
         
-        // Default: text o number
+        // Default: text o number (usado para renombrar)
         return (
             <SearchInput
                 type={inputType}
@@ -99,6 +95,7 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
                 onChange={(e) => setInputValue(e.target.value)}
                 ref={inputRef}
                 style={{ height: '40px', fontSize: '1rem' }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleConfirm(); } }}
             />
         );
     };
@@ -119,7 +116,7 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
                 </div>
                 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-                    <Button onClick={onClose} style={{ backgroundColor: '#6c757d' }}>{closeLabel}</Button>
+                    <Button onClick={onClose} $cancel>{closeLabel}</Button>
                     <Button onClick={handleConfirm} primary>{confirmLabel}</Button>
                 </div>
             </ModalContent>
