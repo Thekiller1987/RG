@@ -3,8 +3,9 @@ import { useAuth } from '../context/AuthContext.jsx';
 import * as api from '../service/api.js';
 import { 
     FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, 
-    FaFileInvoiceDollar, FaCheckCircle, FaArrowLeft, FaClipboardCheck
+    FaFileInvoiceDollar, FaCheckCircle, FaArrowLeft, FaClipboardCheck, FaSignature
 } from 'react-icons/fa';
+// Importamos solo los modales necesarios para la creación
 import ConfirmationModal from './pos/components/ConfirmationModal.jsx'; 
 import TicketModal from './pos/components/TicketModal.jsx'; 
 import PromptModal from './pos/components/PromptModal.jsx'; 
@@ -24,14 +25,19 @@ const styles = {
     container: { padding: '10px', fontFamily: 'Roboto, sans-serif', background: '#e9ecef', minHeight: '100vh' },
     header: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', padding: '10px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
     
+    // Panel Responsive: 2 columnas en desktop (clase de estilo para media query)
     panel: { 
         display: 'grid', 
         gridTemplateColumns: 'minmax(300px, 1fr) 1fr', 
         gap: '15px', 
+    },
+    // Media Query manual para móviles (aplicado al contenedor principal en el return)
+    panelMobile: {
         '@media (max-width: 768px)': { 
             gridTemplateColumns: '1fr' 
         }
     },
+
     card: { border: '1px solid #ddd', borderRadius: '8px', padding: '15px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
     input: { width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '15px', boxSizing: 'border-box' },
     button: { padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', margin: '5px 0', fontSize: '15px', fontWeight: 'bold', transition: 'all 0.2s ease' },
@@ -84,7 +90,7 @@ const PedidosYApartados = () => {
 
     /* ---------------------- FETCHING INICIAL ---------------------- */
 
-    // Función para cargar TODAS las cajas activas disponibles para selección
+    // Función para cargar TODAS las cajas activas disponibles
     const loadActiveCajas = useCallback(async () => {
         if (!token) return;
         try {
@@ -94,22 +100,24 @@ const PedidosYApartados = () => {
             const cajas = (response.data?.abiertas || [])
                 .filter(c => !c.closedAt) 
                 .map(c => ({
-                    value: String(c.id_caja || c.id), 
+                    id: String(c.id_caja || c.id), // ID de la caja
                     label: `Caja #${c.id_caja || c.id} - ${resolveName(c.openedBy)}`
                 }));
             
             setActiveCajas(cajas);
         } catch (error) {
             console.error('Error cargando cajas activas:', error);
-            showAlert({ title: "Error", message: "No se pudo cargar la lista de cajas activas. No se pueden crear pedidos." });
             setActiveCajas([]);
         }
-    }, [token, showAlert]);
+    }, [token]);
 
     useEffect(() => {
         if (currentUser) {
             loadActiveCajas(); 
         }
+        // Polling suave para cajas activas, para que el contador se actualice
+        const intervalId = setInterval(loadActiveCajas, 15000); 
+        return () => clearInterval(intervalId);
     }, [loadActiveCajas, currentUser]);
 
     /* ---- AUTOSLECCIÓN DE CLIENTE CONTADO ---- */
@@ -132,11 +140,13 @@ const PedidosYApartados = () => {
     const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.precio_unitario * item.cantidad), 0), [cart]);
     const total = subtotal; 
 
-    // **FUNCIÓN CORREGIDA:** Usa 'codigo' o 'codigo_barras' como clave UNICA para el carrito.
+    // 🔑 FUNCIÓN DE CLAVE ÚNICA: Usa 'codigo' o 'codigo_barras' como identificador
     const getProductKey = (product) => {
-        return String(product.codigo || product.codigo_barras || product.id_producto);
+        // Utilizamos el código como clave principal para POS
+        return String(product.codigo || product.codigo_barras || product.id_producto || `temp-id-${Date.now()}`);
     };
 
+    // FUNCIÓN CORREGIDA FINAL: Añadir producto usando la CLAVE ÚNICA (CÓDIGO)
     const handleAddToCart = useCallback((product) => {
         const stock = product.existencia ?? 0;
         if (stock <= 0) {
@@ -144,12 +154,11 @@ const PedidosYApartados = () => {
             return;
         }
         
-        // 🔑 CLAVE ÚNICA BASADA EN CÓDIGO:
         const productKey = getProductKey(product);
         const price = product.precio_venta ?? product.precio ?? 0;
 
         setCart(prev => {
-            // Busca la POSICIÓN usando la CLAVE ÚNICA (el código)
+            // Busca la POSICIÓN usando la CLAVE ÚNICA (el código/productKey)
             const existingIndex = prev.findIndex(item => item.productKey === productKey);
             
             if (existingIndex !== -1) {
@@ -181,7 +190,7 @@ const PedidosYApartados = () => {
         });
     }, [showAlert]);
 
-    // **FUNCIÓN CORREGIDA:** Actualiza cantidad o elimina, usando la CLAVE INTERNA (productKey).
+    // FUNCIÓN CORREGIDA FINAL: Actualiza cantidad usando la CLAVE INTERNA (productKey).
     const handleUpdateQuantity = useCallback((productKey, newQuantity) => {
         const numQuantity = parseInt(newQuantity, 10) || 0;
 
@@ -211,7 +220,7 @@ const PedidosYApartados = () => {
         );
     }, [allProducts, showAlert, cart]);
 
-    /* ---------------------- CREACIÓN DE TICKET (FUNCIÓN POS CLONADA) ---------------------- */
+    /* ---------------------- CREACIÓN DE TICKET (ASIGNACIÓN A TODAS LAS CAJAS) ---------------------- */
 
     const handleCreateOrderFlow = () => {
         if (!selectedCustomer) {
@@ -222,38 +231,31 @@ const PedidosYApartados = () => {
             showAlert({ title: 'Carrito Vacío', message: 'Agrega productos al carrito primero.' });
             return;
         }
-        if (activeCajas.length === 0) {
-             showAlert({ title: 'Caja Inactiva', message: 'No hay cajas activas disponibles. Debe haber al menos una caja abierta en el sistema.' });
+        
+        const activeCajaIds = activeCajas.map(c => c.id);
+
+        if (activeCajaIds.length === 0) {
+             showAlert({ title: 'Caja Inactiva', message: 'No hay cajas activas disponibles. Debe haber al menos una caja abierta en el sistema para asignar el ticket.' });
              return;
         }
         
-        // 1. Abrir Modal de Selección de Caja y Nombre
+        // 1. Abrir Modal para Nombre Personalizado
         setModal({
-            name: 'prompt_name_caja',
+            name: 'prompt_name',
             props: {
-                title: 'Crear Nuevo Ticket (Pedido)',
-                // Usamos JSX en el mensaje para inyectar los campos custom
+                title: 'Crear Ticket Personalizado',
                 message: (
                     <>
-                        <p style={{marginBottom: '15px'}}>Selecciona la caja de destino y asigna un nombre/referencia al ticket.</p>
-                        
-                        <label htmlFor="cajaSelect" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                            Caja a Asignar: <span style={{color: '#007bff'}}>(Hay {activeCajas.length} cajas activas)</span>
-                        </label>
-                        <select 
-                            id="cajaSelect" 
-                            style={styles.input}
-                            defaultValue={activeCajas[0]?.value} 
-                        >
-                            {activeCajas.map(opt => (
-                                <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                </option>
-                            ))}
-                        </select>
-
+                        <p style={{marginBottom: '10px', fontWeight: 600}}>
+                            <span style={{ color: '#007bff' }}>Este ticket se asignará automáticamente a las {activeCajaIds.length} cajas activas.</span>
+                        </p>
+                        <ul style={{ listStyleType: 'none', padding: 0, margin: '10px 0', fontSize: '0.85em', maxHeight: '100px', overflowY: 'auto', border: '1px solid #ddd', padding: '8px', borderRadius: '4px' }}>
+                            {activeCajas.map(c => <li key={c.id} style={{ padding: '3px 0', color: '#333' }}>
+                                <FaClipboardCheck style={{ color: '#28a745', marginRight: '5px' }} /> {c.label}
+                            </li>)}
+                        </ul>
                         <label htmlFor="ticketName" style={{ display: 'block', margin: '15px 0 5px', fontWeight: 'bold' }}>
-                            Nombre del Ticket/Referencia:
+                            <FaSignature style={{ marginRight: '5px' }} /> Nombre del Ticket/Referencia:
                         </label>
                         <input 
                             type="text" 
@@ -264,21 +266,14 @@ const PedidosYApartados = () => {
                         />
                     </>
                 ),
-                // Lógica de confirmación: extrae valores del DOM
+                // Lógica de confirmación: extrae el nombre y usa TODOS los IDs de caja
                 onConfirm: () => {
+                    // Leemos el valor del input del DOM después de que el usuario haga clic en Aceptar
                     const nameInput = document.getElementById('ticketName');
-                    const cajaSelect = document.getElementById('cajaSelect');
-
                     const newName = nameInput?.value?.trim() || `Pedido para ${selectedCustomer.nombre}`;
-                    const selectedCajaId = Number(cajaSelect?.value);
-
-                    if (!selectedCajaId) {
-                         showAlert({ title: "Error", message: "Debes seleccionar una caja activa." });
-                         return;
-                    }
                     
-                    // Llama a la función final de guardado con los datos
-                    handleCreateOrder('pedido', newName, selectedCajaId);
+                    // Llama a la función final de guardado con el nombre y TODOS los IDs
+                    handleCreateOrder('pedido', newName, activeCajaIds);
                 },
                 inputType: 'custom', 
                 closeLabel: 'Cancelar',
@@ -287,9 +282,12 @@ const PedidosYApartados = () => {
         });
     };
 
-    const handleCreateOrder = async (tipo, pedidoName, idCaja) => {
-        closeGenericModal();
+    /* ---- Crear Orden (Función Final - Similar a POS.jsx) ---- */
+    const handleCreateOrder = async (tipo, pedidoName, idCajaList) => {
+        // El PromptModal ya se cierra si usamos la lógica de onConfirm en handleCreateOrderFlow
         setLoading(true);
+
+        const primaryCajaId = idCajaList[0]; 
 
         try {
             const orderData = {
@@ -302,9 +300,10 @@ const PedidosYApartados = () => {
                 abonado: 0, 
                 etiqueta: temporaryTag || pedidoName, 
                 nombre_pedido: pedidoName, 
-                id_caja: idCaja, 
+                id_caja: primaryCajaId, // Usamos el ID primario para el registro en la tabla de órdenes
+                cajas_asignadas: idCajaList, // Opcional: si el backend tiene un campo para registrar la asignación múltiple
                 
-                // Mapeamos a la estructura del backend, usando id_producto y cantidad
+                // Mapeamos a la estructura del backend
                 items: cart.map(item => ({
                     producto_id: item.id_producto,
                     cantidad: item.cantidad,
@@ -319,14 +318,14 @@ const PedidosYApartados = () => {
 
             const createdOrder = await api.createOrder(orderData, token);
             
-            showAlert({ title: "Ticket Guardado", message: `Ticket #${createdOrder.id_pedido} guardado con éxito y asignado a la Caja ID: ${idCaja}.` });
+            showAlert({ title: "Ticket Guardado", message: `Ticket #${createdOrder.id_pedido} guardado con éxito. Asignado a ${idCajaList.length} cajas.` });
             
             const orderWithDetails = { 
                 ...orderData, 
                 id_pedido: createdOrder.id_pedido, 
                 created_at: new Date().toISOString(), 
                 tipo,
-                id_caja: idCaja
+                id_caja: primaryCajaId
             };
             askForPrintOrder(orderWithDetails); 
 
@@ -342,7 +341,7 @@ const PedidosYApartados = () => {
         }
     };
 
-    /* ---- LÓGICA DE IMPRESIÓN (copia del POS original) ---- */
+    /* ---- LÓGICA DE IMPRESIÓN (se mantiene) ---- */
 
     const openTicketWithOrder = useCallback((order, printMode = '80') => {
         const transaction = {
@@ -428,10 +427,12 @@ const PedidosYApartados = () => {
                 </span>
             </div>
 
-            <div style={styles.panel}>
+            <div style={{...styles.panel, ...styles.panelMobile}}>
                 
                 {/* Columna Izquierda: Productos y Clientes */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    
+                    {/* Buscador y Lista de Productos */}
                     <div style={{...styles.card, flexGrow: 1}}>
                         <h3 style={{ marginTop: 0, color: '#333' }}><FaSearch /> Buscar Productos</h3>
                         <input
@@ -445,8 +446,7 @@ const PedidosYApartados = () => {
                         <div style={styles.productContainer}>
                             {filteredProducts.map(product => (
                                 <div
-                                    // Usamos el ID del producto (aunque internamente se usa el código)
-                                    key={product.id_producto} 
+                                    key={getProductKey(product)} 
                                     style={styles.productItem}
                                     onClick={() => handleAddToCart(product)}
                                 >
@@ -460,6 +460,7 @@ const PedidosYApartados = () => {
                         </div>
                     </div>
 
+                    {/* Selector de Cliente */}
                     <div style={styles.card}>
                         <h3 style={{ marginTop: 0, color: '#333' }}><FaUserTag /> 1. Cliente</h3>
                         <div style={styles.clientContainer}>
@@ -531,6 +532,7 @@ const PedidosYApartados = () => {
                         </div>
                     </div>
                     
+                    {/* Detalles, Nota y Totales */}
                     <div style={styles.card}>
                         <h3 style={{ marginTop: 0, color: '#333' }}><FaClipboardCheck /> 3. Detalles y Total</h3>
                         <input
@@ -559,14 +561,10 @@ const PedidosYApartados = () => {
                         >
                             <FaFileInvoiceDollar /> {loading ? 'Guardando...' : 'Crear Ticket/Pedido'}
                         </button>
-                         {!selectedCustomer && (
+                         {/* Mensajes de error/bloqueo */}
+                         {(!selectedCustomer || cart.length === 0 || activeCajas.length === 0) && (
                             <p style={{ color: '#dc3545', fontSize: '0.9em', textAlign: 'center', marginTop: '5px' }}>
-                                * Debe seleccionar un cliente (paso 1).
-                            </p>
-                        )}
-                        {activeCajas.length === 0 && (
-                            <p style={{ color: '#dc3545', fontSize: '0.9em', textAlign: 'center', marginTop: '5px' }}>
-                                * No hay cajas activas para asignar el ticket.
+                                * {activeCajas.length === 0 ? 'No hay cajas activas para asignar.' : 'Faltan productos o cliente (Pasos 1 y 2).'}
                             </p>
                         )}
                     </div>
@@ -575,7 +573,7 @@ const PedidosYApartados = () => {
 
             {/* MODALES */}
 
-            {/* Modal de Alerta/Confirmación (usado para impresión y errores) */}
+            {/* Modal de Alerta/Confirmación */}
             {modal.name === 'alert' && (
                 <ConfirmationModal
                     isOpen={true}
@@ -584,13 +582,14 @@ const PedidosYApartados = () => {
                 />
             )}
             
-            {/* Modal de Prompt (Nombrar Pedido/Seleccionar Caja) */}
-            {modal.name === 'prompt_name_caja' && (
+            {/* Modal de Prompt (Nombrar Pedido) */}
+            {modal.name === 'prompt_name' && (
                 <PromptModal
                     isOpen={true}
                     onClose={closeGenericModal}
-                    onConfirm={(value) => {
-                        modal.props.onConfirm(value);
+                    onConfirm={() => {
+                        // Aquí llamamos a la función de confirmación inyectada en handleCreateOrderFlow
+                        modal.props.onConfirm();
                     }}
                     title={modal.props.title}
                     message={modal.props.message}
@@ -618,5 +617,3 @@ const PedidosYApartados = () => {
 };
 
 export default PedidosYApartados;
-
-///comentario Pensando
