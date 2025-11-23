@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useAuth } from '../../context/AuthContext.jsx'; // Ruta de importación mantenida
+import { useAuth } from '../context/AuthContext.jsx'; // <<< RUTA CORREGIDA
 import * as api from '../../service/api.js';
 import { 
     FaShoppingCart, FaClipboardList, FaSearch, FaUserTag, FaTrashAlt, FaPlus, FaMinus, 
     FaFileInvoiceDollar, FaCheckCircle, FaArrowLeft, FaClipboardCheck, FaSignature
 } from 'react-icons/fa';
-import { Button, TotalsRow, SearchInput, ModalOverlay, ModalContent, PanelCard, CartItemWrapper } from './POS.styles.jsx'; 
+import { Button, TotalsRow, SearchInput, PanelCard, CartItemWrapper } from './POS.styles.jsx'; 
 import ConfirmationModal from './pos/components/ConfirmationModal.jsx'; 
 import TicketModal from './pos/components/TicketModal.jsx'; 
 import PromptModal from './pos/components/PromptModal.jsx'; 
@@ -547,6 +547,7 @@ const PedidosYApartados = () => {
                     onClose={closeGenericModal}
                     onConfirm={() => {
                         modal.props.onConfirm();
+                        closeGenericModal();
                     }}
                     title={modal.props.title}
                     message={modal.props.message}

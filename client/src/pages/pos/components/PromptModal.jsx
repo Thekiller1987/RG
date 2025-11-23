@@ -6,6 +6,7 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
     const [inputValue, setInputValue] = useState(initialValue);
     const inputRef = useRef(null);
 
+    // Sincronización y Enfoque (Restablecer estado y enfocar input)
     useEffect(() => {
         if (isOpen) {
             let initial = initialValue;
@@ -24,6 +25,7 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
                         inputRef.current.select();
                     }
                 } else if (inputType === 'custom') {
+                    // Si es custom, intentamos enfocar el campo 'ticketName' que se inyecta
                     const customInput = document.getElementById('ticketName');
                     if (customInput) customInput.focus();
                 }
@@ -37,10 +39,12 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
 
     const handleConfirm = () => {
         if (inputType === 'custom') {
-            onConfirm(); 
+            // Cuando es custom, la lógica de validación y extracción está en el componente padre.
+            onConfirm(); // Llamamos al padre
             return;
         }
 
+        // Lógica para inputs simples (Resuelve el error de renombrar ticket)
         let finalValue = inputValue;
         
         if (inputType === 'number') {
@@ -53,12 +57,14 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
             return;
         }
 
+        // Renombrar ticket o confirmar valor simple
         onConfirm(finalValue);
         onClose(); 
     };
 
     const renderContent = () => {
         if (inputType === 'custom') {
+            // Si es custom, renderizamos el JSX que viene en el message
             return message;
         }
         
@@ -80,6 +86,7 @@ const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = '
             );
         }
         
+        // Default: text o number
         return (
             <SearchInput
                 type={inputType}
