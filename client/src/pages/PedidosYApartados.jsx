@@ -1,6 +1,4 @@
 // client/src/pages/PedidosYApartados.jsx
-// VERSIÓN CORREGIDA: Se pasan los productos al modal para que el buscador funcione
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { Link } from 'react-router-dom';
@@ -451,15 +449,13 @@ const LoadingShimmer = styled.div`
     margin-bottom: 1rem;
 `;
 
-// --- COMPONENTE PRINCIPAL MEJORADO ---
+// --- COMPONENTE PRINCIPAL ---
 const PedidosYApartados = () => {
-    // CAMBIO 1: Extraemos 'products' del contexto, pero tambien creamos un estado local
-    const { user, products: contextProducts } = useAuth();
+    // 1. Extraemos 'products' del contexto para que esté disponible para CUALQUIER usuario
+    const { user, products } = useAuth();
     const token = localStorage.getItem('token');
 
     const [pedidos, setPedidos] = useState([]);
-    // CAMBIO NUEVO: Estado para asegurar que hay productos (para el vendedor)
-    const [listaProductos, setListaProductos] = useState([]); 
     const [isLoading, setIsLoading] = useState(true);
     const [filtroEstado, setFiltroEstado] = useState('Activos');
     const [searchTerm, setSearchTerm] = useState('');
@@ -470,7 +466,7 @@ const PedidosYApartados = () => {
     const showAlert = useCallback((props) => openModal('alert', props), [openModal]);
     const showConfirmation = useCallback((props) => openModal('confirmation', props), [openModal]);
 
-    // Verificar si el usuario tiene permisos de Administración o Contabilidad
+    // Verificar si el usuario tiene permisos de Administración o Contabilidad (Para COBRAR)
     const canManageTickets = useMemo(() => {
         if (!user || !user.rol) return false;
         const rol = user.rol.toLowerCase();
@@ -498,23 +494,6 @@ const PedidosYApartados = () => {
             setIsLoading(false);
         }
     }, [token, showAlert]);
-
-    // NUEVO EFECTO: Si no hay productos en el contexto (Vendedor), cargarlos de la API
-    useEffect(() => {
-        const cargarProductosFaltantes = async () => {
-            if (contextProducts && contextProducts.length > 0) {
-                setListaProductos(contextProducts);
-            } else if (token) {
-                try {
-                    const data = await api.fetchProducts(token);
-                    if (data) setListaProductos(data);
-                } catch (error) {
-                    console.error("Error al cargar productos manualmente", error);
-                }
-            }
-        };
-        cargarProductosFaltantes();
-    }, [contextProducts, token]);
 
     useEffect(() => {
         fetchPedidos();
@@ -551,19 +530,13 @@ const PedidosYApartados = () => {
 
     const handleCreateOrder = async (orderData) => {
         try {
-            // LÓGICA PERSONALIZADA:
-            // Si es vendedor (no admin/contador), forzamos el formato de Ticket
+            // Lógica para Vendedores: Forza nombre "Hecho por..."
             let finalOrderData = { ...orderData };
 
             if (!canManageTickets) {
-                // Obtenemos el nombre del cliente (escrito en el modal) o la descripción
                 const nombreCliente = orderData.clienteNombre || orderData.descripcion || '';
-                
-                // Obtenemos el nombre del usuario logueado
                 const nombreUsuario = user.nombre || user.nombre_usuario || user.username || 'Vendedor';
-
-                // CORRECCIÓN SOLICITADA: Formato "Facturado por [Usuario] - [Cliente]"
-                finalOrderData.clienteNombre = `Facturado por ${nombreUsuario} - ${nombreCliente}`;
+                finalOrderData.clienteNombre = `Hecho por ${nombreUsuario} - ${nombreCliente}`;
             }
 
             await api.createOrder(finalOrderData, token);
@@ -626,7 +599,7 @@ const PedidosYApartados = () => {
                     <h1>No estás autenticado</h1>
                     <p>Por favor, inicia sesión para acceder a esta página.</p>
                     <BackButton to="/login" style={{ marginTop: '1rem' }}>
-                        <Iniciar Sesión />
+                        Iniciar Sesión
                     </BackButton>
                 </div>
             </PageWrapper>
@@ -871,9 +844,9 @@ const PedidosYApartados = () => {
                     onClose={closeModal} 
                     onSubmit={handleCreateOrder} 
                     showAlert={showAlert}
-                    // CAMBIO 2: Pasamos isCajaOpen y listaProductos (que tiene datos aunque sea vendedor)
+                    // 2. Pasamos products y aseguramos que no sea null para que el buscador funcione SIEMPRE
                     isCajaOpen={isCajaOpen}
-                    products={listaProductos}
+                    products={products || []}
                 />
             )}
             
@@ -888,6 +861,8 @@ const PedidosYApartados = () => {
                     readOnly={false} 
                     canCharge={canManageTickets} 
                     canManage={canManageTickets}
+                    // Agregamos también products aquí por si se permite editar
+                    products={products || []}
                 />
             )}
             
@@ -907,7 +882,7 @@ const PedidosYApartados = () => {
                 {...modal.props} 
             />
         </PageWrapper>
-    );
+    ); 
 };
 
 export default PedidosYApartados;
