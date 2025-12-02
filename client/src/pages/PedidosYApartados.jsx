@@ -1,5 +1,5 @@
 // client/src/pages/PedidosYApartados.jsx
-// VERSIÓN CORREGIDA: Permite a empleados agregar productos (Read Only desactivado)
+// VERSIÓN CORREGIDA: Formato de nombre de ticket ajustado
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
@@ -536,11 +536,13 @@ const PedidosYApartados = () => {
             let finalOrderData = { ...orderData };
 
             if (!canManageTickets) {
-                // Obtenemos la descripción o nota del formulario
-                const descripcion = orderData.descripcion || orderData.notas || '';
+                // Capturamos el nombre del cliente que el vendedor escribió en el modal
+                // (ordenData.clienteNombre suele ser lo que se escribe en el input de cliente en CreateOrderModal)
+                const nombreCliente = orderData.clienteNombre || orderData.descripcion || '';
                 
-                // Forzamos el nombre según lo solicitado: Ticket - Nombre Usuario - Descripción
-                finalOrderData.clienteNombre = `Ticket - ${user.nombre || user.username} - ${descripcion}`;
+                // Formato solicitado: "Hecho por [Usuario] - [Nombre Cliente]"
+                const nombreUsuario = user.nombre || user.nombre_usuario || user.username || 'Vendedor';
+                finalOrderData.clienteNombre = `Hecho por ${nombreUsuario} - ${nombreCliente}`;
             }
 
             await api.createOrder(finalOrderData, token);
@@ -848,7 +850,6 @@ const PedidosYApartados = () => {
                     onClose={closeModal} 
                     onSubmit={handleCreateOrder} 
                     showAlert={showAlert}
-                    // AÑADIDO: Pasamos isCajaOpen por si el modal necesita verificar algo
                     isCajaOpen={isCajaOpen}
                 />
             )}
@@ -861,13 +862,7 @@ const PedidosYApartados = () => {
                     showAlert={showAlert} 
                     showConfirmation={showConfirmation} 
                     isCajaOpen={isCajaOpen}
-                    
-                    // --- CORRECCIÓN CLAVE AQUÍ ---
-                    // Antes: readOnly={!canManageTickets} (Esto bloqueaba todo para el empleado)
-                    // Ahora: readOnly={false} (Permite agregar productos)
                     readOnly={false} 
-
-                    // Mantenemos la restricción de cobro
                     canCharge={canManageTickets} 
                     canManage={canManageTickets}
                 />
