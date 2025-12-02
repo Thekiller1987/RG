@@ -34,7 +34,7 @@ export default function ProductPanel({
   onProductClick,
   cartItems = [],
   inputRef,
-  // Recibimos las nuevas propiedades (con valores por defecto por seguridad)
+  // Recibimos las nuevas propiedades
   searchType = 'description',
   setSearchType = () => {} 
 }) {
@@ -50,19 +50,30 @@ export default function ProductPanel({
   const filteredProducts = useMemo(() => {
     const term = (searchTerm || '').toLowerCase().trim();
     
-    // Si no hay búsqueda o es muy corta, mostrar los primeros N productos
-    if (!term || term.length < 3) {
+    // 1. Si no hay búsqueda, mostrar los primeros N productos
+    if (!term) {
       return products.slice(0, PRODUCTS_PER_PAGE);
     }
 
-    // Lógica de filtrado según el tipo seleccionado
+    // 2. Si es búsqueda por NOMBRE, mantenemos la restricción de 3 letras para no saturar
+    //    Pero si es CÓDIGO, permitimos buscar desde 1 caracter (ej: código "5")
+    if (searchType === 'description' && term.length < 3) {
+       return products.slice(0, PRODUCTS_PER_PAGE);
+    }
+
+    // 3. Filtramos los productos
     const results = products.filter(p => {
       if (searchType === 'code') {
-        // Buscar solo por códigos
-        const codigo = String(p.codigo || p.codigo_barras || p.id || '').toLowerCase();
-        return codigo.includes(term);
+        // --- CORRECCIÓN: USAR startsWith ---
+        // Validamos contra 'codigo', 'codigo_barras' o 'id'
+        const codigo = String(p.codigo || '').toLowerCase();
+        const barras = String(p.codigo_barras || '').toLowerCase();
+        const id = String(p.id || '').toLowerCase();
+
+        // Devuelve true si ALGUNO de los campos EMPIEZA con el término
+        return codigo.startsWith(term) || barras.startsWith(term) || id.startsWith(term);
       } else {
-        // Buscar por nombre (y descripción si existe)
+        // Búsqueda por NOMBRE (se mantiene igual, busca en cualquier parte)
         const nombre = (p.nombre || '').toLowerCase();
         const desc = (p.descripcion || '').toLowerCase();
         return nombre.includes(term) || desc.includes(term);
@@ -76,10 +87,12 @@ export default function ProductPanel({
     const term = (searchTerm || '').toLowerCase().trim();
     if (!term) return products.length;
     
-    // Usamos la misma lógica para el conteo total
     return products.filter(p => {
         if (searchType === 'code') {
-            return String(p.codigo || p.codigo_barras || p.id || '').toLowerCase().includes(term);
+            const codigo = String(p.codigo || '').toLowerCase();
+            const barras = String(p.codigo_barras || '').toLowerCase();
+            const id = String(p.id || '').toLowerCase();
+            return codigo.startsWith(term) || barras.startsWith(term) || id.startsWith(term);
         }
         return (p.nombre || '').toLowerCase().includes(term);
     }).length;
@@ -124,11 +137,11 @@ export default function ProductPanel({
           <FaStore /> Productos ({filteredProducts.length} de {totalResults})
           {/* Indicador visual de modo de búsqueda */}
           <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: '#666', marginLeft: '10px' }}>
-            Filtro: {searchType === 'code' ? 'Por Código' : 'Por Nombre'}
+            Filtro: {searchType === 'code' ? 'Por Código (inicia con)' : 'Por Nombre'}
           </span>
         </h3>
 
-        {(searchTerm.length < 3 && totalResults > PRODUCTS_PER_PAGE) && (
+        {(searchTerm.length < 3 && searchType === 'description' && totalResults > PRODUCTS_PER_PAGE) && (
           <S.InfoBox style={{ marginBottom: '1rem', backgroundColor: '#fff3cd', color: '#856404', borderColor: '#ffeeba' }}>
             <FaExclamationTriangle style={{ marginRight: '5px' }} />
             Escribe <strong>3 o más caracteres</strong> para buscar en los {totalResults} productos. Mostrando los primeros {PRODUCTS_PER_PAGE}.
@@ -185,7 +198,7 @@ export default function ProductPanel({
             );
           })}
 
-          {filteredProducts.length === 0 && searchTerm.length >= 3 && (
+          {filteredProducts.length === 0 && (searchTerm.length >= 3 || (searchType === 'code' && searchTerm.length > 0)) && (
             <p style={{ color: '#6c757d', textAlign: 'center', gridColumn: 'span 4' }}>
               No se encontraron productos con “{searchTerm}” usando el filtro de {searchType === 'code' ? 'código' : 'nombre'}.
             </p>

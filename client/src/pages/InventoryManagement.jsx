@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
   FaPlus, FaBoxOpen, FaTags, FaTruck, FaTrash, FaEdit, FaArrowLeft, FaHistory, FaSpinner,
-  FaSearch, FaTimes, FaPlusCircle, FaMinusCircle, FaExclamationTriangle
+  FaSearch, FaTimes, FaPlusCircle, FaMinusCircle, FaExclamationTriangle,
+  FaBarcode, FaFont // <--- AGREGADO
 } from 'react-icons/fa';
 import AlertModal from './pos/components/AlertModal.jsx';
 
@@ -43,6 +44,14 @@ const SearchInput = styled.input`
   width:100%;padding:.75rem 1rem .75rem 2.5rem;border-radius:8px;border:1px solid #e2e8f0;font-size:1rem;
   &:focus{border-color:#2b6cb0;box-shadow:0 0 0 2px rgba(43,108,176,.2);outline:none;}
 `;
+// --- NUEVO ESTILO PARA BOTONES DE FILTRO ---
+const FilterToggleButton = styled.button`
+  display: flex; align-items: center; justify-content: center; width: 45px; height: 42px;
+  border: 1px solid ${p=>p.$active?'#2b6cb0':'#e2e8f0'}; background:${p=>p.$active?'#ebf8ff':'#fff'};
+  color:${p=>p.$active?'#2b6cb0':'#a0aec0'}; border-radius:8px; cursor:pointer; font-size:1.1rem;
+  transition:all .2s; &:hover{border-color:#2b6cb0;color:#2b6cb0}
+`;
+// -------------------------------------------
 const Select = styled.select`
   width:100%;padding:.75rem 1rem;border-radius:8px;border:1px solid #e2e8f0;font-size:1rem;background:#fff;cursor:pointer;
 `;
@@ -90,12 +99,6 @@ const HistoryTd = styled.td`padding:1rem .75rem;border-bottom:1px solid #f7fafc;
   ESTADO/UTIL: INDEXADOR RÁPIDO
 ================================ */
 const norm = (s = '') => s.toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-const matchRank = (q, item) => {
-    if (!q) return 0;
-    if (item.qStarts.some(v => v.startsWith(q))) return 1;
-    if (item.q.includes(q)) return 2;
-    return 9;
-};
 
 /* ================================
   MODALES AUXILIARES
@@ -221,155 +224,153 @@ const StockAdjustmentModal = ({ isOpen, product, onClose, onConfirm }) => {
     );
 };
 
-// client/src/pages/InventoryManagement.jsx
-
 function InventoryHistoryModal({ onClose }) {
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(''); // yyyy-mm-dd
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(''); // yyyy-mm-dd
 
-  useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get('/api/products/inventory/history', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setHistory(res.data || []);
-      } catch (error) {
-        console.error("Error fetching inventory history:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchHistory();
-  }, []);
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await axios.get('/api/products/inventory/history', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setHistory(res.data || []);
+      } catch (error) {
+        console.error("Error fetching inventory history:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHistory();
+  }, []);
 
-  const getTypeBadge = (type) => {
-    const upperType = String(type).toUpperCase();
-    if (upperType.includes('ENTRADA') || upperType.includes('CREACION')) { return <TypeBadge $bg="#e6fffa" $color="#2c7a7b">ENTRADA</TypeBadge>; }
-    if (upperType.includes('SALIDA') || upperType.includes('VENTA') || upperType.includes('ELIMINACION')) { return <TypeBadge $bg="#fed7d7" $color="#9b2c2c">SALIDA</TypeBadge>; }
-    if (upperType.includes('AJUSTE') || upperType.includes('EDICION')) { return <TypeBadge $bg="#feebc8" $color="#9c4221">AJUSTE</TypeBadge>; }
-    return <TypeBadge>{type}</TypeBadge>;
-  };
+  const getTypeBadge = (type) => {
+    const upperType = String(type).toUpperCase();
+    if (upperType.includes('ENTRADA') || upperType.includes('CREACION')) { return <TypeBadge $bg="#e6fffa" $color="#2c7a7b">ENTRADA</TypeBadge>; }
+    if (upperType.includes('SALIDA') || upperType.includes('VENTA') || upperType.includes('ELIMINACION')) { return <TypeBadge $bg="#fed7d7" $color="#9b2c2c">SALIDA</TypeBadge>; }
+    if (upperType.includes('AJUSTE') || upperType.includes('EDICION')) { return <TypeBadge $bg="#feebc8" $color="#9c4221">AJUSTE</TypeBadge>; }
+    return <TypeBadge>{type}</TypeBadge>;
+  };
 
-  // Utilidades de fecha
-  const toKey = (iso) => {
-    const d = new Date(iso);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`; // yyyy-mm-dd
-  };
-  const toNice = (key) => {
-    const [y, m, d] = key.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    return date.toLocaleDateString('es-NI', {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-    });
-  };
+  // Utilidades de fecha
+  const toKey = (iso) => {
+    const d = new Date(iso);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`; // yyyy-mm-dd
+  };
+  const toNice = (key) => {
+    const [y, m, d] = key.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    return date.toLocaleDateString('es-NI', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+  };
 
-  // Agrupar por día y ordenar
-  const grouped = useMemo(() => {
-    const map = new Map();
-    (history || []).forEach(item => {
-      const k = toKey(item.fecha);
-      if (!map.has(k)) map.set(k, []);
-      map.get(k).push(item);
-    });
+  // Agrupar por día y ordenar
+  const grouped = useMemo(() => {
+    const map = new Map();
+    (history || []).forEach(item => {
+      const k = toKey(item.fecha);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(item);
+    });
 
-    // ordenar items por hora desc dentro del día
-    for (const [, arr] of map) {
-      arr.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-    }
+    // ordenar items por hora desc dentro del día
+    for (const [, arr] of map) {
+      arr.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    }
 
-    // arreglo de [key, items] ordenado por día desc
-    const entries = Array.from(map.entries())
-      .sort((a, b) => new Date(b[0]) - new Date(a[0]));
+    // arreglo de [key, items] ordenado por día desc
+    const entries = Array.from(map.entries())
+      .sort((a, b) => new Date(b[0]) - new Date(a[0]));
 
-    // filtro por fecha si hay seleccionada
-    if (selectedDate) {
-      return entries.filter(([k]) => k === selectedDate);
-    }
-    return entries;
-  }, [history, selectedDate]);
+    // filtro por fecha si hay seleccionada
+    if (selectedDate) {
+      return entries.filter(([k]) => k === selectedDate);
+    }
+    return entries;
+  }, [history, selectedDate]);
 
-  return (
-    <ModalOverlay onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}>
-        <HistoryModalContent onClick={e => e.stopPropagation()}>
-          <HistoryHeader>
-            <Title style={{ fontSize: '1.5rem', margin: 0 }}>
-              <FaHistory /> Historial de Movimientos
-            </Title>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <label style={{ fontSize: '.9rem', color: '#4a5568' }}>Filtrar por día:</label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                style={{ height: 36, padding: '0 .5rem', borderRadius: 8, border: '1px solid #e2e8f0' }}
-              />
-              <Button as="a" onClick={() => setSelectedDate('')} style={{ background: '#6c757d', boxShadow: 'none' }} >
-                Limpiar
-              </Button>
-              <Button as="a" onClick={() => setSelectedDate(toKey(new Date().toISOString()))} style={{ background: '#17a2b8', boxShadow: 'none' }} >
-                Hoy
-              </Button>
-              <Button as="a" onClick={onClose} style={{ background: 'none', color: '#a0aec0', boxShadow: 'none' }}>
-                <FaTimes size={24} />
-              </Button>
-            </div>
-          </HistoryHeader>
-          <HistoryBody>
-            {loading ? (
-              <CenteredMessage><Spinner /></CenteredMessage>
-            ) : history.length === 0 ? (
-              <CenteredMessage>No hay movimientos registrados.</CenteredMessage>
-            ) : grouped.length === 0 ? (
-              <CenteredMessage>No hay movimientos para la fecha seleccionada.</CenteredMessage>
-            ) : (
-              <>
-                {grouped.map(([dayKey, items]) => (
-                  <div key={dayKey} style={{ marginBottom: '1.75rem' }}>
-                    <div style={{ position: 'sticky', top: 0, zIndex: 1, background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '.35rem .5rem', marginBottom: '.35rem' }} >
-                      <strong style={{ color: '#2d3748' }}>{toNice(dayKey)}</strong>
-                      <span style={{ color: '#718096', marginLeft: 8 }}>({items.length} mov.)</span>
-                    </div>
-                    <HistoryTable>
-                      <thead>
-                        <tr>
-                          <HistoryTh>Fecha & Hora</HistoryTh>
-                          <HistoryTh>Producto</HistoryTh>
-                          <HistoryTh>Tipo</HistoryTh>
-                          <HistoryTh>Detalles</HistoryTh>
-                          <HistoryTh>Usuario</HistoryTh>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {items.map(item => (
-                          <motion.tr key={item.id_movimiento} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                            <HistoryTd>{new Date(item.fecha).toLocaleString('es-NI')}</HistoryTd>
-                            <HistoryTd>
-                              {item.nombre_producto}{' '}
-                              <span style={{ color: '#a0aec0' }}>({item.codigo_producto})</span>
-                            </HistoryTd>
-                            <HistoryTd>{getTypeBadge(item.tipo_movimiento)}</HistoryTd>
-                            <HistoryTd>{item.detalles}</HistoryTd>
-                            <HistoryTd>{item.nombre_usuario || 'Sistema'}</HistoryTd>
-                          </motion.tr>
-                        ))}
-                      </tbody>
-                    </HistoryTable>
-                  </div>
-                ))}
-              </>
-            )}
-          </HistoryBody>
-        </HistoryModalContent>
-      </motion.div>
-    </ModalOverlay>
-  );
+  return (
+    <ModalOverlay onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}>
+        <HistoryModalContent onClick={e => e.stopPropagation()}>
+          <HistoryHeader>
+            <Title style={{ fontSize: '1.5rem', margin: 0 }}>
+              <FaHistory /> Historial de Movimientos
+            </Title>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <label style={{ fontSize: '.9rem', color: '#4a5568' }}>Filtrar por día:</label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                style={{ height: 36, padding: '0 .5rem', borderRadius: 8, border: '1px solid #e2e8f0' }}
+              />
+              <Button as="a" onClick={() => setSelectedDate('')} style={{ background: '#6c757d', boxShadow: 'none' }} >
+                Limpiar
+              </Button>
+              <Button as="a" onClick={() => setSelectedDate(toKey(new Date().toISOString()))} style={{ background: '#17a2b8', boxShadow: 'none' }} >
+                Hoy
+              </Button>
+              <Button as="a" onClick={onClose} style={{ background: 'none', color: '#a0aec0', boxShadow: 'none' }}>
+                <FaTimes size={24} />
+              </Button>
+            </div>
+          </HistoryHeader>
+          <HistoryBody>
+            {loading ? (
+              <CenteredMessage><Spinner /></CenteredMessage>
+            ) : history.length === 0 ? (
+              <CenteredMessage>No hay movimientos registrados.</CenteredMessage>
+            ) : grouped.length === 0 ? (
+              <CenteredMessage>No hay movimientos para la fecha seleccionada.</CenteredMessage>
+            ) : (
+              <>
+                {grouped.map(([dayKey, items]) => (
+                  <div key={dayKey} style={{ marginBottom: '1.75rem' }}>
+                    <div style={{ position: 'sticky', top: 0, zIndex: 1, background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '.35rem .5rem', marginBottom: '.35rem' }} >
+                      <strong style={{ color: '#2d3748' }}>{toNice(dayKey)}</strong>
+                      <span style={{ color: '#718096', marginLeft: 8 }}>({items.length} mov.)</span>
+                    </div>
+                    <HistoryTable>
+                      <thead>
+                        <tr>
+                          <HistoryTh>Fecha & Hora</HistoryTh>
+                          <HistoryTh>Producto</HistoryTh>
+                          <HistoryTh>Tipo</HistoryTh>
+                          <HistoryTh>Detalles</HistoryTh>
+                          <HistoryTh>Usuario</HistoryTh>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map(item => (
+                          <motion.tr key={item.id_movimiento} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                            <HistoryTd>{new Date(item.fecha).toLocaleString('es-NI')}</HistoryTd>
+                            <HistoryTd>
+                              {item.nombre_producto}{' '}
+                              <span style={{ color: '#a0aec0' }}>({item.codigo_producto})</span>
+                            </HistoryTd>
+                            <HistoryTd>{getTypeBadge(item.tipo_movimiento)}</HistoryTd>
+                            <HistoryTd>{item.detalles}</HistoryTd>
+                            <HistoryTd>{item.nombre_usuario || 'Sistema'}</HistoryTd>
+                          </motion.tr>
+                        ))}
+                      </tbody>
+                    </HistoryTable>
+                  </div>
+                ))}
+              </>
+            )}
+          </HistoryBody>
+        </HistoryModalContent>
+      </motion.div>
+    </ModalOverlay>
+  );
 }
 
 /* ================================
@@ -582,6 +583,7 @@ const InventoryManagement = () => {
   const [providers, setProviders] = useState([]);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchType, setSearchType] = useState('description'); // <--- AGREGADO: ESTADO PARA TIPO BÚSQUEDA
   const deferredSearch = useDeferredValue(searchTerm);
   const searchRef = useRef(null);
   const [filterCategory, setFilterCategory] = useState('');
@@ -655,7 +657,7 @@ const InventoryManagement = () => {
   useEffect(() => { fetchData(); }, [fetchData]);
   
   const { filtered, totalFilteredCount } = useMemo(() => {
-    const q = norm(deferredSearch);
+    const q = (deferredSearch || '').toLowerCase().trim(); // raw deferred query
     const cat = String(filterCategory || '');
     const prov = String(filterProvider || '');
 
@@ -664,6 +666,7 @@ const InventoryManagement = () => {
     if (cat) matched = matched.filter(p => String(p.id_categoria) === cat);
     if (prov) matched = matched.filter(p => String(p.id_proveedor) === prov);
 
+    // --- NUEVA LÓGICA DE BÚSQUEDA ---
     if (!q) {
       return {
         filtered: matched.slice(0, PRODUCTS_INITIAL_LOAD),
@@ -671,21 +674,34 @@ const InventoryManagement = () => {
       };
     }
 
-    const starts = [];
-    const contains = [];
-    for (let i = 0; i < matched.length; i++) {
-      const it = matched[i];
-      const rank = matchRank(q, it);
-      if (rank === 1) starts.push(it);
-      else if (rank === 2) contains.push(it);
+    if (searchType === 'description' && q.length < 3) {
+       return {
+        filtered: matched.slice(0, PRODUCTS_INITIAL_LOAD),
+        totalFilteredCount: matched.length
+      };
     }
 
-    const ranked = starts.concat(contains);
+    const results = matched.filter(p => {
+      if (searchType === 'code') {
+        const codigo = String(p.codigo || '').toLowerCase();
+        // Inventory normalmente usa id_producto, aseguramos búsqueda por ahí también
+        const id = String(p.id_producto || '').toLowerCase(); 
+        const barras = String(p.codigo_barras || '').toLowerCase();
+        
+        return codigo.startsWith(q) || id.startsWith(q) || barras.startsWith(q);
+      } else {
+        const nombre = (p.nombre || '').toLowerCase();
+        const desc = (p.descripcion || '').toLowerCase();
+        return nombre.includes(q) || desc.includes(q);
+      }
+    });
+    // ---------------------------------
+
     return {
-      filtered: ranked.slice(0, visibleCount),
-      totalFilteredCount: ranked.length
+      filtered: results.slice(0, visibleCount),
+      totalFilteredCount: results.length
     };
-  }, [allProducts, deferredSearch, filterCategory, filterProvider, visibleCount]);
+  }, [allProducts, deferredSearch, filterCategory, filterProvider, visibleCount, searchType]);
 
   // Handlers para abrir modales
   const openCreateModal = () => setIsCreateModalOpen(true);
@@ -832,18 +848,25 @@ const InventoryManagement = () => {
         </HeaderContainer>
 
         <FilterContainer>
-            <SearchInputWrapper>
-                <FaSearch style={{ position: 'absolute', left: 12, top: 14, color: '#a0aec0' }} />
-                <SearchInput
-                    ref={searchRef}
-                    placeholder={`Buscar producto (F1) — código, nombre o descripción`}
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    autoComplete="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                />
-            </SearchInputWrapper>
+            {/* --- BLOQUE DE BÚSQUEDA MODIFICADO --- */}
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <SearchInputWrapper style={{ flex: 1 }}>
+                    <FaSearch style={{ position: 'absolute', left: 12, top: 14, color: '#a0aec0' }} />
+                    <SearchInput
+                        ref={searchRef}
+                        placeholder={searchType === 'code' ? "Buscar código..." : "Buscar nombre..."}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck={false}
+                    />
+                </SearchInputWrapper>
+                <FilterToggleButton $active={searchType === 'description'} onClick={() => setSearchType('description')} title="Por Nombre"><FaFont /></FilterToggleButton>
+                <FilterToggleButton $active={searchType === 'code'} onClick={() => setSearchType('code')} title="Por Código"><FaBarcode /></FilterToggleButton>
+            </div>
+            {/* -------------------------------------- */}
+
             <Select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
                 <option value="">Todas las categorías</option>
                 {categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}
