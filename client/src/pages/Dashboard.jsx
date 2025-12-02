@@ -7,7 +7,7 @@ import {
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext.jsx'; 
 
-// 🚨 CORRECCIÓN DE RUTA: Ajustada para reflejar la ubicación real en pages/pos/components
+// Ajusta la ruta si es necesario según tu estructura de carpetas
 import ConfirmationModal from './pos/components/ConfirmationModal.jsx'; 
 
 // --- ESTILOS MEJORADOS Y RESPONSIVOS ---
@@ -124,7 +124,6 @@ const CardIcon = styled.div`
 // --- Componente Dashboard ---
 const Dashboard = () => {
     const { user, logout } = useAuth();
-    // Estado para controlar el modal de cierre de sesión
     const [showLogoutModal, setShowLogoutModal] = useState(false); 
 
     if (!user) {
@@ -136,22 +135,28 @@ const Dashboard = () => {
     }
     
     // ----------------------------------------------------
-    // LÓGICA DE ROLES
+    // LÓGICA DE ROLES AJUSTADA
     // ----------------------------------------------------
     const userRole = user.rol || 'N/A';
-    const isAdmin = userRole === 'Administrador';
+    
+    // Roles base
+    const isAdmin = userRole === 'Administrador' || userRole === 'Admin';
     const isVendedor = userRole === 'Vendedor';
-    // Asumiendo que "Contador" usa el mismo rol de API que "Encargado de Finanzas"
     const isContador = userRole === 'Encargado de Finanzas' || userRole === 'Contador'; 
+    const isInventoryManager = userRole === 'Encargado de Inventario';
     
-    // Permisos combinados:
-    const isInventoryManager = isAdmin || userRole === 'Encargado de Inventario';
-    
-    const canAccessPOS = isAdmin || isVendedor;
+    // --- DEFINICIÓN DE ACCESOS ---
+
+    // 1. Punto de Venta: SOLO Admins (El vendedor ya NO entra aquí)
+    const canAccessPOS = isAdmin;
+
+    // 2. Pedidos: Admins Y Vendedores (Este es el ÚNICO lugar donde entra el vendedor)
     const canAccessOrders = isAdmin || isVendedor;
-    const canAccessCredits = isAdmin || isVendedor || isContador; 
-    const canAccessInventory = isInventoryManager && !isVendedor && !isContador;
-    const canAccessMassUpload = isInventoryManager && !isVendedor && !isContador;
+
+    // 3. El resto de módulos (Vendedor excluido)
+    const canAccessCredits = isAdmin || isContador; 
+    const canAccessInventory = isAdmin || isInventoryManager;
+    const canAccessMassUpload = isAdmin || isInventoryManager;
     const canAccessReports = isAdmin || userRole === 'Gerente' || isContador; 
     const canAccessCashReports = isAdmin || userRole === 'Gerente' || isContador; 
     const canAccessAdminUsers = isAdmin;
@@ -174,7 +179,7 @@ const Dashboard = () => {
                 <TopBar>
                     <Header>
                         <WelcomeTitle>Bienvenido, {displayName} 👋</WelcomeTitle> 
-                        <WelcomeSubtitle>Rol: {userRole}. Selecciona un módulo para empezar a trabajar.</WelcomeSubtitle>
+                        <WelcomeSubtitle>Rol: {userRole}. Selecciona un módulo para empezar.</WelcomeSubtitle>
                     </Header>
                     <LogoutButton aria-label="Cerrar sesión" onClick={handlePrepareLogout}>
                         <FaSignOutAlt /> Cerrar sesión
@@ -182,7 +187,7 @@ const Dashboard = () => {
                 </TopBar>
 
                 <GridContainer>
-                    {/* 1. Punto de Venta (VENDEDOR) */}
+                    {/* 1. Punto de Venta (SOLO ADMIN) */}
                     {canAccessPOS && (
                         <Card to="/pos" color="#007bff"> 
                             <CardIcon color="#007bff"><FaShoppingCart /></CardIcon> 
@@ -191,16 +196,16 @@ const Dashboard = () => {
                         </Card>
                     )}
 
-                    {/* 2. Pedidos y Apartados (VENDEDOR) */}
+                    {/* 2. Pedidos y Apartados (ADMIN Y VENDEDOR) */}
                     {canAccessOrders && (
                         <Card to="/orders" color="#ffc107"> 
                             <CardIcon color="#ffc107"><FaFileInvoice /></CardIcon> 
                             <h2>Pedidos y Apartados</h2> 
-                            <p>Administra pedidos de clientes y artículos reservados.</p> 
+                            <p>Crear tickets, apartados y pedidos.</p> 
                         </Card>
                     )}
                     
-                    {/* 3. Clientes y Créditos (VENDEDOR, CONTADOR) */}
+                    {/* 3. Clientes y Créditos */}
                     {canAccessCredits && (
                         <Card to="/credits" color="#17a2b8"> 
                             <CardIcon color="#17a2b8"><FaCreditCard /></CardIcon> 
@@ -209,7 +214,7 @@ const Dashboard = () => {
                         </Card>
                     )}
 
-                    {/* 4. Inventario (ADMIN, INVENTARIO) */}
+                    {/* 4. Inventario */}
                     {canAccessInventory && (
                         <Card to="/inventory" color="#28a745"> 
                             <CardIcon color="#28a745"><FaBoxOpen /></CardIcon> 
@@ -218,45 +223,44 @@ const Dashboard = () => {
                         </Card>
                     )}
 
-                    {/* 5. Carga Masiva (ADMIN, INVENTARIO) */}
+                    {/* 5. Carga Masiva */}
                     {canAccessMassUpload && (
                         <Card to="/upload/inventory" color="#6f42c1"> 
                             <CardIcon color="#6f42c1"><FaCloudUploadAlt /></CardIcon> 
                             <h2>Carga Masiva</h2> 
-                            <p>Actualiza grandes volúmenes de inventario desde archivos CSV.</p> 
+                            <p>Actualiza inventario desde archivos CSV.</p> 
                         </Card>
                     )}
 
-                    {/* 6. Reportes (ADMIN, GERENTE, CONTADOR) */}
+                    {/* 6. Reportes */}
                     {canAccessReports && (
                         <Card to="/reports" color="#6c757d"> 
                             <CardIcon color="#6c757d"><FaChartBar /></CardIcon> 
                             <h2>Reportes</h2> 
-                            <p>Visualiza el rendimiento general de ventas y operaciones.</p> 
+                            <p>Visualiza el rendimiento general.</p> 
                         </Card>
                     )}
 
-                    {/* 7. Gestión de Cajas (ADMIN, GERENTE, CONTADOR) */}
+                    {/* 7. Gestión de Cajas */}
                     {canAccessCashReports && (
                         <Card to="/cash-report" color="#dc3545"> 
                             <CardIcon color="#dc3545"><FaBriefcase /></CardIcon>
                             <h2>Gestión de Cajas</h2>
-                            <p>Consulta el estado de cajas abiertas y reportes de cierres.</p>
+                            <p>Cierres y arqueos de caja.</p>
                         </Card>
                     )}
 
-                    {/* 8. Usuarios (ADMIN) */}
+                    {/* 8. Usuarios */}
                     {canAccessAdminUsers && (
                         <Card to="/admin/users" color="#ff6b6b"> 
                             <CardIcon color="#ff6b6b"><FaUsers /></CardIcon> 
                             <h2>Usuarios</h2> 
-                            <p>Administra roles, accesos y permisos de usuario.</p> 
+                            <p>Administra roles y accesos.</p> 
                         </Card>
                     )}
                 </GridContainer>
             </Content>
 
-            {/* Renderizar el Modal de Confirmación */}
             <ConfirmationModal
                 isOpen={showLogoutModal}
                 title="Confirmar Cierre de Sesión"
