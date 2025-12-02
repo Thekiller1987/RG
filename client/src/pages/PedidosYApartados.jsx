@@ -1,5 +1,5 @@
 // client/src/pages/PedidosYApartados.jsx
-// VERSIÓN CORREGIDA: Formato de nombre de ticket ajustado
+// SOLO MODIFICADO: Formato de nombre y permisos de edición (readOnly=false)
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
@@ -536,12 +536,13 @@ const PedidosYApartados = () => {
             let finalOrderData = { ...orderData };
 
             if (!canManageTickets) {
-                // Capturamos el nombre del cliente que el vendedor escribió en el modal
-                // (ordenData.clienteNombre suele ser lo que se escribe en el input de cliente en CreateOrderModal)
+                // Obtenemos el nombre del cliente (escrito en el modal) o la descripción
                 const nombreCliente = orderData.clienteNombre || orderData.descripcion || '';
                 
-                // Formato solicitado: "Hecho por [Usuario] - [Nombre Cliente]"
+                // Obtenemos el nombre del usuario logueado
                 const nombreUsuario = user.nombre || user.nombre_usuario || user.username || 'Vendedor';
+
+                // Forzamos el nombre: Hecho por [Usuario] - [Cliente]
                 finalOrderData.clienteNombre = `Hecho por ${nombreUsuario} - ${nombreCliente}`;
             }
 
@@ -850,7 +851,6 @@ const PedidosYApartados = () => {
                     onClose={closeModal} 
                     onSubmit={handleCreateOrder} 
                     showAlert={showAlert}
-                    isCajaOpen={isCajaOpen}
                 />
             )}
             
