@@ -1,5 +1,6 @@
 // client/src/pages/PedidosYApartados.jsx
 // VERSIÓN CORREGIDA - DISEÑO BLANCO Y ANIMACIONES MEJORADAS
+// Lógica de Tickets implementada para Vendedores vs Admins
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
@@ -296,7 +297,6 @@ const EmptyState = styled.div`
     }
 `;
 
-// CORRECCIÓN APLICADA: Se agregaron las comillas simples faltantes
 const StatusBadge = styled.span`
     background: ${props => {
         switch (props.estado) {
@@ -468,6 +468,13 @@ const PedidosYApartados = () => {
     const showAlert = useCallback((props) => openModal('alert', props), [openModal]);
     const showConfirmation = useCallback((props) => openModal('confirmation', props), [openModal]);
 
+    // Verificar si el usuario tiene permisos de Administración o Contabilidad
+    const canManageTickets = useMemo(() => {
+        if (!user || !user.rol) return false;
+        const rol = user.rol.toLowerCase();
+        return rol === 'administrador' || rol === 'admin' || rol === 'contador';
+    }, [user]);
+
     const isCajaOpen = useMemo(() => {
         if (!user) return false;
         const session = loadCajaSession(user.id_usuario || user.id);
@@ -525,10 +532,25 @@ const PedidosYApartados = () => {
 
     const handleCreateOrder = async (orderData) => {
         try {
-            await api.createOrder(orderData, token);
+            // LÓGICA PERSONALIZADA:
+            // Si es vendedor (no admin/contador), forzamos el formato de Ticket
+            let finalOrderData = { ...orderData };
+
+            if (!canManageTickets) {
+                // Obtenemos la descripción o nota del formulario
+                const descripcion = orderData.descripcion || orderData.notas || '';
+                
+                // Forzamos el nombre según lo solicitado: Ticket - Nombre Usuario - Descripción
+                finalOrderData.clienteNombre = `Ticket - ${user.nombre || user.username} - ${descripcion}`;
+                
+                // Nos aseguramos que no se marque como completado o pagado inmediatamente si no hay caja
+                // (Aunque la API probablemente maneje el estado por defecto)
+            }
+
+            await api.createOrder(finalOrderData, token);
             showAlert({ 
                 title: "¡Éxito!", 
-                message: "Pedido creado correctamente."
+                message: "Ticket/Pedido creado correctamente."
             });
             await fetchPedidos();
             closeModal();
@@ -585,7 +607,7 @@ const PedidosYApartados = () => {
                     <h1>No estás autenticado</h1>
                     <p>Por favor, inicia sesión para acceder a esta página.</p>
                     <BackButton to="/login" style={{ marginTop: '1rem' }}>
-                        Iniciar Sesión
+                        <Iniciar Sesión />
                     </BackButton>
                 </div>
             </PageWrapper>
@@ -604,9 +626,11 @@ const PedidosYApartados = () => {
                     <Button 
                         $primary 
                         onClick={() => openModal('createOrder')} 
-                        disabled={!isCajaOpen}
+                        // MODIFICACIÓN: Ya no deshabilitamos el botón si la caja está cerrada
+                        // disabled={!isCajaOpen} 
+                        disabled={false}
                     >
-                        <FaPlus /> Crear Pedido
+                        <FaPlus /> Crear Ticket / Pedido
                     </Button>
                     <BackButton to="/dashboard">
                         <FaArrowLeft/> Volver al Dashboard
@@ -617,7 +641,8 @@ const PedidosYApartados = () => {
             {!isCajaOpen && (
                 <WarningBanner>
                     <FaExclamationTriangle />
-                    La caja está cerrada. No se pueden crear nuevos pedidos ni registrar pagos.
+                    {/* Mensaje actualizado */}
+                    La caja está cerrada. Solo se permite crear Tickets (el cobro debe hacerlo Administración).
                 </WarningBanner>
             )}
 
@@ -657,7 +682,7 @@ const PedidosYApartados = () => {
                         </h3>
                         <Input 
                             type="text" 
-                            placeholder="Buscar por ID o nombre de cliente..." 
+                            placeholder="Buscar por ID o nombre..." 
                             value={searchTerm} 
                             onChange={e => setSearchTerm(e.target.value)} 
                         />
@@ -815,7 +840,7 @@ const PedidosYApartados = () => {
                                 }}>
                                     {searchTerm || filtroEstado !== 'Todos' 
                                         ? 'Prueba ajustando los filtros de búsqueda' 
-                                        : 'Crea tu primer pedido usando el botón superior'
+                                        : 'Crea tu primer ticket/pedido usando el botón superior'
                                     }
                                 </p>
                             </EmptyState>
@@ -840,7 +865,11 @@ const PedidosYApartados = () => {
                     onUpdate={fetchPedidos} 
                     showAlert={showAlert} 
                     showConfirmation={showConfirmation} 
-                    isCajaOpen={isCajaOpen} 
+                    isCajaOpen={isCajaOpen}
+                    // MODIFICACIÓN: Pasamos permisos al modal para bloquear el cobro
+                    canManage={canManageTickets}
+                    canCharge={canManageTickets} // Prop explícita para cobro
+                    readOnly={!canManageTickets} // Prop explícita para edición
                 />
             )}
             
