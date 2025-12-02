@@ -1,40 +1,21 @@
 const pool = require('../config/db');
 
-/* ───────────────────────── getOrders ───────────────────────── */
+// ✅ Obtener pedidos (CON NUEVO CAMPO)
 const getOrders = async (req, res) => {
     try {
-        const userId = req.user?.id;
-        const isAdminOrCajero = req.user?.rol === 'Administrador' || req.user?.rol === 'Cajero' || req.user?.rol === 'Encargado de Finanzas';
-
-        let whereClause = '1=1';
-        const params = [];
-
-        if (!isAdminOrCajero && userId) {
-            whereClause += ' AND o.id_usuario = ?';
-            params.push(userId);
-        }
-
         const query = `
             SELECT 
                 o.id_pedido AS id, 
-                o.id_pedido,
-                COALESCE(NULLIF(o.nombre_cliente, ''), 'Cliente no asignado') AS cliente_nombre,
-                o.id_cliente,
+                COALESCE(NULLIF(o.nombre_cliente, ''), 'Cliente no asignado') AS clienteNombre,
+                o.id_cliente AS clienteId,
                 o.total_pedido AS total, 
                 o.abonado, 
                 o.estado, 
-                o.fecha_creacion AS created_at,
-                o.vendedor,      
-                o.id_usuario,    
-                o.etiqueta,      
-                o.nombre_pedido, 
-                o.tipo,
-                o.id_caja        
+                o.fecha_creacion AS fecha
             FROM pedidos o
-            WHERE ${whereClause}
             ORDER BY o.fecha_creacion DESC
         `;
-        const [orders] = await pool.query(query, params);
+        const [orders] = await pool.query(query);
         res.json(orders);
     } catch (error) {
         console.error('Error al obtener pedidos:', error);
@@ -42,80 +23,47 @@ const getOrders = async (req, res) => {
     }
 };
 
-/* ───────────────────────── createOrder (CORRECCIÓN FINAL) ───────────────────────── */
+// ✅ CREAR PEDIDO - VERSIÓN CON NUEVO CAMPO
 const createOrder = async (req, res) => {
-    const { 
-        items, total, subtotal, pagoDetalles, 
-        
-        // Extracción de todos los campos que React envía
-        id_cliente, cliente_nombre, id_usuario, vendedor, 
-        abonado, id_caja, nombre_pedido, etiqueta,
-        tipo // <--- Campo 'tipo'
-        
-    } = req.body;
-    
-    const userId = id_usuario || req.user?.id; 
+    const { clienteNombre, items, total, abonoInicial, pagoDetalles } = req.body;
     const connection = await pool.getConnection();
     
     try {
         await connection.beginTransaction();
-
-        // 1. Mapeamos abonado a un número seguro (0)
-        const montoAbonado = Number(abonado) || 0; 
         
-        // Determinar estado basado en el tipo (siempre PENDIENTE para un ticket recién creado)
-        const estadoInicial = 'PENDIENTE';
-        const tipoPedido = tipo || 'pedido'; // Aseguramos que el tipo no sea nulo
-
-        // 2. Construimos el objeto de inserción
-        const pedidoData = {
-            id_cliente: id_cliente || null,
-            nombre_cliente: cliente_nombre || 'Consumidor Final',
-            total_pedido: total,
-            subtotal: subtotal,
-            
-            // ✅ CAMPOS CORREGIDOS
-            abonado: montoAbonado, 
-            estado: estadoInicial,
-            tipo: tipoPedido,
-            
-            id_caja: id_caja, 
-            nombre_pedido: nombre_pedido || null,
-            etiqueta: etiqueta || null,
-            
-            id_usuario: userId,
-            vendedor: vendedor || 'N/A', 
-            
-            fecha_creacion: new Date()
-        };
+        const estadoInicial = abonoInicial > 0 ? 'APARTADO' : 'PENDIENTE';
         
+        console.log('=== CREANDO PEDIDO ===');
+        console.log('Cliente Nombre:', clienteNombre);
+        console.log('Estado inicial:', estadoInicial);
+        
+        // ✅ GUARDAMOS EL NOMBRE DEL CLIENTE DIRECTAMENTE
         const [orderResult] = await connection.query(
-            'INSERT INTO pedidos SET ?', pedidoData
+            'INSERT INTO pedidos (id_cliente, nombre_cliente, total_pedido, abonado, estado, fecha_creacion) VALUES (?, ?, ?, ?, ?, NOW())',
+            [null, clienteNombre, total, abonoInicial, estadoInicial]
         );
         
         const orderId = orderResult.insertId;
-        
-        // 3. Insertar Detalle_pedidos y actualizar stock/reservado
+        console.log('Pedido creado con ID:', orderId);
+
+        // Insertar items del pedido
         for (const item of items) {
-            const productoId = item.producto_id || item.id_producto; 
-            
             await connection.query(
                 'INSERT INTO detalle_pedidos (id_pedido, id_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?)',
-                [orderId, productoId, item.cantidad, item.precio_unitario]
+                [orderId, item.id, item.quantity, item.precio]
             );
             
-            // Actualizar stock: Se resta de existencia y suma a stock_reservado
             await connection.query(
                 'UPDATE productos SET existencia = existencia - ?, stock_reservado = stock_reservado + ? WHERE id_producto = ?',
-                [item.cantidad, item.cantidad, productoId]
+                [item.quantity, item.quantity, item.id]
             );
         }
 
-        // 4. Registrar Abono (si aplica, aunque el frontend ahora solo envía 0)
-        if (montoAbonado > 0) {
+        // Si hay abono inicial, registrar venta
+        if (abonoInicial > 0) {
             await connection.query(
                 "INSERT INTO ventas (fecha, total_venta, estado, id_usuario, pago_detalles, tipo_venta, referencia_pedido) VALUES (NOW(), ?, 'ABONO', ?, ?, 'PEDIDO', ?)",
-                [montoAbonado, req.user.id, JSON.stringify(pagoDetalles || {}), orderId]
+                [abonoInicial, req.user.id, JSON.stringify(pagoDetalles), orderId]
             );
         }
 
@@ -123,32 +71,27 @@ const createOrder = async (req, res) => {
         
         res.status(201).json({ 
             message: 'Pedido creado exitosamente', 
-            id_pedido: orderId 
+            orderId 
         });
         
     } catch (error) {
         await connection.rollback();
-        console.error('❌ ERROR CRÍTICO al crear pedido:', error);
-        
-        let msg = error.message || 'Error al crear el pedido';
-        if (msg.includes('id_caja') || msg.includes('abonado')) {
-             msg = "Error de BD: El servidor falló al mapear un campo NOT NULL. Revise la definición de la tabla 'pedidos' y reinicie el servicio.";
-        }
-        
+        console.error('❌ Error al crear pedido:', error);
         res.status(500).json({ 
-            message: msg
+            message: error.message || 'Error al crear el pedido' 
         });
     } finally {
         if (connection) connection.release();
     }
 };
 
-/* ───────────────────────── getOrderDetails ───────────────────────── */
+// ✅ Obtener detalles del pedido (ACTUALIZADO)
 const getOrderDetails = async (req, res) => {
     const { id } = req.params;
     const { search } = req.query;
 
     try {
+        // Datos generales del pedido
         const [orderQuery] = await pool.query(`
             SELECT 
                 o.id_pedido AS id, 
@@ -156,11 +99,7 @@ const getOrderDetails = async (req, res) => {
                 o.total_pedido AS total, 
                 o.abonado, 
                 o.estado, 
-                o.fecha_creacion AS fecha,
-                o.etiqueta,
-                o.nombre_pedido,
-                o.vendedor,
-                o.id_caja 
+                o.fecha_creacion AS fecha
             FROM pedidos o
             WHERE o.id_pedido = ?
         `, [id]);
@@ -168,7 +107,8 @@ const getOrderDetails = async (req, res) => {
         if (orderQuery.length === 0) {
             return res.status(404).json({ message: 'Pedido no encontrado' });
         }
-        
+
+        // Consulta base para los productos del pedido
         let productQuery = `
             SELECT 
                 p.nombre, 
@@ -180,13 +120,16 @@ const getOrderDetails = async (req, res) => {
             WHERE dp.id_pedido = ?
         `;
         const params = [id];
+
         if (search && search.trim() !== '') {
             productQuery += ` AND (p.nombre LIKE ? OR p.codigo LIKE ?)`;
             const likeSearch = `%${search}%`;
             params.push(likeSearch, likeSearch);
         }
+
         const [itemsQuery] = await pool.query(productQuery, params);
 
+        // Abonos del pedido
         const [abonosQuery] = await pool.query(`
             SELECT fecha, total_venta AS monto, pago_detalles 
             FROM ventas 
@@ -205,7 +148,7 @@ const getOrderDetails = async (req, res) => {
     }
 };
 
-/* ───────────────────────── addAbono ───────────────────────── */
+// Las funciones addAbono, liquidarOrder y cancelOrder se mantienen igual...
 const addAbono = async (req, res) => {
     const { id } = req.params;
     const { monto, pagoDetalles } = req.body;
@@ -213,7 +156,7 @@ const addAbono = async (req, res) => {
     
     try {
         await connection.beginTransaction();
-        const [orderRows] = await pool.query('SELECT * FROM pedidos WHERE id_pedido = ? FOR UPDATE', [id]);
+        const [orderRows] = await connection.query('SELECT * FROM pedidos WHERE id_pedido = ? FOR UPDATE', [id]);
         
         if (orderRows.length === 0) {
             throw new Error('Pedido no encontrado');
@@ -227,9 +170,9 @@ const addAbono = async (req, res) => {
         }
         
         const nuevoAbonado = parseFloat(order.abonado) + parseFloat(monto);
-        await pool.query('UPDATE pedidos SET abonado = ? WHERE id_pedido = ?', [nuevoAbonado, id]);
+        await connection.query('UPDATE pedidos SET abonado = ? WHERE id_pedido = ?', [nuevoAbonado, id]);
         
-        await pool.query(
+        await connection.query(
             "INSERT INTO ventas (fecha, total_venta, estado, id_usuario, pago_detalles, tipo_venta, referencia_pedido) VALUES (NOW(), ?, 'ABONO', ?, ?, 'PEDIDO', ?)",
             [monto, req.user.id, JSON.stringify(pagoDetalles), id]
         );
@@ -246,7 +189,6 @@ const addAbono = async (req, res) => {
     }
 };
 
-/* ───────────────────────── liquidarOrder ───────────────────────── */
 const liquidarOrder = async (req, res) => {
     const { id } = req.params;
     const { pagoDetalles } = req.body;
@@ -254,7 +196,7 @@ const liquidarOrder = async (req, res) => {
     
     try {
         await connection.beginTransaction();
-        const [orderRows] = await pool.query('SELECT * FROM pedidos WHERE id_pedido = ? FOR UPDATE', [id]);
+        const [orderRows] = await connection.query('SELECT * FROM pedidos WHERE id_pedido = ? FOR UPDATE', [id]);
         
         if (orderRows.length === 0) {
             throw new Error('Pedido no encontrado');
@@ -263,19 +205,19 @@ const liquidarOrder = async (req, res) => {
         const order = orderRows[0];
         const saldoPendiente = parseFloat(order.total_pedido) - parseFloat(order.abonado);
         
-        await pool.query(
+        await connection.query(
             'UPDATE pedidos SET abonado = total_pedido, estado = "COMPLETADO" WHERE id_pedido = ?', 
             [id]
         );
         
-        await pool.query(
+        await connection.query(
             "INSERT INTO ventas (fecha, total_venta, estado, id_usuario, pago_detalles, tipo_venta, referencia_pedido) VALUES (NOW(), ?, 'LIQUIDACIÓN', ?, ?, 'PEDIDO', ?)",
             [saldoPendiente, req.user.id, JSON.stringify(pagoDetalles), id]
         );
 
-        const [items] = await pool.query('SELECT * FROM detalle_pedidos WHERE id_pedido = ?', [id]);
+        const [items] = await connection.query('SELECT * FROM detalle_pedidos WHERE id_pedido = ?', [id]);
         for (const item of items) {
-            await pool.query(
+            await connection.query(
                 'UPDATE productos SET stock_reservado = stock_reservado - ? WHERE id_producto = ?', 
                 [item.cantidad, item.id_producto]
             );
@@ -293,14 +235,13 @@ const liquidarOrder = async (req, res) => {
     }
 };
 
-/* ───────────────────────── cancelOrder ───────────────────────── */
 const cancelOrder = async (req, res) => {
     const { id } = req.params;
     const connection = await pool.getConnection();
     
     try {
         await connection.beginTransaction();
-        const [orderRows] = await pool.query(
+        const [orderRows] = await connection.query(
             'SELECT * FROM pedidos WHERE id_pedido = ? AND estado != "CANCELADO"', 
             [id]
         );
@@ -312,15 +253,15 @@ const cancelOrder = async (req, res) => {
             });
         }
 
-        const [items] = await pool.query('SELECT * FROM detalle_pedidos WHERE id_pedido = ?', [id]);
+        const [items] = await connection.query('SELECT * FROM detalle_pedidos WHERE id_pedido = ?', [id]);
         for (const item of items) {
-            await pool.query(
+            await connection.query(
                 'UPDATE productos SET stock_reservado = stock_reservado - ?, existencia = existencia + ? WHERE id_producto = ?', 
                 [item.cantidad, item.cantidad, item.id_producto]
             );
         }
         
-        await pool.query(
+        await connection.query(
             'UPDATE pedidos SET estado = "CANCELADO" WHERE id_pedido = ?', 
             [id]
         );
@@ -340,7 +281,6 @@ const cancelOrder = async (req, res) => {
         if (connection) connection.release();
     }
 };
-
 
 module.exports = {
     getOrders,

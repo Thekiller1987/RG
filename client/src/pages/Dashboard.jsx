@@ -147,7 +147,7 @@ const Dashboard = () => {
     // Permisos combinados:
     const isInventoryManager = isAdmin || userRole === 'Encargado de Inventario';
     
-    const canAccessPOS = isAdmin;
+    const canAccessPOS = isAdmin || isVendedor;
     const canAccessOrders = isAdmin || isVendedor;
     const canAccessCredits = isAdmin || isVendedor || isContador; 
     const canAccessInventory = isInventoryManager && !isVendedor && !isContador;
