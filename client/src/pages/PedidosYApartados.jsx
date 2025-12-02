@@ -453,11 +453,13 @@ const LoadingShimmer = styled.div`
 
 // --- COMPONENTE PRINCIPAL MEJORADO ---
 const PedidosYApartados = () => {
-    // CAMBIO 1: Extraemos 'products' del contexto para poder pasarlo al modal
-    const { user, products } = useAuth();
+    // CAMBIO 1: Extraemos 'products' del contexto, pero tambien creamos un estado local
+    const { user, products: contextProducts } = useAuth();
     const token = localStorage.getItem('token');
 
     const [pedidos, setPedidos] = useState([]);
+    // CAMBIO NUEVO: Estado para asegurar que hay productos (para el vendedor)
+    const [listaProductos, setListaProductos] = useState([]); 
     const [isLoading, setIsLoading] = useState(true);
     const [filtroEstado, setFiltroEstado] = useState('Activos');
     const [searchTerm, setSearchTerm] = useState('');
@@ -496,6 +498,23 @@ const PedidosYApartados = () => {
             setIsLoading(false);
         }
     }, [token, showAlert]);
+
+    // NUEVO EFECTO: Si no hay productos en el contexto (Vendedor), cargarlos de la API
+    useEffect(() => {
+        const cargarProductosFaltantes = async () => {
+            if (contextProducts && contextProducts.length > 0) {
+                setListaProductos(contextProducts);
+            } else if (token) {
+                try {
+                    const data = await api.fetchProducts(token);
+                    if (data) setListaProductos(data);
+                } catch (error) {
+                    console.error("Error al cargar productos manualmente", error);
+                }
+            }
+        };
+        cargarProductosFaltantes();
+    }, [contextProducts, token]);
 
     useEffect(() => {
         fetchPedidos();
@@ -543,8 +562,8 @@ const PedidosYApartados = () => {
                 // Obtenemos el nombre del usuario logueado
                 const nombreUsuario = user.nombre || user.nombre_usuario || user.username || 'Vendedor';
 
-                // CORRECCIÓN: Formato "Hecho por [Usuario] - [Cliente]"
-                finalOrderData.clienteNombre = `Hecho por ${nombreUsuario} - ${nombreCliente}`;
+                // CORRECCIÓN SOLICITADA: Formato "Facturado por [Usuario] - [Cliente]"
+                finalOrderData.clienteNombre = `Facturado por ${nombreUsuario} - ${nombreCliente}`;
             }
 
             await api.createOrder(finalOrderData, token);
@@ -852,9 +871,9 @@ const PedidosYApartados = () => {
                     onClose={closeModal} 
                     onSubmit={handleCreateOrder} 
                     showAlert={showAlert}
-                    // CAMBIO 2: Pasamos isCajaOpen y PRODUCTS (esto arregla la búsqueda en blanco)
+                    // CAMBIO 2: Pasamos isCajaOpen y listaProductos (que tiene datos aunque sea vendedor)
                     isCajaOpen={isCajaOpen}
-                    products={products}
+                    products={listaProductos}
                 />
             )}
             
