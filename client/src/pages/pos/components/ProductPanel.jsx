@@ -55,8 +55,8 @@ export default function ProductPanel({
       return products.slice(0, PRODUCTS_PER_PAGE);
     }
 
-    // 2. Si es búsqueda por NOMBRE, mantenemos la restricción de 3 letras para no saturar
-    //    Pero si es CÓDIGO, permitimos buscar desde 1 caracter (ej: código "5")
+    // 2. Si es búsqueda por NOMBRE, mantenemos la restricción de 3 letras
+    //    Pero si es CÓDIGO, permitimos buscar desde 1 caracter
     if (searchType === 'description' && term.length < 3) {
        return products.slice(0, PRODUCTS_PER_PAGE);
     }
@@ -64,16 +64,14 @@ export default function ProductPanel({
     // 3. Filtramos los productos
     const results = products.filter(p => {
       if (searchType === 'code') {
-        // --- CORRECCIÓN: USAR startsWith ---
-        // Validamos contra 'codigo', 'codigo_barras' o 'id'
+        // --- CORRECCIÓN: SOLO CÓDIGO Y BARRAS (SIN ID) ---
         const codigo = String(p.codigo || '').toLowerCase();
         const barras = String(p.codigo_barras || '').toLowerCase();
-        const id = String(p.id || '').toLowerCase();
-
-        // Devuelve true si ALGUNO de los campos EMPIEZA con el término
-        return codigo.startsWith(term) || barras.startsWith(term) || id.startsWith(term);
+        
+        // Devuelve true si el código visible o de barras empieza con el término
+        return codigo.startsWith(term) || barras.startsWith(term);
       } else {
-        // Búsqueda por NOMBRE (se mantiene igual, busca en cualquier parte)
+        // Búsqueda por NOMBRE (se mantiene igual)
         const nombre = (p.nombre || '').toLowerCase();
         const desc = (p.descripcion || '').toLowerCase();
         return nombre.includes(term) || desc.includes(term);
@@ -91,8 +89,8 @@ export default function ProductPanel({
         if (searchType === 'code') {
             const codigo = String(p.codigo || '').toLowerCase();
             const barras = String(p.codigo_barras || '').toLowerCase();
-            const id = String(p.id || '').toLowerCase();
-            return codigo.startsWith(term) || barras.startsWith(term) || id.startsWith(term);
+            // Corrección aquí también: Quitamos el ID
+            return codigo.startsWith(term) || barras.startsWith(term);
         }
         return (p.nombre || '').toLowerCase().includes(term);
     }).length;

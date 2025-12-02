@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import {
   FaPlus, FaBoxOpen, FaTags, FaTruck, FaTrash, FaEdit, FaArrowLeft, FaHistory, FaSpinner,
   FaSearch, FaTimes, FaPlusCircle, FaMinusCircle, FaExclamationTriangle,
-  FaBarcode, FaFont // <--- AGREGADO
+  FaBarcode, FaFont 
 } from 'react-icons/fa';
 import AlertModal from './pos/components/AlertModal.jsx';
 
@@ -684,11 +684,12 @@ const InventoryManagement = () => {
     const results = matched.filter(p => {
       if (searchType === 'code') {
         const codigo = String(p.codigo || '').toLowerCase();
-        // Inventory normalmente usa id_producto, aseguramos búsqueda por ahí también
-        const id = String(p.id_producto || '').toLowerCase(); 
+        // --- CORRECCIÓN: ELIMINADO ID DE LA BÚSQUEDA ---
+        // const id = String(p.id_producto || '').toLowerCase(); 
         const barras = String(p.codigo_barras || '').toLowerCase();
         
-        return codigo.startsWith(q) || id.startsWith(q) || barras.startsWith(q);
+        // Ahora solo buscamos en código y código de barras
+        return codigo.startsWith(q) || barras.startsWith(q);
       } else {
         const nombre = (p.nombre || '').toLowerCase();
         const desc = (p.descripcion || '').toLowerCase();
