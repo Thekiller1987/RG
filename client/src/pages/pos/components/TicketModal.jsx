@@ -9,7 +9,7 @@ import { useAuth } from '../../../context/AuthContext.jsx';
  * ================================================================= */
 const COMPANY = {
   NAME: 'Multirepuestos RG',
-  RUC: '[Número de RUC aquí]',
+  RUC: '1211812770001E',
   PHONE: '84031936 / 84058142',
   ADDRESS: 'Del portón de la normal 75 varas al este. Juigalpa, Chontales.',
   SLOGAN: 'Repuestos de confianza al mejor precio — calidad que mantiene tu motor en marcha.',

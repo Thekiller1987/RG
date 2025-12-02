@@ -1,6 +1,5 @@
 // client/src/pages/PedidosYApartados.jsx
-// VERSIÓN CORREGIDA - DISEÑO BLANCO Y ANIMACIONES MEJORADAS
-// Lógica de Tickets implementada para Vendedores vs Admins
+// VERSIÓN CORREGIDA: Permite a empleados agregar productos (Read Only desactivado)
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
@@ -542,9 +541,6 @@ const PedidosYApartados = () => {
                 
                 // Forzamos el nombre según lo solicitado: Ticket - Nombre Usuario - Descripción
                 finalOrderData.clienteNombre = `Ticket - ${user.nombre || user.username} - ${descripcion}`;
-                
-                // Nos aseguramos que no se marque como completado o pagado inmediatamente si no hay caja
-                // (Aunque la API probablemente maneje el estado por defecto)
             }
 
             await api.createOrder(finalOrderData, token);
@@ -626,8 +622,6 @@ const PedidosYApartados = () => {
                     <Button 
                         $primary 
                         onClick={() => openModal('createOrder')} 
-                        // MODIFICACIÓN: Ya no deshabilitamos el botón si la caja está cerrada
-                        // disabled={!isCajaOpen} 
                         disabled={false}
                     >
                         <FaPlus /> Crear Ticket / Pedido
@@ -641,7 +635,6 @@ const PedidosYApartados = () => {
             {!isCajaOpen && (
                 <WarningBanner>
                     <FaExclamationTriangle />
-                    {/* Mensaje actualizado */}
                     La caja está cerrada. Solo se permite crear Tickets (el cobro debe hacerlo Administración).
                 </WarningBanner>
             )}
@@ -854,7 +847,9 @@ const PedidosYApartados = () => {
                 <CreateOrderModal 
                     onClose={closeModal} 
                     onSubmit={handleCreateOrder} 
-                    showAlert={showAlert} 
+                    showAlert={showAlert}
+                    // AÑADIDO: Pasamos isCajaOpen por si el modal necesita verificar algo
+                    isCajaOpen={isCajaOpen}
                 />
             )}
             
@@ -866,10 +861,15 @@ const PedidosYApartados = () => {
                     showAlert={showAlert} 
                     showConfirmation={showConfirmation} 
                     isCajaOpen={isCajaOpen}
-                    // MODIFICACIÓN: Pasamos permisos al modal para bloquear el cobro
+                    
+                    // --- CORRECCIÓN CLAVE AQUÍ ---
+                    // Antes: readOnly={!canManageTickets} (Esto bloqueaba todo para el empleado)
+                    // Ahora: readOnly={false} (Permite agregar productos)
+                    readOnly={false} 
+
+                    // Mantenemos la restricción de cobro
+                    canCharge={canManageTickets} 
                     canManage={canManageTickets}
-                    canCharge={canManageTickets} // Prop explícita para cobro
-                    readOnly={!canManageTickets} // Prop explícita para edición
                 />
             )}
             
