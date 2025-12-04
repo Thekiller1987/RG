@@ -1,6 +1,5 @@
 // client/src/pages/PedidosYApartados.jsx
-// VERSIÓN CORREGIDA - NOMBRE DE CLIENTE EN TICKET + BÚSQUEDA PRODUCTOS
-// Diseño Blanco y Animaciones Mejoradas
+// VERSIÓN FINAL - Código base restaurado + Corrección Solo Nombre Cliente
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
@@ -652,9 +651,9 @@ const PedidosYApartados = () => {
                 // Obtenemos la descripción o nota del formulario
                 const descripcion = orderData.descripcion || orderData.notas || '';
                 
-                // --- CAMBIO AQUÍ: OBTENEMOS EL NOMBRE DEL CLIENTE DEL FORMULARIO ---
+                // --- CAMBIO SOLO AQUÍ ---
                 const nombreClienteFormulario = orderData.clienteNombre || 'Cliente Casual';
-
+                
                 // Forzamos el nombre: Ticket - Usuario - NombreCliente - Descripción
                 finalOrderData.clienteNombre = `Ticket - ${user.nombre || user.username} - ${nombreClienteFormulario} - ${descripcion}`;
             }
