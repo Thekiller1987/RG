@@ -1,7 +1,6 @@
 // client/src/pages/PedidosYApartados.jsx
-// VERSIÓN CORREGIDA - DISEÑO BLANCO Y ANIMACIONES MEJORADAS
-// Lógica de Tickets implementada para Vendedores vs Admins
-// AGREGADO: Funcionalidad de Búsqueda de Productos para Vendedores
+// VERSIÓN CORREGIDA - NOMBRE DE CLIENTE EN TICKET + BÚSQUEDA PRODUCTOS
+// Diseño Blanco y Animaciones Mejoradas
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
@@ -653,8 +652,11 @@ const PedidosYApartados = () => {
                 // Obtenemos la descripción o nota del formulario
                 const descripcion = orderData.descripcion || orderData.notas || '';
                 
-                // Forzamos el nombre según lo solicitado: Ticket - Nombre Usuario - Descripción
-                finalOrderData.clienteNombre = `Ticket - ${user.nombre || user.username} - ${descripcion}`;
+                // --- CAMBIO AQUÍ: OBTENEMOS EL NOMBRE DEL CLIENTE DEL FORMULARIO ---
+                const nombreClienteFormulario = orderData.clienteNombre || 'Cliente Casual';
+
+                // Forzamos el nombre: Ticket - Usuario - NombreCliente - Descripción
+                finalOrderData.clienteNombre = `Ticket - ${user.nombre || user.username} - ${nombreClienteFormulario} - ${descripcion}`;
             }
 
             await api.createOrder(finalOrderData, token);
