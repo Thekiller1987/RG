@@ -128,29 +128,32 @@ const loadData = async () => {
         };
 
         // Procesar pedidos (orders)
-        const processedOrders = orders.map(o => {
-            const totalPedido = getNum(o.total || o.monto_total || o.precio_total || 0);
-            const abonadoPedido = getNum(o.abonado || o.pagado || 0);
-            
-            return {
-                id: o.id || o.id_pedido,
-                type: 'PEDIDO',
-                raw: o,
-                client: getCliente(o),
-                date: o.created_at || o.fecha || o.fecha_creacion || new Date().toISOString(),
-                total: totalPedido,
-                paid: abonadoPedido,
-                status: getEstado(o),
-                saldo: totalPedido - abonadoPedido,
-                // Campos adicionales para debug
-                debug: {
-                    total_raw: o.total,
-                    abonado_raw: o.abonado,
-                    estado_raw: o.estado
-                }
-            };
-        });
-
+        // En loadData, dentro del bloque donde procesas los pedidos:
+const processedOrders = orders.map(o => {
+    const totalPedido = getNum(o.total || o.monto_total || o.precio_total || 0);
+    const abonadoPedido = getNum(o.abonado || o.pagado || 0);
+    
+    return {
+        id: o.id || o.id_pedido,
+        type: 'PEDIDO',
+        raw: o,
+        client: getCliente(o),
+        date: o.created_at || o.fecha || o.fecha_creacion || new Date().toISOString(),
+        total: totalPedido,
+        paid: abonadoPedido,
+        status: getEstado(o),
+        saldo: totalPedido - abonadoPedido,
+        // Asegurar que siempre haya una propiedad items (aunque sea vacía)
+        items: o.items || o.detalles || o.productos || [],
+        // Campos adicionales para debug
+        debug: {
+            total_raw: o.total,
+            abonado_raw: o.abonado,
+            estado_raw: o.estado,
+            has_items: !!(o.items || o.detalles || o.productos)
+        }
+    };
+});
         // Procesar ventas (sales) que puedan estar pendientes
         const processedSales = sales.map(s => {
             const totalVenta = getNum(s.total_venta || s.total || s.monto_final || 0);

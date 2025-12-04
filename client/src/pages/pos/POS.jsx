@@ -351,89 +351,155 @@ const POS = () => {
     }
   };
 
-  // 2. Vuelca el pedido seleccionado al POS para cobrarlo - FUNCIÓN FALTANTE
-  const handleLoadPendingToPOS = (pendingSale) => {
-      console.log("🚀 Cargando pedido al POS:", pendingSale);
-      
-      // Verificar si el pedido ya está pagado
-      const totalPedido = Number(pendingSale.total || pendingSale.total_venta || pendingSale.monto_total || 0);
-      const pagado = Number(pendingSale.abonado || pendingSale.pagado || 0);
-      const saldo = totalPedido - pagado;
-      
-      if (saldo <= 0.5 && !pendingSale.estado?.includes('PENDIENTE')) { // Margen para decimales pequeños
-          showAlert({ 
-              title: "Pedido ya Pagado", 
-              message: `El pedido #${pendingSale.id} ya está pagado (Saldo: C$${fmt(saldo)}).` 
-          });
-          return;
-      }
-      
-      // Convertir items del pedido a items del carrito
-      const cartItems = (pendingSale.items || []).map(i => {
-          // Buscar producto en catálogo para datos actualizados
-          const catProd = products.find(p => 
-              p.id === (i.id_producto || i.id) ||
-              p.codigo === (i.codigo || i.codigo_producto)
-          );
-          
-          return {
-              id: i.id_producto || i.id || catProd?.id,
-              nombre: i.nombre || i.producto || catProd?.nombre || 'Producto sin nombre',
-              codigo: i.codigo || i.codigo_producto || catProd?.codigo,
-              quantity: Number(i.cantidad || i.quantity || 1),
-              precio_venta: Number(i.precio || i.precio_unitario || i.precio_venta || catProd?.precio || 0),
-              existencia: catProd?.existencia || 9999,
-              costo: catProd?.costo || i.costo || 0,
-              raw: catProd?.raw || i,
-              // Guardar información original del pedido
-              originalOrderItem: i
-          };
-      });
-      
-      // Si no hay items, mostrar advertencia
-      if (cartItems.length === 0) {
-          showAlert({ 
-              title: "Pedido Vacío", 
-              message: "Este pedido no tiene productos. Agrega productos antes de continuar." 
-          });
-          return;
-      }
-      
-      // Crear un nuevo ticket específico para este pedido
-      const newTicketId = Date.now();
-      const newTicket = {
-          id: newTicketId,
-          name: `Pedido #${pendingSale.id}`,
-          items: cartItems,
-          clientId: pendingSale.cliente?.id_cliente || pendingSale.clienteId || pendingSale.id_cliente || 0,
-          serverSaleId: pendingSale.id, // ID original para referencia
-          originalOrderData: pendingSale, // Guardar todos los datos originales
-          discount: { type: 'none', value: 0 },
-          createdAt: new Date().toISOString(),
-          isPendingOrder: true // Flag para identificar que es un pedido pendiente
-      };
-      
-      // Agregar el nuevo ticket y hacerlo activo
-      setOrders(prev => [...prev, newTicket]);
-      setActiveOrderId(newTicketId);
-      
-      closeModal();
-      
-      showAlert({ 
-          title: "✅ Pedido Cargado", 
-          message: `Pedido #${pendingSale.id} cargado exitosamente.\n\nTotal productos: ${cartItems.length}\nSaldo pendiente: C$${fmt(saldo)}\n\nPresiona F2 para proceder al pago.`,
-          type: "success"
-      });
-      
-      // Opcional: Mostrar resumen en consola
-      console.log("📝 Resumen del pedido cargado:", {
-          ticketId: newTicketId,
-          orderId: pendingSale.id,
-          itemsCount: cartItems.length,
-          cliente: pendingSale.cliente?.nombre || pendingSale.clienteNombre,
-          saldoPendiente: saldo
-      });
-  };
+ // En la función handleLoadPendingToPOS - SOLO MODIFICA ESTA FUNCIÓN
+const handleLoadPendingToPOS = (pendingSale) => {
+    console.log("🚀 Cargando pedido al POS:", pendingSale);
+    
+    // Verificar si el pedido ya está pagado
+    const totalPedido = Number(pendingSale.total || pendingSale.total_venta || pendingSale.monto_total || 0);
+    const pagado = Number(pendingSale.abonado || pendingSale.pagado || 0);
+    const saldo = totalPedido - pagado;
+    
+    if (saldo <= 0.5 && !pendingSale.estado?.includes('PENDIENTE')) {
+        showAlert({ 
+            title: "Pedido ya Pagado", 
+            message: `El pedido #${pendingSale.id} ya está pagado (Saldo: C$${fmt(saldo)}).` 
+        });
+        return;
+    }
+    
+    // IMPORTANTE: Los pedidos pueden tener los items en diferentes propiedades
+    // Buscar items en todas las ubicaciones posibles
+    const itemsFromPedido = 
+        pendingSale.items ||           // propiedad común
+        pendingSale.detalles ||        // alternativa común
+        pendingSale.productos ||       // otra alternativa
+        pendingSale.lineas ||          // otra opción
+        [];                           // array vacío si no hay
+    
+    console.log("🔍 Buscando items en pedido:", {
+        items: pendingSale.items,
+        detalles: pendingSale.detalles,
+        productos: pendingSale.productos,
+        lineas: pendingSale.lineas,
+        encontrados: itemsFromPedido.length
+    });
+    
+    // Convertir items del pedido a items del carrito
+    const cartItems = itemsFromPedido.map(i => {
+        // Buscar producto en catálogo para datos actualizados
+        const catProd = products.find(p => 
+            p.id === (i.id_producto || i.id || i.producto_id) ||
+            p.codigo === (i.codigo || i.codigo_producto)
+        );
+        
+        return {
+            id: i.id_producto || i.id || i.producto_id || catProd?.id,
+            nombre: i.nombre || i.producto || i.descripcion || catProd?.nombre || 'Producto',
+            codigo: i.codigo || i.codigo_producto || catProd?.codigo,
+            quantity: Number(i.cantidad || i.quantity || 1),
+            precio_venta: Number(i.precio || i.precio_unitario || i.precio_venta || i.precio_final || catProd?.precio || 0),
+            existencia: catProd?.existencia || 9999,
+            costo: catProd?.costo || i.costo || 0,
+            raw: catProd?.raw || i,
+            // Guardar información original del pedido
+            originalOrderItem: i
+        };
+    });
+    
+    // Si no hay items, verificar si hay total para mostrar mensaje más útil
+    if (cartItems.length === 0) {
+        if (totalPedido > 0) {
+            showAlert({ 
+                title: "Pedido sin productos detallados", 
+                message: `El pedido #${pendingSale.id} tiene un total de C$${fmt(totalPedido)} pero no se encontraron productos específicos.\n\n¿Deseas crear un ticket para este pedido y agregar los productos manualmente?`,
+                type: "custom",
+                buttons: [
+                    {
+                        label: "Sí, crear ticket",
+                        action: () => {
+                            const newTicketId = Date.now();
+                            const newTicket = {
+                                id: newTicketId,
+                                name: `Pedido #${pendingSale.id}`,
+                                items: [],
+                                clientId: pendingSale.cliente?.id_cliente || pendingSale.clienteId || pendingSale.id_cliente || 0,
+                                serverSaleId: pendingSale.id,
+                                originalOrderData: pendingSale,
+                                discount: { type: 'none', value: 0 },
+                                isPendingOrder: true,
+                                // Guardar información del total para referencia
+                                pedidoInfo: {
+                                    total: totalPedido,
+                                    saldo: saldo
+                                }
+                            };
+                            
+                            setOrders(prev => [...prev, newTicket]);
+                            setActiveOrderId(newTicketId);
+                            
+                            closeModal();
+                            
+                            showAlert({ 
+                                title: "Ticket creado", 
+                                message: `Ticket creado para Pedido #${pendingSale.id}.\n\nTotal pendiente: C$${fmt(saldo)}\n\nBusca y agrega los productos manualmente desde el catálogo.` 
+                            });
+                        },
+                        isPrimary: true
+                    },
+                    {
+                        label: "No, cancelar",
+                        action: () => {
+                            console.log("Operación cancelada por el usuario");
+                        },
+                        isCancel: true
+                    }
+                ]
+            });
+        } else {
+            showAlert({ 
+                title: "Pedido Vacío", 
+                message: "Este pedido no tiene productos registrados." 
+            });
+        }
+        return;
+    }
+    
+    // Crear un nuevo ticket específico para este pedido
+    const newTicketId = Date.now();
+    const newTicket = {
+        id: newTicketId,
+        name: `Pedido #${pendingSale.id}`,
+        items: cartItems,
+        clientId: pendingSale.cliente?.id_cliente || pendingSale.clienteId || pendingSale.id_cliente || 0,
+        serverSaleId: pendingSale.id, // ID original para referencia
+        originalOrderData: pendingSale, // Guardar todos los datos originales
+        discount: { type: 'none', value: 0 },
+        createdAt: new Date().toISOString(),
+        isPendingOrder: true
+    };
+    
+    // Agregar el nuevo ticket y hacerlo activo
+    setOrders(prev => [...prev, newTicket]);
+    setActiveOrderId(newTicketId);
+    
+    closeModal();
+    
+    showAlert({ 
+        title: "✅ Pedido Cargado", 
+        message: `Pedido #${pendingSale.id} cargado exitosamente.\n\nProductos: ${cartItems.length}\nSaldo pendiente: C$${fmt(saldo)}\n\nPresiona F2 para proceder al pago.`,
+        type: "success"
+    });
+    
+    console.log("📝 Resumen del pedido cargado:", {
+        ticketId: newTicketId,
+        orderId: pendingSale.id,
+        itemsCount: cartItems.length,
+        items: cartItems,
+        cliente: pendingSale.cliente?.nombre || pendingSale.clienteNombre,
+        saldoPendiente: saldo
+    });
+};
 
   /* -----------------------------------------------------------------
    * 3.6. EFECTOS

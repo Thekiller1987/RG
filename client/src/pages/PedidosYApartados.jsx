@@ -84,32 +84,38 @@ const PedidosYApartados = () => {
         await loadProductsData();
         openModal('createOrder');
     };
+// En handleCreateOrder, modificar la creación del forcedOrder:
+const handleCreateOrder = async (orderData) => {
+    try {
+        // FORZAMOS DATOS PARA EVITAR PAGOS EN ESTA PANTALLA
+        const forcedOrder = { 
+            ...orderData,
+            abonado: 0,
+            estado: 'PENDIENTE',
+            metodo_pago: 'Pendiente',
+            // Asegurar que los items se envíen con la estructura correcta
+            items: orderData.items?.map(item => ({
+                id_producto: item.id,
+                producto: item.nombre,
+                cantidad: item.quantity,
+                precio: item.precio_venta || item.precio,
+                descripcion: item.descripcion || item.nombre
+            })) || []
+        };
 
-    // --- CREAR PEDIDO (Lógica Estricta: ABONO = 0) ---
-    const handleCreateOrder = async (orderData) => {
-        try {
-            // FORZAMOS DATOS PARA EVITAR PAGOS EN ESTA PANTALLA
-            const forcedOrder = { 
-                ...orderData,
-                abonado: 0, // <--- NADIE paga aquí
-                estado: 'PENDIENTE', // <--- Siempre nace pendiente
-                metodo_pago: 'Pendiente'
-            };
-
-            await api.createOrder(forcedOrder, token);
-            // NO llamamos a addCajaTx porque el dinero es 0
-
-            showAlert({ 
-                title: "Ticket Creado Exitosamente", 
-                message: "El ticket se ha guardado como PENDIENTE. El cliente debe pasar a CAJA para realizar el pago." 
-            });
-            
-            await fetchPedidos();
-            closeModal();
-        } catch (error) {
-            showAlert({ title: "Error", message: `No se pudo crear: ${error.message}` });
-        }
-    };
+        await api.createOrder(forcedOrder, token);
+        
+        showAlert({ 
+            title: "Ticket Creado Exitosamente", 
+            message: "El ticket se ha guardado como PENDIENTE. El cliente debe pasar a CAJA para realizar el pago." 
+        });
+        
+        await fetchPedidos();
+        closeModal();
+    } catch (error) {
+        showAlert({ title: "Error", message: `No se pudo crear: ${error.message}` });
+    }
+};
 
     // --- FILTROS ---
     const filteredProducts = useMemo(() => {
