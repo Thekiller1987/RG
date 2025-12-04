@@ -18,7 +18,7 @@ import Unauthorized from './components/Unauthorized.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import InventoryUpload from './pages/InventoryUpload.jsx';
 import CashReport from './pages/CashReport.jsx';
-import FacturasProveedores from './pages/FacturasProveedores.jsx';
+import FacturasProveedores from './pages/FacturasProveedores.jsx'; // <--- NUEVA IMPORTACIÓN
 
 // Mapa de roles
 const ROLES = {

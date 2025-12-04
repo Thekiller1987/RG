@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { 
     FaArrowLeft, FaPlus, FaSearch, FaFilter, FaFileInvoiceDollar, 
     FaCalendarAlt, FaCheckCircle, FaExclamationCircle, FaClock,
-    FaMoneyBillWave, FaBuilding
+    FaMoneyBillWave, FaBuilding, FaList
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../service/api';
@@ -122,11 +122,9 @@ const FacturasProveedores = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // --- SIMULACIÓN DE DATOS ---
-    // NOTA: Cuando tengas el backend listo, reemplazarás esto con api.fetchProviderInvoices()
+    // --- SIMULACIÓN DE DATOS (Para visualización inmediata) ---
     useEffect(() => {
         setLoading(true);
-        // Simulamos que llamamos a la API
         setTimeout(() => {
             const mockData = [
                 { id: 1, proveedor: 'Distribuidora Central', numero: 'FAC-2024-001', fecha: '2024-03-01', vence: '2024-03-15', total: 15000, abono: 5000, estado: 'PENDIENTE' },
@@ -151,13 +149,9 @@ const FacturasProveedores = () => {
 
     const filteredInvoices = useMemo(() => {
         let data = invoices;
-        
-        // 1. Filtro por estado
         if (filter !== 'TODAS') {
             data = data.filter(i => i.estado === filter);
         }
-
-        // 2. Búsqueda
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
             data = data.filter(i => 
@@ -171,9 +165,9 @@ const FacturasProveedores = () => {
     // --- HELPERS VISUALES ---
     const getStatusColor = (status) => {
         switch(status) {
-            case 'VENCIDA': return '#ef4444'; // Rojo
-            case 'PAGADA': return '#10b981'; // Verde
-            case 'PENDIENTE': return '#3b82f6'; // Azul
+            case 'VENCIDA': return '#ef4444'; 
+            case 'PAGADA': return '#10b981'; 
+            case 'PENDIENTE': return '#3b82f6'; 
             default: return '#9ca3af';
         }
     };
@@ -190,92 +184,58 @@ const FacturasProveedores = () => {
     return (
         <PageWrapper>
             <HeaderContainer>
-                <Title>
-                    <FaFileInvoiceDollar /> Facturas de Proveedores
-                </Title>
+                <Title><FaFileInvoiceDollar /> Facturas de Proveedores</Title>
                 <ActionButtons>
                     <Button $primary onClick={() => alert("Aquí abrirías el modal para Registrar Factura")}>
                         <FaPlus /> Registrar Factura
                     </Button>
-                    <BackButton to="/dashboard">
-                        <FaArrowLeft /> Volver
-                    </BackButton>
+                    <BackButton to="/dashboard"><FaArrowLeft /> Volver</BackButton>
                 </ActionButtons>
             </HeaderContainer>
 
-            {/* --- TARJETAS DE RESUMEN (KPIs) --- */}
             <StatsGrid>
                 <StatCard color="#ef4444">
                     <div className="label">Facturas Vencidas</div>
                     <div className="value">{stats.venc}</div>
-                    <div className="sub">Requieren atención inmediata</div>
+                    <div className="sub">Requieren atención</div>
                 </StatCard>
                 <StatCard color="#3b82f6">
-                    <div className="label">Por Pagar (Pendientes)</div>
+                    <div className="label">Por Pagar</div>
                     <div className="value">{stats.pend}</div>
                     <div className="sub">En plazo normal</div>
                 </StatCard>
                 <StatCard color="#f59e0b">
                     <div className="label">Deuda Total</div>
                     <div className="value">C${stats.totalDebt.toLocaleString()}</div>
-                    <div className="sub">Monto total pendiente</div>
+                    <div className="sub">Monto pendiente</div>
                 </StatCard>
             </StatsGrid>
 
-            {/* --- BARRA DE BÚSQUEDA --- */}
             <SearchBar>
                 <FaSearch />
                 <input 
                     type="text" 
-                    placeholder="Buscar por proveedor o número de factura..." 
+                    placeholder="Buscar por proveedor o número..." 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
             </SearchBar>
 
-            {/* --- FILTROS TIPO PESTAÑA (NOTIFICACIONES) --- */}
             <FilterTabs>
-                <TabButton 
-                    active={filter === 'PENDIENTE'} 
-                    activeColor="#3b82f6" 
-                    badgeColor="#3b82f6"
-                    onClick={() => setFilter('PENDIENTE')}
-                >
-                    <FaClock /> Pendientes 
-                    {stats.pend > 0 && <span className="badge">{stats.pend}</span>}
+                <TabButton active={filter === 'PENDIENTE'} activeColor="#3b82f6" badgeColor="#3b82f6" onClick={() => setFilter('PENDIENTE')}>
+                    <FaClock /> Pendientes {stats.pend > 0 && <span className="badge">{stats.pend}</span>}
                 </TabButton>
-
-                <TabButton 
-                    active={filter === 'VENCIDA'} 
-                    activeColor="#ef4444" 
-                    badgeColor="#ef4444"
-                    onClick={() => setFilter('VENCIDA')}
-                >
-                    <FaExclamationCircle /> Vencidas 
-                    {stats.venc > 0 && <span className="badge">{stats.venc}</span>}
+                <TabButton active={filter === 'VENCIDA'} activeColor="#ef4444" badgeColor="#ef4444" onClick={() => setFilter('VENCIDA')}>
+                    <FaExclamationCircle /> Vencidas {stats.venc > 0 && <span className="badge">{stats.venc}</span>}
                 </TabButton>
-
-                <TabButton 
-                    active={filter === 'PAGADA'} 
-                    activeColor="#10b981" 
-                    badgeColor="#10b981"
-                    onClick={() => setFilter('PAGADA')}
-                >
-                    <FaCheckCircle /> Pagadas 
-                    {stats.pag > 0 && <span className="badge">{stats.pag}</span>}
+                <TabButton active={filter === 'PAGADA'} activeColor="#10b981" badgeColor="#10b981" onClick={() => setFilter('PAGADA')}>
+                    <FaCheckCircle /> Pagadas {stats.pag > 0 && <span className="badge">{stats.pag}</span>}
                 </TabButton>
-
-                <TabButton 
-                    active={filter === 'TODAS'} 
-                    activeColor="#6b7280" 
-                    badgeColor="#6b7280"
-                    onClick={() => setFilter('TODAS')}
-                >
+                <TabButton active={filter === 'TODAS'} activeColor="#6b7280" badgeColor="#6b7280" onClick={() => setFilter('TODAS')}>
                     <FaList /> Todas
                 </TabButton>
             </FilterTabs>
 
-            {/* --- LISTADO DE FACTURAS --- */}
             {loading ? (
                 <p style={{textAlign: 'center', color: '#666'}}>Cargando facturas...</p>
             ) : filteredInvoices.length > 0 ? (
@@ -290,47 +250,32 @@ const FacturasProveedores = () => {
                                 <div className="status-stripe"></div>
                                 <div className="header">
                                     <div>
-                                        <div className="provider">
-                                            <FaBuilding style={{color: '#9ca3af'}} /> 
-                                            {invoice.proveedor}
-                                        </div>
+                                        <div className="provider"><FaBuilding style={{color: '#9ca3af'}} /> {invoice.proveedor}</div>
                                         <div className="id">#{invoice.numero}</div>
                                     </div>
-                                    <StatusChip bg={bg} text={color}>
-                                        {invoice.estado}
-                                    </StatusChip>
+                                    <StatusChip bg={bg} text={color}>{invoice.estado}</StatusChip>
                                 </div>
-                                
                                 <div className="body">
                                     <div className="row">
-                                        <span><FaCalendarAlt style={{marginRight: 6}}/> Emisión:</span>
-                                        <strong>{invoice.fecha}</strong>
+                                        <span><FaCalendarAlt style={{marginRight: 6}}/> Emisión:</span><strong>{invoice.fecha}</strong>
                                     </div>
                                     <div className="row">
                                         <span style={{color: invoice.estado === 'VENCIDA' ? '#ef4444' : 'inherit'}}>
                                             <FaExclamationCircle style={{marginRight: 6}}/> Vence:
                                         </span>
-                                        <strong style={{color: invoice.estado === 'VENCIDA' ? '#ef4444' : 'inherit'}}>
-                                            {invoice.vence}
-                                        </strong>
+                                        <strong style={{color: invoice.estado === 'VENCIDA' ? '#ef4444' : 'inherit'}}>{invoice.vence}</strong>
                                     </div>
-                                    
                                     <div className="amount">
-                                        <div style={{fontSize: '0.8rem', color: '#6b7280', fontWeight: '500'}}>Total Factura</div>
+                                        <div style={{fontSize: '0.8rem', color: '#6b7280', fontWeight: '500'}}>Total</div>
                                         C${invoice.total.toLocaleString()}
                                     </div>
-
                                     {invoice.abono > 0 && (
                                         <div className="paid">
                                             Abonado: C${invoice.abono.toLocaleString()} 
                                             {saldo > 0 && <span style={{color: '#ef4444', marginLeft: '5px'}}> (Resta: C${saldo.toLocaleString()})</span>}
                                         </div>
                                     )}
-
-                                    <Button 
-                                        style={{width: '100%', marginTop: '1.5rem', justifyContent: 'center', background: 'white', border: `1px solid ${color}`, color: color}}
-                                        onClick={() => alert(`Gestionar factura ${invoice.numero}`)}
-                                    >
+                                    <Button style={{width: '100%', marginTop: '1.5rem', justifyContent: 'center', background: 'white', border: `1px solid ${color}`, color: color}} onClick={() => alert(`Gestionar factura ${invoice.numero}`)}>
                                         <FaMoneyBillWave /> Gestionar Pagos
                                     </Button>
                                 </div>
