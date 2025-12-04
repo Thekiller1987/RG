@@ -223,7 +223,7 @@ const Dashboard = () => {
 
                     {/* 4. Inventario */}
                     {canAccessInventory && (
-                        <Card to="/InventoryUpload" color="#28a745"> 
+                        <Card to="/inventory" color="#28a745"> 
                             <CardIcon color="#28a745"><FaBoxOpen /></CardIcon> 
                             <h2>Inventario</h2> 
                             <p>Controla el stock de tus productos y mercancía.</p> 
