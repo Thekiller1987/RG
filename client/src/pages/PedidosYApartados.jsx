@@ -1,6 +1,6 @@
 // client/src/pages/PedidosYApartados.jsx
-// VERSIÓN CORREGIDA - DISEÑO BLANCO Y ANIMACIONES MEJORADAS
-// Lógica de Tickets implementada para Vendedores vs Admins
+// VERSIÓN EXTENDIDA Y BLINDADA (SAFETY-FIRST)
+// Se han añadido verificaciones explícitas (Array.isArray) en cada punto crítico.
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
@@ -21,7 +21,9 @@ import {
     FaCheckCircle,
     FaClock,
     FaTimesCircle,
-    FaExclamationTriangle
+    FaExclamationTriangle,
+    FaList,     
+    FaExchangeAlt 
 } from 'react-icons/fa';
 
 import CreateOrderModal from './pos/components/CreateOrderModal';
@@ -30,7 +32,10 @@ import ConfirmationModal from './pos/components/ConfirmationModal';
 import AlertModal from './pos/components/AlertModal';
 import { loadCajaSession } from '../utils/caja';
 
-// --- ANIMACIONES MEJORADAS ---
+// ==========================================
+// SECCIÓN DE ANIMACIONES
+// ==========================================
+
 const fadeIn = keyframes`
     from { 
         opacity: 0; 
@@ -64,7 +69,10 @@ const shimmer = keyframes`
     100% { background-position: calc(200px + 100%) 0; }
 `;
 
-// --- ESTILOS BLANCOS CON ANIMACIONES ---
+// ==========================================
+// SECCIÓN DE ESTILOS (Styled Components)
+// ==========================================
+
 const PageWrapper = styled.div`
     padding: 2rem;
     background: #ffffff;
@@ -103,7 +111,7 @@ const Title = styled.h1`
 
     @media (max-width: 768px) { 
         font-size: 2rem; 
-        justify-content: center;
+        justify-content: center; 
     }
 `;
 
@@ -112,6 +120,8 @@ const Button = styled.button`
     border: none;
     background: ${props => props.$primary ? 
         'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 
+        props.$secondary ? 
+        'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : 
         'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'};
     color: white; 
     border-radius: 12px; 
@@ -250,12 +260,6 @@ const CardBody = styled.div`
     padding: 1.8rem;
     cursor: pointer;
     flex: 1;
-`;
-
-const CardFooter = styled.div`
-    padding: 1.2rem 1.8rem;
-    background: #f8fafc;
-    border-top: 1px solid #e5e7eb;
 `;
 
 const ProgressBar = styled.div`
@@ -452,17 +456,88 @@ const LoadingShimmer = styled.div`
     margin-bottom: 1rem;
 `;
 
-// --- COMPONENTE PRINCIPAL MEJORADO ---
+// --- ESTILOS EXTRA PARA MODAL DE PRODUCTOS ---
+const ModalOverlay = styled.div`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: ${fadeIn} 0.3s ease;
+`;
+
+const ModalContent = styled.div`
+    background: white;
+    padding: 2rem;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+    animation: ${slideIn} 0.3s ease;
+`;
+
+const ProductTable = styled.div`
+    flex: 1;
+    overflow-y: auto;
+    margin-top: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        
+        th {
+            background: #f8fafc;
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: #4b5563;
+            position: sticky;
+            top: 0;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid #f1f5f9;
+            color: #1f2937;
+        }
+
+        tr:hover {
+            background: #f9fafb;
+        }
+    }
+`;
+
+// ==========================================
+// COMPONENTE PRINCIPAL
+// ==========================================
+
 const PedidosYApartados = () => {
     const { user } = useAuth();
     const token = localStorage.getItem('token');
 
+    // Inicializamos SIEMPRE con arrays vacíos para evitar undefined
     const [pedidos, setPedidos] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [filtroEstado, setFiltroEstado] = useState('Activos');
     const [searchTerm, setSearchTerm] = useState('');
     const [modal, setModal] = useState({ name: null, props: {} });
     
+    // --- NUEVO ESTADO PARA PRODUCTOS ---
+    const [products, setProducts] = useState([]); // Inicializado como array vacío
+    const [productSearch, setProductSearch] = useState('');
+    const [searchType, setSearchType] = useState('descripcion'); // 'codigo' | 'descripcion'
+    const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+
     const openModal = useCallback((name, props = {}) => setModal({ name, props }), []);
     const closeModal = useCallback(() => setModal({ name: null, props: {} }), []);
     const showAlert = useCallback((props) => openModal('alert', props), [openModal]);
@@ -481,13 +556,28 @@ const PedidosYApartados = () => {
         return session && !session.closedAt;
     }, [user]);
 
+    // ==========================================
+    // CARGA DE DATOS DE PEDIDOS (CON BLINDAJE)
+    // ==========================================
     const fetchPedidos = useCallback(async () => {
-        if (!token) { setIsLoading(false); return; }
+        if (!token) { 
+            setIsLoading(false); 
+            return; 
+        }
         setIsLoading(true);
         try {
             const data = await api.fetchOrders(token);
-            setPedidos(data);
+            
+            // BLINDAJE 1: Validar si la respuesta es realmente un array
+            if (Array.isArray(data)) {
+                setPedidos(data);
+            } else {
+                console.warn("La API de pedidos no devolvió un array:", data);
+                setPedidos([]); // Fallback seguro
+            }
         } catch (error) {
+            console.error("Error al cargar pedidos:", error);
+            setPedidos([]); // Fallback seguro en error
             showAlert({ 
                 title: "Error de Red", 
                 message: `No se pudieron cargar los pedidos. ${error.message}` 
@@ -497,54 +587,156 @@ const PedidosYApartados = () => {
         }
     }, [token, showAlert]);
 
-    useEffect(() => {
-        fetchPedidos();
-    }, [fetchPedidos]);
-    
-    const pedidosFiltrados = useMemo(() => {
-        let filtered = Array.isArray(pedidos) ? pedidos : [];
+    // ==========================================
+    // CARGA DE DATOS DE PRODUCTOS (CON BLINDAJE)
+    // ==========================================
+    const loadProductsData = useCallback(async () => {
+        if (!token) return;
+        setIsLoadingProducts(true);
+        try {
+            const data = await api.fetchProducts(token);
+            
+            // BLINDAJE 2: Validar si la respuesta es realmente un array
+            if (Array.isArray(data)) {
+                setProducts(data);
+                return data;
+            } else if (data && Array.isArray(data.data)) {
+                // A veces las APIs devuelven { data: [...] }
+                setProducts(data.data);
+                return data.data;
+            } else {
+                console.warn("La API de productos no devolvió un array válido:", data);
+                setProducts([]); // Fallback seguro
+                return [];
+            }
+        } catch (error) {
+            console.error("Error cargando productos:", error);
+            setProducts([]); // Fallback seguro
+            return [];
+        } finally {
+            setIsLoadingProducts(false);
+        }
+    }, [token]);
+
+    // Manejador para el botón "Ver Productos"
+    const handleOpenProductSearch = async () => {
+        await loadProductsData(); // Aseguramos carga fresca
+        openModal('productSearch');
+    };
+
+    // Manejador para el botón "Crear Ticket"
+    const handleOpenCreateOrder = async () => {
+        // BLINDAJE 3: Verificar longitud de forma segura
+        const currentProducts = Array.isArray(products) ? products : [];
         
-        if (filtroEstado === 'Activos') {
-            filtered = filtered.filter(p => p.estado === 'APARTADO' || p.estado === 'PENDIENTE');
-        } else if (filtroEstado !== 'Todos') {
-            filtered = filtered.filter(p => p.estado === filtroEstado.toUpperCase());
+        if (currentProducts.length === 0) {
+            await loadProductsData();
+        }
+        openModal('createOrder');
+    };
+
+    // ==========================================
+    // LÓGICA DE FILTRADO DE PRODUCTOS (SUPER BLINDADA)
+    // ==========================================
+    const filteredProducts = useMemo(() => {
+        // BLINDAJE 4: Verificar explícitamente que 'products' existe y es un array
+        // Si por alguna razón products es null o undefined, usamos []
+        let safeProductsList = [];
+        
+        if (products && Array.isArray(products)) {
+            safeProductsList = products;
+        } else {
+            // Si llegamos aquí, algo raro pasó con el estado, retornamos vacío para evitar el crash
+            return [];
         }
 
+        if (!productSearch) return safeProductsList;
+        
+        const lowerTerm = productSearch.toLowerCase();
+        
+        // Ahora es seguro usar .filter porque safeProductsList está garantizado ser un array
+        return safeProductsList.filter(p => {
+            // Protección adicional dentro del filtro por si algún item es null
+            if (!p) return false;
+
+            if (searchType === 'codigo') {
+                return p.codigo && String(p.codigo).toLowerCase().includes(lowerTerm);
+            } else {
+                const desc = p.descripcion || p.nombre || '';
+                return String(desc).toLowerCase().includes(lowerTerm);
+            }
+        });
+    }, [products, productSearch, searchType]);
+
+    useEffect(() => {
+        fetchPedidos();
+        loadProductsData(); // Precarga productos para que estén listos
+    }, [fetchPedidos, loadProductsData]);
+    
+    // ==========================================
+    // LÓGICA DE FILTRADO DE PEDIDOS (SUPER BLINDADA)
+    // ==========================================
+    const pedidosFiltrados = useMemo(() => {
+        // BLINDAJE 5: Verificar explícitamente que 'pedidos' existe y es un array
+        let safePedidosList = [];
+
+        if (pedidos && Array.isArray(pedidos)) {
+            safePedidosList = pedidos;
+        } else {
+            // Si no es un array, devolvemos array vacío y evitamos el error .filter
+            return [];
+        }
+        
+        let filtered = [...safePedidosList]; // Creamos una copia segura
+        
+        // Aplicar filtro de estado
+        if (filtroEstado === 'Activos') {
+            filtered = filtered.filter(p => p && (p.estado === 'APARTADO' || p.estado === 'PENDIENTE'));
+        } else if (filtroEstado !== 'Todos') {
+            filtered = filtered.filter(p => p && p.estado === filtroEstado.toUpperCase());
+        }
+
+        // Aplicar búsqueda de texto
         if (searchTerm) {
             const lowerSearch = searchTerm.toLowerCase();
-            filtered = filtered.filter(p => 
-                (p.clienteNombre && p.clienteNombre.toLowerCase().includes(lowerSearch)) || 
-                String(p.id).includes(lowerSearch)
-            );
+            filtered = filtered.filter(p => {
+                if (!p) return false;
+                const nombreCliente = p.clienteNombre || '';
+                const idPedido = String(p.id || '');
+                return nombreCliente.toLowerCase().includes(lowerSearch) || idPedido.includes(lowerSearch);
+            });
         }
         return filtered;
     }, [pedidos, filtroEstado, searchTerm]);
 
     // Estadísticas calculadas
     const stats = useMemo(() => {
-        const total = pedidosFiltrados.length;
-        const activos = pedidosFiltrados.filter(p => p.estado === 'APARTADO' || p.estado === 'PENDIENTE').length;
-        const completados = pedidosFiltrados.filter(p => p.estado === 'COMPLETADO').length;
-        const totalVentas = pedidosFiltrados.reduce((sum, p) => sum + parseFloat(p.total || 0), 0);
+        // BLINDAJE 6: Asegurar que pedidosFiltrados es array
+        const safeList = Array.isArray(pedidosFiltrados) ? pedidosFiltrados : [];
+
+        const total = safeList.length;
+        const activos = safeList.filter(p => p && (p.estado === 'APARTADO' || p.estado === 'PENDIENTE')).length;
+        const completados = safeList.filter(p => p && p.estado === 'COMPLETADO').length;
+        const totalVentas = safeList.reduce((sum, p) => sum + parseFloat(p?.total || 0), 0);
 
         return { total, activos, completados, totalVentas };
     }, [pedidosFiltrados]);
 
     const handleCreateOrder = async (orderData) => {
         try {
-            // LÓGICA PERSONALIZADA:
-            // Si es vendedor (no admin/contador), forzamos el formato de Ticket
+            // LÓGICA PERSONALIZADA SOLICITADA:
             let finalOrderData = { ...orderData };
 
             if (!canManageTickets) {
                 // Obtenemos la descripción o nota del formulario
                 const descripcion = orderData.descripcion || orderData.notas || '';
                 
-                // Forzamos el nombre según lo solicitado: Ticket - Nombre Usuario - Descripción
-                finalOrderData.clienteNombre = `Ticket - ${user.nombre || user.username} - ${descripcion}`;
+                // --- TU SOLICITUD ESPECÍFICA AQUÍ ---
+                // Modificación del nombre: Ticket - Usuario - NombreCliente - Descripción
+                const nombreClienteFormulario = orderData.clienteNombre || 'Cliente Casual';
+                const nombreUsuario = user.nombre || user.username || 'Vendedor';
                 
-                // Nos aseguramos que no se marque como completado o pagado inmediatamente si no hay caja
-                // (Aunque la API probablemente maneje el estado por defecto)
+                finalOrderData.clienteNombre = `Ticket - ${nombreUsuario} - ${nombreClienteFormulario} - ${descripcion}`;
             }
 
             await api.createOrder(finalOrderData, token);
@@ -571,6 +763,10 @@ const PedidosYApartados = () => {
             default: return <FaReceipt />;
         }
     };
+
+    // ==========================================
+    // RENDERIZADO (JSX)
+    // ==========================================
 
     if (isLoading) {
         return (
@@ -607,7 +803,7 @@ const PedidosYApartados = () => {
                     <h1>No estás autenticado</h1>
                     <p>Por favor, inicia sesión para acceder a esta página.</p>
                     <BackButton to="/login" style={{ marginTop: '1rem' }}>
-                        <Iniciar Sesión />
+                        Iniciar Sesión
                     </BackButton>
                 </div>
             </PageWrapper>
@@ -623,11 +819,19 @@ const PedidosYApartados = () => {
                 </Title>
                 
                 <ButtonGroup>
+                    {/* BOTÓN: VER PRODUCTOS */}
+                    <Button 
+                        $secondary 
+                        onClick={handleOpenProductSearch} 
+                        disabled={isLoadingProducts}
+                        style={{ marginRight: '0.5rem' }}
+                    >
+                        {isLoadingProducts ? 'Cargando...' : <><FaList /> Ver Productos</>}
+                    </Button>
+
                     <Button 
                         $primary 
-                        onClick={() => openModal('createOrder')} 
-                        // MODIFICACIÓN: Ya no deshabilitamos el botón si la caja está cerrada
-                        // disabled={!isCajaOpen} 
+                        onClick={handleOpenCreateOrder} 
                         disabled={false}
                     >
                         <FaPlus /> Crear Ticket / Pedido
@@ -641,7 +845,6 @@ const PedidosYApartados = () => {
             {!isCajaOpen && (
                 <WarningBanner>
                     <FaExclamationTriangle />
-                    {/* Mensaje actualizado */}
                     La caja está cerrada. Solo se permite crear Tickets (el cobro debe hacerlo Administración).
                 </WarningBanner>
             )}
@@ -724,7 +927,8 @@ const PedidosYApartados = () => {
                             color: '#6b7280',
                             textAlign: 'center'
                         }}>
-                            Mostrando <strong>{pedidosFiltrados.length}</strong> pedidos
+                            {/* BLINDAJE 7: Asegurar renderizado seguro del número */}
+                            Mostrando <strong>{pedidosFiltrados ? pedidosFiltrados.length : 0}</strong> pedidos
                         </p>
                     </div>
                 </FilterPanel>
@@ -732,14 +936,17 @@ const PedidosYApartados = () => {
                 {/* Lista de Pedidos */}
                 <main>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                        {pedidosFiltrados.length > 0 ? (
+                        {pedidosFiltrados && pedidosFiltrados.length > 0 ? (
                             pedidosFiltrados.map((pedido, index) => {
-                                const saldoPendiente = pedido.total - pedido.abonado;
-                                const percentPaid = pedido.total > 0 ? (pedido.abonado / pedido.total) * 100 : 0;
+                                // Protección extra por si un elemento del array es null
+                                if (!pedido) return null;
+
+                                const saldoPendiente = (pedido.total || 0) - (pedido.abonado || 0);
+                                const percentPaid = (pedido.total > 0) ? ((pedido.abonado || 0) / pedido.total) * 100 : 0;
                                 
                                 return (
                                     <PedidoCard 
-                                        key={pedido.id} 
+                                        key={pedido.id || index} 
                                         estado={pedido.estado}
                                         style={{ animationDelay: `${index * 0.1}s` }}
                                     >
@@ -773,21 +980,21 @@ const PedidosYApartados = () => {
                                                 <InfoItem>
                                                     <FaDollarSign />
                                                     <div>
-                                                        <strong>Total:</strong> C${Number(pedido.total).toFixed(2)}
+                                                        <strong>Total:</strong> C${Number(pedido.total || 0).toFixed(2)}
                                                     </div>
                                                 </InfoItem>
                                                 
                                                 <InfoItem>
                                                     <FaCheckCircle style={{ color: '#10b981' }} />
                                                     <div>
-                                                        <strong>Abonado:</strong> C${Number(pedido.abonado).toFixed(2)}
+                                                        <strong>Abonado:</strong> C${Number(pedido.abonado || 0).toFixed(2)}
                                                     </div>
                                                 </InfoItem>
 
                                                 <InfoItem>
                                                     <FaCalendar />
                                                     <div>
-                                                        <strong>Fecha:</strong> {new Date(pedido.fecha).toLocaleDateString('es-NI')}
+                                                        <strong>Fecha:</strong> {pedido.fecha ? new Date(pedido.fecha).toLocaleDateString('es-NI') : 'S/F'}
                                                     </div>
                                                 </InfoItem>
 
@@ -855,6 +1062,8 @@ const PedidosYApartados = () => {
                     onClose={closeModal} 
                     onSubmit={handleCreateOrder} 
                     showAlert={showAlert} 
+                    // BLINDAJE 8: Asegurar que pasamos un array al modal
+                    products={Array.isArray(products) ? products : []}
                 />
             )}
             
@@ -866,13 +1075,91 @@ const PedidosYApartados = () => {
                     showAlert={showAlert} 
                     showConfirmation={showConfirmation} 
                     isCajaOpen={isCajaOpen}
-                    // MODIFICACIÓN: Pasamos permisos al modal para bloquear el cobro
                     canManage={canManageTickets}
-                    canCharge={canManageTickets} // Prop explícita para cobro
-                    readOnly={!canManageTickets} // Prop explícita para edición
+                    canCharge={canManageTickets} 
+                    readOnly={!canManageTickets} 
                 />
             )}
             
+            {/* MODAL DE BÚSQUEDA DE PRODUCTOS */}
+            {modal.name === 'productSearch' && (
+                <ModalOverlay onClick={closeModal}>
+                    <ModalContent onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h2 style={{ margin: 0, color: '#1f2937' }}>Consultar Productos</h2>
+                            <button 
+                                onClick={closeModal}
+                                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#6b7280' }}
+                            >
+                                <FaTimesCircle />
+                            </button>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                            <div style={{ flex: 1 }}>
+                                <Input 
+                                    autoFocus
+                                    placeholder={`Buscar producto por ${searchType}...`}
+                                    value={productSearch}
+                                    onChange={e => setProductSearch(e.target.value)}
+                                />
+                            </div>
+                            <Button 
+                                onClick={() => setSearchType(prev => prev === 'codigo' ? 'descripcion' : 'codigo')}
+                                style={{ background: '#4b5563' }}
+                            >
+                                <FaExchangeAlt /> 
+                                {searchType === 'codigo' ? 'Buscar por Descripción' : 'Buscar por Código'}
+                            </Button>
+                        </div>
+
+                        <ProductTable>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Código</th>
+                                        <th>Descripción</th>
+                                        <th>Precio</th>
+                                        <th>Stock</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {/* BLINDAJE 9: Renderizado seguro de la tabla */}
+                                    {filteredProducts && filteredProducts.length > 0 ? (
+                                        filteredProducts.slice(0, 50).map((prod) => {
+                                            if (!prod) return null;
+                                            return (
+                                                <tr key={prod.id || prod.codigo || Math.random()}>
+                                                    <td style={{fontWeight: 'bold', color: '#3b82f6'}}>{prod.codigo}</td>
+                                                    <td>{prod.descripcion || prod.nombre}</td>
+                                                    <td>C${Number(prod.precio_venta || prod.precio || 0).toFixed(2)}</td>
+                                                    <td style={{
+                                                        color: (prod.stock || prod.existencia) > 0 ? '#10b981' : '#ef4444',
+                                                        fontWeight: '600'
+                                                    }}>
+                                                        {prod.stock || prod.existencia || 0}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    ) : (
+                                        <tr>
+                                            <td colSpan="4" style={{ textAlign: 'center', color: '#9ca3af', padding: '2rem' }}>
+                                                No se encontraron productos
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </ProductTable>
+                        <div style={{ marginTop: '1rem', textAlign: 'right', fontSize: '0.9rem', color: '#6b7280' }}>
+                            {/* BLINDAJE 10: Contadores seguros */}
+                            Mostrando {Math.min(filteredProducts ? filteredProducts.length : 0, 50)} de {products ? products.length : 0} productos
+                        </div>
+                    </ModalContent>
+                </ModalOverlay>
+            )}
+
             <AlertModal 
                 isOpen={modal.name === 'alert'} 
                 onClose={closeModal} 
