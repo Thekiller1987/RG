@@ -1,7 +1,6 @@
 // client/src/pages/PedidosYApartados.jsx
 // VERSIÓN CORREGIDA - DISEÑO BLANCO Y ANIMACIONES MEJORADAS
 // Lógica de Tickets implementada para Vendedores vs Admins
-// AGREGADO: Funcionalidad de Búsqueda de Productos para Vendedores
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
@@ -22,9 +21,7 @@ import {
     FaCheckCircle,
     FaClock,
     FaTimesCircle,
-    FaExclamationTriangle,
-    FaList,     // Nuevo icono
-    FaExchangeAlt // Nuevo icono
+    FaExclamationTriangle
 } from 'react-icons/fa';
 
 import CreateOrderModal from './pos/components/CreateOrderModal';
@@ -115,8 +112,6 @@ const Button = styled.button`
     border: none;
     background: ${props => props.$primary ? 
         'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 
-        props.$secondary ? 
-        'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : // Estilo para el botón secundario
         'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'};
     color: white; 
     border-radius: 12px; 
@@ -255,6 +250,12 @@ const CardBody = styled.div`
     padding: 1.8rem;
     cursor: pointer;
     flex: 1;
+`;
+
+const CardFooter = styled.div`
+    padding: 1.2rem 1.8rem;
+    background: #f8fafc;
+    border-top: 1px solid #e5e7eb;
 `;
 
 const ProgressBar = styled.div`
@@ -451,67 +452,6 @@ const LoadingShimmer = styled.div`
     margin-bottom: 1rem;
 `;
 
-// --- ESTILOS EXTRA PARA MODAL DE PRODUCTOS ---
-const ModalOverlay = styled.div`
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    animation: ${fadeIn} 0.3s ease;
-`;
-
-const ModalContent = styled.div`
-    background: white;
-    padding: 2rem;
-    border-radius: 16px;
-    width: 90%;
-    max-width: 800px;
-    max-height: 85vh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
-    animation: ${slideIn} 0.3s ease;
-`;
-
-const ProductTable = styled.div`
-    flex: 1;
-    overflow-y: auto;
-    margin-top: 1rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        
-        th {
-            background: #f8fafc;
-            padding: 1rem;
-            text-align: left;
-            font-weight: 600;
-            color: #4b5563;
-            position: sticky;
-            top: 0;
-        }
-
-        td {
-            padding: 1rem;
-            border-bottom: 1px solid #f1f5f9;
-            color: #1f2937;
-        }
-
-        tr:hover {
-            background: #f9fafb;
-        }
-    }
-`;
-
 // --- COMPONENTE PRINCIPAL MEJORADO ---
 const PedidosYApartados = () => {
     const { user } = useAuth();
@@ -523,12 +463,6 @@ const PedidosYApartados = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [modal, setModal] = useState({ name: null, props: {} });
     
-    // --- NUEVO ESTADO PARA PRODUCTOS ---
-    const [products, setProducts] = useState([]);
-    const [productSearch, setProductSearch] = useState('');
-    const [searchType, setSearchType] = useState('descripcion'); // 'codigo' | 'descripcion'
-    const [isLoadingProducts, setIsLoadingProducts] = useState(false);
-
     const openModal = useCallback((name, props = {}) => setModal({ name, props }), []);
     const closeModal = useCallback(() => setModal({ name: null, props: {} }), []);
     const showAlert = useCallback((props) => openModal('alert', props), [openModal]);
@@ -562,40 +496,6 @@ const PedidosYApartados = () => {
             setIsLoading(false);
         }
     }, [token, showAlert]);
-
-    // --- NUEVA LÓGICA PARA CARGAR PRODUCTOS ---
-    const fetchProducts = useCallback(async () => {
-        if (!token) return;
-        setIsLoadingProducts(true);
-        try {
-            // Asumimos que existe api.fetchProducts, similar a api.fetchOrders
-            const data = await api.fetchProducts(token);
-            setProducts(data);
-            openModal('productSearch');
-        } catch (error) {
-            showAlert({
-                title: "Error",
-                message: "No se pudieron cargar los productos."
-            });
-        } finally {
-            setIsLoadingProducts(false);
-        }
-    }, [token, showAlert, openModal]);
-
-    // --- FILTRADO DE PRODUCTOS ---
-    const filteredProducts = useMemo(() => {
-        if (!productSearch) return products;
-        const lowerTerm = productSearch.toLowerCase();
-        
-        return products.filter(p => {
-            if (searchType === 'codigo') {
-                return p.codigo && p.codigo.toLowerCase().includes(lowerTerm);
-            } else {
-                return (p.descripcion && p.descripcion.toLowerCase().includes(lowerTerm)) || 
-                       (p.nombre && p.nombre.toLowerCase().includes(lowerTerm));
-            }
-        });
-    }, [products, productSearch, searchType]);
 
     useEffect(() => {
         fetchPedidos();
@@ -707,7 +607,7 @@ const PedidosYApartados = () => {
                     <h1>No estás autenticado</h1>
                     <p>Por favor, inicia sesión para acceder a esta página.</p>
                     <BackButton to="/login" style={{ marginTop: '1rem' }}>
-                        Iniciar Sesión
+                        <Iniciar Sesión />
                     </BackButton>
                 </div>
             </PageWrapper>
@@ -723,16 +623,6 @@ const PedidosYApartados = () => {
                 </Title>
                 
                 <ButtonGroup>
-                    {/* BOTÓN NUEVO: VER PRODUCTOS */}
-                    <Button 
-                        $secondary 
-                        onClick={fetchProducts}
-                        disabled={isLoadingProducts}
-                        style={{ marginRight: '0.5rem' }}
-                    >
-                        {isLoadingProducts ? 'Cargando...' : <><FaList /> Ver Productos</>}
-                    </Button>
-
                     <Button 
                         $primary 
                         onClick={() => openModal('createOrder')} 
@@ -983,80 +873,6 @@ const PedidosYApartados = () => {
                 />
             )}
             
-            {/* NUEVO MODAL DE BÚSQUEDA DE PRODUCTOS */}
-            {modal.name === 'productSearch' && (
-                <ModalOverlay onClick={closeModal}>
-                    <ModalContent onClick={e => e.stopPropagation()}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                            <h2 style={{ margin: 0, color: '#1f2937' }}>Consultar Productos</h2>
-                            <button 
-                                onClick={closeModal}
-                                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#6b7280' }}
-                            >
-                                <FaTimesCircle />
-                            </button>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                            <div style={{ flex: 1 }}>
-                                <Input 
-                                    autoFocus
-                                    placeholder={`Buscar producto por ${searchType}...`}
-                                    value={productSearch}
-                                    onChange={e => setProductSearch(e.target.value)}
-                                />
-                            </div>
-                            <Button 
-                                onClick={() => setSearchType(prev => prev === 'codigo' ? 'descripcion' : 'codigo')}
-                                style={{ background: '#4b5563' }}
-                            >
-                                <FaExchangeAlt /> 
-                                {searchType === 'codigo' ? 'Buscar por Descripción' : 'Buscar por Código'}
-                            </Button>
-                        </div>
-
-                        <ProductTable>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Código</th>
-                                        <th>Descripción</th>
-                                        <th>Precio</th>
-                                        <th>Stock</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredProducts.length > 0 ? (
-                                        filteredProducts.slice(0, 50).map((prod) => (
-                                            <tr key={prod.id || prod.codigo}>
-                                                <td style={{fontWeight: 'bold', color: '#3b82f6'}}>{prod.codigo}</td>
-                                                <td>{prod.descripcion || prod.nombre}</td>
-                                                <td>C${Number(prod.precio_venta || prod.precio).toFixed(2)}</td>
-                                                <td style={{
-                                                    color: (prod.stock || prod.existencia) > 0 ? '#10b981' : '#ef4444',
-                                                    fontWeight: '600'
-                                                }}>
-                                                    {prod.stock || prod.existencia || 0}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan="4" style={{ textAlign: 'center', color: '#9ca3af', padding: '2rem' }}>
-                                                No se encontraron productos
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </ProductTable>
-                        <div style={{ marginTop: '1rem', textAlign: 'right', fontSize: '0.9rem', color: '#6b7280' }}>
-                            Mostrando {Math.min(filteredProducts.length, 50)} de {products.length} productos
-                        </div>
-                    </ModalContent>
-                </ModalOverlay>
-            )}
-
             <AlertModal 
                 isOpen={modal.name === 'alert'} 
                 onClose={closeModal} 
