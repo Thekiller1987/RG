@@ -1,303 +1,249 @@
-import React, { useState, useEffect } from 'react';
-import styled from 'styled-components';
-import { FaTimes, FaMoneyBillWave, FaSearch, FaExclamationCircle, FaUserCheck, FaSync } from 'react-icons/fa';
-import * as api from '../../../service/api';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import styled, { keyframes } from 'styled-components';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import * as api from '../service/api';
+import { 
+    FaClipboardList, FaFilter, FaPlus, FaSearch, FaArrowLeft, FaBoxOpen,
+    FaDollarSign, FaCalendar, FaUser, FaCheckCircle, FaTimesCircle, FaExclamationTriangle, FaList, FaExchangeAlt 
+} from 'react-icons/fa';
 
-// --- ESTILOS ---
-const Overlay = styled.div`
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.7); z-index: 1200;
-  display: flex; align-items: center; justify-content: center;
-  backdrop-filter: blur(3px);
-`;
-const ModalContainer = styled.div`
-  background: white; padding: 25px; border-radius: 12px;
-  width: 95%; max-width: 950px; height: 85vh; display: flex; flex-direction: column;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: fadeIn 0.3s;
-`;
-const Header = styled.div`
-  display: flex; justify-content: space-between; align-items: center;
-  border-bottom: 2px solid #f3f4f6; padding-bottom: 15px; margin-bottom: 15px;
-`;
-const Title = styled.h2` margin: 0; color: #1f2937; display: flex; align-items: center; gap: 10px; `;
-const CloseButton = styled.button`
-  background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #9ca3af;
-  &:hover { color: #ef4444; }
-`;
-const TableContainer = styled.div`
-  flex: 1; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 15px;
-`;
-const Table = styled.table`
-  width: 100%; border-collapse: collapse;
-  th { background-color: #f9fafb; padding: 12px; text-align: left; font-weight: 600; color: #4b5563; position: sticky; top: 0; }
-  td { padding: 12px; border-bottom: 1px solid #f3f4f6; color: #1f2937; font-size: 0.95rem; }
-  tr:hover { background-color: #f8fafc; }
-`;
-const Button = styled.button`
-  padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;
-  color: white; background-color: ${p => p.color || '#3b82f6'};
-  display: flex; align-items: center; gap: 8px; justify-content: center;
-  transition: opacity 0.2s;
-  &:disabled { background-color: #9ca3af; cursor: not-allowed; }
-  &:hover:not(:disabled) { opacity: 0.9; }
-`;
-const Input = styled.input`
-  padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; width: 100%; outline: none;
-  &:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
-`;
-const PaySection = styled.div`
-  background: #eff6ff; padding: 20px; border-radius: 8px; border: 1px solid #dbeafe;
-  display: flex; flex-direction: column; gap: 15px; animation: slideUp 0.3s;
-`;
+import CreateOrderModal from './pos/components/CreateOrderModal';
+import OrderDetailModal from './pos/components/OrderDetailModal'; 
+import ConfirmationModal from './pos/components/ConfirmationModal';
+import AlertModal from './pos/components/AlertModal';
 
-const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) => {
-  const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState(null);
-  const [amount, setAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('Efectivo'); 
-  const [searchTerm, setSearchTerm] = useState('');
+// --- ANIMACIONES Y ESTILOS ---
+const fadeIn = keyframes`from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); }`;
 
-  const token = localStorage.getItem('token');
+const PageWrapper = styled.div`padding: 2rem; background: #f8fafc; min-height: 100vh; font-family: 'Inter', sans-serif; animation: ${fadeIn} 0.6s ease-out;`;
+const HeaderContainer = styled.div`display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1.5rem;`;
+const Title = styled.h1`font-size: 2.2rem; color: #1e293b; display: flex; align-items: center; gap: 1rem; margin: 0; font-weight: 800;`;
+const Button = styled.button`padding: 0.9rem 1.8rem; border: none; background: ${props => props.$primary ? '#2563eb' : props.$secondary ? '#4f46e5' : '#64748b'}; color: white; border-radius: 10px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.75rem; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); &:hover { transform: translateY(-2px); opacity: 0.9; }`;
+const BackButton = styled(Link)`padding: 0.9rem 1.8rem; background: #94a3b8; color: white; border-radius: 10px; font-weight: 600; display: inline-flex; align-items: center; gap: 0.75rem; text-decoration: none; &:hover { background: #64748b; }`;
+const ContentGrid = styled.div`display: grid; grid-template-columns: 300px 1fr; gap: 2rem; @media (max-width: 992px) { grid-template-columns: 1fr; }`;
+const FilterPanel = styled.aside`background: #ffffff; padding: 1.5rem; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); align-self: flex-start; display: flex; flex-direction: column; gap: 1.5rem;`;
+const Input = styled.input`width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid #cbd5e1; outline: none; &:focus { border-color: #2563eb; ring: 2px solid #2563eb; }`;
+const Select = styled.select`width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid #cbd5e1;`;
+const PedidoCard = styled.div`background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 5px solid ${props => props.estado === 'COMPLETADO' ? '#10b981' : props.estado === 'CANCELADO' ? '#ef4444' : '#f59e0b'}; cursor: pointer; transition: transform 0.2s; &:hover { transform: translateY(-3px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }`;
+const ModalOverlay = styled.div`position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(2px);`;
+const ModalContent = styled.div`background: white; width: 90%; max-width: 900px; height: 80vh; border-radius: 12px; padding: 25px; display: flex; flex-direction: column;`;
+const ProductTable = styled.div`flex: 1; overflow-y: auto; margin-top: 15px; table { width: 100%; border-collapse: collapse; } th { background: #f1f5f9; padding: 12px; text-align: left; position: sticky; top: 0; } td { padding: 12px; border-bottom: 1px solid #e2e8f0; }`;
 
-  useEffect(() => {
-    loadPendingTickets();
-  }, []);
+const PedidosYApartados = () => {
+    const { user } = useAuth();
+    const token = localStorage.getItem('token');
 
-  const loadPendingTickets = async () => {
-    setLoading(true);
-    try {
-      // 1. Obtenemos la respuesta cruda
-      const response = await api.fetchOrders(token);
-      
-      console.log("Respuesta API fetchOrders:", response); // <--- MIRA LA CONSOLA (F12)
-
-      // 2. Normalizamos la respuesta: a veces viene en .data, a veces directo
-      let allSales = [];
-      if (Array.isArray(response)) {
-          allSales = response;
-      } else if (response && Array.isArray(response.data)) {
-          allSales = response.data;
-      } else if (response && Array.isArray(response.orders)) {
-          allSales = response.orders;
-      }
-
-      // 3. Filtramos con seguridad (evitando errores NaN)
-      const pending = allSales.filter(s => {
-          // Normalizar valores numéricos
-          const total = parseFloat(s.total || s.total_venta || s.monto_total || 0);
-          const abonado = parseFloat(s.abonado || s.monto_pagado || 0);
-          const saldo = total - abonado;
-          const estado = (s.estado || '').toUpperCase();
-
-          // Solo mostrar si hay deuda real (> 0.5 para margen de error decimal)
-          // Y que NO esté cancelado
-          return saldo > 0.5 && estado !== 'CANCELADO';
-      });
-      
-      // Ordenar: más recientes primero
-      pending.sort((a, b) => new Date(b.created_at || b.fecha || 0) - new Date(a.created_at || a.fecha || 0));
-      
-      console.log("Tickets Pendientes Filtrados:", pending);
-      setTickets(pending);
-
-    } catch (error) {
-      console.error("Error cargando pendientes", error);
-      alert("Error de conexión al cargar tickets: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleProcessPayment = async () => {
-    if (!selectedTicket || !amount || Number(amount) <= 0) return;
+    const [pedidos, setPedidos] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [filtroEstado, setFiltroEstado] = useState('Activos');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [modal, setModal] = useState({ name: null, props: {} });
     
-    const payAmount = Number(amount);
-    const deudaActual = selectedTicket.deudaCalculada;
+    // Catalogo Productos
+    const [products, setProducts] = useState([]);
+    const [productSearch, setProductSearch] = useState('');
+    const [searchType, setSearchType] = useState('descripcion');
+    const [isLoadingProducts, setIsLoadingProducts] = useState(false);
 
-    if (payAmount > (deudaActual + 0.5)) {
-        alert(`El abono no puede ser mayor a la deuda (C$ ${deudaActual.toFixed(2)})`);
-        return;
-    }
+    const openModal = useCallback((name, props = {}) => setModal({ name, props }), []);
+    const closeModal = useCallback(() => setModal({ name: null, props: {} }), []);
+    const showAlert = useCallback((props) => openModal('alert', props), [openModal]);
 
-    try {
-      // 1. Registrar abono en base de datos
-      await api.addPaymentToSale({
-        saleId: selectedTicket.id, // OJO: Asegurate que el ID se llame 'id'
-        amount: payAmount,
-        method: paymentMethod,
-        userId: currentUser?.id || currentUser?.id_usuario
-      }, token);
+    // Permisos: Solo admin puede editar, pero NADIE puede pagar aquí
+    const canManageTickets = useMemo(() => user?.rol?.toLowerCase().includes('admin'), [user]);
 
-      // 2. Registrar en CAJA LOCAL (Punto de Venta)
-      if (paymentMethod === 'Efectivo' && onRegisterTransaction) {
-        const clientName = selectedTicket.clienteNombre || selectedTicket.cliente?.nombre || 'Cliente';
-        const note = `Abono a Ticket #${selectedTicket.id} - ${clientName}`;
+    // --- CARGAR DATOS ---
+    const fetchPedidos = useCallback(async () => {
+        if (!token) return;
+        setIsLoading(true);
+        try {
+            const data = await api.fetchOrders(token);
+            setPedidos(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error("Error pedidos:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [token]);
+
+    const loadProductsData = useCallback(async () => {
+        if (!token || products.length > 0) return; // Cache simple
+        setIsLoadingProducts(true);
+        try {
+            const data = await api.fetchProducts(token);
+            setProducts(Array.isArray(data) ? data : (data.data || []));
+        } catch (error) {
+            console.error("Error productos:", error);
+        } finally {
+            setIsLoadingProducts(false);
+        }
+    }, [token, products]);
+
+    const handleOpenCreateOrder = async () => {
+        await loadProductsData();
+        openModal('createOrder');
+    };
+
+    // --- CREAR PEDIDO (Lógica Estricta: ABONO = 0) ---
+    const handleCreateOrder = async (orderData) => {
+        try {
+            // FORZAMOS DATOS PARA EVITAR PAGOS EN ESTA PANTALLA
+            const forcedOrder = { 
+                ...orderData,
+                abonado: 0, // <--- NADIE paga aquí
+                estado: 'PENDIENTE', // <--- Siempre nace pendiente
+                metodo_pago: 'Pendiente'
+            };
+
+            await api.createOrder(forcedOrder, token);
+            // NO llamamos a addCajaTx porque el dinero es 0
+
+            showAlert({ 
+                title: "Ticket Creado Exitosamente", 
+                message: "El ticket se ha guardado como PENDIENTE. El cliente debe pasar a CAJA para realizar el pago." 
+            });
+            
+            await fetchPedidos();
+            closeModal();
+        } catch (error) {
+            showAlert({ title: "Error", message: `No se pudo crear: ${error.message}` });
+        }
+    };
+
+    // --- FILTROS ---
+    const filteredProducts = useMemo(() => {
+        if (!productSearch) return products;
+        const term = productSearch.toLowerCase();
+        return products.filter(p => searchType === 'codigo' ? String(p.codigo).includes(term) : p.descripcion.toLowerCase().includes(term));
+    }, [products, productSearch, searchType]);
+
+    const pedidosFiltrados = useMemo(() => {
+        let filtered = [...pedidos];
+        if (filtroEstado === 'Activos') filtered = filtered.filter(p => ['PENDIENTE', 'APARTADO'].includes(p.estado));
+        else if (filtroEstado !== 'Todos') filtered = filtered.filter(p => p.estado === filtroEstado);
         
-        onRegisterTransaction('entrada', payAmount, note);
-      }
+        if (searchTerm) {
+            const lower = searchTerm.toLowerCase();
+            filtered = filtered.filter(p => (p.clienteNombre || '').toLowerCase().includes(lower) || String(p.id).includes(lower));
+        }
+        return filtered.sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
+    }, [pedidos, filtroEstado, searchTerm]);
 
-      alert("¡Abono registrado correctamente!");
-      setSelectedTicket(null);
-      setAmount('');
-      loadPendingTickets(); // Recargar lista
-    } catch (error) {
-      console.error(error);
-      alert("Error al registrar abono: " + (error.message || "Error desconocido"));
-    }
-  };
+    useEffect(() => { fetchPedidos(); }, [fetchPedidos]);
 
-  // Filtrado visual por buscador
-  const filteredTickets = tickets.filter(t => {
-    const term = searchTerm.toLowerCase();
-    const cName = (t.clienteNombre || t.cliente?.nombre || '').toLowerCase();
-    const tId = String(t.id || '');
-    return cName.includes(term) || tId.includes(term);
-  });
-
-  return (
-    <Overlay>
-      <ModalContainer>
-        <Header>
-          <Title><FaMoneyBillWave /> Cuentas por Cobrar y Pendientes</Title>
-          <CloseButton onClick={onClose}><FaTimes /></CloseButton>
-        </Header>
-
-        <div style={{display: 'flex', gap: 10, marginBottom: 15}}>
-            <div style={{position: 'relative', flex: 1}}>
-                <FaSearch style={{position: 'absolute', top: 12, left: 10, color: '#9ca3af'}}/>
-                <Input 
-                    style={{paddingLeft: 35}}
-                    placeholder="Buscar por cliente o número de ticket..." 
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    autoFocus
-                />
-            </div>
-            <Button onClick={loadPendingTickets} color="#6b7280" title="Recargar lista">
-                <FaSync /> Actualizar
-            </Button>
-        </div>
-
-        <TableContainer>
-            <Table>
-                <thead>
-                    <tr>
-                        <th>Ticket</th>
-                        <th>Fecha</th>
-                        <th>Cliente</th>
-                        <th>Estado</th>
-                        <th>Total</th>
-                        <th>Abonado</th>
-                        <th>Saldo</th>
-                        <th>Acción</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {loading ? 
-                        <tr><td colSpan="8" style={{textAlign: 'center', padding: 20}}>Cargando datos...</td></tr> 
-                    : filteredTickets.length === 0 ? 
-                        <tr><td colSpan="8" style={{textAlign: 'center', padding: 20, color: '#666'}}>No se encontraron cuentas pendientes.</td></tr> 
-                    : filteredTickets.map(ticket => {
-                        // Recalcular para mostrar
-                        const total = parseFloat(ticket.total || ticket.total_venta || 0);
-                        const abonado = parseFloat(ticket.abonado || 0);
-                        const deuda = total - abonado;
-                        
-                        // Parsear fecha
-                        const rawDate = ticket.created_at || ticket.fecha;
-                        const dateStr = rawDate ? new Date(rawDate).toLocaleDateString() : 'S/F';
-
-                        // Nombre cliente
-                        const clientName = ticket.clienteNombre || ticket.cliente?.nombre || 'Casual';
-
-                        return (
-                        <tr key={ticket.id}>
-                            <td>#{ticket.id}</td>
-                            <td>{dateStr}</td>
-                            <td><FaUserCheck style={{color: '#6b7280', marginRight:5}}/> {clientName}</td>
-                            <td>
-                                <span style={{
-                                    padding: '3px 8px', borderRadius: 10, 
-                                    background: '#fee2e2', color: '#991b1b', 
-                                    fontSize: '0.8rem', fontWeight: 'bold'
-                                }}>
-                                    {ticket.estado || 'PENDIENTE'}
-                                </span>
-                            </td>
-                            <td>C$ {total.toFixed(2)}</td>
-                            <td>C$ {abonado.toFixed(2)}</td>
-                            <td style={{color: '#dc2626', fontWeight: 'bold'}}>C$ {deuda.toFixed(2)}</td>
-                            <td>
-                                <Button 
-                                    color="#10b981"
-                                    onClick={() => { setSelectedTicket({...ticket, deudaCalculada: deuda}); setAmount(''); }}
-                                >
-                                    <FaMoneyBillWave /> Cobrar
-                                </Button>
-                            </td>
-                        </tr>
-                     )})}
-                </tbody>
-            </Table>
-        </TableContainer>
-
-        {selectedTicket && (
-            <PaySection>
-                <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                    <h3 style={{margin: 0, color: '#1e40af'}}>
-                        Cobrando Ticket #{selectedTicket.id} - {selectedTicket.clienteNombre || selectedTicket.cliente?.nombre}
-                    </h3>
-                    <button onClick={() => setSelectedTicket(null)} style={{border: 'none', background: 'transparent', cursor: 'pointer', color: '#666'}}>
-                        <FaTimes/>
-                    </button>
-                </div>
-                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20}}>
-                    <div>
-                        <label style={{display: 'block', marginBottom: 5, fontWeight: 600}}>
-                            Monto a Pagar (Deuda: {selectedTicket.deudaCalculada.toFixed(2)})
-                        </label>
-                        <Input 
-                            type="number" 
-                            value={amount} 
-                            onChange={e => setAmount(e.target.value)}
-                            placeholder="0.00"
-                            onKeyDown={e => e.key === 'Enter' && handleProcessPayment()}
-                            autoFocus
-                        />
-                    </div>
-                    <div>
-                        <label style={{display: 'block', marginBottom: 5, fontWeight: 600}}>Método de Pago</label>
-                        <select 
-                            style={{width: '100%', padding: 10, borderRadius: 6, border: '1px solid #d1d5db'}}
-                            value={paymentMethod}
-                            onChange={e => setPaymentMethod(e.target.value)}
-                        >
-                            <option value="Efectivo">Efectivo (Caja)</option>
-                            <option value="Tarjeta">Tarjeta (Banco)</option>
-                            <option value="Transferencia">Transferencia (Banco)</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div style={{display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 15}}>
-                    <Button color="#ef4444" onClick={() => setSelectedTicket(null)}>Cancelar</Button>
-                    <Button color="#2563eb" onClick={handleProcessPayment} style={{fontSize: '1.1rem', padding: '10px 25px'}}>
-                        Confirmar Pago
+    return (
+        <PageWrapper>
+            <HeaderContainer>
+                <Title><FaClipboardList /> Pedidos y Consultas</Title>
+                <div style={{display:'flex', gap: '10px'}}>
+                    <Button $secondary onClick={() => { loadProductsData(); openModal('productSearch'); }} disabled={isLoadingProducts}>
+                        <FaList /> Ver Precios
                     </Button>
+                    <Button $primary onClick={handleOpenCreateOrder}>
+                        <FaPlus /> Nuevo Pedido (Sin Cobro)
+                    </Button>
+                    <BackButton to="/dashboard"><FaArrowLeft/> Salir</BackButton>
                 </div>
-                {paymentMethod === 'Efectivo' && (
-                    <div style={{display: 'flex', alignItems: 'center', gap: 5, color: '#059669', fontSize: '0.9rem', marginTop: 5}}>
-                        <FaExclamationCircle /> 
-                        <span>Este dinero se sumará automáticamente a tu turno de caja actual.</span>
-                    </div>
-                )}
-            </PaySection>
-        )}
+            </HeaderContainer>
 
-      </ModalContainer>
-    </Overlay>
-  );
+            <ContentGrid>
+                <FilterPanel>
+                    <div>
+                        <h3><FaSearch /> Buscar</h3>
+                        <Input placeholder="Cliente o Ticket ID..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                    </div>
+                    <div>
+                        <h3><FaFilter /> Estado</h3>
+                        <Select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+                            <option value="Activos">Pendientes de Pago</option>
+                            <option value="Todos">Historial Completo</option>
+                            <option value="COMPLETADO">Pagados</option>
+                        </Select>
+                    </div>
+                </FilterPanel>
+
+                <main>
+                    {pedidosFiltrados.length === 0 ? (
+                        <div style={{textAlign:'center', padding: 50, color: '#94a3b8'}}>
+                            <FaBoxOpen size={50}/> <p>No hay tickets encontrados.</p>
+                        </div>
+                    ) : pedidosFiltrados.map(p => (
+                        <PedidoCard key={p.id} estado={p.estado} onClick={() => openModal('orderDetail', { pedidoId: p.id })}>
+                            <div style={{display:'flex', justifyContent:'space-between', marginBottom: 10}}>
+                                <h3 style={{margin:0}}>Ticket #{p.id}</h3>
+                                <span style={{fontWeight:'bold', color: p.estado === 'PENDIENTE' ? '#f59e0b' : '#10b981'}}>{p.estado}</span>
+                            </div>
+                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, color:'#64748b'}}>
+                                <span><FaUser/> {p.clienteNombre}</span>
+                                <span><FaCalendar/> {new Date(p.fecha).toLocaleDateString()}</span>
+                                <span>Total: <strong>C$ {Number(p.total).toFixed(2)}</strong></span>
+                                <span style={{color: '#ef4444'}}>Deuda: <strong>C$ {(Number(p.total) - Number(p.abonado)).toFixed(2)}</strong></span>
+                            </div>
+                        </PedidoCard>
+                    ))}
+                </main>
+            </ContentGrid>
+            
+            {/* MODALES */}
+            {modal.name === 'createOrder' && (
+                <CreateOrderModal 
+                    onClose={closeModal} 
+                    onSubmit={handleCreateOrder} 
+                    showAlert={showAlert} 
+                    products={products}
+                    allowMoneyInput={false} // BLOQUEO VISUAL DE DINERO
+                />
+            )}
+            
+            {modal.name === 'orderDetail' && (
+                <OrderDetailModal 
+                    pedidoId={modal.props.pedidoId} 
+                    onClose={closeModal} 
+                    onUpdate={fetchPedidos} 
+                    showAlert={showAlert} 
+                    isCajaOpen={false} // Forzamos false para bloquear pagos
+                    canManage={canManageTickets} 
+                    canCharge={false} // BLOQUEO LÓGICO DE COBRO
+                    readOnly={true} 
+                />
+            )}
+            
+            {modal.name === 'productSearch' && (
+                <ModalOverlay onClick={closeModal}>
+                    <ModalContent onClick={e => e.stopPropagation()}>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <h2><FaList/> Catálogo de Precios</h2>
+                            <button onClick={closeModal} style={{background:'none', border:'none', fontSize:24, cursor:'pointer'}}><FaTimesCircle/></button>
+                        </div>
+                        <div style={{display:'flex', gap:10, margin:'15px 0'}}>
+                            <Input autoFocus placeholder={`Buscar por ${searchType}...`} value={productSearch} onChange={e => setProductSearch(e.target.value)} style={{flex:1}}/>
+                            <Button onClick={() => setSearchType(p => p === 'codigo' ? 'descripcion' : 'codigo')} style={{background:'#475569'}}>
+                                <FaExchangeAlt /> {searchType === 'codigo' ? 'Código' : 'Nombre'}
+                            </Button>
+                        </div>
+                        <ProductTable>
+                            <table>
+                                <thead><tr><th>Código</th><th>Producto</th><th>Precio</th><th>Existencia</th></tr></thead>
+                                <tbody>
+                                    {filteredProducts.slice(0, 100).map(p => (
+                                        <tr key={p.id}>
+                                            <td style={{fontWeight:'bold', color:'#2563eb'}}>{p.codigo}</td>
+                                            <td>{p.descripcion || p.nombre}</td>
+                                            <td>C$ {Number(p.precio_venta || p.precio).toFixed(2)}</td>
+                                            <td style={{color: (p.existencia) > 0 ? '#10b981' : '#ef4444', fontWeight:'bold'}}>{p.existencia || 0}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </ProductTable>
+                    </ModalContent>
+                </ModalOverlay>
+            )}
+
+            <AlertModal isOpen={modal.name === 'alert'} onClose={closeModal} {...modal.props} />
+        </PageWrapper>
+    );
 };
 
-export default PendingTicketsModal;
+export default PedidosYApartados;

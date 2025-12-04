@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FaTimes, FaMoneyBillWave, FaSearch, FaExclamationCircle, FaUserCheck } from 'react-icons/fa';
+import { FaTimes, FaMoneyBillWave, FaSearch, FaExclamationCircle, FaUserCheck, FaSync } from 'react-icons/fa';
 import * as api from '../../../service/api';
 
 // --- ESTILOS ---
@@ -67,24 +67,41 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
   const loadPendingTickets = async () => {
     setLoading(true);
     try {
-      const allSales = await api.fetchOrders(token); 
+      // CAMBIO IMPORTANTE: Usamos fetchSales en lugar de fetchOrders
+      // Las cuentas por cobrar suelen estar en la tabla de Ventas
+      const response = await api.fetchSales(token);
       
-      // Filtramos ventas que tengan deuda (Total - Abonado > 0) y no estén canceladas
-      const pending = Array.isArray(allSales) 
-        ? allSales.filter(s => {
-            const total = parseFloat(s.total || s.total_venta || 0);
-            const abonado = parseFloat(s.abonado || 0);
-            const saldo = total - abonado;
-            // Tolerancia de 0.5 por decimales, y excluimos cancelados
-            return saldo > 0.5 && s.estado !== 'CANCELADO';
-          })
-        : [];
+      console.log("Respuesta API fetchSales:", response); 
+
+      // 2. Normalizamos la respuesta
+      let allSales = [];
+      if (Array.isArray(response)) {
+          allSales = response;
+      } else if (response && Array.isArray(response.data)) {
+          allSales = response.data;
+      }
+
+      // 3. Filtramos: Buscamos DEUDA (Total - Pagado > 0)
+      const pending = allSales.filter(s => {
+          // Detectar nombres de campos (soporta varios formatos de API)
+          const total = parseFloat(s.total || s.total_venta || s.monto_total || s.amount || 0);
+          const abonado = parseFloat(s.abonado || s.monto_pagado || s.pagado || 0);
+          const saldo = total - abonado;
+          const estado = (s.estado || '').toUpperCase();
+
+          // Solo mostrar si hay deuda real y NO está cancelado
+          return saldo > 0.5 && estado !== 'CANCELADO';
+      });
       
-      // Ordenar por fecha (más recientes primero)
-      pending.sort((a, b) => new Date(b.created_at || b.fecha) - new Date(a.created_at || a.fecha));
+      // Ordenar: más recientes primero
+      pending.sort((a, b) => new Date(b.created_at || b.fecha || 0) - new Date(a.created_at || a.fecha || 0));
+      
+      console.log("Tickets Con Deuda Encontrados:", pending);
       setTickets(pending);
+
     } catch (error) {
       console.error("Error cargando pendientes", error);
+      alert("Error al cargar tickets (Revisa consola F12): " + error.message);
     } finally {
       setLoading(false);
     }
@@ -102,20 +119,18 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
     }
 
     try {
-      // 1. Registrar el abono en la Base de Datos (API)
+      // Usar la función que arreglamos en api.js
       await api.addPaymentToSale({
-        saleId: selectedTicket.id,
+        saleId: selectedTicket.id || selectedTicket.id_venta, 
         amount: payAmount,
         method: paymentMethod,
         userId: currentUser?.id || currentUser?.id_usuario
       }, token);
 
-      // 2. IMPORTANTE: Conectar con la CAJA del POS
+      // Registrar en CAJA LOCAL
       if (paymentMethod === 'Efectivo' && onRegisterTransaction) {
         const clientName = selectedTicket.clienteNombre || selectedTicket.cliente?.nombre || 'Cliente';
-        const note = `Abono a Ticket #${selectedTicket.id} - ${clientName}`;
-        
-        // Llamamos a la función del padre (POS.jsx) para meter dinero al turno actual
+        const note = `Abono a Ticket #${selectedTicket.id || selectedTicket.id_venta} - ${clientName}`;
         onRegisterTransaction('entrada', payAmount, note);
       }
 
@@ -129,16 +144,18 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
     }
   };
 
-  const filteredTickets = tickets.filter(t => 
-    (t.clienteNombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    String(t.id).includes(searchTerm)
-  );
+  const filteredTickets = tickets.filter(t => {
+    const term = searchTerm.toLowerCase();
+    const cName = (t.clienteNombre || t.cliente?.nombre || t.nombre_cliente || '').toLowerCase();
+    const tId = String(t.id || t.id_venta || '');
+    return cName.includes(term) || tId.includes(term);
+  });
 
   return (
     <Overlay>
       <ModalContainer>
         <Header>
-          <Title><FaMoneyBillWave /> Cuentas por Cobrar y Pendientes</Title>
+          <Title><FaMoneyBillWave /> Cuentas por Cobrar (Créditos)</Title>
           <CloseButton onClick={onClose}><FaTimes /></CloseButton>
         </Header>
 
@@ -147,49 +164,69 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
                 <FaSearch style={{position: 'absolute', top: 12, left: 10, color: '#9ca3af'}}/>
                 <Input 
                     style={{paddingLeft: 35}}
-                    placeholder="Buscar por cliente o número de ticket..." 
+                    placeholder="Buscar por cliente o número..." 
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     autoFocus
                 />
             </div>
-            <Button onClick={loadPendingTickets} color="#6b7280">Actualizar</Button>
+            <Button onClick={loadPendingTickets} color="#6b7280" title="Recargar lista">
+                <FaSync /> Actualizar
+            </Button>
         </div>
 
         <TableContainer>
             <Table>
                 <thead>
                     <tr>
-                        <th>Ticket</th>
+                        <th>ID</th>
                         <th>Fecha</th>
                         <th>Cliente</th>
                         <th>Estado</th>
                         <th>Total</th>
                         <th>Abonado</th>
-                        <th>Saldo</th>
+                        <th>Saldo Pendiente</th>
                         <th>Acción</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {loading ? <tr><td colSpan="8" style={{textAlign: 'center'}}>Buscando cuentas...</td></tr> : 
-                     filteredTickets.length === 0 ? <tr><td colSpan="8" style={{textAlign: 'center', padding: 20}}>No hay cuentas pendientes.</td></tr> :
-                     filteredTickets.map(ticket => {
-                        const total = parseFloat(ticket.total || ticket.total_venta || 0);
-                        const abonado = parseFloat(ticket.abonado || 0);
+                    {loading ? 
+                        <tr><td colSpan="8" style={{textAlign: 'center', padding: 20}}>Cargando ventas...</td></tr> 
+                    : filteredTickets.length === 0 ? 
+                        <tr><td colSpan="8" style={{textAlign: 'center', padding: 20, color: '#666'}}>
+                            No se encontraron ventas con saldo pendiente.
+                        </td></tr> 
+                    : filteredTickets.map(ticket => {
+                        const total = parseFloat(ticket.total || ticket.total_venta || ticket.monto_total || 0);
+                        const abonado = parseFloat(ticket.abonado || ticket.monto_pagado || 0);
                         const deuda = total - abonado;
+                        
+                        const rawDate = ticket.created_at || ticket.fecha;
+                        const dateStr = rawDate ? new Date(rawDate).toLocaleDateString() : 'S/F';
+                        const clientName = ticket.clienteNombre || ticket.cliente?.nombre || ticket.nombre_cliente || 'Cliente Casual';
+                        const ticketId = ticket.id || ticket.id_venta;
+
                         return (
-                        <tr key={ticket.id}>
-                            <td>#{ticket.id}</td>
-                            <td>{new Date(ticket.created_at || ticket.fecha).toLocaleDateString()}</td>
-                            <td><FaUserCheck style={{color: '#6b7280', marginRight:5}}/> {ticket.clienteNombre || 'Casual'}</td>
-                            <td><span style={{padding: '3px 8px', borderRadius: 10, background: '#fee2e2', color: '#991b1b', fontSize: '0.8rem', fontWeight: 'bold'}}>{ticket.estado}</span></td>
+                        <tr key={ticketId}>
+                            <td>#{ticketId}</td>
+                            <td>{dateStr}</td>
+                            <td><FaUserCheck style={{color: '#6b7280', marginRight:5}}/> {clientName}</td>
+                            <td>
+                                <span style={{
+                                    padding: '3px 8px', borderRadius: 10, 
+                                    background: '#fee2e2', color: '#991b1b', 
+                                    fontSize: '0.8rem', fontWeight: 'bold'
+                                }}>
+                                    PENDIENTE
+                                </span>
+                            </td>
                             <td>C$ {total.toFixed(2)}</td>
                             <td>C$ {abonado.toFixed(2)}</td>
-                            <td style={{color: '#dc2626', fontWeight: 'bold'}}>C$ {deuda.toFixed(2)}</td>
+                            <td style={{color: '#dc2626', fontWeight: 'bold', fontSize: '1.05rem'}}>C$ {deuda.toFixed(2)}</td>
                             <td>
                                 <Button 
                                     color="#10b981"
-                                    onClick={() => { setSelectedTicket({...ticket, deudaCalculada: deuda}); setAmount(''); }}
+                                    onClick={() => { setSelectedTicket({...ticket, id: ticketId, deudaCalculada: deuda}); setAmount(''); }}
                                 >
                                     <FaMoneyBillWave /> Cobrar
                                 </Button>
@@ -203,12 +240,18 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
         {selectedTicket && (
             <PaySection>
                 <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                    <h3 style={{margin: 0, color: '#1e40af'}}>Cobrando Ticket #{selectedTicket.id} - {selectedTicket.clienteNombre}</h3>
-                    <button onClick={() => setSelectedTicket(null)} style={{border: 'none', background: 'transparent', cursor: 'pointer', color: '#666'}}><FaTimes/></button>
+                    <h3 style={{margin: 0, color: '#1e40af'}}>
+                        Cobrando Ticket #{selectedTicket.id} - {selectedTicket.clienteNombre || selectedTicket.cliente?.nombre || selectedTicket.nombre_cliente}
+                    </h3>
+                    <button onClick={() => setSelectedTicket(null)} style={{border: 'none', background: 'transparent', cursor: 'pointer', color: '#666'}}>
+                        <FaTimes/>
+                    </button>
                 </div>
                 <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20}}>
                     <div>
-                        <label style={{display: 'block', marginBottom: 5, fontWeight: 600}}>Monto a Pagar (Deuda: {selectedTicket.deudaCalculada.toFixed(2)})</label>
+                        <label style={{display: 'block', marginBottom: 5, fontWeight: 600}}>
+                            Monto a Pagar (Deuda Actual: C$ {selectedTicket.deudaCalculada.toFixed(2)})
+                        </label>
                         <Input 
                             type="number" 
                             value={amount} 
