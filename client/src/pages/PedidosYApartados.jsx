@@ -1,259 +1,243 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import styled, { keyframes } from 'styled-components';
-import { Link, useNavigate } from 'react-router-dom'; // Agregamos useNavigate
-import { useAuth } from '../context/AuthContext';
-import * as api from '../service/api';
-
-// Iconos seguros
-import { 
-    FaClipboardList, FaSearch, FaArrowLeft, FaSync, 
-    FaCartPlus, FaUser, FaClock, FaCheckCircle, FaTimesCircle
-} from 'react-icons/fa';
-
-// --- MODALES (Descomenta si las rutas son correctas en tu proyecto) ---
-// import CreateOrderModal from './pos/components/CreateOrderModal';
-// import OrderDetailModal from './pos/components/OrderDetailModal'; 
+import React, { useState, useEffect, useMemo } from 'react';
+import styled from 'styled-components';
+import { FaSearch, FaShoppingCart, FaPlus, FaTrash, FaPaperPlane, FaSync, FaTags } from 'react-icons/fa';
+import { useAuth } from '../context/AuthContext'; // Ajusta la ruta si es necesaria
+import * as api from '../service/api'; // Ajusta la ruta
 
 // --- ESTILOS ---
-const fadeIn = keyframes`from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); }`;
-
-const PageWrapper = styled.div`
-  padding: 2rem; 
-  background: #f1f5f9; 
-  min-height: 100vh; 
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  animation: ${fadeIn} 0.5s ease-out;
+const Container = styled.div`
+  display: flex; height: 100vh; background: #f1f5f9; font-family: 'Segoe UI', sans-serif;
 `;
-
-const Header = styled.div`
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;
-  background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+const LeftPanel = styled.div`
+  flex: 2; padding: 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: hidden;
 `;
-
-const Title = styled.h1`
-  font-size: 1.8rem; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 10px;
+const RightPanel = styled.div`
+  flex: 1; background: white; padding: 20px; display: flex; flex-direction: column; 
+  box-shadow: -4px 0 15px rgba(0,0,0,0.05); border-left: 1px solid #e2e8f0;
 `;
-
-const Grid = styled.div`
-  display: grid; 
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); 
-  gap: 1.5rem;
+const SearchBar = styled.div`
+  display: flex; gap: 10px; background: white; padding: 15px; border-radius: 12px; 
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 `;
-
-const TicketCard = styled.div`
-  background: white; 
-  border-radius: 12px; 
-  padding: 1.5rem; 
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  border-left: 6px solid ${props => props.color};
-  transition: transform 0.2s;
-  &:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
-`;
-
-const Badge = styled.span`
-  background: ${props => props.bg}; color: ${props => props.color};
-  padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold;
-`;
-
-const ActionButton = styled.button`
-  width: 100%;
-  margin-top: 15px;
-  padding: 12px;
-  border: none;
-  border-radius: 8px;
-  font-weight: bold;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  transition: background 0.2s;
-  
-  /* Estilo dinámico */
-  background: ${props => props.primary ? '#2563eb' : '#e2e8f0'};
-  color: ${props => props.primary ? 'white' : '#475569'};
-
-  &:hover {
-    background: ${props => props.primary ? '#1d4ed8' : '#cbd5e1'};
-  }
-`;
-
 const Input = styled.input`
-  padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; width: 250px;
-  &:focus { border-color: #2563eb; }
+  flex: 1; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; outline: none; font-size: 1rem;
+  &:focus { border-color: #3b82f6; }
+`;
+const ProductGrid = styled.div`
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; 
+  overflow-y: auto; padding-bottom: 20px;
+`;
+const ProductCard = styled.div`
+  background: white; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; 
+  display: flex; flex-direction: column; justify-content: space-between; gap: 10px;
+  transition: transform 0.2s; cursor: pointer;
+  &:hover { transform: translateY(-3px); border-color: #3b82f6; box-shadow: 0 5px 15px rgba(59,130,246,0.1); }
+`;
+const PriceTag = styled.div`
+  font-size: 1.2rem; font-weight: bold; color: #2563eb;
+`;
+const CartItem = styled.div`
+  display: flex; justify-content: space-between; align-items: center; padding: 10px 0; 
+  border-bottom: 1px solid #f1f5f9;
+`;
+const Button = styled.button`
+  background: ${props => props.bg || '#3b82f6'}; color: white; border: none; padding: 15px; 
+  border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; 
+  justify-content: center; gap: 10px; font-size: 1rem; width: 100%; margin-top: 10px;
+  &:hover { opacity: 0.9; }
+  &:disabled { background: #cbd5e1; cursor: not-allowed; }
 `;
 
-const PedidosYApartados = () => {
-    const navigate = useNavigate(); // Hook para redireccionar
-    const { user } = useAuth();
+const SellerDashboard = () => {
+    const { user } = useAuth(); // Obtenemos el usuario vendedor
     const token = localStorage.getItem('token');
-
-    const [pedidos, setPedidos] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
     
-    // Estados para modales (si los usas)
-    const [modalOpen, setModalOpen] = useState(false);
+    const [products, setProducts] = useState([]);
+    const [cart, setCart] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [clientName, setClientName] = useState('');
 
-    // --- 1. CARGAR PEDIDOS ---
-    const fetchPedidos = useCallback(async () => {
-        if (!token) return;
+    // --- 1. CARGAR PRODUCTOS ---
+    const fetchProducts = async () => {
         setLoading(true);
         try {
-            const data = await api.fetchOrders(token);
-            // Aseguramos que sea array y filtramos si es necesario
-            const lista = Array.isArray(data) ? data : [];
-            // Ordenamos: Los pendientes primero, luego por fecha reciente
-            lista.sort((a, b) => {
-                if (a.estado === 'PENDIENTE' && b.estado !== 'PENDIENTE') return -1;
-                if (a.estado !== 'PENDIENTE' && b.estado === 'PENDIENTE') return 1;
-                return new Date(b.fecha) - new Date(a.fecha);
-            });
-            setPedidos(lista);
+            // Asegúrate que esta función exista en tu api.js y traiga inventario y precios
+            const data = await api.fetchProducts(token); 
+            setProducts(data || []);
         } catch (error) {
-            console.error("Error:", error);
+            console.error("Error cargando productos", error);
         } finally {
             setLoading(false);
         }
-    }, [token]);
+    };
 
-    useEffect(() => {
-        fetchPedidos();
-        // Auto-actualizar cada 15 segundos para ver nuevos tickets de vendedores
-        const interval = setInterval(fetchPedidos, 15000); 
-        return () => clearInterval(interval);
-    }, [fetchPedidos]);
+    useEffect(() => { fetchProducts(); }, []);
 
-    // --- 2. FUNCIÓN CLAVE: CARGAR AL POS (CAJA) ---
-    const handleCargarEnCaja = (pedido) => {
-        if (!pedido.items || pedido.items.length === 0) {
-            alert("Este ticket no tiene productos.");
-            return;
-        }
+    // --- 2. LÓGICA DEL CARRITO ---
+    const addToCart = (product) => {
+        setCart(prev => {
+            const existing = prev.find(p => p.id === product.id);
+            if (existing) {
+                return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
+            }
+            return [...prev, { ...product, quantity: 1 }];
+        });
+    };
 
-        const confirmacion = window.confirm(`¿Cargar Ticket #${pedido.id} en la pantalla de cobro?`);
-        if (confirmacion) {
-            // Redirigimos a la ruta del POS y le pasamos los datos
-            // IMPORTANTE: Asegúrate que tu ruta sea '/pos' o '/caja'
-            navigate('/pos', { 
-                state: { 
-                    ticketData: {
-                        items: pedido.items,
-                        cliente: pedido.cliente, // Si tienes objeto cliente
-                        clienteNombre: pedido.clienteNombre,
-                        originalOrderId: pedido.id // Para saber qué ticket actualizar luego
-                    }
-                } 
-            });
+    const removeFromCart = (id) => {
+        setCart(prev => prev.filter(p => p.id !== id));
+    };
+
+    const updateQuantity = (id, delta) => {
+        setCart(prev => prev.map(p => {
+            if (p.id === id) {
+                const newQty = Math.max(1, p.quantity + delta);
+                // Validación básica de stock visual
+                if (newQty > p.existencia) return p; 
+                return { ...p, quantity: newQty };
+            }
+            return p;
+        }));
+    };
+
+    const total = useMemo(() => {
+        return cart.reduce((acc, item) => acc + (item.precio * item.quantity), 0);
+    }, [cart]);
+
+    // --- 3. CREAR EL TICKET PENDIENTE (ENVIAR A CAJA) ---
+    const handleSendToCaja = async () => {
+        if (cart.length === 0) return alert("El carrito está vacío");
+
+        const orderData = {
+            userId: user?.id || user?.id_usuario, // ID del Vendedor
+            clienteNombre: clientName || "Consumidor Final",
+            items: cart.map(i => ({
+                id_producto: i.id,
+                cantidad: i.quantity,
+                precio: i.precio,
+                nombre: i.nombre // Guardamos nombre por si acaso
+            })),
+            total: total,
+            estado: 'PENDIENTE', // <--- CLAVE: Se guarda como pendiente para el POS
+            tipo: 'PRE-VENTA'
+        };
+
+        try {
+            // Llamada a tu API para crear pedido. 
+            // Si usas la misma que ventas, asegúrate que acepte estado 'PENDIENTE'
+            await api.createOrder(orderData, token); 
+            
+            alert("✅ Ticket enviado a caja correctamente.");
+            setCart([]);
+            setClientName('');
+        } catch (error) {
+            console.error(error);
+            alert("Error al enviar el pedido: " + error.message);
         }
     };
 
-    // --- FILTROS ---
-    const filteredPedidos = useMemo(() => {
-        if (!searchTerm) return pedidos;
-        const lower = searchTerm.toLowerCase();
-        return pedidos.filter(p => 
-            (p.clienteNombre || '').toLowerCase().includes(lower) || 
-            String(p.id).includes(lower)
-        );
-    }, [pedidos, searchTerm]);
+    // Filtro de búsqueda
+    const filteredProducts = products.filter(p => 
+        p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        (p.codigo && p.codigo.includes(searchTerm))
+    );
 
     return (
-        <PageWrapper>
-            <Header>
-                <div>
-                    <Title><FaClipboardList /> Tickets Pendientes</Title>
-                    <p style={{color: '#64748b', margin: '5px 0 0 0'}}>
-                        Selecciona un ticket creado por un vendedor para cobrarlo.
-                    </p>
-                </div>
-                <div style={{display:'flex', gap: '10px', alignItems:'center'}}>
-                    <div style={{position:'relative'}}>
-                        <FaSearch style={{position:'absolute', left:10, top:12, color:'#94a3b8'}}/>
-                        <Input 
-                            placeholder="Buscar cliente o ticket #..." 
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                            style={{paddingLeft: 35}}
-                        />
-                    </div>
-                    <button 
-                        onClick={fetchPedidos} 
-                        style={{padding:10, background:'#e2e8f0', border:'none', borderRadius:8, cursor:'pointer'}}
-                        title="Actualizar lista"
-                    >
-                        <FaSync className={loading ? 'fa-spin' : ''} />
+        <Container>
+            {/* --- PANEL IZQUIERDO: PRODUCTOS Y PRECIOS --- */}
+            <LeftPanel>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                    <h2 style={{margin:0, color:'#1e293b'}}>Panel de Ventas</h2>
+                    <button onClick={fetchProducts} style={{background:'none', border:'none', cursor:'pointer', color:'#64748b'}}>
+                        <FaSync size={20} className={loading ? 'fa-spin' : ''}/>
                     </button>
-                    <Link to="/dashboard" style={{textDecoration:'none', color:'#475569', fontWeight:'bold', marginLeft:10}}>
-                        <FaArrowLeft /> Salir
-                    </Link>
                 </div>
-            </Header>
 
-            {loading && pedidos.length === 0 ? (
-                <div style={{textAlign:'center', padding:40, color:'#64748b'}}>Cargando tickets...</div>
-            ) : (
-                <Grid>
-                    {filteredPedidos.map(p => {
-                        const esPendiente = p.estado === 'PENDIENTE';
-                        const colorEstado = esPendiente ? '#f59e0b' : p.estado === 'COMPLETADO' ? '#10b981' : '#ef4444';
-                        
-                        return (
-                            <TicketCard key={p.id} color={colorEstado}>
-                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:15}}>
-                                    <span style={{fontWeight:'800', fontSize:'1.1rem', color:'#334155'}}>
-                                        Ticket #{p.id}
-                                    </span>
-                                    <Badge 
-                                        bg={esPendiente ? '#fef3c7' : '#dcfce7'} 
-                                        color={esPendiente ? '#b45309' : '#166534'}
-                                    >
-                                        {p.estado}
-                                    </Badge>
+                <SearchBar>
+                    <FaSearch color="#94a3b8" size={20} style={{marginTop: 10}}/>
+                    <Input 
+                        placeholder="Buscar producto por nombre o código..." 
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        autoFocus
+                    />
+                </SearchBar>
+
+                <ProductGrid>
+                    {filteredProducts.map(p => (
+                        <ProductCard key={p.id} onClick={() => addToCart(p)}>
+                            <div style={{fontWeight:'bold', color:'#334155'}}>{p.nombre}</div>
+                            <div style={{fontSize:'0.85rem', color:'#64748b'}}>Cod: {p.codigo || 'S/C'}</div>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop: 'auto'}}>
+                                <PriceTag>C$ {parseFloat(p.precio).toFixed(2)}</PriceTag>
+                                <div style={{fontSize:'0.8rem', background: p.existencia > 0 ? '#dcfce7':'#fee2e2', color: p.existencia > 0 ? '#166534':'#991b1b', padding:'2px 8px', borderRadius:4}}>
+                                    Stock: {p.existencia}
                                 </div>
+                            </div>
+                        </ProductCard>
+                    ))}
+                </ProductGrid>
+            </LeftPanel>
 
-                                <div style={{display:'flex', flexDirection:'column', gap:8, color:'#475569', fontSize:'0.95rem'}}>
-                                    <div style={{display:'flex', alignItems:'center', gap:8}}>
-                                        <FaUser size={14}/> 
-                                        <strong>{p.clienteNombre || 'Consumidor Final'}</strong>
-                                    </div>
-                                    <div style={{display:'flex', alignItems:'center', gap:8}}>
-                                        <FaClock size={14}/> 
-                                        {new Date(p.fecha).toLocaleString()}
-                                    </div>
-                                    <div style={{marginTop:5, paddingTop:10, borderTop:'1px solid #f1f5f9', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                        <span>Total estimado:</span>
-                                        <span style={{fontSize:'1.2rem', fontWeight:'bold', color:'#0f172a'}}>
-                                            C$ {Number(p.total).toFixed(2)}
-                                        </span>
-                                    </div>
-                                </div>
+            {/* --- PANEL DERECHO: TICKET TEMPORAL --- */}
+            <RightPanel>
+                <h3 style={{display:'flex', alignItems:'center', gap:10, borderBottom:'1px solid #e2e8f0', paddingBottom:15}}>
+                    <FaShoppingCart /> Ticket Actual
+                </h3>
 
-                                {/* BOTÓN DE ACCIÓN PRINCIPAL */}
-                                {esPendiente ? (
-                                    <ActionButton 
-                                        primary 
-                                        onClick={() => handleCargarEnCaja(p)}
-                                    >
-                                        <FaCartPlus size={18} /> CARGAR A CAJA
-                                    </ActionButton>
-                                ) : (
-                                    <ActionButton disabled>
-                                        {p.estado === 'COMPLETADO' ? <FaCheckCircle/> : <FaTimesCircle/>} 
-                                        {p.estado}
-                                    </ActionButton>
-                                )}
-                            </TicketCard>
-                        );
-                    })}
-                </Grid>
-            )}
-
-            {filteredPedidos.length === 0 && !loading && (
-                <div style={{textAlign:'center', marginTop:50, color:'#94a3b8'}}>
-                    <h3>No hay tickets encontrados</h3>
-                    <p>Los vendedores deben crear pedidos para que aparezcan aquí.</p>
+                <div style={{marginBottom: 15}}>
+                    <label style={{fontSize:'0.9rem', color:'#64748b'}}>Cliente (Opcional):</label>
+                    <Input 
+                        style={{width:'90%', padding: 8, marginTop: 5}}
+                        placeholder="Nombre del cliente..."
+                        value={clientName}
+                        onChange={e => setClientName(e.target.value)}
+                    />
                 </div>
-            )}
-        </PageWrapper>
+
+                <div style={{flex: 1, overflowY: 'auto'}}>
+                    {cart.length === 0 ? (
+                        <div style={{textAlign:'center', color:'#94a3b8', marginTop: 50}}>
+                            <FaShoppingCart size={40} style={{marginBottom:10}}/>
+                            <p>Escanea o selecciona productos</p>
+                        </div>
+                    ) : (
+                        cart.map(item => (
+                            <CartItem key={item.id}>
+                                <div style={{flex:1}}>
+                                    <div style={{fontWeight:'bold', fontSize:'0.9rem'}}>{item.nombre}</div>
+                                    <div style={{color:'#64748b', fontSize:'0.85rem'}}>C$ {item.precio} x {item.quantity}</div>
+                                </div>
+                                <div style={{display:'flex', alignItems:'center', gap:5}}>
+                                    <button onClick={() => updateQuantity(item.id, -1)} style={{padding:'2px 8px', cursor:'pointer'}}>-</button>
+                                    <span>{item.quantity}</span>
+                                    <button onClick={() => updateQuantity(item.id, 1)} style={{padding:'2px 8px', cursor:'pointer'}}>+</button>
+                                </div>
+                                <div style={{fontWeight:'bold', marginLeft:10}}>
+                                    C$ {(item.precio * item.quantity).toFixed(2)}
+                                </div>
+                                <button onClick={() => removeFromCart(item.id)} style={{marginLeft:10, background:'none', border:'none', color:'#ef4444', cursor:'pointer'}}>
+                                    <FaTrash />
+                                </button>
+                            </CartItem>
+                        ))
+                    )}
+                </div>
+
+                <div style={{borderTop:'2px dashed #cbd5e1', paddingTop:20, marginTop:10}}>
+                    <div style={{display:'flex', justifyContent:'space-between', fontSize:'1.2rem', fontWeight:'bold', marginBottom:15}}>
+                        <span>Total:</span>
+                        <span>C$ {total.toFixed(2)}</span>
+                    </div>
+
+                    <Button onClick={handleSendToCaja} disabled={cart.length === 0}>
+                        <FaPaperPlane /> ENVIAR A CAJA
+                    </Button>
+                </div>
+            </RightPanel>
+        </Container>
     );
 };
 
-export default PedidosYApartados;
+export default SellerDashboard;
