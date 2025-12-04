@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { Link } from 'react-router-dom';
-import axios from 'axios'; // Importamos axios para cargar proveedores directamente
+import axios from 'axios'; 
 import { 
     FaArrowLeft, FaPlus, FaSearch, FaFileInvoiceDollar, 
     FaCalendarAlt, FaCheckCircle, FaExclamationCircle, FaClock,
     FaMoneyBillWave, FaBuilding, FaList, FaTrashAlt, FaTimes, FaStore
-} from 'react-icons/fa'; // Agregado FaList aquí
+} from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
-import * as api from '../service/api'; // Tu archivo api.js
-import { API_URL } from '../service/api'; // Importamos la URL base
+import * as api from '../service/api';
+import { API_URL } from '../service/api';
 import ConfirmationModal from './pos/components/ConfirmationModal'; 
+import AlertModal from './pos/components/AlertModal';
 
 // --- ANIMACIONES ---
 const fadeIn = keyframes`from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); }`;
@@ -345,6 +346,9 @@ const FacturasProveedores = () => {
     const [filter, setFilter] = useState('PENDIENTE'); 
     const [searchTerm, setSearchTerm] = useState('');
     
+    // ESTADO PARA LA ALERTA BONITA
+    const [alertInfo, setAlertInfo] = useState({ show: false, title: '', message: '', type: 'info' });
+
     // Estados de Modales
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showPayModal, setShowPayModal] = useState(false);
@@ -362,6 +366,11 @@ const FacturasProveedores = () => {
     });
     const [payAmount, setPayAmount] = useState('');
 
+    // --- HELPER PARA ALERTAS ---
+    const showAlert = (title, message, type = 'info') => {
+        setAlertInfo({ show: true, title, message, type });
+    };
+
     // --- CARGA INICIAL ---
     useEffect(() => {
         const loadData = async () => {
@@ -371,7 +380,8 @@ const FacturasProveedores = () => {
                 const invData = await api.fetchProviderInvoices(token);
                 setInvoices(Array.isArray(invData) ? invData : []);
 
-                // 2. Cargar Proveedores Directamente con Axios para evitar errores si no existe en api.js
+                // 2. Cargar Proveedores Directamente con Axios
+                // Utilizamos el mismo patrón que en el inventario
                 const provResponse = await axios.get(`${API_URL}/providers`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
@@ -390,7 +400,7 @@ const FacturasProveedores = () => {
     // --- LOGICA DE NEGOCIO ---
     const handleCreate = async (e) => {
         e.preventDefault();
-        if (!formData.proveedor) return alert("Seleccione un proveedor");
+        if (!formData.proveedor) return showAlert("Atención", "Seleccione un proveedor de la lista", "warning");
 
         try {
             await api.createProviderInvoice(formData, token);
@@ -401,9 +411,9 @@ const FacturasProveedores = () => {
                 fecha_emision: new Date().toISOString().split('T')[0], 
                 fecha_vencimiento: '', monto_total: '', notas: '' 
             });
-            alert("Factura registrada exitosamente.");
+            showAlert("Éxito", "Factura registrada exitosamente.", "success");
         } catch (error) {
-            alert("Error al guardar factura. Verifique los datos.");
+            showAlert("Error", "Error al guardar factura. Verifique los datos.", "error");
         }
     };
 
@@ -412,16 +422,16 @@ const FacturasProveedores = () => {
         if (!selectedInvoice || !payAmount) return;
         
         const maxPay = parseFloat(selectedInvoice.monto_total) - parseFloat(selectedInvoice.monto_abonado);
-        if(parseFloat(payAmount) > maxPay) return alert(`El monto no puede ser mayor a la deuda (C$${maxPay})`);
+        if(parseFloat(payAmount) > maxPay) return showAlert("Error", `El monto no puede ser mayor a la deuda (C$${maxPay})`, "error");
 
         try {
             await api.payProviderInvoice(selectedInvoice.id, payAmount, token);
             setRefreshTrigger(prev => prev + 1);
             setShowPayModal(false);
             setPayAmount('');
-            alert("Abono registrado correctamente.");
+            showAlert("Éxito", "Abono registrado correctamente.", "success");
         } catch (error) {
-            alert("Error al registrar el pago.");
+            showAlert("Error", "Error al registrar el pago.", "error");
         }
     };
 
@@ -431,9 +441,9 @@ const FacturasProveedores = () => {
             await api.deleteProviderInvoice(selectedInvoice.id, token);
             setRefreshTrigger(prev => prev + 1);
             setShowConfirmDelete(false);
-            alert("Factura eliminada.");
+            showAlert("Eliminado", "Factura eliminada correctamente.", "success");
         } catch (error) {
-            alert("No se pudo eliminar la factura.");
+            showAlert("Error", "No se pudo eliminar la factura.", "error");
         }
     };
 
@@ -628,8 +638,7 @@ const FacturasProveedores = () => {
                                 >
                                     <option value="">Seleccione un proveedor...</option>
                                     {providers.map(p => (
-                                        // Ajustamos para usar id_proveedor y nombre, igual que tu BD
-                                        <option key={p.id_proveedor} value={p.nombre}>
+                                        <option key={p.id_proveedor || p.id} value={p.nombre}>
                                             {p.nombre}
                                         </option>
                                     ))}
@@ -710,6 +719,14 @@ const FacturasProveedores = () => {
                 onConfirm={handleDelete}
             />
 
+            {/* --- ALERTA PERSONALIZADA --- */}
+            <AlertModal 
+                isOpen={alertInfo.show}
+                onClose={() => setAlertInfo(prev => ({ ...prev, show: false }))}
+                title={alertInfo.title}
+                message={alertInfo.message}
+                type={alertInfo.type} 
+            />
         </PageWrapper>
     );
 };
