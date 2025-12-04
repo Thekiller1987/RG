@@ -1009,12 +1009,16 @@ showAlert({ title: "Éxito", message: "Venta realizada con éxito" });
     askForPrint(transaction); 
   };
   
-  // Handler para recargar datos después de un abono a crédito
-  const handleAbonoSuccess = useCallback(() => {
-    closeModal();
-    showAlert({ title: 'Éxito', message: 'Abono registrado correctamente' });
-    refreshData();
-  }, [closeModal, showAlert, refreshData]);
+// ▼▼▼ CÓDIGO CORREGIDO ▼▼▼
+  const handleAbonoSuccess = useCallback(async () => {
+    closeModal();
+    showAlert({ title: 'Éxito', message: 'Abono registrado correctamente. Caja actualizada.' });
+    
+    // Recargamos las ventas Y TAMBIÉN la caja para que sume el dinero inmediatamente
+    await refreshData();       
+    await reloadCajaSession(); 
+  }, [closeModal, showAlert, refreshData, reloadCajaSession]);
+  // ▲▲▲ FIN DEL CAMBIO ▲▲▲
 
   // Handler para abrir el modal de historial de ventas
   const handleOpenHistoryModal = () => openModal('history', { loadSalesFunction: loadSalesFromDB });
