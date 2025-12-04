@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { Link } from 'react-router-dom';
+import axios from 'axios'; // Importamos axios para cargar proveedores directamente
 import { 
     FaArrowLeft, FaPlus, FaSearch, FaFileInvoiceDollar, 
     FaCalendarAlt, FaCheckCircle, FaExclamationCircle, FaClock,
     FaMoneyBillWave, FaBuilding, FaList, FaTrashAlt, FaTimes, FaStore
-} from 'react-icons/fa';
+} from 'react-icons/fa'; // Agregado FaList aquí
 import { useAuth } from '../context/AuthContext';
-import * as api from '../service/api';
+import * as api from '../service/api'; // Tu archivo api.js
+import { API_URL } from '../service/api'; // Importamos la URL base
 import ConfirmationModal from './pos/components/ConfirmationModal'; 
 
 // --- ANIMACIONES ---
@@ -76,6 +78,7 @@ const Button = styled.button`
     cursor: pointer; 
     display: flex; 
     align-items: center; 
+    justify-content: center;
     gap: 0.5rem; 
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     
@@ -334,7 +337,7 @@ const FacturasProveedores = () => {
     
     // Estados de datos
     const [invoices, setInvoices] = useState([]);
-    const [providers, setProviders] = useState([]); // Lista de proveedores para el select
+    const [providers, setProviders] = useState([]); 
     const [loading, setLoading] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -368,12 +371,11 @@ const FacturasProveedores = () => {
                 const invData = await api.fetchProviderInvoices(token);
                 setInvoices(Array.isArray(invData) ? invData : []);
 
-                // 2. Cargar Proveedores (Para el select)
-                // Si no tienes una función dedicada, usa request directo
-                // Asumimos que la ruta es /providers o /proveedores
-                const provData = await api.request('get', '/providers', token).catch(() => []); 
-                // Ajustar según la estructura que devuelva tu backend
-                const provList = Array.isArray(provData) ? provData : (provData.data || []);
+                // 2. Cargar Proveedores Directamente con Axios para evitar errores si no existe en api.js
+                const provResponse = await axios.get(`${API_URL}/providers`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const provList = Array.isArray(provResponse.data) ? provResponse.data : (provResponse.data.data || []);
                 setProviders(provList);
 
             } catch (err) {
@@ -399,6 +401,7 @@ const FacturasProveedores = () => {
                 fecha_emision: new Date().toISOString().split('T')[0], 
                 fecha_vencimiento: '', monto_total: '', notas: '' 
             });
+            alert("Factura registrada exitosamente.");
         } catch (error) {
             alert("Error al guardar factura. Verifique los datos.");
         }
@@ -407,11 +410,16 @@ const FacturasProveedores = () => {
     const handlePay = async (e) => {
         e.preventDefault();
         if (!selectedInvoice || !payAmount) return;
+        
+        const maxPay = parseFloat(selectedInvoice.monto_total) - parseFloat(selectedInvoice.monto_abonado);
+        if(parseFloat(payAmount) > maxPay) return alert(`El monto no puede ser mayor a la deuda (C$${maxPay})`);
+
         try {
             await api.payProviderInvoice(selectedInvoice.id, payAmount, token);
             setRefreshTrigger(prev => prev + 1);
             setShowPayModal(false);
             setPayAmount('');
+            alert("Abono registrado correctamente.");
         } catch (error) {
             alert("Error al registrar el pago.");
         }
@@ -423,6 +431,7 @@ const FacturasProveedores = () => {
             await api.deleteProviderInvoice(selectedInvoice.id, token);
             setRefreshTrigger(prev => prev + 1);
             setShowConfirmDelete(false);
+            alert("Factura eliminada.");
         } catch (error) {
             alert("No se pudo eliminar la factura.");
         }
@@ -611,11 +620,17 @@ const FacturasProveedores = () => {
                         <form onSubmit={handleCreate}>
                             <FormGroup>
                                 <label>Proveedor</label>
-                                <select required value={formData.proveedor} onChange={e => setFormData({...formData, proveedor: e.target.value})}>
+                                {/* AQUÍ ESTÁ LA SELECCIÓN DE PROVEEDORES CARGADA DESDE LA BD */}
+                                <select 
+                                    required 
+                                    value={formData.proveedor} 
+                                    onChange={e => setFormData({...formData, proveedor: e.target.value})}
+                                >
                                     <option value="">Seleccione un proveedor...</option>
                                     {providers.map(p => (
-                                        <option key={p.id_proveedor || p.id} value={p.nombre || p.name}>
-                                            {p.nombre || p.name}
+                                        // Ajustamos para usar id_proveedor y nombre, igual que tu BD
+                                        <option key={p.id_proveedor} value={p.nombre}>
+                                            {p.nombre}
                                         </option>
                                     ))}
                                 </select>
