@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { 
     FaSignOutAlt, FaShoppingCart, FaBoxOpen, FaFileInvoice, 
-    FaCreditCard, FaCloudUploadAlt, FaChartBar, FaBriefcase, FaUsers 
+    FaCreditCard, FaCloudUploadAlt, FaChartBar, FaBriefcase, FaUsers,
+    FaFileInvoiceDollar // <--- NUEVO ICONO PARA FACTURAS
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext.jsx'; 
 
-// Ajusta la ruta si es necesario según tu estructura de carpetas
 import ConfirmationModal from './pos/components/ConfirmationModal.jsx'; 
 
 // --- ESTILOS MEJORADOS Y RESPONSIVOS ---
@@ -147,19 +147,17 @@ const Dashboard = () => {
     
     // --- DEFINICIÓN DE ACCESOS ---
 
-    // 1. Punto de Venta: SOLO Admins (El vendedor ya NO entra aquí)
     const canAccessPOS = isAdmin;
-
-    // 2. Pedidos: Admins Y Vendedores (Este es el ÚNICO lugar donde entra el vendedor)
     const canAccessOrders = isAdmin || isVendedor;
-
-    // 3. El resto de módulos (Vendedor excluido)
     const canAccessCredits = isAdmin || isContador; 
     const canAccessInventory = isAdmin || isInventoryManager;
     const canAccessMassUpload = isAdmin || isInventoryManager;
     const canAccessReports = isAdmin || userRole === 'Gerente' || isContador; 
     const canAccessCashReports = isAdmin || userRole === 'Gerente' || isContador; 
     const canAccessAdminUsers = isAdmin;
+    
+    // NUEVO ACCESO: Facturas de Proveedores (Solo Admin y Contador)
+    const canAccessInvoices = isAdmin || isContador;
 
     const displayName = user.nombre_usuario || user.nombre || user.name || 'Usuario';
     // ----------------------------------------------------
@@ -187,7 +185,7 @@ const Dashboard = () => {
                 </TopBar>
 
                 <GridContainer>
-                    {/* 1. Punto de Venta (SOLO ADMIN) */}
+                    {/* 1. Punto de Venta */}
                     {canAccessPOS && (
                         <Card to="/pos" color="#007bff"> 
                             <CardIcon color="#007bff"><FaShoppingCart /></CardIcon> 
@@ -196,12 +194,21 @@ const Dashboard = () => {
                         </Card>
                     )}
 
-                    {/* 2. Pedidos y Apartados (ADMIN Y VENDEDOR) */}
+                    {/* 2. Pedidos y Apartados */}
                     {canAccessOrders && (
                         <Card to="/orders" color="#ffc107"> 
                             <CardIcon color="#ffc107"><FaFileInvoice /></CardIcon> 
                             <h2>Pedidos y Apartados</h2> 
                             <p>Crear tickets, apartados y pedidos.</p> 
+                        </Card>
+                    )}
+                    
+                    {/* NUEVO: Facturas Proveedores */}
+                    {canAccessInvoices && (
+                        <Card to="/invoices" color="#e83e8c"> 
+                            <CardIcon color="#e83e8c"><FaFileInvoiceDollar /></CardIcon> 
+                            <h2>Facturas Proveedores</h2> 
+                            <p>Gestionar pagos, vencimientos y proveedores.</p> 
                         </Card>
                     )}
                     
@@ -244,7 +251,7 @@ const Dashboard = () => {
                     {/* 7. Gestión de Cajas */}
                     {canAccessCashReports && (
                         <Card to="/cash-report" color="#dc3545"> 
-                            <CardIcon color="#dc3545"><FaBriefcase /></CardIcon>
+                            <CardIcon color="#dc3545"><FaBriefcase /></CardIcon> 
                             <h2>Gestión de Cajas</h2>
                             <p>Cierres y arqueos de caja.</p>
                         </Card>

@@ -1,4 +1,3 @@
-// client/src/App.jsx
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
@@ -19,6 +18,7 @@ import Unauthorized from './components/Unauthorized.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import InventoryUpload from './pages/InventoryUpload.jsx';
 import CashReport from './pages/CashReport.jsx';
+import FacturasProveedores from './pages/FacturasProveedores.jsx';
 
 // Mapa de roles
 const ROLES = {
@@ -132,6 +132,16 @@ function App() {
         element={
           <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
             <CashReport />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Facturas de Proveedores (Nueva Ruta) */}
+      <Route
+        path="/invoices"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS]}>
+            <FacturasProveedores />
           </ProtectedRoute>
         }
       />

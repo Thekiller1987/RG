@@ -261,3 +261,16 @@ export const fetchCajaReportById = async (sessionId, token) => {
     // La forma en que lo usamos en el frontend es navegar a la URL directamente.
     return await request('get', `/caja/reporte/${sessionId}`, token);
 };
+
+// --- FACTURAS PROVEEDORES ---
+export const fetchProviderInvoices = async (token) => {
+    return await request('get', '/facturas-proveedores', token);
+};
+
+export const createProviderInvoice = async (invoiceData, token) => {
+    return await request('post', '/facturas-proveedores', token, invoiceData);
+};
+
+export const payProviderInvoice = async (invoiceId, amount, token) => {
+    return await request('post', `/facturas-proveedores/${invoiceId}/pagar`, token, { amount });
+};
