@@ -220,11 +220,26 @@ const POS = () => {
     }
   }, [token, logout, showAlert]);
 
-  // Recarga ventas y datos maestros
-  const refreshData = useCallback(async () => {
-    if (!token) return;
-    await Promise.all([loadSalesFromDB(), loadMasterData(token)]);
-  }, [token, loadSalesFromDB, loadMasterData]);
+ const refreshData = useCallback(async () => {
+    if (!token) return;
+    await Promise.all([loadSalesFromDB(), loadMasterData(token)]);
+  }, [token, loadSalesFromDB, loadMasterData]);
+
+  // ▼▼▼ AGREGA ESTA FUNCIÓN NUEVA AQUÍ ▼▼▼
+  const reloadCajaSession = useCallback(async () => {
+    if (!userId || !token) return;
+    try {
+        // Pedimos al servidor la sesión actualizada con el nuevo saldo
+        const serverSession = await api.getCajaSession(userId, token);
+        if (serverSession) {
+            setCajaSession(serverSession); // Actualiza el contexto (lo que ve el modal)
+            saveCajaSession(userId, serverSession); // Guarda en localstorage
+        }
+    } catch (error) {
+        console.error("Error recargando caja:", error);
+    }
+  }, [userId, token, setCajaSession]);
+  // ▲▲▲ FIN DE LO AGREGADO ▲▲▲;
 
   /* -----------------------------------------------------------------
    * 3.6. EFECTOS (useEffect) y Sincronización
