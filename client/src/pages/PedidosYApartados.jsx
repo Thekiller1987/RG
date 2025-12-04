@@ -106,7 +106,7 @@ const Title = styled.h1`
 
     @media (max-width: 768px) { 
         font-size: 2rem; 
-        justify-content: center; 
+        justify-content: center;
     }
 `;
 
@@ -116,7 +116,7 @@ const Button = styled.button`
     background: ${props => props.$primary ? 
         'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 
         props.$secondary ? 
-        'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : 
+        'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : // Estilo para el botón secundario
         'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'};
     color: white; 
     border-radius: 12px; 
@@ -563,36 +563,24 @@ const PedidosYApartados = () => {
         }
     }, [token, showAlert]);
 
-    // --- NUEVA LÓGICA CENTRALIZADA PARA CARGAR PRODUCTOS ---
-    const loadProductsData = useCallback(async () => {
+    // --- NUEVA LÓGICA PARA CARGAR PRODUCTOS ---
+    const fetchProducts = useCallback(async () => {
         if (!token) return;
         setIsLoadingProducts(true);
         try {
+            // Asumimos que existe api.fetchProducts, similar a api.fetchOrders
             const data = await api.fetchProducts(token);
-            setProducts(data || []);
-            return data;
+            setProducts(data);
+            openModal('productSearch');
         } catch (error) {
-            console.error("Error cargando productos:", error);
-            // No mostramos alerta para no interrumpir el flujo si es precarga
+            showAlert({
+                title: "Error",
+                message: "No se pudieron cargar los productos."
+            });
         } finally {
             setIsLoadingProducts(false);
         }
-    }, [token]);
-
-    // Manejador para el botón "Ver Productos"
-    const handleOpenProductSearch = async () => {
-        await loadProductsData(); // Aseguramos carga fresca
-        openModal('productSearch');
-    };
-
-    // Manejador para el botón "Crear Ticket"
-    const handleOpenCreateOrder = async () => {
-        // CORRECCIÓN CLAVE: Si no hay productos, cargarlos antes de abrir el modal
-        if (products.length === 0) {
-            await loadProductsData();
-        }
-        openModal('createOrder');
-    };
+    }, [token, showAlert, openModal]);
 
     // --- FILTRADO DE PRODUCTOS ---
     const filteredProducts = useMemo(() => {
@@ -611,8 +599,7 @@ const PedidosYApartados = () => {
 
     useEffect(() => {
         fetchPedidos();
-        loadProductsData(); // Precarga productos para que estén listos
-    }, [fetchPedidos, loadProductsData]);
+    }, [fetchPedidos]);
     
     const pedidosFiltrados = useMemo(() => {
         let filtered = Array.isArray(pedidos) ? pedidos : [];
@@ -655,6 +642,9 @@ const PedidosYApartados = () => {
                 
                 // Forzamos el nombre según lo solicitado: Ticket - Nombre Usuario - Descripción
                 finalOrderData.clienteNombre = `Ticket - ${user.nombre || user.username} - ${descripcion}`;
+                
+                // Nos aseguramos que no se marque como completado o pagado inmediatamente si no hay caja
+                // (Aunque la API probablemente maneje el estado por defecto)
             }
 
             await api.createOrder(finalOrderData, token);
@@ -733,10 +723,10 @@ const PedidosYApartados = () => {
                 </Title>
                 
                 <ButtonGroup>
-                    {/* BOTÓN: VER PRODUCTOS */}
+                    {/* BOTÓN NUEVO: VER PRODUCTOS */}
                     <Button 
                         $secondary 
-                        onClick={handleOpenProductSearch} // Usamos la nueva función
+                        onClick={fetchProducts}
                         disabled={isLoadingProducts}
                         style={{ marginRight: '0.5rem' }}
                     >
@@ -745,7 +735,9 @@ const PedidosYApartados = () => {
 
                     <Button 
                         $primary 
-                        onClick={handleOpenCreateOrder} // Usamos la nueva función con validación de productos
+                        onClick={() => openModal('createOrder')} 
+                        // MODIFICACIÓN: Ya no deshabilitamos el botón si la caja está cerrada
+                        // disabled={!isCajaOpen} 
                         disabled={false}
                     >
                         <FaPlus /> Crear Ticket / Pedido
@@ -759,6 +751,7 @@ const PedidosYApartados = () => {
             {!isCajaOpen && (
                 <WarningBanner>
                     <FaExclamationTriangle />
+                    {/* Mensaje actualizado */}
                     La caja está cerrada. Solo se permite crear Tickets (el cobro debe hacerlo Administración).
                 </WarningBanner>
             )}
@@ -972,8 +965,6 @@ const PedidosYApartados = () => {
                     onClose={closeModal} 
                     onSubmit={handleCreateOrder} 
                     showAlert={showAlert} 
-                    // CORRECCIÓN FINAL: Pasamos los productos al modal para que estén disponibles
-                    products={products}
                 />
             )}
             
@@ -985,13 +976,14 @@ const PedidosYApartados = () => {
                     showAlert={showAlert} 
                     showConfirmation={showConfirmation} 
                     isCajaOpen={isCajaOpen}
+                    // MODIFICACIÓN: Pasamos permisos al modal para bloquear el cobro
                     canManage={canManageTickets}
                     canCharge={canManageTickets} // Prop explícita para cobro
                     readOnly={!canManageTickets} // Prop explícita para edición
                 />
             )}
             
-            {/* MODAL DE BÚSQUEDA DE PRODUCTOS */}
+            {/* NUEVO MODAL DE BÚSQUEDA DE PRODUCTOS */}
             {modal.name === 'productSearch' && (
                 <ModalOverlay onClick={closeModal}>
                     <ModalContent onClick={e => e.stopPropagation()}>
