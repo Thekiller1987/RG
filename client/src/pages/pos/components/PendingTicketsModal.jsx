@@ -55,60 +55,81 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser, onPr
     const [paymentMethod, setPaymentMethod] = useState('Efectivo');
     const [processing, setProcessing] = useState(false);
 
-    // 1. CARGA DE DATOS (Pedidos y Ventas con Deuda)
+ // 1. CARGA DE DATOS ROBUSTA (A prueba de fallos)
     const loadData = async () => {
         setLoading(true);
         try {
-            // Cargar Pedidos y Ventas en paralelo
+            console.log("Iniciando carga de deudas...");
+
+            // Intentamos cargar pedidos y ventas
             const [ordersRes, salesRes] = await Promise.all([
-                api.fetchOrders(token).catch(() => []), 
-                api.fetchSales(token).catch(() => []) // Asumiendo que fetchSales trae historial
+                api.fetchOrders(token).catch(err => { console.log("Error pedidos", err); return []; }), 
+                api.fetchSales(token).catch(err => { console.log("Error ventas", err); return []; })
             ]);
 
+            // Normalizamos la respuesta (por si viene en .data o directo)
             const rawOrders = Array.isArray(ordersRes) ? ordersRes : (ordersRes.data || []);
             const rawSales = Array.isArray(salesRes) ? salesRes : (salesRes.data || []);
 
-            // Normalizar Pedidos
+            // Función auxiliar para limpiar números
+            const toNum = (val) => parseFloat(val) || 0;
+
+            // Procesar PEDIDOS
             const orders = rawOrders.map(o => ({
                 id: o.id,
                 type: 'PEDIDO',
                 client: o.clienteNombre || o.cliente?.nombre || 'Cliente Casual',
                 date: o.created_at || o.fecha,
-                total: parseFloat(o.total || 0),
-                paid: parseFloat(o.abonado || 0),
-                status: o.estado
+                // Buscamos cualquier campo que parezca un total
+                total: toNum(o.total || o.monto_total || o.precio_total), 
+                paid: toNum(o.abonado || o.pagado || 0),
+                status: (o.estado || 'PENDIENTE').toUpperCase()
             }));
 
-            // Normalizar Ventas (Filtrar solo las que tienen saldo pendiente)
+            // Procesar VENTAS (Historial)
             const sales = rawSales.map(s => ({
                 id: s.id,
                 type: 'VENTA',
                 client: s.cliente?.nombre || s.clienteNombre || 'Cliente Casual',
                 date: s.fecha || s.created_at,
-                total: parseFloat(s.total_venta || s.total || 0),
-                paid: parseFloat(s.monto_pagado || s.abonado || 0),
-                status: s.estado || 'COMPLETADO' // Las ventas nacen completadas salvo crédito
+                // Las ventas suelen tener 'total_venta' o 'total'
+                total: toNum(s.total_venta || s.total || s.monto_final),
+                paid: toNum(s.monto_pagado || s.abonado || 0),
+                status: (s.estado || 'COMPLETADO').toUpperCase()
             }));
 
-            // UNIFICAR Y FILTRAR: Solo lo que debe dinero y no está cancelado
+            // UNIFICAR Y FILTRAR
             const combined = [...orders, ...sales].filter(t => {
-                const saldo = t.total - t.paid;
-                const isValidStatus = !['CANCELADO', 'ANULADO'].includes(t.status);
-                return saldo > 0.5 && isValidStatus; // Saldo mayor a 0.5 cordobas (margen error decimal)
-            }).map(t => ({...t, saldo: t.total - t.paid}));
+                // 1. Calculamos el saldo real matemáticamente
+                const saldoCalculado = t.total - t.paid;
+                
+                // 2. ¿Tiene deuda? (Mayor a 0.50 c$ para evitar errores de decimales)
+                const tieneDeuda = saldoCalculado > 0.5;
 
-            // Ordenar por fecha (más reciente primero)
+                // 3. ¿El estado indica deuda explícita?
+                const dicePendiente = t.status.includes('PENDIENTE') || t.status.includes('CREDITO') || t.status.includes('APARTADO');
+
+                // 4. Ignorar anulados/cancelados
+                const esValido = !t.status.includes('ANULADO') && !t.status.includes('CANCELADO');
+
+                // REGLA FINAL: Si tiene deuda real Y es válido, O si dice explícitamente pendiente.
+                return esValido && (tieneDeuda || dicePendiente);
+            }).map(t => ({
+                ...t, 
+                saldo: (t.total - t.paid) > 0 ? (t.total - t.paid) : t.total // Si el cálculo falló, asumimos deuda total
+            }));
+
+            console.log("Tickets encontrados con deuda:", combined);
             setTickets(combined.sort((a,b) => new Date(b.date) - new Date(a.date)));
             setSelectedTicket(null);
 
         } catch (error) {
-            console.error(error);
-            alert("Error cargando cuentas por cobrar");
+            console.error("Error fatal cargando:", error);
+            // Opcional: alert("Error: " + error.message);
         } finally {
             setLoading(false);
         }
     };
-
     useEffect(() => { loadData(); }, []);
 
     // 2. PROCESAR EL COBRO
