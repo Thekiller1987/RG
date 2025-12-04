@@ -59,3 +59,16 @@ exports.registerPayment = async (req, res) => {
     res.status(500).json({ message: 'Error al registrar pago' });
   }
 };
+
+// Eliminar factura
+exports.deleteInvoice = async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Opcional: Verificar si tiene abonos antes de borrar, o borrar directo
+    await db.query('DELETE FROM facturas_proveedores WHERE id = ?', [id]);
+    res.json({ message: 'Factura eliminada correctamente' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error al eliminar factura' });
+  }
+};
