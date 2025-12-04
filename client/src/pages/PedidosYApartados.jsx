@@ -1,6 +1,6 @@
 // client/src/pages/PedidosYApartados.jsx
-// VERSIÓN EXTENDIDA Y BLINDADA (SAFETY-FIRST)
-// Se han añadido verificaciones explícitas (Array.isArray) en cada punto crítico.
+// VERSIÓN OPTIMIZADA PARA VENDEDORES (SIN ABONOS) Y PRODUCTOS
+// Mantiene responsividad y funciones originales.
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
@@ -37,25 +37,13 @@ import { loadCajaSession } from '../utils/caja';
 // ==========================================
 
 const fadeIn = keyframes`
-    from { 
-        opacity: 0; 
-        transform: translateY(20px); 
-    }
-    to { 
-        opacity: 1; 
-        transform: translateY(0); 
-    }
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
 `;
 
 const slideIn = keyframes`
-    from { 
-        transform: translateX(-20px); 
-        opacity: 0; 
-    }
-    to { 
-        transform: translateX(0); 
-        opacity: 1; 
-    }
+    from { transform: translateX(-20px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
 `;
 
 const pulse = keyframes`
@@ -80,9 +68,7 @@ const PageWrapper = styled.div`
     font-family: 'Inter', 'Segoe UI', sans-serif;
     animation: ${fadeIn} 0.6s ease-out;
 
-    @media (max-width: 768px) { 
-        padding: 1rem; 
-    }
+    @media (max-width: 768px) { padding: 1rem; }
 `;
 
 const HeaderContainer = styled.div`
@@ -177,9 +163,7 @@ const ContentGrid = styled.div`
     gap: 2rem;
     animation: ${fadeIn} 0.7s ease-out 0.1s both;
     
-    @media (max-width: 992px) { 
-        grid-template-columns: 1fr; 
-    }
+    @media (max-width: 992px) { grid-template-columns: 1fr; }
 `;
 
 const FilterPanel = styled.aside`
@@ -354,9 +338,7 @@ const CardContent = styled.div`
     gap: 1.2rem;
     margin-bottom: 1.2rem;
 
-    @media (max-width: 480px) {
-        grid-template-columns: 1fr;
-    }
+    @media (max-width: 480px) { grid-template-columns: 1fr; }
 `;
 
 const InfoItem = styled.div`
@@ -366,10 +348,7 @@ const InfoItem = styled.div`
     color: #6b7280;
     font-size: 0.95rem;
 
-    strong {
-        color: #374151;
-        font-weight: 600;
-    }
+    strong { color: #374151; font-weight: 600; }
 `;
 
 const AmountDisplay = styled.div`
@@ -401,11 +380,7 @@ const ButtonGroup = styled.div`
     @media (max-width: 768px) {
         flex-direction: column;
         width: 100%;
-        
-        button, a {
-            width: 100%;
-            justify-content: center;
-        }
+        button, a { width: 100%; justify-content: center; }
     }
 `;
 
@@ -456,17 +431,12 @@ const LoadingShimmer = styled.div`
     margin-bottom: 1rem;
 `;
 
-// --- ESTILOS EXTRA PARA MODAL DE PRODUCTOS ---
+// --- MODAL DE PRODUCTOS ---
 const ModalOverlay = styled.div`
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; align-items: center; justify-content: center;
     z-index: 1000;
     animation: ${fadeIn} 0.3s ease;
 `;
@@ -478,42 +448,25 @@ const ModalContent = styled.div`
     width: 90%;
     max-width: 800px;
     max-height: 85vh;
-    display: flex;
-    flex-direction: column;
+    display: flex; flex-direction: column;
     box-shadow: 0 20px 50px rgba(0,0,0,0.2);
     animation: ${slideIn} 0.3s ease;
 `;
 
 const ProductTable = styled.div`
-    flex: 1;
-    overflow-y: auto;
-    margin-top: 1rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
+    flex: 1; overflow-y: auto; margin-top: 1rem;
+    border: 1px solid #e5e7eb; border-radius: 8px;
 
     table {
-        width: 100%;
-        border-collapse: collapse;
-        
+        width: 100%; border-collapse: collapse;
         th {
-            background: #f8fafc;
-            padding: 1rem;
-            text-align: left;
-            font-weight: 600;
-            color: #4b5563;
-            position: sticky;
-            top: 0;
+            background: #f8fafc; padding: 1rem; text-align: left;
+            font-weight: 600; color: #4b5563; position: sticky; top: 0;
         }
-
         td {
-            padding: 1rem;
-            border-bottom: 1px solid #f1f5f9;
-            color: #1f2937;
+            padding: 1rem; border-bottom: 1px solid #f1f5f9; color: #1f2937;
         }
-
-        tr:hover {
-            background: #f9fafb;
-        }
+        tr:hover { background: #f9fafb; }
     }
 `;
 
@@ -525,17 +478,16 @@ const PedidosYApartados = () => {
     const { user } = useAuth();
     const token = localStorage.getItem('token');
 
-    // Inicializamos SIEMPRE con arrays vacíos para evitar undefined
     const [pedidos, setPedidos] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [filtroEstado, setFiltroEstado] = useState('Activos');
     const [searchTerm, setSearchTerm] = useState('');
     const [modal, setModal] = useState({ name: null, props: {} });
     
-    // --- NUEVO ESTADO PARA PRODUCTOS ---
-    const [products, setProducts] = useState([]); // Inicializado como array vacío
+    // --- ESTADO PRODUCTOS ---
+    const [products, setProducts] = useState([]);
     const [productSearch, setProductSearch] = useState('');
-    const [searchType, setSearchType] = useState('descripcion'); // 'codigo' | 'descripcion'
+    const [searchType, setSearchType] = useState('descripcion');
     const [isLoadingProducts, setIsLoadingProducts] = useState(false);
 
     const openModal = useCallback((name, props = {}) => setModal({ name, props }), []);
@@ -543,7 +495,7 @@ const PedidosYApartados = () => {
     const showAlert = useCallback((props) => openModal('alert', props), [openModal]);
     const showConfirmation = useCallback((props) => openModal('confirmation', props), [openModal]);
 
-    // Verificar si el usuario tiene permisos de Administración o Contabilidad
+    // Lógica de Permisos: Solo Admin o Contador pueden gestionar/cobrar
     const canManageTickets = useMemo(() => {
         if (!user || !user.rol) return false;
         const rol = user.rol.toLowerCase();
@@ -557,78 +509,59 @@ const PedidosYApartados = () => {
     }, [user]);
 
     // ==========================================
-    // CARGA DE DATOS DE PEDIDOS (CON BLINDAJE)
+    // CARGA DE DATOS
     // ==========================================
     const fetchPedidos = useCallback(async () => {
-        if (!token) { 
-            setIsLoading(false); 
-            return; 
-        }
+        if (!token) { setIsLoading(false); return; }
         setIsLoading(true);
         try {
             const data = await api.fetchOrders(token);
-            
-            // BLINDAJE 1: Validar si la respuesta es realmente un array
             if (Array.isArray(data)) {
                 setPedidos(data);
             } else {
                 console.warn("La API de pedidos no devolvió un array:", data);
-                setPedidos([]); // Fallback seguro
+                setPedidos([]);
             }
         } catch (error) {
             console.error("Error al cargar pedidos:", error);
-            setPedidos([]); // Fallback seguro en error
-            showAlert({ 
-                title: "Error de Red", 
-                message: `No se pudieron cargar los pedidos. ${error.message}` 
-            });
+            setPedidos([]);
+            showAlert({ title: "Error", message: `Error cargando pedidos: ${error.message}` });
         } finally {
             setIsLoading(false);
         }
     }, [token, showAlert]);
 
-    // ==========================================
-    // CARGA DE DATOS DE PRODUCTOS (CON BLINDAJE)
-    // ==========================================
     const loadProductsData = useCallback(async () => {
         if (!token) return;
         setIsLoadingProducts(true);
         try {
             const data = await api.fetchProducts(token);
-            
-            // BLINDAJE 2: Validar si la respuesta es realmente un array
             if (Array.isArray(data)) {
                 setProducts(data);
                 return data;
             } else if (data && Array.isArray(data.data)) {
-                // A veces las APIs devuelven { data: [...] }
                 setProducts(data.data);
                 return data.data;
             } else {
-                console.warn("La API de productos no devolvió un array válido:", data);
-                setProducts([]); // Fallback seguro
+                setProducts([]);
                 return [];
             }
         } catch (error) {
             console.error("Error cargando productos:", error);
-            setProducts([]); // Fallback seguro
+            setProducts([]);
             return [];
         } finally {
             setIsLoadingProducts(false);
         }
     }, [token]);
 
-    // Manejador para el botón "Ver Productos"
     const handleOpenProductSearch = async () => {
-        await loadProductsData(); // Aseguramos carga fresca
+        await loadProductsData();
         openModal('productSearch');
     };
 
-    // Manejador para el botón "Crear Ticket"
     const handleOpenCreateOrder = async () => {
-        // BLINDAJE 3: Verificar longitud de forma segura
         const currentProducts = Array.isArray(products) ? products : [];
-        
         if (currentProducts.length === 0) {
             await loadProductsData();
         }
@@ -636,29 +569,15 @@ const PedidosYApartados = () => {
     };
 
     // ==========================================
-    // LÓGICA DE FILTRADO DE PRODUCTOS (SUPER BLINDADA)
+    // FILTRADO
     // ==========================================
     const filteredProducts = useMemo(() => {
-        // BLINDAJE 4: Verificar explícitamente que 'products' existe y es un array
-        // Si por alguna razón products es null o undefined, usamos []
-        let safeProductsList = [];
-        
-        if (products && Array.isArray(products)) {
-            safeProductsList = products;
-        } else {
-            // Si llegamos aquí, algo raro pasó con el estado, retornamos vacío para evitar el crash
-            return [];
-        }
-
+        let safeProductsList = Array.isArray(products) ? products : [];
         if (!productSearch) return safeProductsList;
         
         const lowerTerm = productSearch.toLowerCase();
-        
-        // Ahora es seguro usar .filter porque safeProductsList está garantizado ser un array
         return safeProductsList.filter(p => {
-            // Protección adicional dentro del filtro por si algún item es null
             if (!p) return false;
-
             if (searchType === 'codigo') {
                 return p.codigo && String(p.codigo).toLowerCase().includes(lowerTerm);
             } else {
@@ -670,33 +589,19 @@ const PedidosYApartados = () => {
 
     useEffect(() => {
         fetchPedidos();
-        loadProductsData(); // Precarga productos para que estén listos
+        loadProductsData();
     }, [fetchPedidos, loadProductsData]);
     
-    // ==========================================
-    // LÓGICA DE FILTRADO DE PEDIDOS (SUPER BLINDADA)
-    // ==========================================
     const pedidosFiltrados = useMemo(() => {
-        // BLINDAJE 5: Verificar explícitamente que 'pedidos' existe y es un array
-        let safePedidosList = [];
-
-        if (pedidos && Array.isArray(pedidos)) {
-            safePedidosList = pedidos;
-        } else {
-            // Si no es un array, devolvemos array vacío y evitamos el error .filter
-            return [];
-        }
+        let safePedidosList = Array.isArray(pedidos) ? pedidos : [];
+        let filtered = [...safePedidosList];
         
-        let filtered = [...safePedidosList]; // Creamos una copia segura
-        
-        // Aplicar filtro de estado
         if (filtroEstado === 'Activos') {
             filtered = filtered.filter(p => p && (p.estado === 'APARTADO' || p.estado === 'PENDIENTE'));
         } else if (filtroEstado !== 'Todos') {
             filtered = filtered.filter(p => p && p.estado === filtroEstado.toUpperCase());
         }
 
-        // Aplicar búsqueda de texto
         if (searchTerm) {
             const lowerSearch = searchTerm.toLowerCase();
             filtered = filtered.filter(p => {
@@ -709,48 +614,44 @@ const PedidosYApartados = () => {
         return filtered;
     }, [pedidos, filtroEstado, searchTerm]);
 
-    // Estadísticas calculadas
     const stats = useMemo(() => {
-        // BLINDAJE 6: Asegurar que pedidosFiltrados es array
         const safeList = Array.isArray(pedidosFiltrados) ? pedidosFiltrados : [];
-
-        const total = safeList.length;
-        const activos = safeList.filter(p => p && (p.estado === 'APARTADO' || p.estado === 'PENDIENTE')).length;
-        const completados = safeList.filter(p => p && p.estado === 'COMPLETADO').length;
-        const totalVentas = safeList.reduce((sum, p) => sum + parseFloat(p?.total || 0), 0);
-
-        return { total, activos, completados, totalVentas };
+        return {
+            total: safeList.length,
+            activos: safeList.filter(p => p && (p.estado === 'APARTADO' || p.estado === 'PENDIENTE')).length,
+            completados: safeList.filter(p => p && p.estado === 'COMPLETADO').length,
+            totalVentas: safeList.reduce((sum, p) => sum + parseFloat(p?.total || 0), 0)
+        };
     }, [pedidosFiltrados]);
 
+    // ==========================================
+    // CREACIÓN DE PEDIDO (LÓGICA BLINDADA)
+    // ==========================================
     const handleCreateOrder = async (orderData) => {
         try {
-            // LÓGICA PERSONALIZADA SOLICITADA:
             let finalOrderData = { ...orderData };
 
+            // RESTRICCIÓN DE SEGURIDAD PARA VENDEDORES
             if (!canManageTickets) {
-                // Obtenemos la descripción o nota del formulario
+                // 1. Modificación del nombre para trazabilidad
                 const descripcion = orderData.descripcion || orderData.notas || '';
-                
-                // --- TU SOLICITUD ESPECÍFICA AQUÍ ---
-                // Modificación del nombre: Ticket - Usuario - NombreCliente - Descripción
                 const nombreClienteFormulario = orderData.clienteNombre || 'Cliente Casual';
                 const nombreUsuario = user.nombre || user.username || 'Vendedor';
-                
                 finalOrderData.clienteNombre = `Ticket - ${nombreUsuario} - ${nombreClienteFormulario} - ${descripcion}`;
+
+                // 2. FORZAR ABONO A CERO
+                // Si no es admin/contador, ignoramos cualquier monto de dinero que haya puesto.
+                finalOrderData.abonado = 0; 
+                // Aseguramos que el estado sea pendiente si no hay pago
+                finalOrderData.estado = 'PENDIENTE'; 
             }
 
             await api.createOrder(finalOrderData, token);
-            showAlert({ 
-                title: "¡Éxito!", 
-                message: "Ticket/Pedido creado correctamente."
-            });
+            showAlert({ title: "¡Éxito!", message: "Ticket/Pedido creado correctamente." });
             await fetchPedidos();
             closeModal();
         } catch (error) {
-            showAlert({ 
-                title: "Error al Crear", 
-                message: `No se pudo crear el pedido. ${error.message}` 
-            });
+            showAlert({ title: "Error al Crear", message: `No se pudo crear el pedido. ${error.message}` });
         }
     };
 
@@ -765,17 +666,14 @@ const PedidosYApartados = () => {
     };
 
     // ==========================================
-    // RENDERIZADO (JSX)
+    // RENDERIZADO
     // ==========================================
 
     if (isLoading) {
         return (
             <PageWrapper>
                 <HeaderContainer>
-                    <Title>
-                        <FaClipboardList /> 
-                        Pedidos y Apartados
-                    </Title>
+                    <Title><FaClipboardList /> Pedidos y Apartados</Title>
                 </HeaderContainer>
                 <ContentGrid>
                     <FilterPanel>
@@ -783,9 +681,7 @@ const PedidosYApartados = () => {
                         <LoadingShimmer style={{height: '50px'}} />
                     </FilterPanel>
                     <main>
-                        {[1, 2, 3].map(i => (
-                            <LoadingShimmer key={i} style={{height: '150px', marginBottom: '1rem'}} />
-                        ))}
+                        {[1, 2, 3].map(i => <LoadingShimmer key={i} style={{height: '150px', marginBottom: '1rem'}} />)}
                     </main>
                 </ContentGrid>
             </PageWrapper>
@@ -795,16 +691,9 @@ const PedidosYApartados = () => {
     if (!user) {
         return (
             <PageWrapper>
-                <div style={{ 
-                    textAlign: 'center', 
-                    color: '#374151',
-                    padding: '4rem 2rem'
-                }}>
+                <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
                     <h1>No estás autenticado</h1>
-                    <p>Por favor, inicia sesión para acceder a esta página.</p>
-                    <BackButton to="/login" style={{ marginTop: '1rem' }}>
-                        Iniciar Sesión
-                    </BackButton>
+                    <Link to="/login">Iniciar Sesión</Link>
                 </div>
             </PageWrapper>
         );
@@ -813,13 +702,9 @@ const PedidosYApartados = () => {
     return (
         <PageWrapper>
             <HeaderContainer>
-                <Title>
-                    <FaClipboardList /> 
-                    Pedidos y Apartados
-                </Title>
+                <Title><FaClipboardList /> Pedidos y Apartados</Title>
                 
                 <ButtonGroup>
-                    {/* BOTÓN: VER PRODUCTOS */}
                     <Button 
                         $secondary 
                         onClick={handleOpenProductSearch} 
@@ -849,7 +734,6 @@ const PedidosYApartados = () => {
                 </WarningBanner>
             )}
 
-            {/* Estadísticas */}
             <StatsBar>
                 <StatCard>
                     <div className="stat-value">{stats.total}</div>
@@ -870,19 +754,9 @@ const PedidosYApartados = () => {
             </StatsBar>
             
             <ContentGrid>
-                {/* Panel de Filtros */}
                 <FilterPanel>
                     <div>
-                        <h3 style={{
-                            marginTop: 0, 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '0.75rem',
-                            color: '#374151',
-                            fontSize: '1.2rem'
-                        }}>
-                            <FaSearch /> Búsqueda
-                        </h3>
+                        <h3><FaSearch /> Búsqueda</h3>
                         <Input 
                             type="text" 
                             placeholder="Buscar por ID o nombre..." 
@@ -890,22 +764,9 @@ const PedidosYApartados = () => {
                             onChange={e => setSearchTerm(e.target.value)} 
                         />
                     </div>
-                    
                     <div>
-                        <h3 style={{
-                            marginTop: 0, 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '0.75rem',
-                            color: '#374151',
-                            fontSize: '1.2rem'
-                        }}>
-                            <FaFilter /> Filtros
-                        </h3>
-                        <Select 
-                            value={filtroEstado} 
-                            onChange={(e) => setFiltroEstado(e.target.value)}
-                        >
+                        <h3><FaFilter /> Filtros</h3>
+                        <Select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
                             <option value="Activos">Activos (Apartados y Pendientes)</option>
                             <option value="Todos">Todos los Pedidos</option>
                             <option value="APARTADO">Solo Apartados</option>
@@ -914,33 +775,18 @@ const PedidosYApartados = () => {
                             <option value="CANCELADO">Cancelados</option>
                         </Select>
                     </div>
-
-                    <div style={{
-                        padding: '1rem',
-                        background: '#f8fafc',
-                        borderRadius: '10px',
-                        border: '1px solid #e5e7eb'
-                    }}>
-                        <p style={{ 
-                            margin: 0, 
-                            fontSize: '0.9rem', 
-                            color: '#6b7280',
-                            textAlign: 'center'
-                        }}>
-                            {/* BLINDAJE 7: Asegurar renderizado seguro del número */}
+                    <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '10px' }}>
+                        <p style={{ margin: 0, textAlign: 'center', color: '#6b7280' }}>
                             Mostrando <strong>{pedidosFiltrados ? pedidosFiltrados.length : 0}</strong> pedidos
                         </p>
                     </div>
                 </FilterPanel>
 
-                {/* Lista de Pedidos */}
                 <main>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                         {pedidosFiltrados && pedidosFiltrados.length > 0 ? (
                             pedidosFiltrados.map((pedido, index) => {
-                                // Protección extra por si un elemento del array es null
                                 if (!pedido) return null;
-
                                 const saldoPendiente = (pedido.total || 0) - (pedido.abonado || 0);
                                 const percentPaid = (pedido.total > 0) ? ((pedido.abonado || 0) / pedido.total) * 100 : 0;
                                 
@@ -953,84 +799,45 @@ const PedidosYApartados = () => {
                                         <CardBody onClick={() => openModal('orderDetail', { pedidoId: pedido.id })}>
                                             <CardHeader>
                                                 <div>
-                                                    <h3 style={{ 
-                                                        margin: 0, 
-                                                        color: '#1f2937',
-                                                        fontSize: '1.3rem',
-                                                        fontWeight: '600'
-                                                    }}>
-                                                        Pedido #{pedido.id}
-                                                    </h3>
-                                                    <p style={{ 
-                                                        margin: '0.5rem 0 0', 
-                                                        color: '#6b7280',
-                                                        fontSize: '0.95rem'
-                                                    }}>
+                                                    <h3 style={{ margin: 0, color: '#1f2937' }}>Pedido #{pedido.id}</h3>
+                                                    <p style={{ margin: '0.5rem 0 0', color: '#6b7280' }}>
                                                         <FaUser style={{ marginRight: '0.5rem' }} />
                                                         {pedido.clienteNombre || 'Cliente no asignado'}
                                                     </p>
                                                 </div>
                                                 <StatusBadge estado={pedido.estado}>
-                                                    {getStatusIcon(pedido.estado)}
-                                                    {pedido.estado}
+                                                    {getStatusIcon(pedido.estado)} {pedido.estado}
                                                 </StatusBadge>
                                             </CardHeader>
-
                                             <CardContent>
                                                 <InfoItem>
                                                     <FaDollarSign />
-                                                    <div>
-                                                        <strong>Total:</strong> C${Number(pedido.total || 0).toFixed(2)}
-                                                    </div>
+                                                    <div><strong>Total:</strong> C${Number(pedido.total || 0).toFixed(2)}</div>
                                                 </InfoItem>
-                                                
                                                 <InfoItem>
                                                     <FaCheckCircle style={{ color: '#10b981' }} />
-                                                    <div>
-                                                        <strong>Abonado:</strong> C${Number(pedido.abonado || 0).toFixed(2)}
-                                                    </div>
+                                                    <div><strong>Abonado:</strong> C${Number(pedido.abonado || 0).toFixed(2)}</div>
                                                 </InfoItem>
-
                                                 <InfoItem>
                                                     <FaCalendar />
-                                                    <div>
-                                                        <strong>Fecha:</strong> {pedido.fecha ? new Date(pedido.fecha).toLocaleDateString('es-NI') : 'S/F'}
-                                                    </div>
+                                                    <div><strong>Fecha:</strong> {pedido.fecha ? new Date(pedido.fecha).toLocaleDateString('es-NI') : 'S/F'}</div>
                                                 </InfoItem>
-
                                                 {saldoPendiente > 0.009 && (
                                                     <InfoItem>
                                                         <FaExclamationTriangle style={{ color: '#ef4444' }} />
                                                         <div>
                                                             <strong>Saldo Pendiente:</strong> 
-                                                            <span style={{ color: '#ef4444', fontWeight: '600' }}>
-                                                                C${saldoPendiente.toFixed(2)}
-                                                            </span>
+                                                            <span style={{ color: '#ef4444', fontWeight: '600' }}> C${saldoPendiente.toFixed(2)}</span>
                                                         </div>
                                                     </InfoItem>
                                                 )}
                                             </CardContent>
-
                                             <AmountDisplay>
-                                                <div style={{ 
-                                                    display: 'flex', 
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center',
-                                                    marginBottom: '0.5rem'
-                                                }}>
-                                                    <span style={{ fontSize: '0.9rem', color: '#6b7280' }}>
-                                                        Progreso de pago:
-                                                    </span>
-                                                    <span style={{ 
-                                                        fontWeight: '600', 
-                                                        color: percentPaid === 100 ? '#10b981' : '#3b82f6'
-                                                    }}>
-                                                        {percentPaid.toFixed(1)}%
-                                                    </span>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                                    <span style={{ fontSize: '0.9rem', color: '#6b7280' }}>Progreso de pago:</span>
+                                                    <span style={{ fontWeight: '600', color: percentPaid === 100 ? '#10b981' : '#3b82f6' }}>{percentPaid.toFixed(1)}%</span>
                                                 </div>
-                                                <ProgressBar percent={percentPaid}>
-                                                    <div></div>
-                                                </ProgressBar>
+                                                <ProgressBar percent={percentPaid}><div></div></ProgressBar>
                                             </AmountDisplay>
                                         </CardBody>
                                     </PedidoCard>
@@ -1040,15 +847,8 @@ const PedidosYApartados = () => {
                             <EmptyState>
                                 <FaBoxOpen />
                                 <p>No se han encontrado pedidos</p>
-                                <p style={{ 
-                                    fontSize: '1rem', 
-                                    marginTop: '0.5rem',
-                                    color: '#9ca3af'
-                                }}>
-                                    {searchTerm || filtroEstado !== 'Todos' 
-                                        ? 'Prueba ajustando los filtros de búsqueda' 
-                                        : 'Crea tu primer ticket/pedido usando el botón superior'
-                                    }
+                                <p style={{ fontSize: '1rem', marginTop: '0.5rem', color: '#9ca3af' }}>
+                                    {searchTerm || filtroEstado !== 'Todos' ? 'Prueba ajustando los filtros' : 'Crea tu primer ticket'}
                                 </p>
                             </EmptyState>
                         )}
@@ -1056,14 +856,15 @@ const PedidosYApartados = () => {
                 </main>
             </ContentGrid>
             
-            {/* Modales */}
+            {/* MODALES */}
             {modal.name === 'createOrder' && (
                 <CreateOrderModal 
                     onClose={closeModal} 
                     onSubmit={handleCreateOrder} 
                     showAlert={showAlert} 
-                    // BLINDAJE 8: Asegurar que pasamos un array al modal
                     products={Array.isArray(products) ? products : []}
+                    // AÑADIDO: Prop para bloquear input de dinero visualmente si el modal lo soporta
+                    allowMoneyInput={canManageTickets}
                 />
             )}
             
@@ -1077,110 +878,59 @@ const PedidosYApartados = () => {
                     isCajaOpen={isCajaOpen}
                     canManage={canManageTickets}
                     canCharge={canManageTickets}
-                    // AÑADIDO: Habilitar botones de eliminar y editar para admins
                     canDelete={canManageTickets} 
                     canEdit={canManageTickets}
                     readOnly={!canManageTickets} 
                 />
             )}
             
-            {/* MODAL DE BÚSQUEDA DE PRODUCTOS */}
             {modal.name === 'productSearch' && (
                 <ModalOverlay onClick={closeModal}>
                     <ModalContent onClick={e => e.stopPropagation()}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                            <h2 style={{ margin: 0, color: '#1f2937' }}>Consultar Productos</h2>
-                            <button 
-                                onClick={closeModal}
-                                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#6b7280' }}
-                            >
-                                <FaTimesCircle />
-                            </button>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+                            <h2 style={{ margin: 0 }}>Consultar Productos</h2>
+                            <button onClick={closeModal} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}><FaTimesCircle /></button>
                         </div>
-
                         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
                             <div style={{ flex: 1 }}>
-                                <Input 
-                                    autoFocus
-                                    placeholder={`Buscar producto por ${searchType}...`}
-                                    value={productSearch}
-                                    onChange={e => setProductSearch(e.target.value)}
-                                />
+                                <Input autoFocus placeholder={`Buscar producto por ${searchType}...`} value={productSearch} onChange={e => setProductSearch(e.target.value)} />
                             </div>
-                            <Button 
-                                onClick={() => setSearchType(prev => prev === 'codigo' ? 'descripcion' : 'codigo')}
-                                style={{ background: '#4b5563' }}
-                            >
-                                <FaExchangeAlt /> 
-                                {searchType === 'codigo' ? 'Buscar por Descripción' : 'Buscar por Código'}
+                            <Button onClick={() => setSearchType(prev => prev === 'codigo' ? 'descripcion' : 'codigo')} style={{ background: '#4b5563' }}>
+                                <FaExchangeAlt /> {searchType === 'codigo' ? 'Buscar por Descripción' : 'Buscar por Código'}
                             </Button>
                         </div>
-
                         <ProductTable>
                             <table>
                                 <thead>
-                                    <tr>
-                                        <th>Código</th>
-                                        <th>Descripción</th>
-                                        <th>Precio</th>
-                                        <th>Stock</th>
-                                    </tr>
+                                    <tr><th>Código</th><th>Descripción</th><th>Precio</th><th>Stock</th></tr>
                                 </thead>
                                 <tbody>
-                                    {/* BLINDAJE 9: Renderizado seguro de la tabla */}
                                     {filteredProducts && filteredProducts.length > 0 ? (
-                                        filteredProducts.slice(0, 50).map((prod) => {
-                                            if (!prod) return null;
-                                            return (
-                                                <tr key={prod.id || prod.codigo || Math.random()}>
-                                                    <td style={{fontWeight: 'bold', color: '#3b82f6'}}>{prod.codigo}</td>
-                                                    <td>{prod.descripcion || prod.nombre}</td>
-                                                    <td>C${Number(prod.precio_venta || prod.precio || 0).toFixed(2)}</td>
-                                                    <td style={{
-                                                        color: (prod.stock || prod.existencia) > 0 ? '#10b981' : '#ef4444',
-                                                        fontWeight: '600'
-                                                    }}>
-                                                        {prod.stock || prod.existencia || 0}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
+                                        filteredProducts.slice(0, 50).map((prod) => (
+                                            <tr key={prod.id || prod.codigo || Math.random()}>
+                                                <td style={{fontWeight: 'bold', color: '#3b82f6'}}>{prod.codigo}</td>
+                                                <td>{prod.descripcion || prod.nombre}</td>
+                                                <td>C${Number(prod.precio_venta || prod.precio || 0).toFixed(2)}</td>
+                                                <td style={{ color: (prod.stock || prod.existencia) > 0 ? '#10b981' : '#ef4444', fontWeight: '600' }}>{prod.stock || prod.existencia || 0}</td>
+                                            </tr>
+                                        ))
                                     ) : (
-                                        <tr>
-                                            <td colSpan="4" style={{ textAlign: 'center', color: '#9ca3af', padding: '2rem' }}>
-                                                No se encontraron productos
-                                            </td>
-                                        </tr>
+                                        <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}>No se encontraron productos</td></tr>
                                     )}
                                 </tbody>
                             </table>
                         </ProductTable>
                         <div style={{ marginTop: '1rem', textAlign: 'right', fontSize: '0.9rem', color: '#6b7280' }}>
-                            {/* BLINDAJE 10: Contadores seguros */}
                             Mostrando {Math.min(filteredProducts ? filteredProducts.length : 0, 50)} de {products ? products.length : 0} productos
                         </div>
                     </ModalContent>
                 </ModalOverlay>
             )}
 
-            <AlertModal 
-                isOpen={modal.name === 'alert'} 
-                onClose={closeModal} 
-                {...modal.props} 
-            />
-            
-            <ConfirmationModal 
-                isOpen={modal.name === 'confirmation'} 
-                onClose={closeModal} 
-                onConfirm={() => { 
-                    if(modal.props.onConfirm) modal.props.onConfirm(); 
-                    closeModal(); 
-                }} 
-                {...modal.props} 
-            />
+            <AlertModal isOpen={modal.name === 'alert'} onClose={closeModal} {...modal.props} />
+            <ConfirmationModal isOpen={modal.name === 'confirmation'} onClose={closeModal} onConfirm={() => { if(modal.props.onConfirm) modal.props.onConfirm(); closeModal(); }} {...modal.props} />
         </PageWrapper>
     );
 };
 
 export default PedidosYApartados;
-//NO TOCAR
