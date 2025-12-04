@@ -155,14 +155,72 @@ export const createOrder = async (orderData, token) => {
     return await request('POST', '/orders', token, orderData);
 };
 
+// ===================================================================
+// === NUEVAS FUNCIONES PARA MANEJO DE PEDIDOS ===
+// ===================================================================
+
+/**
+ * Actualiza un pedido existente
+ * @param {number} orderId - ID del pedido
+ * @param {object} updateData - Datos a actualizar
+ * @param {string} token - Token de autenticación
+ */
+export const updateOrder = async (orderId, updateData, token) => {
+    return await request('PUT', `/orders/${orderId}`, token, updateData);
+};
+
+/**
+ * Elimina un pedido
+ * @param {number} orderId - ID del pedido
+ * @param {string} token - Token de autenticación
+ */
+export const deleteOrder = async (orderId, token) => {
+    return await request('DELETE', `/orders/${orderId}`, token);
+};
+
+/**
+ * Marca un pedido como completado (liquidado desde POS)
+ * @param {number} orderId - ID del pedido
+ * @param {object} paymentData - Datos del pago
+ * @param {string} token - Token de autenticación
+ */
+export const completeOrder = async (orderId, paymentData, token) => {
+    return await request('POST', `/orders/${orderId}/complete`, token, paymentData);
+};
+
+/**
+ * Obtiene los pedidos pendientes (para el modal del POS)
+ * @param {string} token - Token de autenticación
+ */
+export const fetchPendingOrders = async (token) => {
+    return await request('GET', '/orders/pending', token);
+};
+
+/**
+ * Agrega un abono parcial a un pedido
+ * @param {number} orderId - ID del pedido
+ * @param {object} abonoData - Datos del abono {amount, method, notes}
+ * @param {string} token - Token de autenticación
+ */
 export const addAbonoToOrder = async (orderId, abonoData, token) => {
     return await request('POST', `/orders/${orderId}/abono`, token, abonoData);
 };
 
+/**
+ * Líquida completamente un pedido
+ * @param {number} orderId - ID del pedido
+ * @param {object} paymentData - Datos del pago completo
+ * @param {string} token - Token de autenticación
+ */
 export const liquidateOrder = async (orderId, paymentData, token) => {
     return await request('POST', `/orders/${orderId}/liquidar`, token, paymentData);
 };
 
+/**
+ * Cancela un pedido (marca como cancelado)
+ * @param {number} orderId - ID del pedido
+ * @param {string} token - Token de autenticación
+ */
 export const cancelOrder = async (orderId, token) => {
     return await request('DELETE', `/orders/${orderId}`, token);
 };
@@ -283,4 +341,73 @@ export const payProviderInvoice = async (invoiceId, amount, token) => {
 };
 export const deleteProviderInvoice = async (invoiceId, token) => {
     return await request('delete', `/facturas-proveedores/${invoiceId}`, token);
+};
+
+// ===================================================================
+// === FUNCIONES PARA EL FLUJO COMPLETO PEDIDOS → POS ===
+// ===================================================================
+
+/**
+ * Carga un pedido al POS (actualiza estado y devuelve datos)
+ * @param {number} orderId - ID del pedido
+ * @param {object} posData - Datos del POS
+ * @param {string} token - Token de autenticación
+ */
+export const loadOrderToPOS = async (orderId, posData, token) => {
+    return await request('POST', `/orders/${orderId}/load-to-pos`, token, posData);
+};
+
+/**
+ * Verifica si un pedido ya fue facturado en el POS
+ * @param {number} orderId - ID del pedido
+ * @param {string} token - Token de autenticación
+ */
+export const checkOrderStatus = async (orderId, token) => {
+    return await request('GET', `/orders/${orderId}/status`, token);
+};
+
+/**
+ * Obtiene pedidos por estado específico
+ * @param {string} estado - Estado del pedido (PENDIENTE, COMPLETADO, etc)
+ * @param {string} token - Token de autenticación
+ */
+export const fetchOrdersByStatus = async (estado, token) => {
+    return await request('GET', `/orders/status/${estado}`, token);
+};
+
+/**
+ * Sincroniza pedidos con ventas (para cuando se factura en POS)
+ * @param {object} syncData - Datos de sincronización {orderId, saleId, amount}
+ * @param {string} token - Token de autenticación
+ */
+export const syncOrderWithSale = async (syncData, token) => {
+    return await request('POST', '/orders/sync-sale', token, syncData);
+};
+
+// ===================================================================
+// === FUNCIONES ESPECÍFICAS PARA EL MODAL DE PENDIENTES ===
+// ===================================================================
+
+/**
+ * Obtiene todos los tickets pendientes de pago
+ * @param {string} token - Token de autenticación
+ */
+export const fetchPendingTickets = async (token) => {
+    return await request('GET', '/tickets/pending', token);
+};
+
+/**
+ * Obtiene la deuda total de pedidos pendientes
+ * @param {string} token - Token de autenticación
+ */
+export const fetchTotalDebt = async (token) => {
+    return await request('GET', '/orders/debt/total', token);
+};
+
+/**
+ * Obtiene pedidos con saldo pendiente (para cobro parcial)
+ * @param {string} token - Token de autenticación
+ */
+export const fetchOrdersWithBalance = async (token) => {
+    return await request('GET', '/orders/with-balance', token);
 };
