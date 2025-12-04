@@ -1,22 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FaTimes, FaMoneyBillWave, FaSearch, FaExclamationCircle } from 'react-icons/fa';
-import * as api from '../../../service/api'; // Ajusta la ruta según tu estructura real
+import { FaTimes, FaMoneyBillWave, FaSearch, FaExclamationCircle, FaUserCheck } from 'react-icons/fa';
+import * as api from '../../../service/api';
 
 // --- ESTILOS ---
 const Overlay = styled.div`
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0,0,0,0.7); z-index: 1200;
   display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(3px);
 `;
 const ModalContainer = styled.div`
   background: white; padding: 25px; border-radius: 12px;
-  width: 95%; max-width: 900px; max-height: 90vh; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  width: 95%; max-width: 950px; height: 85vh; display: flex; flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: fadeIn 0.3s;
 `;
 const Header = styled.div`
   display: flex; justify-content: space-between; align-items: center;
-  border-bottom: 2px solid #f3f4f6; padding-bottom: 15px;
+  border-bottom: 2px solid #f3f4f6; padding-bottom: 15px; margin-bottom: 15px;
 `;
 const Title = styled.h2` margin: 0; color: #1f2937; display: flex; align-items: center; gap: 10px; `;
 const CloseButton = styled.button`
@@ -24,12 +25,12 @@ const CloseButton = styled.button`
   &:hover { color: #ef4444; }
 `;
 const TableContainer = styled.div`
-  flex: 1; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px;
+  flex: 1; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 15px;
 `;
 const Table = styled.table`
   width: 100%; border-collapse: collapse;
   th { background-color: #f9fafb; padding: 12px; text-align: left; font-weight: 600; color: #4b5563; position: sticky; top: 0; }
-  td { padding: 12px; border-bottom: 1px solid #f3f4f6; color: #1f2937; }
+  td { padding: 12px; border-bottom: 1px solid #f3f4f6; color: #1f2937; font-size: 0.95rem; }
   tr:hover { background-color: #f8fafc; }
 `;
 const Button = styled.button`
@@ -41,11 +42,12 @@ const Button = styled.button`
   &:hover:not(:disabled) { opacity: 0.9; }
 `;
 const Input = styled.input`
-  padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; width: 100%;
+  padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; width: 100%; outline: none;
+  &:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
 `;
 const PaySection = styled.div`
   background: #eff6ff; padding: 20px; border-radius: 8px; border: 1px solid #dbeafe;
-  display: flex; flex-direction: column; gap: 15px; animation: fadeIn 0.3s;
+  display: flex; flex-direction: column; gap: 15px; animation: slideUp 0.3s;
 `;
 
 const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) => {
@@ -65,21 +67,21 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
   const loadPendingTickets = async () => {
     setLoading(true);
     try {
-      // 1. Obtenemos todas las ventas/pedidos
       const allSales = await api.fetchOrders(token); 
       
-      // 2. Filtramos solo las que deben dinero (Saldo pendiente > 0)
-      // Aseguramos que 'saldo_pendiente' o la lógica de cálculo exista
+      // Filtramos ventas que tengan deuda (Total - Abonado > 0) y no estén canceladas
       const pending = Array.isArray(allSales) 
         ? allSales.filter(s => {
-            const total = parseFloat(s.total || 0);
+            const total = parseFloat(s.total || s.total_venta || 0);
             const abonado = parseFloat(s.abonado || 0);
             const saldo = total - abonado;
-            // Mostramos si hay deuda y no está cancelado
+            // Tolerancia de 0.5 por decimales, y excluimos cancelados
             return saldo > 0.5 && s.estado !== 'CANCELADO';
           })
         : [];
-        
+      
+      // Ordenar por fecha (más recientes primero)
+      pending.sort((a, b) => new Date(b.created_at || b.fecha) - new Date(a.created_at || a.fecha));
       setTickets(pending);
     } catch (error) {
       console.error("Error cargando pendientes", error);
@@ -92,44 +94,41 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
     if (!selectedTicket || !amount || Number(amount) <= 0) return;
     
     const payAmount = Number(amount);
-    const total = parseFloat(selectedTicket.total || 0);
-    const abonadoPrevio = parseFloat(selectedTicket.abonado || 0);
-    const deudaActual = total - abonadoPrevio;
+    const deudaActual = selectedTicket.deudaCalculada;
 
-    if (payAmount > (deudaActual + 0.5)) { // Margen de error pequeño por decimales
-        alert("El abono no puede ser mayor al saldo pendiente.");
+    if (payAmount > (deudaActual + 0.5)) {
+        alert(`El abono no puede ser mayor a la deuda (C$ ${deudaActual.toFixed(2)})`);
         return;
     }
 
     try {
-      // 1. Registrar el abono en la base de datos de la venta
+      // 1. Registrar el abono en la Base de Datos (API)
       await api.addPaymentToSale({
         saleId: selectedTicket.id,
         amount: payAmount,
         method: paymentMethod,
-        userId: currentUser?.id
+        userId: currentUser?.id || currentUser?.id_usuario
       }, token);
 
-      // 2. IMPORTANTE: Si es EFECTIVO, avisar al POS para meter dinero en Caja
+      // 2. IMPORTANTE: Conectar con la CAJA del POS
       if (paymentMethod === 'Efectivo' && onRegisterTransaction) {
         const clientName = selectedTicket.clienteNombre || selectedTicket.cliente?.nombre || 'Cliente';
-        const note = `Cobro Ticket #${selectedTicket.id} - ${clientName}`;
+        const note = `Abono a Ticket #${selectedTicket.id} - ${clientName}`;
         
-        // Esta función viene del padre (POS.jsx)
+        // Llamamos a la función del padre (POS.jsx) para meter dinero al turno actual
         onRegisterTransaction('entrada', payAmount, note);
       }
 
-      alert("¡Abono registrado con éxito!");
+      alert("¡Abono registrado correctamente!");
       setSelectedTicket(null);
       setAmount('');
-      loadPendingTickets(); // Recargar lista para quitar al que ya pagó
+      loadPendingTickets(); // Recargar lista
     } catch (error) {
       console.error(error);
       alert("Error al registrar abono: " + (error.message || "Error desconocido"));
     }
   };
 
-  // Filtrado en tiempo real
   const filteredTickets = tickets.filter(t => 
     (t.clienteNombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     String(t.id).includes(searchTerm)
@@ -139,53 +138,51 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
     <Overlay>
       <ModalContainer>
         <Header>
-          <Title><FaMoneyBillWave /> Cobrar Cuentas Pendientes</Title>
+          <Title><FaMoneyBillWave /> Cuentas por Cobrar y Pendientes</Title>
           <CloseButton onClick={onClose}><FaTimes /></CloseButton>
         </Header>
 
-        {/* Buscador */}
-        <div style={{display: 'flex', gap: 10}}>
+        <div style={{display: 'flex', gap: 10, marginBottom: 15}}>
             <div style={{position: 'relative', flex: 1}}>
                 <FaSearch style={{position: 'absolute', top: 12, left: 10, color: '#9ca3af'}}/>
                 <Input 
                     style={{paddingLeft: 35}}
-                    placeholder="Buscar por nombre de cliente o número de ticket..." 
+                    placeholder="Buscar por cliente o número de ticket..." 
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     autoFocus
                 />
             </div>
-            <Button onClick={loadPendingTickets} color="#6b7280">Refrescar</Button>
+            <Button onClick={loadPendingTickets} color="#6b7280">Actualizar</Button>
         </div>
 
-        {/* Tabla de Deudores */}
         <TableContainer>
             <Table>
                 <thead>
                     <tr>
-                        <th>ID</th>
+                        <th>Ticket</th>
                         <th>Fecha</th>
                         <th>Cliente</th>
                         <th>Estado</th>
                         <th>Total</th>
                         <th>Abonado</th>
-                        <th>Deuda</th>
+                        <th>Saldo</th>
                         <th>Acción</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {loading ? <tr><td colSpan="8" style={{textAlign: 'center'}}>Cargando cuentas...</td></tr> : 
-                     filteredTickets.length === 0 ? <tr><td colSpan="8" style={{textAlign: 'center', padding: 20}}>No hay cuentas por cobrar.</td></tr> :
+                    {loading ? <tr><td colSpan="8" style={{textAlign: 'center'}}>Buscando cuentas...</td></tr> : 
+                     filteredTickets.length === 0 ? <tr><td colSpan="8" style={{textAlign: 'center', padding: 20}}>No hay cuentas pendientes.</td></tr> :
                      filteredTickets.map(ticket => {
-                        const total = parseFloat(ticket.total || 0);
+                        const total = parseFloat(ticket.total || ticket.total_venta || 0);
                         const abonado = parseFloat(ticket.abonado || 0);
                         const deuda = total - abonado;
                         return (
                         <tr key={ticket.id}>
                             <td>#{ticket.id}</td>
                             <td>{new Date(ticket.created_at || ticket.fecha).toLocaleDateString()}</td>
-                            <td><strong>{ticket.clienteNombre || 'Cliente Casual'}</strong></td>
-                            <td><span style={{padding: '2px 8px', borderRadius: 10, background: '#dbeafe', color: '#1e40af', fontSize: '0.8rem'}}>{ticket.estado}</span></td>
+                            <td><FaUserCheck style={{color: '#6b7280', marginRight:5}}/> {ticket.clienteNombre || 'Casual'}</td>
+                            <td><span style={{padding: '3px 8px', borderRadius: 10, background: '#fee2e2', color: '#991b1b', fontSize: '0.8rem', fontWeight: 'bold'}}>{ticket.estado}</span></td>
                             <td>C$ {total.toFixed(2)}</td>
                             <td>C$ {abonado.toFixed(2)}</td>
                             <td style={{color: '#dc2626', fontWeight: 'bold'}}>C$ {deuda.toFixed(2)}</td>
@@ -194,7 +191,7 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
                                     color="#10b981"
                                     onClick={() => { setSelectedTicket({...ticket, deudaCalculada: deuda}); setAmount(''); }}
                                 >
-                                    Cobrar
+                                    <FaMoneyBillWave /> Cobrar
                                 </Button>
                             </td>
                         </tr>
@@ -203,45 +200,46 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
             </Table>
         </TableContainer>
 
-        {/* Panel de Pago (Abajo) */}
         {selectedTicket && (
             <PaySection>
                 <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                    <h3 style={{margin: 0}}>Cobrando Ticket #{selectedTicket.id}</h3>
+                    <h3 style={{margin: 0, color: '#1e40af'}}>Cobrando Ticket #{selectedTicket.id} - {selectedTicket.clienteNombre}</h3>
                     <button onClick={() => setSelectedTicket(null)} style={{border: 'none', background: 'transparent', cursor: 'pointer', color: '#666'}}><FaTimes/></button>
                 </div>
                 <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20}}>
                     <div>
-                        <label style={{display: 'block', marginBottom: 5, fontWeight: 600}}>Monto a Pagar (Máx: {selectedTicket.deudaCalculada.toFixed(2)})</label>
+                        <label style={{display: 'block', marginBottom: 5, fontWeight: 600}}>Monto a Pagar (Deuda: {selectedTicket.deudaCalculada.toFixed(2)})</label>
                         <Input 
                             type="number" 
                             value={amount} 
                             onChange={e => setAmount(e.target.value)}
                             placeholder="0.00"
+                            onKeyDown={e => e.key === 'Enter' && handleProcessPayment()}
+                            autoFocus
                         />
                     </div>
                     <div>
-                        <label style={{display: 'block', marginBottom: 5, fontWeight: 600}}>Método</label>
+                        <label style={{display: 'block', marginBottom: 5, fontWeight: 600}}>Método de Pago</label>
                         <select 
                             style={{width: '100%', padding: 10, borderRadius: 6, border: '1px solid #d1d5db'}}
                             value={paymentMethod}
                             onChange={e => setPaymentMethod(e.target.value)}
                         >
-                            <option value="Efectivo">Efectivo (Entra a Caja)</option>
+                            <option value="Efectivo">Efectivo (Caja)</option>
                             <option value="Tarjeta">Tarjeta (Banco)</option>
                             <option value="Transferencia">Transferencia (Banco)</option>
                         </select>
                     </div>
                 </div>
                 
-                <div style={{display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 10}}>
+                <div style={{display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 15}}>
                     <Button color="#ef4444" onClick={() => setSelectedTicket(null)}>Cancelar</Button>
-                    <Button color="#3b82f6" onClick={handleProcessPayment}>
-                        <FaMoneyBillWave /> Confirmar Pago
+                    <Button color="#2563eb" onClick={handleProcessPayment} style={{fontSize: '1.1rem', padding: '10px 25px'}}>
+                        Confirmar Pago
                     </Button>
                 </div>
                 {paymentMethod === 'Efectivo' && (
-                    <div style={{display: 'flex', alignItems: 'center', gap: 5, color: '#059669', fontSize: '0.9rem'}}>
+                    <div style={{display: 'flex', alignItems: 'center', gap: 5, color: '#059669', fontSize: '0.9rem', marginTop: 5}}>
                         <FaExclamationCircle /> 
                         <span>Este dinero se sumará automáticamente a tu turno de caja actual.</span>
                     </div>
