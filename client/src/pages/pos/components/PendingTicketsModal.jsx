@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FaTimes, FaMoneyBillWave, FaSync, FaFileInvoiceDollar, FaUserClock, FaBug } from 'react-icons/fa';
+import { 
+  FaTimes, 
+  FaMoneyBillWave, 
+  FaSync, // <-- AQUÍ ESTÁ EL ICONO FALTANTE
+  FaFileInvoiceDollar, 
+  FaUserClock, 
+  FaBug 
+} from 'react-icons/fa';
 import * as api from '../../service/api'; 
 
 // --- ESTILOS DEL MODAL ---
@@ -51,7 +58,7 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser, onPr
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [rawDataDebug, setRawDataDebug] = useState(null); // Para ver qué llega
+    const [rawDataDebug, setRawDataDebug] = useState(null);
     
     // Estado del cobro
     const [selectedTicket, setSelectedTicket] = useState(null);
@@ -60,179 +67,159 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser, onPr
     const [processing, setProcessing] = useState(false);
 
     // --- CARGA DE DATOS ---
-  // Reemplaza la función loadData completa con esta versión mejorada
-const loadData = async () => {
-    setLoading(true);
-    console.log("🔄 Iniciando carga de pendientes...");
-
-    try {
-        // IMPORTANTE: Cambiar la API que usas para pedidos pendientes
-        let orders = [];
-        let sales = [];
+    const loadData = async () => {
+        setLoading(true);
+        console.log("🔄 Iniciando carga de pendientes...");
 
         try {
-            // USAR LA MISMA API QUE PEDIDOSYAPARTADOS
-            const resOrders = await api.fetchOrders(token);
-            console.log("📦 Respuesta de Pedidos:", resOrders);
-            
-            // Asegurarnos de obtener el array correctamente
-            if (Array.isArray(resOrders)) {
-                orders = resOrders;
-            } else if (resOrders && Array.isArray(resOrders.data)) {
-                orders = resOrders.data;
-            } else if (resOrders && resOrders.orders) {
-                orders = Array.isArray(resOrders.orders) ? resOrders.orders : [];
+            let orders = [];
+            let sales = [];
+
+            try {
+                const resOrders = await api.fetchOrders(token);
+                console.log("📦 Respuesta de Pedidos:", resOrders);
+                
+                if (Array.isArray(resOrders)) {
+                    orders = resOrders;
+                } else if (resOrders && Array.isArray(resOrders.data)) {
+                    orders = resOrders.data;
+                } else if (resOrders && resOrders.orders) {
+                    orders = Array.isArray(resOrders.orders) ? resOrders.orders : [];
+                }
+                
+                if (orders.length > 0) {
+                    console.log("📋 Primer pedido:", orders[0]);
+                }
+            } catch (e) { 
+                console.error("❌ Error Pedidos:", e); 
             }
-            
-            // DEBUG: Guardar el primer pedido para inspeccionar
-            if (orders.length > 0) {
-                console.log("📋 Primer pedido:", orders[0]);
-                console.log("📋 Campos disponibles:", Object.keys(orders[0]));
+
+            try {
+                const resSales = await api.fetchSales(token);
+                console.log("💰 Respuesta de Ventas:", resSales);
+                
+                if (Array.isArray(resSales)) {
+                    sales = resSales;
+                } else if (resSales && Array.isArray(resSales.data)) {
+                    sales = resSales.data;
+                }
+            } catch (e) { 
+                console.error("❌ Error Ventas:", e); 
             }
-        } catch (e) { 
-            console.error("❌ Error Pedidos:", e); 
-        }
 
-        try {
-            // También cargar ventas para completar
-            const resSales = await api.fetchSales(token);
-            console.log("💰 Respuesta de Ventas:", resSales);
+            const getNum = (val) => {
+                if (val === null || val === undefined) return 0;
+                const num = parseFloat(val);
+                return isNaN(num) ? 0 : num;
+            };
+
+            const getCliente = (obj) => {
+                return obj.clienteNombre || 
+                       obj.cliente?.nombre || 
+                       obj.nombre_cliente || 
+                       'Consumidor Final';
+            };
+
+            const getEstado = (obj) => {
+                return (obj.estado || obj.status || 'PENDIENTE').toUpperCase();
+            };
+
+            // Procesar pedidos
+            const processedOrders = orders.map(o => {
+                const totalPedido = getNum(o.total || o.monto_total || o.precio_total || 0);
+                const abonadoPedido = getNum(o.abonado || o.pagado || 0);
+                
+                return {
+                    id: o.id || o.id_pedido,
+                    type: 'PEDIDO',
+                    raw: o,
+                    client: getCliente(o),
+                    date: o.created_at || o.fecha || o.fecha_creacion || new Date().toISOString(),
+                    total: totalPedido,
+                    paid: abonadoPedido,
+                    status: getEstado(o),
+                    saldo: totalPedido - abonadoPedido,
+                    debug: {
+                        total_raw: o.total,
+                        abonado_raw: o.abonado,
+                        estado_raw: o.estado
+                    }
+                };
+            });
+
+            // Procesar ventas pendientes
+            const processedSales = sales.map(s => {
+                const totalVenta = getNum(s.total_venta || s.total || s.monto_final || 0);
+                const pagadoVenta = getNum(s.monto_pagado || s.abonado || 0);
+                const estadoVenta = getEstado(s);
+                
+                if (estadoVenta.includes('COMPLETADO') || estadoVenta.includes('CANCELADO')) {
+                    return null;
+                }
+                
+                return {
+                    id: s.id || s.id_venta,
+                    type: 'VENTA',
+                    raw: s,
+                    client: getCliente(s),
+                    date: s.fecha || s.created_at || s.fecha_creacion || new Date().toISOString(),
+                    total: totalVenta,
+                    paid: pagadoVenta,
+                    status: estadoVenta,
+                    saldo: totalVenta - pagadoVenta
+                };
+            }).filter(Boolean);
+
+            // Combinar todo
+            const allItems = [...processedOrders, ...processedSales];
+            console.log("📊 Total items procesados:", allItems.length);
+
+            // Filtrar solo los pendientes
+            const filteredList = allItems.filter(t => {
+                if (t.status.includes('CANCELADO') || 
+                    t.status.includes('ANULADO') || 
+                    t.status.includes('COMPLETADO')) {
+                    return false;
+                }
+                
+                if (t.saldo > 0.5) return true;
+                
+                if (t.status.includes('PENDIENTE') || 
+                    t.status.includes('APARTADO') || 
+                    t.status.includes('CREDITO') ||
+                    t.status.includes('POR COBRAR')) {
+                    return true;
+                }
+                
+                return false;
+            });
+
+            // Ordenar por fecha más reciente
+            filteredList.sort((a, b) => new Date(b.date) - new Date(a.date));
             
-            if (Array.isArray(resSales)) {
-                sales = resSales;
-            } else if (resSales && Array.isArray(resSales.data)) {
-                sales = resSales.data;
-            }
-        } catch (e) { 
-            console.error("❌ Error Ventas:", e); 
-        }
+            console.log("✅ Pendientes finales:", filteredList.length);
+            
+            setTickets(filteredList);
+            setRawDataDebug({
+                totalProcesados: allItems.length,
+                pendientes: filteredList.length,
+                ejemplo: filteredList[0] || { mensaje: 'No hay items' },
+                rawCounts: {
+                    orders: orders.length,
+                    sales: sales.length
+                }
+            });
 
-        // Helper mejorado para números
-        const getNum = (val) => {
-            if (val === null || val === undefined) return 0;
-            const num = parseFloat(val);
-            return isNaN(num) ? 0 : num;
-        };
-
-        // Helper para obtener cliente
-        const getCliente = (obj) => {
-            return obj.clienteNombre || 
-                   obj.cliente?.nombre || 
-                   obj.nombre_cliente || 
-                   'Consumidor Final';
-        };
-
-        // Helper para obtener estado
-        const getEstado = (obj) => {
-            return (obj.estado || obj.status || 'PENDIENTE').toUpperCase();
-        };
-
-        // Procesar pedidos (orders)
-        // En loadData, dentro del bloque donde procesas los pedidos:
-const processedOrders = orders.map(o => {
-    const totalPedido = getNum(o.total || o.monto_total || o.precio_total || 0);
-    const abonadoPedido = getNum(o.abonado || o.pagado || 0);
-    
-    return {
-        id: o.id || o.id_pedido,
-        type: 'PEDIDO',
-        raw: o,
-        client: getCliente(o),
-        date: o.created_at || o.fecha || o.fecha_creacion || new Date().toISOString(),
-        total: totalPedido,
-        paid: abonadoPedido,
-        status: getEstado(o),
-        saldo: totalPedido - abonadoPedido,
-        // Asegurar que siempre haya una propiedad items (aunque sea vacía)
-        items: o.items || o.detalles || o.productos || [],
-        // Campos adicionales para debug
-        debug: {
-            total_raw: o.total,
-            abonado_raw: o.abonado,
-            estado_raw: o.estado,
-            has_items: !!(o.items || o.detalles || o.productos)
+        } catch (error) {
+            console.error("❌ Error fatal:", error);
+            setRawDataDebug({ 
+                error: error.message,
+                stack: error.stack 
+            });
+        } finally {
+            setLoading(false);
         }
     };
-});
-        // Procesar ventas (sales) que puedan estar pendientes
-        const processedSales = sales.map(s => {
-            const totalVenta = getNum(s.total_venta || s.total || s.monto_final || 0);
-            const pagadoVenta = getNum(s.monto_pagado || s.abonado || 0);
-            const estadoVenta = getEstado(s);
-            
-            // Solo incluir ventas que estén pendientes
-            if (estadoVenta.includes('COMPLETADO') || estadoVenta.includes('CANCELADO')) {
-                return null;
-            }
-            
-            return {
-                id: s.id || s.id_venta,
-                type: 'VENTA',
-                raw: s,
-                client: getCliente(s),
-                date: s.fecha || s.created_at || s.fecha_creacion || new Date().toISOString(),
-                total: totalVenta,
-                paid: pagadoVenta,
-                status: estadoVenta,
-                saldo: totalVenta - pagadoVenta
-            };
-        }).filter(Boolean); // Eliminar nulls
-
-        // Combinar todo
-        const allItems = [...processedOrders, ...processedSales];
-        console.log("📊 Total items procesados:", allItems.length);
-        console.log("📊 Ejemplo item:", allItems[0]);
-
-        // Filtrar solo los pendientes (lógica más flexible)
-        const filteredList = allItems.filter(t => {
-            // 1. Descartar explícitamente cancelados/anulados
-            if (t.status.includes('CANCELADO') || 
-                t.status.includes('ANULADO') || 
-                t.status.includes('COMPLETADO')) {
-                return false;
-            }
-            
-            // 2. Si tiene saldo positivo (> 0.5 para evitar decimales pequeños)
-            if (t.saldo > 0.5) return true;
-            
-            // 3. Si el estado indica pendiente/apartado/crédito
-            if (t.status.includes('PENDIENTE') || 
-                t.status.includes('APARTADO') || 
-                t.status.includes('CREDITO') ||
-                t.status.includes('POR COBRAR')) {
-                return true;
-            }
-            
-            return false;
-        });
-
-        // Ordenar por fecha más reciente
-        filteredList.sort((a, b) => new Date(b.date) - new Date(a.date));
-        
-        console.log("✅ Pendientes finales:", filteredList.length);
-        console.log("✅ Lista:", filteredList);
-        
-        setTickets(filteredList);
-        setRawDataDebug({
-            totalProcesados: allItems.length,
-            pendientes: filteredList.length,
-            ejemplo: filteredList[0] || { mensaje: 'No hay items' },
-            rawCounts: {
-                orders: orders.length,
-                sales: sales.length
-            }
-        });
-
-    } catch (error) {
-        console.error("❌ Error fatal:", error);
-        setRawDataDebug({ 
-            error: error.message,
-            stack: error.stack 
-        });
-    } finally {
-        setLoading(false);
-    }
-};
 
     useEffect(() => { loadData(); }, []);
 
@@ -311,8 +298,10 @@ const processedOrders = orders.map(o => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {displayTickets.length === 0 ? (
-                                        <tr><td colSpan={8} align="center" style={{padding:20}}>No hay datos para mostrar. Revisa el cuadro negro abajo.</td></tr>
+                                    {loading ? (
+                                        <tr><td colSpan={8} align="center" style={{padding:20}}>Cargando...</td></tr>
+                                    ) : displayTickets.length === 0 ? (
+                                        <tr><td colSpan={8} align="center" style={{padding:20}}>No hay tickets pendientes.</td></tr>
                                     ) : displayTickets.map(t => (
                                         <tr key={`${t.type}-${t.id}`} style={{background: selectedTicket?.id === t.id ? '#eff6ff' : ''}}>
                                             <td>#{t.id}</td>
@@ -323,7 +312,12 @@ const processedOrders = orders.map(o => {
                                             <td>{t.paid.toFixed(2)}</td>
                                             <td style={{color:'red', fontWeight:'bold'}}>{t.saldo.toFixed(2)}</td>
                                             <td>
-                                                <Button onClick={() => { setSelectedTicket(t); setAmount(''); }} style={{padding:'5px 10px', fontSize:'0.8rem'}}>Cobrar</Button>
+                                                <Button 
+                                                    onClick={() => { setSelectedTicket(t); setAmount(''); }} 
+                                                    style={{padding:'5px 10px', fontSize:'0.8rem'}}
+                                                >
+                                                    Cobrar
+                                                </Button>
                                             </td>
                                         </tr>
                                     ))}
@@ -331,14 +325,15 @@ const processedOrders = orders.map(o => {
                             </Table>
                         </div>
 
-                        {/* --- DEBUG BOX: SI SALE VACÍO, MIRA ESTO --- */}
-                        <div style={{marginTop: 10}}>
-                             <small style={{fontWeight:'bold', color:'#ef4444'}}> <FaBug/> Diagnóstico de Datos (Solo visible si hay error)</small>
-                             <DebugBox>
-                                 {JSON.stringify(rawDataDebug, null, 2)}
-                             </DebugBox>
-                        </div>
-
+                        {/* DEBUG BOX */}
+                        {rawDataDebug && (
+                            <div style={{marginTop: 10}}>
+                                <small style={{fontWeight:'bold', color:'#ef4444'}}> <FaBug/> Diagnóstico de Datos</small>
+                                <DebugBox>
+                                    {JSON.stringify(rawDataDebug, null, 2)}
+                                </DebugBox>
+                            </div>
+                        )}
                     </ListSection>
 
                     {selectedTicket && (
@@ -348,21 +343,63 @@ const processedOrders = orders.map(o => {
                             <p style={{fontSize:'1.2rem', color:'red'}}>Deuda: C$ {selectedTicket.saldo.toFixed(2)}</p>
                             
                             <label>Monto a Abonar</label>
-                            <Input type="number" value={amount} onChange={e => setAmount(e.target.value)} style={{fontSize:'1.2rem'}}/>
+                            <Input 
+                                type="number" 
+                                value={amount} 
+                                onChange={e => setAmount(e.target.value)} 
+                                style={{fontSize:'1.2rem'}}
+                                min="0"
+                                max={selectedTicket.saldo}
+                                step="0.01"
+                            />
                             <div style={{display:'flex', gap:5, marginTop:5}}>
-                                <Badge bg="#d1fae5" txt="#059669" onClick={() => setAmount(selectedTicket.saldo.toFixed(2))} style={{cursor:'pointer'}}>Todo</Badge>
+                                <Badge 
+                                    bg="#d1fae5" 
+                                    txt="#059669" 
+                                    onClick={() => setAmount(selectedTicket.saldo.toFixed(2))} 
+                                    style={{cursor:'pointer', padding: '5px 10px'}}
+                                >
+                                    Todo
+                                </Badge>
+                                <Badge 
+                                    bg="#fef3c7" 
+                                    txt="#92400e" 
+                                    onClick={() => setAmount((selectedTicket.saldo / 2).toFixed(2))} 
+                                    style={{cursor:'pointer', padding: '5px 10px'}}
+                                >
+                                    Mitad
+                                </Badge>
                             </div>
 
-                            <label style={{marginTop:10}}>Método</label>
-                            <select style={{width:'100%', padding:10}} value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
-                                <option>Efectivo</option>
-                                <option>Tarjeta</option>
-                                <option>Transferencia</option>
+                            <label style={{marginTop:10}}>Método de Pago</label>
+                            <select 
+                                style={{width:'100%', padding:10, borderRadius: '6px', border: '1px solid #cbd5e1'}} 
+                                value={paymentMethod} 
+                                onChange={e => setPaymentMethod(e.target.value)}
+                            >
+                                <option value="Efectivo">Efectivo</option>
+                                <option value="Tarjeta">Tarjeta</option>
+                                <option value="Transferencia">Transferencia</option>
+                                <option value="Mixto">Mixto</option>
                             </select>
 
-                            <Button onClick={handlePay} disabled={processing || !amount} color="#10b981" style={{width:'100%', marginTop:20, padding:15}}>
-                                {processing ? '...' : 'CONFIRMAR PAGO'}
+                            <Button 
+                                onClick={handlePay} 
+                                disabled={processing || !amount || parseFloat(amount) <= 0} 
+                                color="#10b981" 
+                                style={{width:'100%', marginTop:20, padding:15}}
+                            >
+                                {processing ? 'Procesando...' : 'CONFIRMAR PAGO'}
                             </Button>
+                            
+                            {selectedTicket.type === 'PEDIDO' && (
+                                <div style={{marginTop: 15, padding: 10, background: '#fef3c7', borderRadius: 6}}>
+                                    <small>
+                                        <strong>Nota:</strong> Este es un pedido creado en "Pedidos y Consultas". 
+                                        Para facturarlo completamente, ve al POS y usa "Cargar Pedido".
+                                    </small>
+                                </div>
+                            )}
                         </PaySection>
                     )}
                 </Body>
