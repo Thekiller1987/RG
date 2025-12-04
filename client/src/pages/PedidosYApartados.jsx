@@ -624,33 +624,63 @@ const PedidosYApartados = () => {
         };
     }, [pedidosFiltrados]);
 
-    // ==========================================
-    // CREACIÓN DE PEDIDO (LÓGICA BLINDADA)
+  // CREACIÓN DE PEDIDO CORREGIDA (CON INGRESO A CAJA)
     // ==========================================
     const handleCreateOrder = async (orderData) => {
         try {
             let finalOrderData = { ...orderData };
 
-            // RESTRICCIÓN DE SEGURIDAD PARA VENDEDORES
+            // 1. RESTRICCIÓN DE SEGURIDAD PARA VENDEDORES
             if (!canManageTickets) {
-                // 1. Modificación del nombre para trazabilidad
                 const descripcion = orderData.descripcion || orderData.notas || '';
                 const nombreClienteFormulario = orderData.clienteNombre || 'Cliente Casual';
                 const nombreUsuario = user.nombre || user.username || 'Vendedor';
                 finalOrderData.clienteNombre = `Ticket - ${nombreUsuario} - ${nombreClienteFormulario} - ${descripcion}`;
-
-                // 2. FORZAR ABONO A CERO
-                // Si no es admin/contador, ignoramos cualquier monto de dinero que haya puesto.
+                
+                // Vendedores no pueden recibir dinero inicial en esta vista, se fuerza a pendiente
                 finalOrderData.abonado = 0; 
-                // Aseguramos que el estado sea pendiente si no hay pago
                 finalOrderData.estado = 'PENDIENTE'; 
             }
 
-            await api.createOrder(finalOrderData, token);
+            // 2. CREAR EL PEDIDO (TICKET)
+            const response = await api.createOrder(finalOrderData, token);
+            
+            // 3. LOGICA NUEVA: REGISTRAR EL DINERO EN CAJA
+            // Si el usuario es Admin/Contador y puso un abono inicial, lo guardamos en la caja
+            const montoAbonado = parseFloat(finalOrderData.abonado);
+            
+            if (canManageTickets && montoAbonado > 0 && response) {
+                try {
+                    // Usamos el ID del pedido creado para la referencia
+                    const pedidoId = response.id || response.insertId || 'NUEVO';
+                    
+                    // Llamamos a la API para registrar el movimiento en caja
+                    // NOTA: Asegúrate que esta función exista en tu archivo api.js, 
+                    // es la misma que usas en el POS.
+                    await api.registerTransaction({
+                        usuario_id: user.id || user.id_usuario,
+                        monto: montoAbonado,
+                        tipo: 'entrada', // O 'INGRESO' según tu base de datos
+                        descripcion: `Abono inicial Pedido #${pedidoId} - Cliente: ${finalOrderData.clienteNombre}`,
+                        origen: 'PEDIDOS'
+                    }, token);
+                    
+                    console.log("Dinero registrado en caja correctamente");
+                } catch (cajaError) {
+                    console.error("Error al registrar en caja:", cajaError);
+                    showAlert({ 
+                        title: "Advertencia", 
+                        message: "El pedido se creó, pero hubo un error registrando el dinero en caja. Verifica el saldo manualmente." 
+                    });
+                }
+            }
+
             showAlert({ title: "¡Éxito!", message: "Ticket/Pedido creado correctamente." });
             await fetchPedidos();
             closeModal();
+            
         } catch (error) {
+            console.error(error);
             showAlert({ title: "Error al Crear", message: `No se pudo crear el pedido. ${error.message}` });
         }
     };
