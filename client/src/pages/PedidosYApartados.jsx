@@ -4,9 +4,9 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../service/api';
 import { 
-    FaClipboardList, FaFilter, FaPlus, FaSearch, FaArrowLeft, FaBoxOpen,
-    FaDollarSign, FaCalendar, FaUser, FaCheckCircle, FaTimesCircle, FaExclamationTriangle, FaList, FaExchangeAlt,
-    FaTrash, FaEdit, FaEye, FaFileInvoiceDollar
+    FaClipboardList, FaFilter, FaPlus, FaArrowLeft, FaBoxOpen,
+    FaCalendar, FaUser, FaCheckCircle, FaTimesCircle, FaExchangeAlt,
+    FaTrash, FaEdit, FaEye, FaMoneyBillWave, FaCreditCard, FaUniversity
 } from 'react-icons/fa';
 
 import CreateOrderModal from './pos/components/CreateOrderModal';
@@ -21,7 +21,7 @@ const PageWrapper = styled.div`padding: 2rem; background: #f8fafc; min-height: 1
 const HeaderContainer = styled.div`display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1.5rem;`;
 const Title = styled.h1`font-size: 2.2rem; color: #1e293b; display: flex; align-items: center; gap: 1rem; margin: 0; font-weight: 800;`;
 const Button = styled.button`
-  padding: 0.7rem 1.4rem; border: none; background: ${props => props.$primary ? '#2563eb' : props.$secondary ? '#4f46e5' : props.$danger ? '#ef4444' : '#64748b'}; 
+  padding: 0.7rem 1.4rem; border: none; background: ${props => props.$primary ? '#2563eb' : props.$secondary ? '#4f46e5' : props.$danger ? '#ef4444' : props.$success ? '#10b981' : '#64748b'}; 
   color: white; border-radius: 8px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem; 
   transition: all 0.2s; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
   &:hover { transform: translateY(-2px); opacity: 0.9; }
@@ -42,8 +42,18 @@ const PedidoCard = styled.div`
 `;
 const ActionButtons = styled.div`display: flex; gap: 0.5rem; margin-top: 10px; justify-content: flex-end;`;
 const ModalOverlay = styled.div`position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(2px);`;
-const ModalContent = styled.div`background: white; width: 90%; max-width: 900px; height: 80vh; border-radius: 12px; padding: 25px; display: flex; flex-direction: column;`;
+const ModalContent = styled.div`background: white; width: 90%; max-width: ${props => props.$width || '900px'}; height: ${props => props.$height || '80vh'}; border-radius: 12px; padding: 25px; display: flex; flex-direction: column;`;
 const ProductTable = styled.div`flex: 1; overflow-y: auto; margin-top: 15px; table { width: 100%; border-collapse: collapse; } th { background: #f1f5f9; padding: 12px; text-align: left; position: sticky; top: 0; } td { padding: 12px; border-bottom: 1px solid #e2e8f0; }`;
+
+// Estilos específicos para el Modal de Pago
+const PaymentOption = styled.div`
+  border: 2px solid ${props => props.$selected ? '#2563eb' : '#e2e8f0'};
+  background: ${props => props.$selected ? '#eff6ff' : 'white'};
+  padding: 15px; border-radius: 8px; cursor: pointer; text-align: center;
+  transition: all 0.2s; font-weight: bold; color: ${props => props.$selected ? '#2563eb' : '#64748b'};
+  &:hover { border-color: #2563eb; }
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+`;
 
 const PedidosYApartados = () => {
     const { user } = useAuth();
@@ -62,12 +72,14 @@ const PedidosYApartados = () => {
     const [searchType, setSearchType] = useState('descripcion');
     const [isLoadingProducts, setIsLoadingProducts] = useState(false);
 
+    // Estado para el modal de cobro
+    const [cobroData, setCobroData] = useState({ pedido: null, metodo: 'Efectivo', monto: 0 });
+
     const openModal = useCallback((name, props = {}) => setModal({ name, props }), []);
     const closeModal = useCallback(() => setModal({ name: null, props: {} }), []);
     const showAlert = useCallback((props) => openModal('alert', props), [openModal]);
     const showConfirmation = useCallback((props) => openModal('confirmation', props), [openModal]);
 
-    // Permisos: Solo admin puede editar, pero NADIE puede pagar aquí
     const canManageTickets = useMemo(() => user?.rol?.toLowerCase().includes('admin'), [user]);
 
     // --- CARGAR DATOS ---
@@ -85,7 +97,7 @@ const PedidosYApartados = () => {
     }, [token]);
 
     const loadProductsData = useCallback(async () => {
-        if (!token || products.length > 0) return; // Cache simple
+        if (!token || products.length > 0) return; 
         setIsLoadingProducts(true);
         try {
             const data = await api.fetchProducts(token);
@@ -105,7 +117,6 @@ const PedidosYApartados = () => {
     // --- CREAR PEDIDO ---
     const handleCreateOrder = async (orderData) => {
         try {
-            // Preparar los items con la estructura correcta
             const itemsWithStructure = orderData.items?.map(item => ({
                 id_producto: item.id,
                 producto: item.nombre,
@@ -116,21 +127,18 @@ const PedidosYApartados = () => {
                 total_linea: (Number(item.quantity) || 1) * (Number(item.precio_venta || item.precio || 0))
             })) || [];
 
-            // Calcular total del pedido
             const totalPedido = itemsWithStructure.reduce((sum, item) => sum + item.total_linea, 0);
 
             const pedidoData = { 
                 ...orderData,
                 items: itemsWithStructure,
                 total: totalPedido,
-                abonado: 0, // Siempre 0 al crear
+                abonado: 0,
                 estado: 'PENDIENTE',
                 metodo_pago: 'Pendiente',
                 fecha: new Date().toISOString(),
                 usuario_id: user?.id || 1
             };
-
-            console.log("📤 Enviando pedido al backend:", pedidoData);
             
             const response = await api.createOrder(pedidoData, token);
             
@@ -143,17 +151,13 @@ const PedidosYApartados = () => {
             closeModal();
         } catch (error) {
             console.error("❌ Error creando pedido:", error);
-            showAlert({ 
-                title: "❌ Error", 
-                message: `No se pudo crear el pedido: ${error.message || 'Error desconocido'}` 
-            });
+            showAlert({ title: "❌ Error", message: `No se pudo crear el pedido: ${error.message}` });
         }
     };
 
-    // --- ELIMINAR PEDIDO MANUALMENTE ---
+    // --- ELIMINAR PEDIDO ---
     const handleDeleteOrder = async (pedidoId) => {
         if (!pedidoId) return;
-        
         showConfirmation({
             title: "¿Eliminar Pedido?",
             message: `¿Estás seguro de eliminar el pedido #${pedidoId}?\n\nEsta acción no se puede deshacer.`,
@@ -163,23 +167,14 @@ const PedidosYApartados = () => {
                 setDeletingId(pedidoId);
                 try {
                     const response = await api.deleteOrder(pedidoId, token);
-                    
                     if (response.success) {
-                        // Eliminar del estado local
                         setPedidos(prev => prev.filter(p => p.id !== pedidoId));
-                        showAlert({ 
-                            title: "✅ Pedido Eliminado", 
-                            message: `El pedido #${pedidoId} ha sido eliminado correctamente.` 
-                        });
+                        showAlert({ title: "✅ Pedido Eliminado", message: `El pedido #${pedidoId} ha sido eliminado.` });
                     } else {
                         throw new Error(response.message || "Error al eliminar");
                     }
                 } catch (error) {
-                    console.error("❌ Error eliminando pedido:", error);
-                    showAlert({ 
-                        title: "❌ Error", 
-                        message: `No se pudo eliminar el pedido: ${error.message || 'Error desconocido'}` 
-                    });
+                    showAlert({ title: "❌ Error", message: error.message });
                 } finally {
                     setDeletingId(null);
                 }
@@ -187,46 +182,67 @@ const PedidosYApartados = () => {
         });
     };
 
-    // --- MARCAR COMO COMPLETADO ---
-    const handleMarkAsCompleted = async (pedidoId) => {
-        showConfirmation({
-            title: "¿Marcar como Completado?",
-            message: `¿Marcar el pedido #${pedidoId} como COMPLETADO?\n\nEsto significa que ya fue pagado en caja.`,
-            confirmText: "Sí, completar",
-            cancelText: "Cancelar",
-            onConfirm: async () => {
-                try {
-                    const updateData = {
-                        estado: 'COMPLETADO',
-                        abonado: pedidos.find(p => p.id === pedidoId)?.total || 0,
-                        metodo_pago: 'Completado en POS'
-                    };
-                    
-                    await api.updateOrder(pedidoId, updateData, token);
-                    
-                    // Actualizar estado local
-                    setPedidos(prev => prev.map(p => 
-                        p.id === pedidoId ? { ...p, ...updateData } : p
-                    ));
-                    
-                    showAlert({ 
-                        title: "✅ Pedido Completado", 
-                        message: `El pedido #${pedidoId} ha sido marcado como COMPLETADO.` 
-                    });
-                    
-                    await fetchPedidos();
-                } catch (error) {
-                    console.error("❌ Error completando pedido:", error);
-                    showAlert({ 
-                        title: "❌ Error", 
-                        message: `No se pudo completar el pedido: ${error.message}` 
-                    });
-                }
-            }
+    // --- NUEVA LÓGICA DE COBRO (ABRI MODAL) ---
+    const handleOpenPaymentModal = (pedido) => {
+        const deuda = Number(pedido.total) - Number(pedido.abonado || 0);
+        setCobroData({
+            pedido: pedido,
+            metodo: 'Efectivo',
+            monto: deuda // Por defecto sugiere pagar todo
         });
+        openModal('payOrder');
     };
 
-    // --- VER DETALLES ---
+    // --- PROCESAR EL PAGO FINAL ---
+    const handleProcessPayment = async () => {
+        const { pedido, metodo, monto } = cobroData;
+        if (!pedido) return;
+
+        // Validaciones básicas
+        if (monto <= 0) {
+            alert("El monto debe ser mayor a 0");
+            return;
+        }
+
+        try {
+            // Calculamos nuevos valores
+            const nuevoAbonado = Number(pedido.abonado || 0) + Number(monto);
+            const esPagoCompleto = nuevoAbonado >= Number(pedido.total) - 0.5; // Margen de error pequeño por decimales
+
+            // Preparamos datos para la API
+            const updateData = {
+                // Si paga todo, pasa a COMPLETADO, si no, se queda como APARTADO (o lo que tu lógica de negocio dicte)
+                estado: esPagoCompleto ? 'COMPLETADO' : 'APARTADO',
+                abonado: nuevoAbonado,
+                metodo_pago: metodo, // Enviamos Efectivo, Tarjeta o Transferencia
+                // BANDERAS IMPORTANTES PARA EL BACKEND (Corte de Caja)
+                registrar_movimiento_caja: true, 
+                tipo_movimiento: 'INGRESO',
+                monto_ingreso: Number(monto),
+                es_efectivo: metodo === 'Efectivo' // Solo suma a la caja física si es efectivo
+            };
+            
+            console.log("📤 Procesando pago:", updateData);
+
+            await api.updateOrder(pedido.id, updateData, token);
+            
+            setPedidos(prev => prev.map(p => 
+                p.id === pedido.id ? { ...p, ...updateData } : p
+            ));
+            
+            closeModal();
+            showAlert({ 
+                title: "✅ Pago Registrado", 
+                message: `Se registró un pago de C$${Number(monto).toFixed(2)} en ${metodo}.\nEstado del pedido: ${updateData.estado}` 
+            });
+            
+            await fetchPedidos();
+        } catch (error) {
+            console.error("❌ Error completando pago:", error);
+            showAlert({ title: "❌ Error", message: `No se pudo registrar el pago: ${error.message}` });
+        }
+    };
+
     const handleViewDetails = (pedidoId) => {
         openModal('orderDetail', { pedidoId });
     };
@@ -254,25 +270,17 @@ const PedidosYApartados = () => {
         return filtered.sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
     }, [pedidos, filtroEstado, searchTerm]);
 
-    // --- EFECTO PARA REFRESCAR DATOS PERIÓDICAMENTE ---
     useEffect(() => { 
         fetchPedidos(); 
-        
-        // Refrescar cada 30 segundos para ver cambios desde el POS
         const interval = setInterval(() => {
-            if (filtroEstado === 'Activos') {
-                fetchPedidos();
-            }
+            if (filtroEstado === 'Activos') fetchPedidos();
         }, 30000);
-        
         return () => clearInterval(interval);
     }, [fetchPedidos]);
 
-    // --- ESTADÍSTICAS ---
     const estadisticas = useMemo(() => {
         const activos = pedidos.filter(p => ['PENDIENTE', 'APARTADO'].includes(p.estado));
         const totalDeuda = activos.reduce((sum, p) => sum + (Number(p.total) - Number(p.abonado || 0)), 0);
-        
         return {
             total: pedidos.length,
             activos: activos.length,
@@ -290,55 +298,28 @@ const PedidosYApartados = () => {
                         <FaList /> Ver Precios
                     </Button>
                     <Button $primary onClick={handleOpenCreateOrder}>
-                        <FaPlus /> Nuevo Pedido (Sin Cobro)
+                        <FaPlus /> Nuevo Pedido
                     </Button>
                     <BackButton to="/dashboard"><FaArrowLeft/> Salir</BackButton>
                 </div>
             </HeaderContainer>
 
-            {/* ESTADÍSTICAS */}
+            {/* ESTADISTICAS */}
             <div style={{display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap'}}>
-                <div style={{
-                    background: '#e0f2fe', 
-                    padding: '1rem', 
-                    borderRadius: '8px', 
-                    flex: 1, 
-                    minWidth: '200px',
-                    borderLeft: '4px solid #0ea5e9'
-                }}>
+                {/* ... (Tus tarjetas de estadísticas se mantienen igual) ... */}
+                 <div style={{background: '#e0f2fe', padding: '1rem', borderRadius: '8px', flex: 1, minWidth: '200px', borderLeft: '4px solid #0ea5e9'}}>
                     <div style={{fontSize: '0.9rem', color: '#0369a1'}}>Total Pedidos</div>
                     <div style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#0c4a6e'}}>{estadisticas.total}</div>
                 </div>
-                <div style={{
-                    background: '#fef3c7', 
-                    padding: '1rem', 
-                    borderRadius: '8px', 
-                    flex: 1, 
-                    minWidth: '200px',
-                    borderLeft: '4px solid #f59e0b'
-                }}>
+                <div style={{background: '#fef3c7', padding: '1rem', borderRadius: '8px', flex: 1, minWidth: '200px', borderLeft: '4px solid #f59e0b'}}>
                     <div style={{fontSize: '0.9rem', color: '#92400e'}}>Pendientes</div>
                     <div style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#78350f'}}>{estadisticas.activos}</div>
                 </div>
-                <div style={{
-                    background: '#dcfce7', 
-                    padding: '1rem', 
-                    borderRadius: '8px', 
-                    flex: 1, 
-                    minWidth: '200px',
-                    borderLeft: '4px solid #10b981'
-                }}>
+                <div style={{background: '#dcfce7', padding: '1rem', borderRadius: '8px', flex: 1, minWidth: '200px', borderLeft: '4px solid #10b981'}}>
                     <div style={{fontSize: '0.9rem', color: '#065f46'}}>Completados</div>
                     <div style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#064e3b'}}>{estadisticas.completados}</div>
                 </div>
-                <div style={{
-                    background: '#fee2e2', 
-                    padding: '1rem', 
-                    borderRadius: '8px', 
-                    flex: 1, 
-                    minWidth: '200px',
-                    borderLeft: '4px solid #ef4444'
-                }}>
+                <div style={{background: '#fee2e2', padding: '1rem', borderRadius: '8px', flex: 1, minWidth: '200px', borderLeft: '4px solid #ef4444'}}>
                     <div style={{fontSize: '0.9rem', color: '#991b1b'}}>Deuda Total</div>
                     <div style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#7f1d1d'}}>C$ {estadisticas.totalDeuda.toFixed(2)}</div>
                 </div>
@@ -348,11 +329,7 @@ const PedidosYApartados = () => {
                 <FilterPanel>
                     <div>
                         <h3><FaSearch /> Buscar</h3>
-                        <Input 
-                            placeholder="Cliente o Ticket ID..." 
-                            value={searchTerm} 
-                            onChange={e => setSearchTerm(e.target.value)} 
-                        />
+                        <Input placeholder="Cliente o Ticket ID..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                     </div>
                     <div>
                         <h3><FaFilter /> Estado</h3>
@@ -366,7 +343,6 @@ const PedidosYApartados = () => {
                         </Select>
                     </div>
                     <div>
-                        <h3><FaSync /> Acciones</h3>
                         <Button onClick={fetchPedidos} style={{width: '100%'}} disabled={isLoading}>
                             {isLoading ? 'Cargando...' : 'Actualizar Lista'}
                         </Button>
@@ -375,47 +351,22 @@ const PedidosYApartados = () => {
 
                 <main>
                     {isLoading ? (
-                        <div style={{textAlign:'center', padding: 50, color: '#94a3b8'}}>
-                            <FaBoxOpen size={50}/> <p>Cargando pedidos...</p>
-                        </div>
+                        <div style={{textAlign:'center', padding: 50, color: '#94a3b8'}}><FaBoxOpen size={50}/> <p>Cargando pedidos...</p></div>
                     ) : pedidosFiltrados.length === 0 ? (
-                        <div style={{textAlign:'center', padding: 50, color: '#94a3b8'}}>
-                            <FaBoxOpen size={50}/> <p>No hay tickets encontrados.</p>
-                        </div>
+                        <div style={{textAlign:'center', padding: 50, color: '#94a3b8'}}><FaBoxOpen size={50}/> <p>No hay tickets encontrados.</p></div>
                     ) : pedidosFiltrados.map(p => {
                         const deuda = Number(p.total) - Number(p.abonado || 0);
-                        const tieneItems = p.items && Array.isArray(p.items) && p.items.length > 0;
-                        
                         return (
                             <PedidoCard key={p.id} estado={p.estado}>
                                 <div style={{display:'flex', justifyContent:'space-between', marginBottom: 10}}>
-                                    <h3 style={{margin:0}}>
-                                        Ticket #{p.id} 
-                                        {tieneItems && (
-                                            <span style={{fontSize: '0.8rem', marginLeft: '10px', color: '#64748b'}}>
-                                                ({p.items.length} productos)
-                                            </span>
-                                        )}
-                                    </h3>
+                                    <h3 style={{margin:0}}>Ticket #{p.id}</h3>
                                     <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                                        <span style={{
-                                            fontWeight:'bold', 
-                                            color: p.estado === 'PENDIENTE' ? '#f59e0b' : 
-                                                   p.estado === 'COMPLETADO' ? '#10b981' : 
-                                                   p.estado === 'CANCELADO' ? '#ef4444' : '#7c3aed'
-                                        }}>
+                                        <span style={{fontWeight:'bold', color: p.estado === 'PENDIENTE' ? '#f59e0b' : p.estado === 'COMPLETADO' ? '#10b981' : p.estado === 'CANCELADO' ? '#ef4444' : '#7c3aed'}}>
                                             {p.estado}
                                         </span>
                                         {deuda > 0 && p.estado !== 'COMPLETADO' && (
-                                            <span style={{
-                                                background: '#fee2e2',
-                                                color: '#dc2626',
-                                                padding: '2px 8px',
-                                                borderRadius: '12px',
-                                                fontSize: '0.8rem',
-                                                fontWeight: 'bold'
-                                            }}>
-                                                C$ {deuda.toFixed(2)}
+                                            <span style={{background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold'}}>
+                                                Debe: C$ {deuda.toFixed(2)}
                                             </span>
                                         )}
                                     </div>
@@ -428,27 +379,22 @@ const PedidosYApartados = () => {
                                 </div>
                                 
                                 <ActionButtons>
-                                    <SmallButton 
-                                        onClick={() => handleViewDetails(p.id)}
-                                        title="Ver detalles"
-                                    >
-                                        <FaEye /> Ver
-                                    </SmallButton>
+                                    <SmallButton onClick={() => handleViewDetails(p.id)} title="Ver detalles"><FaEye /> Ver</SmallButton>
                                     
                                     {p.estado !== 'COMPLETADO' && p.estado !== 'CANCELADO' && canManageTickets && (
                                         <>
                                             <SmallButton 
-                                                $primary
-                                                onClick={() => handleMarkAsCompleted(p.id)}
-                                                title="Marcar como completado"
+                                                $success 
+                                                onClick={() => handleOpenPaymentModal(p)} 
+                                                title="Realizar Cobro"
                                             >
-                                                <FaCheckCircle /> Completar
+                                                <FaMoneyBillWave /> Cobrar / Completar
                                             </SmallButton>
                                             
                                             <SmallButton 
-                                                $danger
-                                                onClick={() => handleDeleteOrder(p.id)}
-                                                disabled={deletingId === p.id}
+                                                $danger 
+                                                onClick={() => handleDeleteOrder(p.id)} 
+                                                disabled={deletingId === p.id} 
                                                 title="Eliminar pedido"
                                             >
                                                 {deletingId === p.id ? '...' : <><FaTrash /> Eliminar</>}
@@ -464,26 +410,78 @@ const PedidosYApartados = () => {
             
             {/* MODALES */}
             {modal.name === 'createOrder' && (
-                <CreateOrderModal 
-                    onClose={closeModal} 
-                    onSubmit={handleCreateOrder} 
-                    showAlert={showAlert} 
-                    products={products}
-                    allowMoneyInput={false} // BLOQUEO VISUAL DE DINERO
-                />
+                <CreateOrderModal onClose={closeModal} onSubmit={handleCreateOrder} showAlert={showAlert} products={products} allowMoneyInput={false} />
             )}
             
             {modal.name === 'orderDetail' && (
-                <OrderDetailModal 
-                    pedidoId={modal.props.pedidoId} 
-                    onClose={closeModal} 
-                    onUpdate={fetchPedidos} 
-                    showAlert={showAlert} 
-                    isCajaOpen={false} // Forzamos false para bloquear pagos
-                    canManage={canManageTickets} 
-                    canCharge={false} // BLOQUEO LÓGICO DE COBRO
-                    readOnly={true} 
-                />
+                <OrderDetailModal pedidoId={modal.props.pedidoId} onClose={closeModal} onUpdate={fetchPedidos} showAlert={showAlert} isCajaOpen={false} canManage={canManageTickets} canCharge={false} readOnly={true} />
+            )}
+
+            {/* --- NUEVO MODAL DE COBRO --- */}
+            {modal.name === 'payOrder' && cobroData.pedido && (
+                <ModalOverlay onClick={closeModal}>
+                    <ModalContent $height="auto" $width="500px" onClick={e => e.stopPropagation()}>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: '20px'}}>
+                            <h2 style={{margin:0, color:'#1e293b'}}><FaMoneyBillWave/> Registrar Pago</h2>
+                            <button onClick={closeModal} style={{background:'none', border:'none', fontSize:24, cursor:'pointer'}}><FaTimesCircle/></button>
+                        </div>
+
+                        <div style={{background: '#f1f5f9', padding: '15px', borderRadius: '8px', marginBottom: '20px'}}>
+                            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '5px'}}>
+                                <span>Total Ticket:</span>
+                                <strong>C$ {Number(cobroData.pedido.total).toFixed(2)}</strong>
+                            </div>
+                            <div style={{display: 'flex', justifyContent: 'space-between', color: '#dc2626'}}>
+                                <span>Saldo Pendiente:</span>
+                                <strong>C$ {(Number(cobroData.pedido.total) - Number(cobroData.pedido.abonado || 0)).toFixed(2)}</strong>
+                            </div>
+                        </div>
+
+                        <div style={{marginBottom: '20px'}}>
+                            <label style={{fontWeight:'bold', display:'block', marginBottom:'8px'}}>Método de Pago:</label>
+                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px'}}>
+                                <PaymentOption 
+                                    $selected={cobroData.metodo === 'Efectivo'} 
+                                    onClick={() => setCobroData({...cobroData, metodo: 'Efectivo'})}
+                                >
+                                    <FaMoneyBillWave size={20}/> Efectivo
+                                </PaymentOption>
+                                <PaymentOption 
+                                    $selected={cobroData.metodo === 'Tarjeta'} 
+                                    onClick={() => setCobroData({...cobroData, metodo: 'Tarjeta'})}
+                                >
+                                    <FaCreditCard size={20}/> Tarjeta
+                                </PaymentOption>
+                                <PaymentOption 
+                                    $selected={cobroData.metodo === 'Transferencia'} 
+                                    onClick={() => setCobroData({...cobroData, metodo: 'Transferencia'})}
+                                >
+                                    <FaUniversity size={20}/> Transf.
+                                </PaymentOption>
+                            </div>
+                            {cobroData.metodo === 'Efectivo' && (
+                                <p style={{fontSize: '0.8rem', color: '#059669', marginTop: '5px'}}>
+                                    * Este monto se sumará al efectivo en caja del turno actual.
+                                </p>
+                            )}
+                        </div>
+
+                        <div style={{marginBottom: '25px'}}>
+                            <label style={{fontWeight:'bold', display:'block', marginBottom:'8px'}}>Monto a Cobrar (C$):</label>
+                            <Input 
+                                type="number" 
+                                value={cobroData.monto} 
+                                onChange={e => setCobroData({...cobroData, monto: e.target.value})}
+                                style={{fontSize: '1.2rem', fontWeight: 'bold'}}
+                                min="0"
+                            />
+                        </div>
+
+                        <Button $primary style={{width: '100%', justifyContent: 'center', padding: '15px'}} onClick={handleProcessPayment}>
+                            <FaCheckCircle /> Confirmar Cobro
+                        </Button>
+                    </ModalContent>
+                </ModalOverlay>
             )}
             
             {modal.name === 'productSearch' && (
