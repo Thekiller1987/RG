@@ -1076,7 +1076,10 @@ const PedidosYApartados = () => {
                     showConfirmation={showConfirmation} 
                     isCajaOpen={isCajaOpen}
                     canManage={canManageTickets}
-                    canCharge={canManageTickets} 
+                    canCharge={canManageTickets}
+                    // AÑADIDO: Habilitar botones de eliminar y editar para admins
+                    canDelete={canManageTickets} 
+                    canEdit={canManageTickets}
                     readOnly={!canManageTickets} 
                 />
             )}
@@ -1180,3 +1183,4 @@ const PedidosYApartados = () => {
 };
 
 export default PedidosYApartados;
+//NO TOCAR
