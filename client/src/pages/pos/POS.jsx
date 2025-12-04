@@ -1010,14 +1010,33 @@ showAlert({ title: "Éxito", message: "Venta realizada con éxito" });
   };
   
 // ▼▼▼ CÓDIGO CORREGIDO ▼▼▼
-  const handleAbonoSuccess = useCallback(async () => {
+ const handleAbonoSuccess = useCallback(async (montoPosible) => {
+    // 1. Cerrar el modal de historial
     closeModal();
-    showAlert({ title: 'Éxito', message: 'Abono registrado correctamente. Caja actualizada.' });
     
-    // Recargamos las ventas Y TAMBIÉN la caja para que sume el dinero inmediatamente
-    await refreshData();       
-    await reloadCajaSession(); 
-  }, [closeModal, showAlert, refreshData, reloadCajaSession]);
+    // 2. Recargar las ventas para ver el saldo actualizado del ticket
+    await refreshData();
+    
+    // 3. Intentar sincronizar con el servidor (por si acaso el backend sí lo registró)
+    await reloadCajaSession();
+
+    // 4. PASO CLAVE: Forzar el ingreso a caja
+    // Como el saldo no se actualizó solo, abrimos un cuadro para confirmar el ingreso del dinero.
+    showPrompt({
+      title: 'Ingreso a Caja',
+      message: 'El abono fue realizado. ¿Cuánto dinero en efectivo ingresó a la caja para sumarlo?',
+      inputType: 'number',
+      initialValue: typeof montoPosible === 'number' ? montoPosible : '', 
+      onConfirm: (val) => {
+        const amount = Number(val);
+        if (amount > 0) {
+          // Esto inyecta el dinero directamente en tu caja local y en el servidor
+          handleRegisterTransaction('entrada', amount, 'Abono a crédito (Registrado en POS)');
+        }
+      }
+    });
+  }, [closeModal, refreshData, reloadCajaSession, showPrompt, handleRegisterTransaction]);
+  // ▲▲▲ FIN DEL CAMBIO ▲▲▲
   // ▲▲▲ FIN DEL CAMBIO ▲▲▲
 
   // Handler para abrir el modal de historial de ventas
