@@ -563,27 +563,38 @@ const POS = () => {
     });
   };
 
-  /**
-   * Aplica un descuento al total de la orden activa.
-   */
-  const applyOrderDiscount = () => {
-    showPrompt({
-      title: "Descuento a la Orden",
-      message: "Ej: '10%' o '50' (C$)",
-      onConfirm: (value) => {
-        if (!value) { updateActiveOrder('discount', { type: 'none', value: 0 }); return; }
-        if (value.includes('%')) {
-          const n = parseFloat(value.replace('%', ''));
-          if (!isNaN(n) && n > 0 && n <= 100) updateActiveOrder('discount', { type: 'percentage', value: n });
-          else showAlert({ title: 'Inválido', message: 'Porcentaje 1-100.' });
-        } else {
-          const n = parseFloat(value);
-          if (!isNaN(n) && n >= 0) updateActiveOrder('discount', { type: 'fixed', value: n });
-          else showAlert({ title: 'Inválido', message: 'Monto >= 0.' });
-        }
-      }
-    });
-  };
+ /**
+   * Aplica un descuento al total de la orden activa.
+   * MODIFICADO: Ahora es EXCLUSIVAMENTE por PORCENTAJE.
+   */
+  const applyOrderDiscount = () => {
+    showPrompt({
+      title: "Descuento a la Orden (%)",
+      message: "Ingrese el porcentaje (Ej: 10 para 10%):",
+      inputType: 'number', // Forzamos teclado numérico
+      onConfirm: (value) => {
+        // Si no escribe nada o cancela, quitamos el descuento
+        if (!value) { 
+            updateActiveOrder('discount', { type: 'none', value: 0 }); 
+            return; 
+        }
+
+        // Convertimos lo escrito a número
+        const n = parseFloat(value);
+
+        // Validamos que sea un número lógico para porcentaje (entre 0 y 100)
+        if (!isNaN(n) && n > 0 && n <= 100) {
+          // FORZAMOS que el tipo sea 'percentage'
+          updateActiveOrder('discount', { type: 'percentage', value: n });
+          
+          // Opcional: Mostrar confirmación visual
+          showAlert({ title: "Descuento Aplicado", message: `Se aplicó un ${n}% de descuento.` });
+        } else {
+          showAlert({ title: 'Inválido', message: 'Por favor ingrese un porcentaje entre 1 y 100.' });
+        }
+      }
+    });
+  };
 
   /* -----------------------------------------------------------------
    * 3.9. LÓGICA DEL CARRITO (Cart)

@@ -1,4 +1,3 @@
-// client/src/pages/pos/components/CreateOrderModal.jsx - VERSIÓN SIMPLIFICADA
 import React, { useState, useMemo } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../../context/AuthContext';
@@ -24,6 +23,9 @@ const ProductListItem = styled.div`
     border-radius: 5px;
     cursor: pointer;
     transition: background-color 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     &:hover { background-color: #f0f4f8; }
 `;
 
@@ -37,12 +39,18 @@ const CreateOrderModal = ({ onClose, onSubmit, showAlert }) => {
 
     const total = useMemo(() => cart.reduce((sum, item) => sum + item.precio * item.quantity, 0), [cart]);
 
+    // ✅ CAMBIO IMPORTANTE: Lógica de búsqueda mejorada (Código + Nombre)
     const filteredProducts = useMemo(() => {
         if (!searchTerm) return [];
-        return products.filter(p => 
-            p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) && 
-            p.existencia > 0
-        );
+        const term = searchTerm.toLowerCase();
+        
+        return products.filter(p => {
+            const nombreMatch = p.nombre.toLowerCase().includes(term);
+            // Validamos que exista codigo, lo pasamos a string y comparamos
+            const codigoMatch = (p.codigo || '').toString().toLowerCase().includes(term);
+            
+            return (nombreMatch || codigoMatch) && p.existencia > 0;
+        });
     }, [searchTerm, products]);
 
     const handleAddToCart = (product) => {
@@ -97,7 +105,6 @@ const CreateOrderModal = ({ onClose, onSubmit, showAlert }) => {
             return;
         }
         
-        // ✅ ENVIAMOS EL NOMBRE DEL CLIENTE EN LUGAR DEL ID
         onSubmit({
             clienteNombre: clienteNombre.trim(),
             items: cart,
@@ -117,7 +124,6 @@ const CreateOrderModal = ({ onClose, onSubmit, showAlert }) => {
                 <Grid>
                     <Panel>
                         <h3><FaUser /> 1. Nombre del Cliente</h3>
-                        {/* ✅ CAMBIO: Input de texto en lugar de Select */}
                         <Input 
                             type="text" 
                             placeholder="Escriba el nombre del cliente..." 
@@ -126,15 +132,25 @@ const CreateOrderModal = ({ onClose, onSubmit, showAlert }) => {
                         />
                         
                         <h3><FaBoxOpen /> 2. Agregar Productos</h3>
+                        {/* ✅ CAMBIO: Placeholder actualizado */}
                         <Input 
                             type="text" 
-                            placeholder="Buscar producto por nombre..." 
+                            placeholder="Buscar por nombre o código..." 
                             value={searchTerm} 
                             onChange={e => setSearchTerm(e.target.value)} 
                         />
                         {filteredProducts.slice(0, 5).map(p => (
                             <ProductListItem key={p.id} onClick={() => handleAddToCart(p)}>
-                                {p.nombre} (Stock: {p.existencia}) - C${Number(p.precio).toFixed(2)}
+                                {/* ✅ CAMBIO: Mostramos Código en negrita y Nombre */}
+                                <div>
+                                    <strong>{p.codigo}</strong> - {p.nombre}
+                                    <div style={{fontSize: '0.85rem', color: '#666'}}>
+                                        Stock: {p.existencia}
+                                    </div>
+                                </div>
+                                <div style={{fontWeight: 'bold', color: '#2ecc71'}}>
+                                    C${Number(p.precio).toFixed(2)}
+                                </div>
                             </ProductListItem>
                         ))}
                     </Panel>
