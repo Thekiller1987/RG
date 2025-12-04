@@ -1,53 +1,57 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FaTimes, FaMoneyBillWave, FaSearch, FaExclamationCircle, FaUserCheck, FaSync, FashoppingBag, FaClipboardList } from 'react-icons/fa';
+import { FaTimes, FaMoneyBillWave, FaSearch, FaExclamationCircle, FaUserCheck, FaSync, FaClipboardList, FaShoppingCart } from 'react-icons/fa';
 import * as api from '../../../service/api';
 
-// --- ESTILOS (Sin cambios) ---
+// --- ESTILOS (Optimizados) ---
 const Overlay = styled.div`
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.7); z-index: 1200;
+  background: rgba(0,0,0,0.75); z-index: 1200;
   display: flex; align-items: center; justify-content: center;
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(4px);
 `;
 const ModalContainer = styled.div`
   background: white; padding: 25px; border-radius: 12px;
-  width: 95%; max-width: 950px; height: 85vh; display: flex; flex-direction: column;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: fadeIn 0.3s;
+  width: 95%; max-width: 1000px; height: 85vh; display: flex; flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4); animation: fadeIn 0.3s;
 `;
 const Header = styled.div`
   display: flex; justify-content: space-between; align-items: center;
   border-bottom: 2px solid #f3f4f6; padding-bottom: 15px; margin-bottom: 15px;
 `;
-const Title = styled.h2` margin: 0; color: #1f2937; display: flex; align-items: center; gap: 10px; `;
+const Title = styled.h2` margin: 0; color: #111827; display: flex; align-items: center; gap: 10px; `;
 const CloseButton = styled.button`
   background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #9ca3af;
-  &:hover { color: #ef4444; }
+  transition: color 0.2s; &:hover { color: #ef4444; }
 `;
 const TableContainer = styled.div`
   flex: 1; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 15px;
 `;
 const Table = styled.table`
   width: 100%; border-collapse: collapse;
-  th { background-color: #f9fafb; padding: 12px; text-align: left; font-weight: 600; color: #4b5563; position: sticky; top: 0; }
-  td { padding: 12px; border-bottom: 1px solid #f3f4f6; color: #1f2937; font-size: 0.95rem; }
-  tr:hover { background-color: #f8fafc; }
+  th { background-color: #f9fafb; padding: 14px; text-align: left; font-weight: 700; color: #374151; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid #e5e7eb; }
+  td { padding: 12px; border-bottom: 1px solid #f3f4f6; color: #1f2937; vertical-align: middle; }
+  tr:hover { background-color: #f0f9ff; }
 `;
 const Button = styled.button`
   padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;
   color: white; background-color: ${p => p.color || '#3b82f6'};
   display: flex; align-items: center; gap: 8px; justify-content: center;
-  transition: opacity 0.2s;
+  transition: all 0.2s;
   &:disabled { background-color: #9ca3af; cursor: not-allowed; }
-  &:hover:not(:disabled) { opacity: 0.9; }
+  &:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
 `;
 const Input = styled.input`
-  padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; width: 100%; outline: none;
-  &:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
+  padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; width: 100%; outline: none; font-size: 1rem;
+  &:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
 `;
 const PaySection = styled.div`
-  background: #eff6ff; padding: 20px; border-radius: 8px; border: 1px solid #dbeafe;
+  background: #eff6ff; padding: 20px; border-radius: 8px; border: 1px solid #bfdbfe;
   display: flex; flex-direction: column; gap: 15px; animation: slideUp 0.3s;
+`;
+const Badge = styled.span`
+  padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+  background: ${p => p.bg}; color: ${p => p.color};
 `;
 
 const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) => {
@@ -64,40 +68,45 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
     loadAllPending();
   }, []);
 
-  // Función auxiliar para entender la estructura de datos, venga de donde venga
-  const normalizeData = (item, type) => {
-    // Intentar encontrar el TOTAL con todos los nombres posibles
+  // --- FUNCIÓN INTELIGENTE DE NORMALIZACIÓN ---
+  // Esta función revisa todos los posibles nombres que tu base de datos pueda tener
+  const normalizeData = (item, originType) => {
+    // 1. Detectar ID
+    const id = item.id || item.id_pedido || item.id_venta;
+
+    // 2. Detectar Total (Venta o Pedido)
     const total = parseFloat(
-        item.total || item.total_venta || item.monto_total || item.amount || item.total_pedido || 0
+        item.total || item.total_venta || item.total_pedido || item.monto_total || item.amount || 0
     );
     
-    // Intentar encontrar lo ABONADO con todos los nombres posibles
+    // 3. Detectar Abono/Pagado
     const abonado = parseFloat(
         item.abonado || item.monto_pagado || item.pagado || item.abono || 0
     );
 
-    // Intentar encontrar el ID
-    const id = item.id || item.id_venta || item.id_pedido;
+    // 4. Detectar Cliente (Objeto o String)
+    let clientName = 'Cliente Casual';
+    if (item.clienteNombre) clientName = item.clienteNombre;
+    else if (item.nombre_cliente) clientName = item.nombre_cliente;
+    else if (item.cliente && typeof item.cliente === 'object') clientName = item.cliente.nombre || item.cliente.razon_social;
+    else if (item.cliente && typeof item.cliente === 'string') clientName = item.cliente;
 
-    // Intentar encontrar el nombre del CLIENTE
-    const clientName = item.clienteNombre 
-                    || item.cliente?.nombre 
-                    || item.nombre_cliente 
-                    || (item.cliente ? item.cliente.nombre : 'Cliente Casual');
+    // 5. Detectar Fecha
+    const fecha = item.created_at || item.fecha || item.date || new Date().toISOString();
 
-    // Intentar encontrar la FECHA
-    const fecha = item.created_at || item.fecha || item.date;
+    // 6. Estado
+    const estado = (item.estado || 'PENDIENTE').toUpperCase();
 
     return {
-        original: item, // Guardamos el objeto original por si acaso
+        original: item, 
         id: id,
-        type: type, // 'Pedido' o 'Venta'
+        type: originType, // 'Pedido' o 'Venta'
         date: fecha,
         clientName: clientName,
         total: total,
         abonado: abonado,
         saldo: total - abonado,
-        estado: (item.estado || '').toUpperCase()
+        estado: estado
     };
   };
 
@@ -106,44 +115,48 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
     let combinedData = [];
 
     try {
-        console.log("Iniciando carga híbrida...");
+        console.log("--- Iniciando Carga de Pendientes ---");
 
-        // 1. Intentar cargar PEDIDOS (Orders)
+        // 1. Cargar PEDIDOS (Orders)
         try {
             const ordersRes = await api.fetchOrders(token);
+            // Manejo robusto de respuesta: puede ser array directo o objeto { data: [] }
             const ordersRaw = Array.isArray(ordersRes) ? ordersRes : (ordersRes.data || ordersRes.orders || []);
             const ordersNorm = ordersRaw.map(o => normalizeData(o, 'Pedido'));
             combinedData = [...combinedData, ...ordersNorm];
-            console.log("Pedidos cargados:", ordersNorm.length);
+            console.log(`Pedidos cargados: ${ordersNorm.length}`);
         } catch (e) {
-            console.warn("No se pudieron cargar pedidos (quizás no existe la ruta):", e);
+            console.warn("Error cargando pedidos (puede que la ruta no exista o falle):", e);
         }
 
-        // 2. Intentar cargar VENTAS (Sales)
+        // 2. Cargar VENTAS (Sales) con saldo pendiente
         try {
             const salesRes = await api.fetchSales(token);
             const salesRaw = Array.isArray(salesRes) ? salesRes : (salesRes.data || []);
             const salesNorm = salesRaw.map(s => normalizeData(s, 'Venta'));
             combinedData = [...combinedData, ...salesNorm];
-            console.log("Ventas cargadas:", salesNorm.length);
+            console.log(`Ventas cargadas: ${salesNorm.length}`);
         } catch (e) {
-            console.warn("No se pudieron cargar ventas:", e);
+            console.warn("Error cargando ventas:", e);
         }
 
-        // 3. Filtrar lo que realmente se debe (Saldo > 0.5 y NO Cancelado)
+        // 3. FILTRADO MAESTRO
+        // Mostrar solo lo que tiene deuda (Saldo > 0.5) Y no está cancelado/completado totalmente
         const pending = combinedData.filter(item => {
-            return item.saldo > 0.5 && item.estado !== 'CANCELADO';
+            const hasDebt = item.saldo > 0.5;
+            const isNotCancelled = item.estado !== 'CANCELADO' && item.estado !== 'ANULADO';
+            return hasDebt && isNotCancelled;
         });
 
-        // 4. Ordenar por fecha (más reciente primero)
-        pending.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+        // 4. Ordenar: Lo más reciente primero
+        pending.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-        console.log("Total pendientes finales:", pending);
+        console.log("Total tickets procesables:", pending.length);
         setTickets(pending);
 
     } catch (error) {
-        console.error("Error crítico cargando datos:", error);
-        alert("Error al cargar datos. Revisa la consola.");
+        console.error("Error crítico general:", error);
+        alert("Ocurrió un error al cargar los datos. Revisa la conexión.");
     } finally {
         setLoading(false);
     }
@@ -160,10 +173,9 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
     }
 
     try {
-      // AQUÍ ES IMPORTANTE: Dependiendo de tu backend, el endpoint puede ser el mismo o distinto.
-      // Usaremos addPaymentToSale por defecto, ya que usualmente maneja ambos por ID.
-      // Si tu backend tiene "addPaymentToOrder", avísame para cambiarlo.
-      
+      // Usamos addPaymentToSale. 
+      // NOTA: Si tu backend requiere un endpoint diferente para pedidos (ej. /orders/:id/pay), cámbialo aquí.
+      // Por lo general, los sistemas unifican el pago por ID.
       await api.addPaymentToSale({
         saleId: selectedTicket.id, 
         amount: payAmount,
@@ -171,23 +183,23 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
         userId: currentUser?.id || currentUser?.id_usuario
       }, token);
 
-      // Registrar en CAJA LOCAL
+      // Registrar movimiento en CAJA LOCAL
       if (paymentMethod === 'Efectivo' && onRegisterTransaction) {
-        const note = `Abono a ${selectedTicket.type} #${selectedTicket.id} - ${selectedTicket.clientName}`;
+        const note = `Cobro de ${selectedTicket.type} #${selectedTicket.id} - ${selectedTicket.clientName}`;
         onRegisterTransaction('entrada', payAmount, note);
       }
 
-      alert("¡Abono registrado correctamente!");
+      alert("¡Pago aplicado correctamente!");
       setSelectedTicket(null);
       setAmount('');
-      loadAllPending(); // Recargar todo
+      loadAllPending(); // Recargar la lista para actualizar saldos
     } catch (error) {
       console.error(error);
-      alert("Error al registrar abono: " + (error.message || "Error desconocido"));
+      alert("Error al registrar el pago: " + (error.message || "Error desconocido del servidor"));
     }
   };
 
-  // Filtrado del buscador
+  // Buscador en tiempo real
   const filteredTickets = tickets.filter(t => {
     const term = searchTerm.toLowerCase();
     const cName = (t.clientName || '').toLowerCase();
@@ -199,22 +211,22 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
     <Overlay>
       <ModalContainer>
         <Header>
-          <Title><FaClipboardList /> Pedidos y Cuentas Pendientes</Title>
+          <Title><FaClipboardList /> Cuentas por Cobrar (Pedidos y Ventas)</Title>
           <CloseButton onClick={onClose}><FaTimes /></CloseButton>
         </Header>
 
         <div style={{display: 'flex', gap: 10, marginBottom: 15}}>
             <div style={{position: 'relative', flex: 1}}>
-                <FaSearch style={{position: 'absolute', top: 12, left: 10, color: '#9ca3af'}}/>
+                <FaSearch style={{position: 'absolute', top: 14, left: 12, color: '#9ca3af'}}/>
                 <Input 
-                    style={{paddingLeft: 35}}
-                    placeholder="Buscar cliente, pedido o venta..." 
+                    style={{paddingLeft: 38}}
+                    placeholder="Buscar por cliente, ID de pedido o venta..." 
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     autoFocus
                 />
             </div>
-            <Button onClick={loadAllPending} color="#6b7280" title="Recargar lista">
+            <Button onClick={loadAllPending} color="#6b7280" title="Forzar recarga">
                 <FaSync /> Actualizar
             </Button>
         </div>
@@ -223,8 +235,8 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
             <Table>
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Tipo</th>
+                        <th style={{width: '80px'}}>ID</th>
+                        <th style={{width: '100px'}}>Origen</th>
                         <th>Fecha</th>
                         <th>Cliente</th>
                         <th>Estado</th>
@@ -236,41 +248,37 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
                 </thead>
                 <tbody>
                     {loading ? 
-                        <tr><td colSpan="9" style={{textAlign: 'center', padding: 20}}>Buscando en Ventas y Pedidos...</td></tr> 
+                        <tr><td colSpan="9" style={{textAlign: 'center', padding: 30, color: '#6b7280'}}>Cargando datos...</td></tr> 
                     : filteredTickets.length === 0 ? 
-                        <tr><td colSpan="9" style={{textAlign: 'center', padding: 20, color: '#666'}}>
-                            No se encontraron deudas pendientes ni en pedidos ni en ventas.
+                        <tr><td colSpan="9" style={{textAlign: 'center', padding: 30, color: '#9ca3af', fontStyle: 'italic'}}>
+                            <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:10}}>
+                                <FaExclamationCircle size={30}/>
+                                No se encontraron cuentas pendientes.
+                            </div>
                         </td></tr> 
                     : filteredTickets.map((ticket, index) => {
                         const dateStr = ticket.date ? new Date(ticket.date).toLocaleDateString() : 'S/F';
-
                         return (
                         <tr key={`${ticket.type}-${ticket.id}-${index}`}>
-                            <td>#{ticket.id}</td>
+                            <td><strong>#{ticket.id}</strong></td>
                             <td>
                                 {ticket.type === 'Pedido' ? 
-                                    <span style={{color:'#d97706', fontWeight:'bold', fontSize:'0.8rem'}}><FaClipboardList/> PEDIDO</span> : 
-                                    <span style={{color:'#2563eb', fontWeight:'bold', fontSize:'0.8rem'}}><FaMoneyBillWave/> VENTA</span>
+                                    <Badge bg="#fff7ed" color="#c2410c"><FaClipboardList/> PEDIDO</Badge> : 
+                                    <Badge bg="#eff6ff" color="#1d4ed8"><FaShoppingCart/> VENTA</Badge>
                                 }
                             </td>
                             <td>{dateStr}</td>
                             <td><FaUserCheck style={{color: '#6b7280', marginRight:5}}/> {ticket.clientName}</td>
                             <td>
-                                <span style={{
-                                    padding: '3px 8px', borderRadius: 10, 
-                                    background: '#fee2e2', color: '#991b1b', 
-                                    fontSize: '0.8rem', fontWeight: 'bold'
-                                }}>
-                                    {ticket.estado || 'PENDIENTE'}
-                                </span>
+                                <Badge bg="#fee2e2" color="#991b1b">{ticket.estado}</Badge>
                             </td>
                             <td>C$ {ticket.total.toFixed(2)}</td>
-                            <td>C$ {ticket.abonado.toFixed(2)}</td>
+                            <td style={{color: '#059669'}}>C$ {ticket.abonado.toFixed(2)}</td>
                             <td style={{color: '#dc2626', fontWeight: 'bold', fontSize: '1.05rem'}}>C$ {ticket.saldo.toFixed(2)}</td>
                             <td>
                                 <Button 
                                     color="#10b981"
-                                    onClick={() => { setSelectedTicket(ticket); setAmount(''); }}
+                                    onClick={() => { setSelectedTicket(ticket); setAmount(ticket.saldo); /* Sugerir saldo total */ }}
                                 >
                                     <FaMoneyBillWave /> Cobrar
                                 </Button>
@@ -283,18 +291,20 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
 
         {selectedTicket && (
             <PaySection>
-                <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                    <h3 style={{margin: 0, color: '#1e40af'}}>
-                        Cobrando {selectedTicket.type} #{selectedTicket.id} - {selectedTicket.clientName}
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems:'center'}}>
+                    <h3 style={{margin: 0, color: '#1e40af', display:'flex', alignItems:'center', gap: 10}}>
+                        <FaMoneyBillWave /> Cobrando {selectedTicket.type} #{selectedTicket.id} 
+                        <span style={{fontSize:'0.9rem', color:'#6b7280', fontWeight:'normal'}}>({selectedTicket.clientName})</span>
                     </h3>
-                    <button onClick={() => setSelectedTicket(null)} style={{border: 'none', background: 'transparent', cursor: 'pointer', color: '#666'}}>
+                    <button onClick={() => setSelectedTicket(null)} style={{border: 'none', background: 'transparent', cursor: 'pointer', color: '#666', fontSize: '1.2rem'}}>
                         <FaTimes/>
                     </button>
                 </div>
+                
                 <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20}}>
                     <div>
-                        <label style={{display: 'block', marginBottom: 5, fontWeight: 600}}>
-                            Monto a Pagar (Saldo: C$ {selectedTicket.saldo.toFixed(2)})
+                        <label style={{display: 'block', marginBottom: 8, fontWeight: 600, color: '#374151'}}>
+                            Monto a Pagar (Deuda: <span style={{color: '#dc2626'}}>C$ {selectedTicket.saldo.toFixed(2)}</span>)
                         </label>
                         <Input 
                             type="number" 
@@ -306,29 +316,30 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
                         />
                     </div>
                     <div>
-                        <label style={{display: 'block', marginBottom: 5, fontWeight: 600}}>Método de Pago</label>
+                        <label style={{display: 'block', marginBottom: 8, fontWeight: 600, color: '#374151'}}>Método de Pago</label>
                         <select 
-                            style={{width: '100%', padding: 10, borderRadius: 6, border: '1px solid #d1d5db'}}
+                            style={{width: '100%', padding: 12, borderRadius: 6, border: '1px solid #d1d5db', fontSize: '1rem', background: 'white'}}
                             value={paymentMethod}
                             onChange={e => setPaymentMethod(e.target.value)}
                         >
                             <option value="Efectivo">Efectivo (Caja)</option>
                             <option value="Tarjeta">Tarjeta (Banco)</option>
                             <option value="Transferencia">Transferencia (Banco)</option>
+                            <option value="Sinpe">Móvil / Otro</option>
                         </select>
                     </div>
                 </div>
                 
                 <div style={{display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 15}}>
-                    <Button color="#ef4444" onClick={() => setSelectedTicket(null)}>Cancelar</Button>
-                    <Button color="#2563eb" onClick={handleProcessPayment} style={{fontSize: '1.1rem', padding: '10px 25px'}}>
-                        Confirmar Pago
+                    <Button color="#ef4444" onClick={() => setSelectedTicket(null)}>Cancelar Operación</Button>
+                    <Button color="#2563eb" onClick={handleProcessPayment} style={{fontSize: '1.05rem', padding: '10px 30px'}}>
+                        CONFIRMAR PAGO
                     </Button>
                 </div>
                 {paymentMethod === 'Efectivo' && (
-                    <div style={{display: 'flex', alignItems: 'center', gap: 5, color: '#059669', fontSize: '0.9rem', marginTop: 5}}>
+                    <div style={{display: 'flex', alignItems: 'center', gap: 6, color: '#059669', fontSize: '0.85rem', marginTop: 10, fontWeight: 600}}>
                         <FaExclamationCircle /> 
-                        <span>Este dinero se sumará automáticamente a tu turno de caja actual.</span>
+                        <span>Este ingreso se registrará automáticamente en tu corte de caja actual.</span>
                     </div>
                 )}
             </PaySection>
