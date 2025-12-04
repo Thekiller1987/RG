@@ -1,44 +1,51 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FaTimes, FaMoneyBillWave, FaCreditCard, FaSearch } from 'react-icons/fa';
-import * as api from '../../service/api'; // Asegúrate que la ruta sea correcta
+import { FaTimes, FaMoneyBillWave, FaSearch, FaExclamationCircle } from 'react-icons/fa';
+import * as api from '../../../service/api'; // Ajusta la ruta según tu estructura real
 
-// Estilos básicos para el modal
+// --- ESTILOS ---
 const Overlay = styled.div`
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0,0,0,0.7); z-index: 1200;
-  display: flex; align-items: center; justifyContent: center;
+  display: flex; align-items: center; justify-content: center;
 `;
 const ModalContainer = styled.div`
-  background: white; padding: 20px; border-radius: 8px;
-  width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 15px;
+  background: white; padding: 25px; border-radius: 12px;
+  width: 95%; max-width: 900px; max-height: 90vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
 `;
 const Header = styled.div`
   display: flex; justify-content: space-between; align-items: center;
-  border-bottom: 1px solid #eee; padding-bottom: 10px;
+  border-bottom: 2px solid #f3f4f6; padding-bottom: 15px;
 `;
-const Title = styled.h2` margin: 0; color: #333; `;
+const Title = styled.h2` margin: 0; color: #1f2937; display: flex; align-items: center; gap: 10px; `;
 const CloseButton = styled.button`
-  background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666;
+  background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #9ca3af;
+  &:hover { color: #ef4444; }
+`;
+const TableContainer = styled.div`
+  flex: 1; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px;
 `;
 const Table = styled.table`
-  width: 100%; border-collapse: collapse; margin-top: 10px;
-  th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
-  th { background-color: #f8f9fa; font-weight: bold; }
-  tr:hover { background-color: #f1f1f1; }
+  width: 100%; border-collapse: collapse;
+  th { background-color: #f9fafb; padding: 12px; text-align: left; font-weight: 600; color: #4b5563; position: sticky; top: 0; }
+  td { padding: 12px; border-bottom: 1px solid #f3f4f6; color: #1f2937; }
+  tr:hover { background-color: #f8fafc; }
 `;
 const Button = styled.button`
-  padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;
-  color: white; background-color: ${p => p.color || '#007bff'};
-  &:disabled { background-color: #ccc; cursor: not-allowed; }
+  padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;
+  color: white; background-color: ${p => p.color || '#3b82f6'};
+  display: flex; align-items: center; gap: 8px; justify-content: center;
+  transition: opacity 0.2s;
+  &:disabled { background-color: #9ca3af; cursor: not-allowed; }
+  &:hover:not(:disabled) { opacity: 0.9; }
 `;
 const Input = styled.input`
-  padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 100%;
+  padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; width: 100%;
 `;
 const PaySection = styled.div`
-  background: #f0f8ff; padding: 15px; border-radius: 8px; border: 1px solid #cce5ff;
-  display: flex; flex-direction: column; gap: 10px;
+  background: #eff6ff; padding: 20px; border-radius: 8px; border: 1px solid #dbeafe;
+  display: flex; flex-direction: column; gap: 15px; animation: fadeIn 0.3s;
 `;
 
 const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) => {
@@ -46,12 +53,11 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
   const [loading, setLoading] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [amount, setAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('Efectivo'); // 'Efectivo' | 'Tarjeta' | 'Transferencia'
+  const [paymentMethod, setPaymentMethod] = useState('Efectivo'); 
   const [searchTerm, setSearchTerm] = useState('');
 
   const token = localStorage.getItem('token');
 
-  // Cargar tickets pendientes al abrir
   useEffect(() => {
     loadPendingTickets();
   }, []);
@@ -59,13 +65,19 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
   const loadPendingTickets = async () => {
     setLoading(true);
     try {
-      // Asumimos que tienes un endpoint que trae ventas, filtramos las pendientes
-      // Si tienes un endpoint especifico api.getPendingSales() úsalo
-      const allSales = await api.fetchSales(token); // O api.getSalesWithBalance(token)
+      // 1. Obtenemos todas las ventas/pedidos
+      const allSales = await api.fetchOrders(token); 
       
-      // Filtramos localmente las que tienen deuda (adaptar según tu backend)
+      // 2. Filtramos solo las que deben dinero (Saldo pendiente > 0)
+      // Aseguramos que 'saldo_pendiente' o la lógica de cálculo exista
       const pending = Array.isArray(allSales) 
-        ? allSales.filter(s => s.saldo_pendiente > 0 || s.estado === 'pendiente')
+        ? allSales.filter(s => {
+            const total = parseFloat(s.total || 0);
+            const abonado = parseFloat(s.abonado || 0);
+            const saldo = total - abonado;
+            // Mostramos si hay deuda y no está cancelado
+            return saldo > 0.5 && s.estado !== 'CANCELADO';
+          })
         : [];
         
       setTickets(pending);
@@ -80,14 +92,17 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
     if (!selectedTicket || !amount || Number(amount) <= 0) return;
     
     const payAmount = Number(amount);
-    if (payAmount > selectedTicket.saldo_pendiente) {
-        alert("El abono no puede ser mayor al saldo pendiente");
+    const total = parseFloat(selectedTicket.total || 0);
+    const abonadoPrevio = parseFloat(selectedTicket.abonado || 0);
+    const deudaActual = total - abonadoPrevio;
+
+    if (payAmount > (deudaActual + 0.5)) { // Margen de error pequeño por decimales
+        alert("El abono no puede ser mayor al saldo pendiente.");
         return;
     }
 
     try {
-      // 1. Registrar el pago en el backend (actualiza la deuda de la venta)
-      // Ajusta 'api.addPaymentToSale' a como se llame tu función real en api.js
+      // 1. Registrar el abono en la base de datos de la venta
       await api.addPaymentToSale({
         saleId: selectedTicket.id,
         amount: payAmount,
@@ -95,25 +110,26 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
         userId: currentUser?.id
       }, token);
 
-      // 2. CRÍTICO: Si es EFECTIVO, registrar en la CAJA del turno actual
-      if (paymentMethod === 'Efectivo') {
+      // 2. IMPORTANTE: Si es EFECTIVO, avisar al POS para meter dinero en Caja
+      if (paymentMethod === 'Efectivo' && onRegisterTransaction) {
         const clientName = selectedTicket.clienteNombre || selectedTicket.cliente?.nombre || 'Cliente';
-        const note = `Abono: ${clientName} - Ticket #${selectedTicket.id}`;
+        const note = `Cobro Ticket #${selectedTicket.id} - ${clientName}`;
         
-        // Llamamos a la función que nos pasó POS.jsx
+        // Esta función viene del padre (POS.jsx)
         onRegisterTransaction('entrada', payAmount, note);
       }
 
-      alert("Abono registrado correctamente");
+      alert("¡Abono registrado con éxito!");
       setSelectedTicket(null);
       setAmount('');
-      loadPendingTickets(); // Recargar lista
+      loadPendingTickets(); // Recargar lista para quitar al que ya pagó
     } catch (error) {
-      alert("Error al registrar abono: " + error.message);
+      console.error(error);
+      alert("Error al registrar abono: " + (error.message || "Error desconocido"));
     }
   };
 
-  // Filtrado de búsqueda
+  // Filtrado en tiempo real
   const filteredTickets = tickets.filter(t => 
     (t.clienteNombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     String(t.id).includes(searchTerm)
@@ -123,92 +139,112 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser }) =>
     <Overlay>
       <ModalContainer>
         <Header>
-          <Title>Cuentas por Cobrar</Title>
+          <Title><FaMoneyBillWave /> Cobrar Cuentas Pendientes</Title>
           <CloseButton onClick={onClose}><FaTimes /></CloseButton>
         </Header>
 
-        {/* Barra de búsqueda */}
+        {/* Buscador */}
         <div style={{display: 'flex', gap: 10}}>
-            <Input 
-                placeholder="Buscar por cliente o # ticket..." 
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                autoFocus
-            />
-            <Button onClick={loadPendingTickets}><FaSearch /></Button>
+            <div style={{position: 'relative', flex: 1}}>
+                <FaSearch style={{position: 'absolute', top: 12, left: 10, color: '#9ca3af'}}/>
+                <Input 
+                    style={{paddingLeft: 35}}
+                    placeholder="Buscar por nombre de cliente o número de ticket..." 
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    autoFocus
+                />
+            </div>
+            <Button onClick={loadPendingTickets} color="#6b7280">Refrescar</Button>
         </div>
 
-        {/* Lista de Tickets */}
-        <div style={{flex: 1, overflowY: 'auto'}}>
+        {/* Tabla de Deudores */}
+        <TableContainer>
             <Table>
                 <thead>
                     <tr>
-                        <th>Ticket #</th>
+                        <th>ID</th>
                         <th>Fecha</th>
                         <th>Cliente</th>
-                        <th>Total Original</th>
-                        <th>Saldo Pendiente</th>
+                        <th>Estado</th>
+                        <th>Total</th>
+                        <th>Abonado</th>
+                        <th>Deuda</th>
                         <th>Acción</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {loading ? <tr><td colSpan="6">Cargando...</td></tr> : 
-                     filteredTickets.length === 0 ? <tr><td colSpan="6">No hay cuentas pendientes.</td></tr> :
-                     filteredTickets.map(ticket => (
+                    {loading ? <tr><td colSpan="8" style={{textAlign: 'center'}}>Cargando cuentas...</td></tr> : 
+                     filteredTickets.length === 0 ? <tr><td colSpan="8" style={{textAlign: 'center', padding: 20}}>No hay cuentas por cobrar.</td></tr> :
+                     filteredTickets.map(ticket => {
+                        const total = parseFloat(ticket.total || 0);
+                        const abonado = parseFloat(ticket.abonado || 0);
+                        const deuda = total - abonado;
+                        return (
                         <tr key={ticket.id}>
-                            <td>{ticket.id}</td>
+                            <td>#{ticket.id}</td>
                             <td>{new Date(ticket.created_at || ticket.fecha).toLocaleDateString()}</td>
-                            <td>{ticket.clienteNombre || ticket.cliente?.nombre || 'N/A'}</td>
-                            <td>C$ {Number(ticket.total_venta).toFixed(2)}</td>
-                            <td style={{color: 'red', fontWeight: 'bold'}}>C$ {Number(ticket.saldo_pendiente).toFixed(2)}</td>
+                            <td><strong>{ticket.clienteNombre || 'Cliente Casual'}</strong></td>
+                            <td><span style={{padding: '2px 8px', borderRadius: 10, background: '#dbeafe', color: '#1e40af', fontSize: '0.8rem'}}>{ticket.estado}</span></td>
+                            <td>C$ {total.toFixed(2)}</td>
+                            <td>C$ {abonado.toFixed(2)}</td>
+                            <td style={{color: '#dc2626', fontWeight: 'bold'}}>C$ {deuda.toFixed(2)}</td>
                             <td>
                                 <Button 
-                                    color="#28a745"
-                                    onClick={() => { setSelectedTicket(ticket); setAmount(''); }}
+                                    color="#10b981"
+                                    onClick={() => { setSelectedTicket({...ticket, deudaCalculada: deuda}); setAmount(''); }}
                                 >
-                                    Abonar
+                                    Cobrar
                                 </Button>
                             </td>
                         </tr>
-                    ))}
+                     )})}
                 </tbody>
             </Table>
-        </div>
+        </TableContainer>
 
-        {/* Sección de Pago (Solo aparece si seleccionas un ticket) */}
+        {/* Panel de Pago (Abajo) */}
         {selectedTicket && (
             <PaySection>
-                <h3>Abonando al Ticket #{selectedTicket.id} - {selectedTicket.clienteNombre}</h3>
-                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10}}>
+                <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                    <h3 style={{margin: 0}}>Cobrando Ticket #{selectedTicket.id}</h3>
+                    <button onClick={() => setSelectedTicket(null)} style={{border: 'none', background: 'transparent', cursor: 'pointer', color: '#666'}}><FaTimes/></button>
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20}}>
                     <div>
-                        <label>Monto a Abonar (Max: {selectedTicket.saldo_pendiente})</label>
+                        <label style={{display: 'block', marginBottom: 5, fontWeight: 600}}>Monto a Pagar (Máx: {selectedTicket.deudaCalculada.toFixed(2)})</label>
                         <Input 
                             type="number" 
                             value={amount} 
                             onChange={e => setAmount(e.target.value)}
-                            max={selectedTicket.saldo_pendiente}
+                            placeholder="0.00"
                         />
                     </div>
                     <div>
-                        <label>Método de Pago</label>
+                        <label style={{display: 'block', marginBottom: 5, fontWeight: 600}}>Método</label>
                         <select 
-                            style={{width: '100%', padding: 9, borderRadius: 4, border: '1px solid #ddd'}}
+                            style={{width: '100%', padding: 10, borderRadius: 6, border: '1px solid #d1d5db'}}
                             value={paymentMethod}
                             onChange={e => setPaymentMethod(e.target.value)}
                         >
                             <option value="Efectivo">Efectivo (Entra a Caja)</option>
-                            <option value="Tarjeta">Tarjeta / Transferencia (No afecta Caja)</option>
+                            <option value="Tarjeta">Tarjeta (Banco)</option>
+                            <option value="Transferencia">Transferencia (Banco)</option>
                         </select>
                     </div>
                 </div>
-                <div style={{display: 'flex', gap: 10, marginTop: 10}}>
-                    <Button color="#007bff" onClick={handleProcessPayment} style={{flex: 1}}>
-                        <FaMoneyBillWave /> Confirmar Abono
+                
+                <div style={{display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 10}}>
+                    <Button color="#ef4444" onClick={() => setSelectedTicket(null)}>Cancelar</Button>
+                    <Button color="#3b82f6" onClick={handleProcessPayment}>
+                        <FaMoneyBillWave /> Confirmar Pago
                     </Button>
-                    <Button color="#dc3545" onClick={() => setSelectedTicket(null)}>Cancelar</Button>
                 </div>
                 {paymentMethod === 'Efectivo' && (
-                    <small style={{color: '#28a745'}}>* Este monto se registrará automáticamente como "Entrada" en tu turno de caja actual.</small>
+                    <div style={{display: 'flex', alignItems: 'center', gap: 5, color: '#059669', fontSize: '0.9rem'}}>
+                        <FaExclamationCircle /> 
+                        <span>Este dinero se sumará automáticamente a tu turno de caja actual.</span>
+                    </div>
                 )}
             </PaySection>
         )}
