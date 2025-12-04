@@ -220,28 +220,59 @@ const POS = () => {
    * 3.5.5 LÓGICA DE CARGA DE PEDIDOS/APARTADOS PENDIENTES
    * ----------------------------------------------------------------- */
   
-  // 1. Carga los pedidos desde el servidor
+// Reemplaza tu función actual con esta:
   const loadPendingOrdersFromServer = async () => {
     if (!token) return;
-    showAlert({ title: "Cargando", message: "Buscando pedidos pendientes...", type: "loading" });
+    
+    // Mostramos cargando
+    showAlert({ title: "Cargando", message: "Analizando pedidos...", type: "loading" });
+
     try {
-        const allSales = await api.fetchSales(token); 
-        // Filtramos solo pendientes o apartados con saldo
-        const pendientes = Array.isArray(allSales) 
-            ? allSales.filter(s => s.estado === 'pendiente' || (s.saldo_pendiente > 0 && s.estado !== 'cancelado'))
-            : [];
+        const rawResponse = await api.fetchSales(token); 
+        console.log("📦 Respuesta Cruda del Servidor:", rawResponse); // MIRA LA CONSOLA (F12)
+
+        // 1. Aseguramos que sea un Array, a veces viene en response.data
+        const allSales = Array.isArray(rawResponse) 
+            ? rawResponse 
+            : (rawResponse.data || rawResponse.orders || []);
+
+        // 2. Filtro FLEXIBLE (Convierte todo a mayúsculas para comparar)
+        const pendientes = allSales.filter(s => {
+            // Obtenemos el estado y lo forzamos a mayúsculas
+            const estado = (s.estado || s.status || '').toString().toUpperCase();
+            
+            // Obtenemos el saldo si existe
+            const saldo = Number(s.saldo_pendiente || s.saldo || s.total_pendiente || 0);
+
+            // CONDICIONES PARA QUE APAREZCA:
+            // A. Que diga explícitamente PENDIENTE o APARTADO
+            const esEstadoPendiente = estado.includes('PENDIENTE') || estado.includes('APARTADO');
+            
+            // B. O que tenga saldo positivo (deuda) y no esté cancelado
+            const tieneDeuda = saldo > 0.5; // Margen de 0.50 centavos por redondeo
+            
+            // C. Que NO esté cancelado ni anulado
+            const noEstaCancelado = !estado.includes('CANCELADO') && !estado.includes('ANULADO');
+
+            return (esEstadoPendiente || tieneDeuda) && noEstaCancelado;
+        });
         
+        console.log("✅ Pedidos Filtrados:", pendientes); // MIRA LA CONSOLA SI SALE VACÍO
+
         setPendingOrdersList(pendientes);
-        closeModal(); // Cerrar loading modal
+        closeModal(); // Cerrar el loading
         
         if (pendientes.length === 0) {
-            showAlert({ title: "Aviso", message: "No hay pedidos pendientes." });
+            // Si sigue saliendo esto, es que la API no está mandando lo que creemos
+            showAlert({ title: "Sin Resultados", message: "La API respondió, pero ningún pedido cumple los requisitos." });
         } else {
-            openModal('pendingOrders'); // Abrimos el modal de selección
+            openModal('pendingOrders'); // Abrimos el modal
         }
+
     } catch (e) {
+        console.error("Error al cargar pedidos:", e);
         closeModal();
-        showAlert({ title: "Error", message: "No se pudieron cargar los pedidos." });
+        showAlert({ title: "Error", message: "No se pudieron cargar los pedidos. Revisa la consola." });
     }
   };
 
