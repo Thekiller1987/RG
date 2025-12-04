@@ -220,91 +220,219 @@ const POS = () => {
    * 3.5.5 LÓGICA DE CARGA DE PEDIDOS/APARTADOS PENDIENTES
    * ----------------------------------------------------------------- */
   
-// Reemplaza tu función actual con esta:
+  // Reemplaza tu función actual con esta:
   const loadPendingOrdersFromServer = async () => {
-    if (!token) return;
+    if (!token) {
+        showAlert({ title: "Error", message: "No hay token de autenticación." });
+        return;
+    }
     
-    // Mostramos cargando
-    showAlert({ title: "Cargando", message: "Analizando pedidos...", type: "loading" });
+    // Mostrar estado de carga
+    openModal('alert', { 
+        title: "Cargando", 
+        message: "Buscando pedidos pendientes...", 
+        type: "loading" 
+    });
 
     try {
-        const rawResponse = await api.fetchSales(token); 
-        console.log("📦 Respuesta Cruda del Servidor:", rawResponse); // MIRA LA CONSOLA (F12)
+        // 1. Cargar PEDIDOS (orders) - Esto es lo más importante
+        const pedidosResponse = await api.fetchOrders(token);
+        console.log("📦 Respuesta de Pedidos (API fetchOrders):", pedidosResponse);
+        
+        // Extraer array de pedidos correctamente
+        let allPedidos = [];
+        if (Array.isArray(pedidosResponse)) {
+            allPedidos = pedidosResponse;
+        } else if (pedidosResponse && Array.isArray(pedidosResponse.data)) {
+            allPedidos = pedidosResponse.data;
+        } else if (pedidosResponse && pedidosResponse.orders) {
+            allPedidos = Array.isArray(pedidosResponse.orders) ? pedidosResponse.orders : [];
+        }
+        
+        console.log(`📊 Total pedidos obtenidos: ${allPedidos.length}`);
 
-        // 1. Aseguramos que sea un Array, a veces viene en response.data
-        const allSales = Array.isArray(rawResponse) 
-            ? rawResponse 
-            : (rawResponse.data || rawResponse.orders || []);
-
-        // 2. Filtro FLEXIBLE (Convierte todo a mayúsculas para comparar)
-        const pendientes = allSales.filter(s => {
-            // Obtenemos el estado y lo forzamos a mayúsculas
-            const estado = (s.estado || s.status || '').toString().toUpperCase();
+        // 2. Filtrar pedidos pendientes
+        const pendientes = allPedidos.filter(p => {
+            // Asegurar que sea un objeto válido
+            if (!p || typeof p !== 'object') return false;
             
-            // Obtenemos el saldo si existe
-            const saldo = Number(s.saldo_pendiente || s.saldo || s.total_pendiente || 0);
-
-            // CONDICIONES PARA QUE APAREZCA:
-            // A. Que diga explícitamente PENDIENTE o APARTADO
-            const esEstadoPendiente = estado.includes('PENDIENTE') || estado.includes('APARTADO');
+            // Obtener estado (convertir a string y mayúsculas)
+            const estado = String(p.estado || p.status || '').toUpperCase().trim();
             
-            // B. O que tenga saldo positivo (deuda) y no esté cancelado
-            const tieneDeuda = saldo > 0.5; // Margen de 0.50 centavos por redondeo
+            // Obtener saldo pendiente
+            const total = Number(p.total || p.monto_total || p.precio_total || 0);
+            const abonado = Number(p.abonado || p.pagado || 0);
+            const saldo = total - abonado;
             
-            // C. Que NO esté cancelado ni anulado
-            const noEstaCancelado = !estado.includes('CANCELADO') && !estado.includes('ANULADO');
+            console.log(`🔍 Analizando pedido #${p.id}:`, {
+                estado,
+                total,
+                abonado,
+                saldo,
+                cumple: (estado.includes('PENDIENTE') || estado.includes('APARTADO') || saldo > 0.5) && 
+                       !estado.includes('CANCELADO') && 
+                       !estado.includes('ANULADO') &&
+                       !estado.includes('COMPLETADO')
+            });
 
-            return (esEstadoPendiente || tieneDeuda) && noEstaCancelado;
+            // CONDICIONES PARA SER PENDIENTE:
+            // 1. Estado sea PENDIENTE o APARTADO
+            // 2. O tenga saldo positivo
+            // 3. Y NO esté cancelado/anulado/completado
+            return (
+                (estado.includes('PENDIENTE') || 
+                 estado.includes('APARTADO') || 
+                 estado.includes('CREDITO') ||
+                 saldo > 0.5) && 
+                !estado.includes('CANCELADO') && 
+                !estado.includes('ANULADO') &&
+                !estado.includes('COMPLETADO')
+            );
         });
         
-        console.log("✅ Pedidos Filtrados:", pendientes); // MIRA LA CONSOLA SI SALE VACÍO
+        console.log(`✅ Pedidos pendientes encontrados: ${pendientes.length}`);
+        console.log("📋 Lista de pendientes:", pendientes);
 
+        // 3. Si no hay pendientes, cargar también de ventas
+        if (pendientes.length === 0) {
+            console.log("⚠️ No hay pedidos pendientes, revisando ventas...");
+            try {
+                const ventasResponse = await api.fetchSales(token);
+                let allVentas = [];
+                
+                if (Array.isArray(ventasResponse)) {
+                    allVentas = ventasResponse;
+                } else if (ventasResponse && Array.isArray(ventasResponse.data)) {
+                    allVentas = ventasResponse.data;
+                }
+                
+                // Filtrar ventas pendientes
+                const ventasPendientes = allVentas.filter(v => {
+                    const estado = String(v.estado || v.status || '').toUpperCase().trim();
+                    return estado.includes('PENDIENTE') || estado.includes('APARTADO');
+                });
+                
+                if (ventasPendientes.length > 0) {
+                    pendientes.push(...ventasPendientes);
+                    console.log(`💰 Ventas pendientes añadidas: ${ventasPendientes.length}`);
+                }
+            } catch (ventasError) {
+                console.error("Error cargando ventas:", ventasError);
+            }
+        }
+
+        // 4. Actualizar estado y mostrar resultados
         setPendingOrdersList(pendientes);
         closeModal(); // Cerrar el loading
         
         if (pendientes.length === 0) {
-            // Si sigue saliendo esto, es que la API no está mandando lo que creemos
-            showAlert({ title: "Sin Resultados", message: "La API respondió, pero ningún pedido cumple los requisitos." });
+            showAlert({ 
+                title: "Sin Pendientes", 
+                message: "No se encontraron pedidos o ventas pendientes.\n\nPosibles causas:\n1. Todos los pedidos están pagados\n2. La API no está devolviendo datos\n3. Los estados no coinciden (revisa 'PENDIENTE', 'APARTADO')" 
+            });
         } else {
-            openModal('pendingOrders'); // Abrimos el modal
+            // Abrir modal con lista de pendientes
+            openModal('pendingOrders');
+            
+            // Debug adicional
+            setTimeout(() => {
+                console.log("🔍 DEBUG FINAL - Primer pendiente:", pendientes[0]);
+                console.log("🔍 DEBUG FINAL - Campos:", Object.keys(pendientes[0]));
+            }, 100);
         }
 
     } catch (e) {
-        console.error("Error al cargar pedidos:", e);
+        console.error("❌ Error al cargar pedidos:", e);
         closeModal();
-        showAlert({ title: "Error", message: "No se pudieron cargar los pedidos. Revisa la consola." });
+        showAlert({ 
+            title: "Error de Conexión", 
+            message: `No se pudieron cargar los pedidos:\n${e.message}\n\nRevisa:\n1. Conexión a internet\n2. Token de autenticación\n3. Consola para más detalles (F12)` 
+        });
     }
   };
 
-  // 2. Vuelca el pedido seleccionado al POS para cobrarlo
+  // 2. Vuelca el pedido seleccionado al POS para cobrarlo - FUNCIÓN FALTANTE
   const handleLoadPendingToPOS = (pendingSale) => {
+      console.log("🚀 Cargando pedido al POS:", pendingSale);
+      
+      // Verificar si el pedido ya está pagado
+      const totalPedido = Number(pendingSale.total || pendingSale.total_venta || pendingSale.monto_total || 0);
+      const pagado = Number(pendingSale.abonado || pendingSale.pagado || 0);
+      const saldo = totalPedido - pagado;
+      
+      if (saldo <= 0.5 && !pendingSale.estado?.includes('PENDIENTE')) { // Margen para decimales pequeños
+          showAlert({ 
+              title: "Pedido ya Pagado", 
+              message: `El pedido #${pendingSale.id} ya está pagado (Saldo: C$${fmt(saldo)}).` 
+          });
+          return;
+      }
+      
       // Convertir items del pedido a items del carrito
       const cartItems = (pendingSale.items || []).map(i => {
-          // Buscamos el producto en el catálogo actual para tener existencia actualizada
-          const catProd = products.find(p => p.id === (i.id_producto || i.id));
+          // Buscar producto en catálogo para datos actualizados
+          const catProd = products.find(p => 
+              p.id === (i.id_producto || i.id) ||
+              p.codigo === (i.codigo || i.codigo_producto)
+          );
+          
           return {
-              ...i,
-              id: i.id_producto || i.id, 
-              nombre: i.nombre || i.producto || catProd?.nombre,
-              quantity: Number(i.cantidad || i.quantity),
-              precio_venta: Number(i.precio || i.precio_venta),
-              existencia: catProd?.existencia || 9999, 
-              ...catProd 
+              id: i.id_producto || i.id || catProd?.id,
+              nombre: i.nombre || i.producto || catProd?.nombre || 'Producto sin nombre',
+              codigo: i.codigo || i.codigo_producto || catProd?.codigo,
+              quantity: Number(i.cantidad || i.quantity || 1),
+              precio_venta: Number(i.precio || i.precio_unitario || i.precio_venta || catProd?.precio || 0),
+              existencia: catProd?.existencia || 9999,
+              costo: catProd?.costo || i.costo || 0,
+              raw: catProd?.raw || i,
+              // Guardar información original del pedido
+              originalOrderItem: i
           };
       });
-
-      // Actualizar el ticket activo con los datos del pedido
-      setOrders(prev => prev.map(o => o.id === activeOrderId ? {
-          ...o,
+      
+      // Si no hay items, mostrar advertencia
+      if (cartItems.length === 0) {
+          showAlert({ 
+              title: "Pedido Vacío", 
+              message: "Este pedido no tiene productos. Agrega productos antes de continuar." 
+          });
+          return;
+      }
+      
+      // Crear un nuevo ticket específico para este pedido
+      const newTicketId = Date.now();
+      const newTicket = {
+          id: newTicketId,
+          name: `Pedido #${pendingSale.id}`,
           items: cartItems,
-          clientId: pendingSale.cliente?.id_cliente || pendingSale.clienteId || 0,
-          name: `Cobro Pedido #${pendingSale.id}`,
-          serverSaleId: pendingSale.id, // <--- GUARDAMOS EL ID ORIGINAL
-          discount: { type: 'none', value: 0 } 
-      } : o));
-
+          clientId: pendingSale.cliente?.id_cliente || pendingSale.clienteId || pendingSale.id_cliente || 0,
+          serverSaleId: pendingSale.id, // ID original para referencia
+          originalOrderData: pendingSale, // Guardar todos los datos originales
+          discount: { type: 'none', value: 0 },
+          createdAt: new Date().toISOString(),
+          isPendingOrder: true // Flag para identificar que es un pedido pendiente
+      };
+      
+      // Agregar el nuevo ticket y hacerlo activo
+      setOrders(prev => [...prev, newTicket]);
+      setActiveOrderId(newTicketId);
+      
       closeModal();
-      showAlert({ title: "Cargado", message: `Pedido #${pendingSale.id} cargado. Presiona F2 para cobrar.` });
+      
+      showAlert({ 
+          title: "✅ Pedido Cargado", 
+          message: `Pedido #${pendingSale.id} cargado exitosamente.\n\nTotal productos: ${cartItems.length}\nSaldo pendiente: C$${fmt(saldo)}\n\nPresiona F2 para proceder al pago.`,
+          type: "success"
+      });
+      
+      // Opcional: Mostrar resumen en consola
+      console.log("📝 Resumen del pedido cargado:", {
+          ticketId: newTicketId,
+          orderId: pendingSale.id,
+          itemsCount: cartItems.length,
+          cliente: pendingSale.cliente?.nombre || pendingSale.clienteNombre,
+          saldoPendiente: saldo
+      });
   };
 
   /* -----------------------------------------------------------------
@@ -1145,42 +1273,110 @@ const POS = () => {
       {/* MODAL NUEVO: LISTA DE PEDIDOS PENDIENTES */}
       {modal.name === 'pendingOrders' && (
          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-             <div style={{ background: 'white', padding: '20px', borderRadius: '8px', maxWidth: '600px', width: '90%', maxHeight: '80vh', overflowY: 'auto' }}>
-                 <h3>Seleccionar Pedido Pendiente</h3>
-                 <p style={{fontSize: '0.9rem', color: '#666'}}>Seleccione un pedido para cargarlo al POS y cobrarlo.</p>
+             <div style={{ background: 'white', padding: '20px', borderRadius: '8px', maxWidth: '900px', width: '95%', maxHeight: '80vh', overflowY: 'auto' }}>
+                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                     <h3 style={{ margin: 0 }}>📋 Pedidos Pendientes de Pago</h3>
+                     <button onClick={closeModal} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer' }}>
+                         ✕ Cerrar
+                     </button>
+                 </div>
+                 
+                 <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '20px' }}>
+                     Seleccione un pedido para cargarlo al POS y completar el pago.
+                     <br/>
+                     <small>Total encontrados: {pendingOrdersList.length}</small>
+                 </p>
                  
                  {pendingOrdersList.length === 0 ? (
-                     <p>No hay pedidos pendientes.</p>
+                     <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                         <div style={{ fontSize: '48px', marginBottom: '10px' }}>📭</div>
+                         <p>No hay pedidos pendientes</p>
+                     </div>
                  ) : (
-                     <table style={{width: '100%', borderCollapse: 'collapse', marginTop: '10px'}}>
-                         <thead>
-                             <tr style={{background: '#f8f9fa', textAlign: 'left'}}>
-                                 <th style={{padding: '8px'}}>ID</th>
-                                 <th style={{padding: '8px'}}>Cliente</th>
-                                 <th style={{padding: '8px'}}>Fecha</th>
-                                 <th style={{padding: '8px'}}>Total</th>
-                                 <th style={{padding: '8px'}}>Acción</th>
-                             </tr>
-                         </thead>
-                         <tbody>
-                             {pendingOrdersList.map(order => (
-                                 <tr key={order.id} style={{borderBottom: '1px solid #eee'}}>
-                                     <td style={{padding: '8px'}}>#{order.id}</td>
-                                     <td style={{padding: '8px'}}>{order.cliente?.nombre || order.clienteNombre || 'Consumidor Final'}</td>
-                                     <td style={{padding: '8px'}}>{new Date(order.fecha_creacion || order.fecha).toLocaleDateString()}</td>
-                                     <td style={{padding: '8px'}}>C${fmt(order.total_venta || order.total)}</td>
-                                     <td style={{padding: '8px'}}>
-                                         <S.Button primary style={{padding: '5px 10px', fontSize: '0.8rem'}} onClick={() => handleLoadPendingToPOS(order)}>
-                                             Cargar
-                                         </S.Button>
-                                     </td>
+                     <div style={{ overflowX: 'auto' }}>
+                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                             <thead>
+                                 <tr style={{ background: '#f8f9fa', textAlign: 'left' }}>
+                                     <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>ID</th>
+                                     <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Cliente</th>
+                                     <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Fecha</th>
+                                     <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Total</th>
+                                     <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Pagado</th>
+                                     <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Saldo</th>
+                                     <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Estado</th>
+                                     <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Acción</th>
                                  </tr>
-                             ))}
-                         </tbody>
-                     </table>
+                             </thead>
+                             <tbody>
+                                 {pendingOrdersList.map(order => {
+                                     const totalPedido = Number(order.total || order.total_venta || order.monto_total || 0);
+                                     const pagado = Number(order.abonado || order.pagado || order.monto_pagado || 0);
+                                     const saldo = totalPedido - pagado;
+                                     const estado = (order.estado || order.status || '').toUpperCase();
+                                     
+                                     return (
+                                         <tr key={order.id} style={{ borderBottom: '1px solid #eee', cursor: 'pointer' }} onClick={() => handleLoadPendingToPOS(order)}>
+                                             <td style={{ padding: '12px', fontWeight: 'bold' }}>#{order.id}</td>
+                                             <td style={{ padding: '12px' }}>
+                                                 {order.cliente?.nombre || order.clienteNombre || order.nombre_cliente || 'Consumidor Final'}
+                                             </td>
+                                             <td style={{ padding: '12px' }}>
+                                                 {new Date(order.fecha_creacion || order.fecha || order.created_at).toLocaleDateString()}
+                                             </td>
+                                             <td style={{ padding: '12px', fontWeight: 'bold' }}>
+                                                 C${fmt(totalPedido)}
+                                             </td>
+                                             <td style={{ padding: '12px', color: '#059669' }}>
+                                                 C${fmt(pagado)}
+                                             </td>
+                                             <td style={{ padding: '12px', color: saldo > 0 ? '#dc2626' : '#059669', fontWeight: 'bold' }}>
+                                                 C${fmt(saldo)}
+                                             </td>
+                                             <td style={{ padding: '12px' }}>
+                                                 <span style={{
+                                                     color: estado.includes('PENDIENTE') ? '#d97706' : 
+                                                            estado.includes('APARTADO') ? '#7c3aed' : 
+                                                            estado.includes('CREDITO') ? '#059669' : '#6b7280',
+                                                     fontWeight: 'bold'
+                                                 }}>
+                                                     {estado}
+                                                 </span>
+                                             </td>
+                                             <td style={{ padding: '12px' }}>
+                                                 <button 
+                                                     style={{
+                                                         background: '#3b82f6',
+                                                         color: 'white',
+                                                         border: 'none',
+                                                         padding: '8px 16px',
+                                                         borderRadius: '6px',
+                                                         cursor: 'pointer',
+                                                         fontWeight: 'bold'
+                                                     }}
+                                                     onClick={(e) => {
+                                                         e.stopPropagation();
+                                                         handleLoadPendingToPOS(order);
+                                                     }}
+                                                 >
+                                                     Cargar al POS
+                                                 </button>
+                                             </td>
+                                         </tr>
+                                     );
+                                 })}
+                             </tbody>
+                         </table>
+                     </div>
                  )}
-                 <div style={{marginTop: '20px', textAlign: 'right'}}>
-                     <S.Button $cancel onClick={closeModal}>Cerrar</S.Button>
+                 
+                 <div style={{ marginTop: '20px', padding: '15px', background: '#f8fafc', borderRadius: '6px' }}>
+                     <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem' }}>💡 Notas:</h4>
+                     <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.85rem', color: '#64748b' }}>
+                         <li>Los pedidos se crean en "Pedidos y Consultas" sin pago</li>
+                         <li>Aquí aparecen como pendientes para completar el cobro</li>
+                         <li>Al cargar un pedido, se transfiere al POS para finalizar la venta</li>
+                         <li>El sistema actualiza automáticamente el estado del pedido original</li>
+                     </ul>
                  </div>
              </div>
          </div>

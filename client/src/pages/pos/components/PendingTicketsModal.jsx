@@ -60,89 +60,176 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser, onPr
     const [processing, setProcessing] = useState(false);
 
     // --- CARGA DE DATOS ---
-    const loadData = async () => {
-        setLoading(true);
-        console.log("🔄 Iniciando carga...");
+  // Reemplaza la función loadData completa con esta versión mejorada
+const loadData = async () => {
+    setLoading(true);
+    console.log("🔄 Iniciando carga de pendientes...");
+
+    try {
+        // IMPORTANTE: Cambiar la API que usas para pedidos pendientes
+        let orders = [];
+        let sales = [];
 
         try {
-            // Cargar Pedidos y Ventas por separado para no fallar si uno da error
-            let orders = [];
-            let sales = [];
-
-            try {
-                const resOrders = await api.fetchOrders(token);
-                orders = Array.isArray(resOrders) ? resOrders : (resOrders.data || []);
-            } catch (e) { console.error("Error Pedidos:", e); }
-
-            try {
-                const resSales = await api.fetchSales(token);
-                sales = Array.isArray(resSales) ? resSales : (resSales.data || []);
-            } catch (e) { console.error("Error Ventas:", e); }
-
-            // DEBUG: Guardamos un ejemplo para ver qué llega
-            if (orders.length > 0) setRawDataDebug(orders[0]);
-            else if (sales.length > 0) setRawDataDebug(sales[0]);
-            else setRawDataDebug({ mensaje: "API devolvió listas vacías", ordenes: orders, ventas: sales });
-
-            // Helper seguro para números
-            const getNum = (val) => {
-                if (!val) return 0;
-                const num = parseFloat(val);
-                return isNaN(num) ? 0 : num;
-            };
-
-            // Procesar TODO (Sin filtrar estricto al inicio)
-            const allItems = [
-                ...orders.map(o => ({
-                    id: o.id,
-                    type: 'PEDIDO',
-                    raw: o, // Guardamos original
-                    client: o.clienteNombre || o.cliente?.nombre || 'Sin Nombre',
-                    date: o.created_at || o.fecha || new Date().toISOString(),
-                    total: getNum(o.total || o.monto_total || o.precio_total),
-                    paid: getNum(o.abonado || o.pagado || 0),
-                    status: (o.estado || 'PENDIENTE').toUpperCase()
-                })),
-                ...sales.map(s => ({
-                    id: s.id,
-                    type: 'VENTA',
-                    raw: s,
-                    client: s.clienteNombre || s.cliente?.nombre || 'Sin Nombre',
-                    date: s.fecha || s.created_at || new Date().toISOString(),
-                    total: getNum(s.total_venta || s.total || s.monto_final),
-                    paid: getNum(s.monto_pagado || s.abonado || 0),
-                    status: (s.estado || 'COMPLETADO').toUpperCase()
-                }))
-            ];
-
-            // AHORA FILTRAMOS (Lógica más suave)
-            const filteredList = allItems.map(t => ({
-                ...t,
-                saldo: t.total - t.paid
-            })).filter(t => {
-                // 1. Descartar anulados siempre
-                if (t.status.includes('ANULADO') || t.status.includes('CANCELADO')) return false;
-                
-                // 2. Si tiene deuda positiva, MOSTRAR
-                if (t.saldo > 0.5) return true;
-
-                // 3. Si dice PENDIENTE o APARTADO, MOSTRAR (aunque saldo parezca 0)
-                if (t.status.includes('PENDIENTE') || t.status.includes('APARTADO') || t.status.includes('CREDITO')) return true;
-
-                return false; 
-            });
-
-            // Ordenar
-            filteredList.sort((a, b) => new Date(b.date) - new Date(a.date));
-            setTickets(filteredList);
-
-        } catch (error) {
-            console.error("Error fatal:", error);
-            setRawDataDebug({ error: error.message });
-        } finally {
-            setLoading(false);
+            // USAR LA MISMA API QUE PEDIDOSYAPARTADOS
+            const resOrders = await api.fetchOrders(token);
+            console.log("📦 Respuesta de Pedidos:", resOrders);
+            
+            // Asegurarnos de obtener el array correctamente
+            if (Array.isArray(resOrders)) {
+                orders = resOrders;
+            } else if (resOrders && Array.isArray(resOrders.data)) {
+                orders = resOrders.data;
+            } else if (resOrders && resOrders.orders) {
+                orders = Array.isArray(resOrders.orders) ? resOrders.orders : [];
+            }
+            
+            // DEBUG: Guardar el primer pedido para inspeccionar
+            if (orders.length > 0) {
+                console.log("📋 Primer pedido:", orders[0]);
+                console.log("📋 Campos disponibles:", Object.keys(orders[0]));
+            }
+        } catch (e) { 
+            console.error("❌ Error Pedidos:", e); 
         }
-    };
+
+        try {
+            // También cargar ventas para completar
+            const resSales = await api.fetchSales(token);
+            console.log("💰 Respuesta de Ventas:", resSales);
+            
+            if (Array.isArray(resSales)) {
+                sales = resSales;
+            } else if (resSales && Array.isArray(resSales.data)) {
+                sales = resSales.data;
+            }
+        } catch (e) { 
+            console.error("❌ Error Ventas:", e); 
+        }
+
+        // Helper mejorado para números
+        const getNum = (val) => {
+            if (val === null || val === undefined) return 0;
+            const num = parseFloat(val);
+            return isNaN(num) ? 0 : num;
+        };
+
+        // Helper para obtener cliente
+        const getCliente = (obj) => {
+            return obj.clienteNombre || 
+                   obj.cliente?.nombre || 
+                   obj.nombre_cliente || 
+                   'Consumidor Final';
+        };
+
+        // Helper para obtener estado
+        const getEstado = (obj) => {
+            return (obj.estado || obj.status || 'PENDIENTE').toUpperCase();
+        };
+
+        // Procesar pedidos (orders)
+        const processedOrders = orders.map(o => {
+            const totalPedido = getNum(o.total || o.monto_total || o.precio_total || 0);
+            const abonadoPedido = getNum(o.abonado || o.pagado || 0);
+            
+            return {
+                id: o.id || o.id_pedido,
+                type: 'PEDIDO',
+                raw: o,
+                client: getCliente(o),
+                date: o.created_at || o.fecha || o.fecha_creacion || new Date().toISOString(),
+                total: totalPedido,
+                paid: abonadoPedido,
+                status: getEstado(o),
+                saldo: totalPedido - abonadoPedido,
+                // Campos adicionales para debug
+                debug: {
+                    total_raw: o.total,
+                    abonado_raw: o.abonado,
+                    estado_raw: o.estado
+                }
+            };
+        });
+
+        // Procesar ventas (sales) que puedan estar pendientes
+        const processedSales = sales.map(s => {
+            const totalVenta = getNum(s.total_venta || s.total || s.monto_final || 0);
+            const pagadoVenta = getNum(s.monto_pagado || s.abonado || 0);
+            const estadoVenta = getEstado(s);
+            
+            // Solo incluir ventas que estén pendientes
+            if (estadoVenta.includes('COMPLETADO') || estadoVenta.includes('CANCELADO')) {
+                return null;
+            }
+            
+            return {
+                id: s.id || s.id_venta,
+                type: 'VENTA',
+                raw: s,
+                client: getCliente(s),
+                date: s.fecha || s.created_at || s.fecha_creacion || new Date().toISOString(),
+                total: totalVenta,
+                paid: pagadoVenta,
+                status: estadoVenta,
+                saldo: totalVenta - pagadoVenta
+            };
+        }).filter(Boolean); // Eliminar nulls
+
+        // Combinar todo
+        const allItems = [...processedOrders, ...processedSales];
+        console.log("📊 Total items procesados:", allItems.length);
+        console.log("📊 Ejemplo item:", allItems[0]);
+
+        // Filtrar solo los pendientes (lógica más flexible)
+        const filteredList = allItems.filter(t => {
+            // 1. Descartar explícitamente cancelados/anulados
+            if (t.status.includes('CANCELADO') || 
+                t.status.includes('ANULADO') || 
+                t.status.includes('COMPLETADO')) {
+                return false;
+            }
+            
+            // 2. Si tiene saldo positivo (> 0.5 para evitar decimales pequeños)
+            if (t.saldo > 0.5) return true;
+            
+            // 3. Si el estado indica pendiente/apartado/crédito
+            if (t.status.includes('PENDIENTE') || 
+                t.status.includes('APARTADO') || 
+                t.status.includes('CREDITO') ||
+                t.status.includes('POR COBRAR')) {
+                return true;
+            }
+            
+            return false;
+        });
+
+        // Ordenar por fecha más reciente
+        filteredList.sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+        console.log("✅ Pendientes finales:", filteredList.length);
+        console.log("✅ Lista:", filteredList);
+        
+        setTickets(filteredList);
+        setRawDataDebug({
+            totalProcesados: allItems.length,
+            pendientes: filteredList.length,
+            ejemplo: filteredList[0] || { mensaje: 'No hay items' },
+            rawCounts: {
+                orders: orders.length,
+                sales: sales.length
+            }
+        });
+
+    } catch (error) {
+        console.error("❌ Error fatal:", error);
+        setRawDataDebug({ 
+            error: error.message,
+            stack: error.stack 
+        });
+    } finally {
+        setLoading(false);
+    }
+};
 
     useEffect(() => { loadData(); }, []);
 
