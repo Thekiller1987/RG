@@ -2,23 +2,24 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import styled, { keyframes } from 'styled-components'; 
+// Importamos FaArrowLeft para el botón de regresar
 import { 
     FaSearch, FaFilePdf, FaPlus, FaTrash, 
-    FaSync, FaBarcode, FaFont, FaMinus, FaFileAlt 
+    FaSync, FaBarcode, FaFont, FaMinus, FaFileAlt, 
+    FaArrowLeft // ICONO DE REGRESO AÑADIDO
 } from 'react-icons/fa'; 
+
+// NOTA: Si usas react-router-dom, DEBES descomentar y usar:
+// import { useNavigate } from 'react-router-dom'; 
 
 import { useAuth } from '../context/AuthContext'; 
 import * as api from '../service/api'; 
 
-// 1. IMPORTAMOS EL MODAL DE PROFORMA - RUTA CORREGIDA
-// Desde: src/pages/     Necesita ir a: src/pages/POS/components/
-// RUTA ANTERIOR: './POS/components/ProformaModal.jsx'; (Ruta relativa incorrecta desde 'pages')
-// RUTA CORREGIDA: './pos/components/ProformaModal.jsx'; 
 import ProformaModal from './pos/components/ProformaModal.jsx'; 
 
 
 // =================================================================
-// ESTILOS RESPONSIVE (STYLED COMPONENTS) - (Se mantiene igual)
+// ESTILOS RESPONSIVE (STYLED COMPONENTS) - ACTUALIZADO
 // =================================================================
 const spin = keyframes`
     0% { transform: rotate(0deg); }
@@ -30,13 +31,53 @@ const Container = styled.div`
 `;
 const LeftPanel = styled.div`
     flex: 2; padding: 20px; display: flex; flex-direction: column; gap: 15px; overflow-y: hidden;
-    @media (max-width: 768px) { flex: none; height: auto; overflow-y: visible; }
+    @media (max-width: 768px) { flex: none; height: auto; overflow-y: visible; padding: 15px; } /* Ajuste padding en móvil */
 `;
 const RightPanel = styled.div`
     flex: 1; background: white; padding: 20px; display: flex; flex-direction: column; box-shadow: -4px 0 15px rgba(0,0,0,0.05); border-left: 1px solid #e2e8f0; min-width: 350px;
-    @media (max-width: 768px) { flex: none; width: 100%; border-left: none; border-top: 1px solid #e2e8f0; min-width: 0; }
+    @media (max-width: 768px) { flex: none; width: 100%; border-left: none; border-top: 1px solid #e2e8f0; min-width: 0; padding: 15px; } /* Ajuste padding en móvil */
 `;
-const Header = styled.div` display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; `;
+const Header = styled.div` 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 10px; 
+    gap: 10px;
+`;
+
+const HeaderActions = styled.div`
+    display: flex;
+    gap: 10px;
+    
+    button {
+        padding: 8px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: background 0.2s;
+        white-space: nowrap; /* Evita que el texto se rompa */
+    }
+
+    @media (max-width: 768px) {
+        flex-direction: column;
+        
+        button {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+`;
+
+// Nuevo estilo para el botón de regreso
+const BackButton = styled.button`
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    color: #475569;
+    &:hover { background: #e2e8f0; }
+`;
+
 const SearchContainer = styled.div`
     background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px;
 `;
@@ -52,8 +93,18 @@ const SearchInputWrapper = styled.div`
 `;
 const Input = styled.input` flex: 1; padding: 12px; border: none; background: transparent; outline: none; font-size: 1rem; `;
 const ProductGrid = styled.div`
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; overflow-y: auto; padding-bottom: 20px; flex: 1;
-    @media (max-width: 768px) { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height: 50vh; }
+    display: grid; 
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
+    gap: 15px; 
+    overflow-y: auto; 
+    padding-bottom: 20px; 
+    flex: 1;
+    
+    /* Mejorar la visualización en móviles */
+    @media (max-width: 768px) { 
+        grid-template-columns: repeat(2, 1fr); /* Dos columnas más manejables en móvil */
+        max-height: 60vh; /* Altura máxima para que el usuario pueda ver el carrito */
+    }
 `;
 const ProductCard = styled.div`
     background: white; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; transition: transform 0.2s; cursor: pointer; 
@@ -87,6 +138,9 @@ const sanitizeText = (text) => String(text || '').toLowerCase().normalize("NFD")
 // =================================================================
 
 const ProformaGenerator = () => {
+    // Si usas react-router-dom, descomenta la siguiente línea:
+    // const navigate = useNavigate(); 
+    
     const { user, products: authProducts } = useAuth(); 
     const token = localStorage.getItem('token');
     
@@ -97,7 +151,6 @@ const ProformaGenerator = () => {
     const [loading, setLoading] = useState(false);
     const [clientName, setClientName] = useState('');
     
-    // 2. NUEVOS ESTADOS PARA MANEJAR EL MODAL
     const [isProformaModalOpen, setIsProformaModalOpen] = useState(false);
     const [proformaDetails, setProformaDetails] = useState(null);
 
@@ -110,7 +163,6 @@ const ProformaGenerator = () => {
     }, [authProducts]);
 
     const fetchProducts = useCallback(async () => {
-        // ... (función fetchProducts se mantiene igual)
         setLoading(true);
         try {
             const data = await api.fetchProducts(token); 
@@ -125,10 +177,19 @@ const ProformaGenerator = () => {
         }
     }, [token]);
 
+    const goToDashboard = () => {
+        // Lógica de navegación.
+        // Si usas React Router: navigate('/dashboard');
+        // Si no tienes enrutamiento aquí:
+        alert("Navegando al Dashboard. (Reemplaza esta función con tu lógica de enrutamiento, ej: useNavigate)");
+        window.location.href = '/dashboard'; // Navegación de respaldo
+    };
+
+
     const addToCart = (product) => {
-        // ... (función addToCart se mantiene igual)
         setCart(prev => {
             const existing = prev.find(p => p.id === product.id);
+            // Aseguramos que el precio sea un número flotante
             const finalPrice = parseFloat(product.precio_venta || product.precio || 0); 
             
             if (existing) {
@@ -144,7 +205,6 @@ const ProformaGenerator = () => {
     };
 
     const updateQuantity = (id, delta) => {
-        // ... (función updateQuantity se mantiene igual)
         setCart(prev => {
             const newCart = prev.map(p => {
                 if (p.id === id) {
@@ -161,7 +221,6 @@ const ProformaGenerator = () => {
     };
     
     const filteredProducts = useMemo(() => {
-        // ... (filteredProducts se mantiene igual)
         const term = sanitizeText(searchTerm);
         if (term.length < 3 && searchType === 'nombre') {
             return products.slice(0, 100); 
@@ -182,7 +241,6 @@ const ProformaGenerator = () => {
 
 
     const handleSearchSubmit = (e) => {
-        // ... (handleSearchSubmit se mantiene igual)
         if (e.key === 'Enter') {
             e.preventDefault(); 
             if (searchType === 'codigo' && searchTerm) {
@@ -210,7 +268,6 @@ const ProformaGenerator = () => {
         }, 0);
     }, [cart]);
 
-    // Calcular Subtotal y Descuento (Asumiendo que no hay impuestos ni descuentos fijos aquí)
     const subtotal = total;
     const discount = 0;
 
@@ -222,7 +279,7 @@ const ProformaGenerator = () => {
         searchInputRef.current?.focus();
     }, []);
 
-    // 3. FUNCIÓN MEJORADA: PREPARA LOS DATOS Y ABRE EL MODAL
+    // FUNCIÓN: PREPARA LOS DATOS Y ABRE EL MODAL
     const handleGenerateProforma = async () => {
         if (cart.length === 0) return alert("El carrito está vacío. Agrega productos para generar la proforma.");
         
@@ -233,36 +290,24 @@ const ProformaGenerator = () => {
         
         setLoading(true);
 
-        // 1. Prepara el objeto de la Proforma con todos los datos necesarios
         const newProformaDetails = {
             cart: cart,
             total: total,
             subtotal: subtotal,
             discount: discount,
-            proformaFor: clientTrimmed, // El nombre a quien se emitirá la proforma (el campo de texto)
-            client: { nombre: clientTrimmed, telefono: 'N/D' }, // Datos simulados del cliente
-            // currentUser: user, // Ya está disponible a través de useAuth en ProformaModal si es necesario
+            proformaFor: clientTrimmed, 
+            client: { nombre: clientTrimmed, telefono: 'N/D' }, 
         };
 
-        // Simula la espera de la API si fuera necesario (la quitamos ya que el modal es inmediato)
-        // await new Promise(resolve => setTimeout(resolve, 500)); 
-
-        // 2. Guarda los detalles y abre el modal
         setProformaDetails(newProformaDetails);
         setIsProformaModalOpen(true);
         setLoading(false);
     };
 
-    // 4. FUNCIÓN DUMMY PARA setTicketData (necesaria para ProformaModal)
-    // El ProformaModal usa setTicketData para pasar la transacción al componente de impresión.
-    // Como estamos en un contexto de solo proforma, esta función solo limpia el carrito después de la impresión simulada.
-    const handleSetTicketData = useCallback((data) => {
-        console.log("Simulación de envío a impresión/PDF:", data.transaction);
-        // Aquí podrías agregar la lógica real para llamar al servicio de impresión de PDF
-        
-        // Asumiendo que la impresión/generación es exitosa, limpiamos la pantalla.
-        // En una aplicación real, esto se haría DENTRO de la función de impresión del TicketModal.
-        alert(`🎉 Proforma lista para imprimir. Limpiando carro de cotización.`);
+    // FUNCIÓN MODIFICADA: SOLO CIERRA EL MODAL Y LIMPIA EL CARRO
+    const handleSetTicketData = useCallback(() => {
+        // En una aplicación real, el modal de proforma manejaría la generación del PDF.
+        // Al cerrarse (o al generar el PDF exitosamente), llama a esta función para limpiar.
         resetCart();
     }, [resetCart]);
 
@@ -273,16 +318,25 @@ const ProformaGenerator = () => {
             <LeftPanel>
                 <Header>
                     <h2 style={{margin:0, color:'#1e293b'}}>Catálogo y Proformas</h2>
-                    <button 
-                        onClick={fetchProducts} 
-                        disabled={loading}
-                        style={{background:'white', border:'1px solid #cbd5e1', padding:'8px 12px', borderRadius:6, cursor:'pointer', display:'flex', alignItems:'center', gap:5}}
-                    >
-                        {loading ? <LoadingIcon size={14}/> : <FaSync size={14}/>}
-                        {loading ? 'Cargando...' : 'Recargar Productos'}
-                    </button>
+                    <HeaderActions>
+                        <BackButton 
+                            onClick={goToDashboard} 
+                            style={{ background: '#3b82f6', color: 'white', border: 'none' }}
+                        >
+                            <FaArrowLeft size={14}/> Regresar
+                        </BackButton>
+                        
+                        <button 
+                            onClick={fetchProducts} 
+                            disabled={loading}
+                            style={{background:'white', border:'1px solid #cbd5e1', color: '#475569'}}
+                        >
+                            {loading ? <LoadingIcon size={14}/> : <FaSync size={14}/>}
+                            {loading ? 'Cargando...' : 'Recargar'}
+                        </button>
+                    </HeaderActions>
                 </Header>
-                {/* ... (Contenedor de búsqueda y ProductGrid se mantienen iguales) ... */}
+                
                 <SearchContainer>
                     <SearchTypeToggle>
                         <ToggleButton 
@@ -416,17 +470,29 @@ const ProformaGenerator = () => {
                     >
                         {loading ? <LoadingIcon /> : <FaFilePdf />} GENERAR PROFORMA PDF
                     </ActionButton>
+                    
+                    {/* Botón para vaciar carrito */}
+                    <ActionButton 
+                        bg="#dc2626" 
+                        onClick={() => resetCart()}
+                        disabled={cart.length === 0 || loading}
+                        style={{marginTop: 5, padding: 10}}
+                    >
+                        <FaTrash /> VACIAR CARRO
+                    </ActionButton>
                 </div>
             </RightPanel>
 
             {/* 5. RENDERING CONDICIONAL DEL MODAL DE PROFORMA */}
             {isProformaModalOpen && proformaDetails && (
                 <ProformaModal 
-                    {...proformaDetails} // Pasa cart, total, subtotal, discount, proformaFor, client
-                    onClose={() => setIsProformaModalOpen(false)} // Cierra el modal
-                    // Este prop es lo que el modal usará para "confirmar" la impresión y limpiar el carrito.
+                    {...proformaDetails} 
+                    onClose={() => setIsProformaModalOpen(false)} 
+                    // Se llama para limpiar el carro después de que el PDF se genera/cierra.
                     setTicketData={handleSetTicketData} 
-                    currentUser={user} // Pasamos el usuario para que ProformaModal pueda obtener el nombre del vendedor.
+                    currentUser={user} 
+                    // Nuevo prop para asegurar que el modal sepa que NO debe imprimir.
+                    onlyPDF={true} 
                 />
             )}
         </Container>
