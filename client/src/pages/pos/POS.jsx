@@ -11,7 +11,7 @@ import {
   FaTrashAlt, FaTimes, FaPercentage, FaHistory, FaLock, FaDollarSign, FaEdit, FaRedo,
   FaSignInAlt, FaSignOutAlt, FaPrint,
   FaBarcode, FaAlignLeft,
-  FaClipboardList, FaFileInvoiceDollar // <--- ICONOS PARA GESTIÓN DE PEDIDOS
+  FaClipboardList, FaFileInvoiceDollar
 } from 'react-icons/fa';
 
 // Contextos, APIs y Utilidades
@@ -20,7 +20,7 @@ import * as api from '../../service/api.js';
 
 // Componentes Estilizados y de Modal
 import ProductPanel from './components/ProductPanel.jsx';
-import * as S from './POS.styles.jsx'; // Estilos
+import * as S from './POS.styles.jsx';
 import PaymentModal from './components/PaymentModal.jsx';
 import CajaModal from './components/CajaModal.jsx';
 import SalesHistoryModal from './components/SalesHistoryModal.jsx';
@@ -51,7 +51,6 @@ import { loadTickets, saveTickets, subscribeTicketChanges } from '../../utils/ti
  * 2. FUNCIONES HELPER FUERA DEL COMPONENTE
  * ================================================================= */
 
-// correlativo simple y persistente para proformas
 const nextProformaNumber = () => {
   const key = 'proforma_seq';
   const base = 1760000000000;
@@ -64,17 +63,13 @@ const nextProformaNumber = () => {
 const fmt = (n) =>
   new Intl.NumberFormat('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n || 0));
 
-/**
- * Crea un ticket vacío.
- * SE AGREGA: serverSaleId para saber si este ticket viene de un pedido pendiente.
- */
 const createEmptyTicket = (clientId = 0) => ({
   id: Date.now(),
   name: 'Ticket Nuevo',
   items: [],
   clientId,
   discount: { type: 'none', value: 0 },
-  serverSaleId: null // <--- IMPORTANTE: ID del pedido original si existe
+  serverSaleId: null
 });
 
 const toUserRef = (u, fallbackId = null) => ({
@@ -135,7 +130,7 @@ const POS = () => {
   const [modal, setModal] = useState({ name: null, props: {} });
   const [ticketData, setTicketData] = useState({ transaction: null, creditStatus: null, shouldOpen: false });
 
-  // ESTADO NUEVO: Lista de Pedidos Pendientes para cargar
+  // Lista de Pedidos Pendientes para cargar
   const [pendingOrdersList, setPendingOrdersList] = useState([]);
 
   /* -----------------------------------------------------------------
@@ -212,7 +207,6 @@ const POS = () => {
         saveCajaSession(userId, serverSession);
       }
     } catch (error) {
-      console.error("Error recargando caja:", error);
     }
   }, [userId, token, setCajaSession]);
 
@@ -220,14 +214,12 @@ const POS = () => {
    * 3.5.5 LÓGICA DE CARGA DE PEDIDOS/APARTADOS PENDIENTES
    * ----------------------------------------------------------------- */
 
-  // ** FUNCIÓN CORREGIDA: Trae pedidos de la API y filtra estados **
   const loadPendingOrdersFromServer = async () => {
     if (!token) {
         showAlert({ title: "Error", message: "No hay token de autenticación." });
         return;
     }
-
-    // Mostrar estado de carga
+    
     openModal('alert', {
         title: "Cargando",
         message: "Buscando pedidos pendientes...",
@@ -235,205 +227,202 @@ const POS = () => {
     });
 
     try {
-        // 1. Cargar PEDIDOS (orders)
-        const pedidosResponse = await api.fetchOrders(token);
-        console.log("📦 Respuesta de Pedidos (API fetchOrders):", pedidosResponse);
-
-        // Extraer array de pedidos correctamente
         let allPedidos = [];
-        if (Array.isArray(pedidosResponse)) {
-            allPedidos = pedidosResponse;
-        } else if (pedidosResponse && Array.isArray(pedidosResponse.data)) {
-            allPedidos = pedidosResponse.data;
-        } else if (pedidosResponse && pedidosResponse.orders) {
-            allPedidos = Array.isArray(pedidosResponse.orders) ? pedidosResponse.orders : [];
-        }
+        try {
+            const pedidosResponse = await api.fetchOrders(token);
+            if (Array.isArray(pedidosResponse)) {
+                allPedidos = pedidosResponse;
+            } else if (pedidosResponse && Array.isArray(pedidosResponse.data)) {
+                allPedidos = pedidosResponse.data;
+            } else if (pedidosResponse && pedidosResponse.orders) {
+                allPedidos = Array.isArray(pedidosResponse.orders) ? pedidosResponse.orders : [];
+            }
+        } catch (e) { }
 
-        console.log(`📊 Total pedidos obtenidos: ${allPedidos.length}`);
-
-        // 2. Filtrar pedidos pendientes
         const pendientes = allPedidos.filter(p => {
             if (!p || typeof p !== 'object') return false;
 
             const estado = String(p.estado || p.status || '').toUpperCase().trim();
-
-            // Asegurar que las propiedades existan antes de convertir a número
             const total = Number(p.total || p.monto_total || p.precio_total || 0);
             const abonado = Number(p.abonado || p.pagado || p.monto_pagado || 0);
             const saldo = total - abonado;
 
-            // CONDICIONES PARA SER PENDIENTE:
-            // 1. Estado incluye PENDIENTE, APARTADO, o CREDITO (puede tener abonos)
-            // 2. O tiene saldo positivo mayor a una pequeña tolerancia (0.01)
-            // 3. Y NO esté Cancelado/Anulado/Completado
             return (
                 (estado.includes('PENDIENTE') ||
                  estado.includes('APARTADO') ||
                  estado.includes('CREDITO') ||
-                 saldo > 0.01) &&
+                 saldo > 0.5) &&
                 !estado.includes('CANCELADO') &&
                 !estado.includes('ANULADO') &&
                 !estado.includes('COMPLETADO')
             );
         });
+        
+        if (pendientes.length === 0) {
+             try {
+                const ventasResponse = await api.fetchSales(token);
+                let allVentas = [];
+                if (Array.isArray(ventasResponse)) {
+                    allVentas = ventasResponse;
+                } else if (ventasResponse && Array.isArray(ventasResponse.data)) {
+                    allVentas = ventasResponse.data;
+                }
+                
+                const ventasPendientes = allVentas.filter(v => {
+                    const estado = String(v.estado || v.status || '').toUpperCase().trim();
+                    const total = Number(v.total || v.total_venta || 0);
+                    const pagado = Number(v.monto_pagado || v.abonado || 0);
+                    const saldo = total - pagado;
+                    
+                    return (estado.includes('PENDIENTE') || estado.includes('APARTADO') || saldo > 0.5) &&
+                           !estado.includes('CANCELADO') && !estado.includes('COMPLETADO');
+                });
+                
+                if (ventasPendientes.length > 0) {
+                    pendientes.push(...ventasPendientes);
+                }
+             } catch (ventasError) { }
+        }
 
-        console.log(`✅ Pedidos pendientes encontrados: ${pendientes.length}`);
-
-        // 3. Actualizar estado y mostrar resultados
         setPendingOrdersList(pendientes);
-        closeModal(); // Cerrar el loading
+        closeModal();
 
         if (pendientes.length === 0) {
             showAlert({
                 title: "Sin Pendientes",
-                message: "No se encontraron pedidos o ventas pendientes."
+                message: "No se encontraron pedidos o ventas pendientes.",
+                type: "info"
             });
         } else {
-            // Abrir modal con lista de pendientes
             openModal('pendingOrders');
         }
 
     } catch (e) {
-        console.error("❌ Error al cargar pedidos:", e);
         closeModal();
         showAlert({
             title: "Error de Conexión",
-            message: `No se pudieron cargar los pedidos:\n${e.message}\n\nRevisa:\n1. Conexión a internet\n2. Token de autenticación\n3. Consola para más detalles (F12)`
+            message: `No se pudieron cargar los pedidos: ${e.message}`
         });
     }
   };
 
-  // ** FUNCIÓN CORREGIDA: Carga el pedido al POS **
-  const handleLoadPendingToPOS = (pendingSale) => {
-    console.log("🚀 Cargando pedido al POS:", pendingSale);
-
+const handleLoadPendingToPOS = (pendingSale) => {
+    
     const totalPedido = Number(pendingSale.total || pendingSale.total_venta || pendingSale.monto_total || 0);
-    const pagado = Number(pendingSale.abonado || pendingSale.pagado || pendingSale.monto_pagado || 0);
+    const pagado = Number(pendingSale.abonado || pendingSale.pagado || 0);
     const saldo = totalPedido - pagado;
+    
+    const clienteNombre = pendingSale.cliente?.nombre || pendingSale.clienteNombre || pendingSale.nombre_cliente || `Pedido #${pendingSale.id}`;
+    const clienteId = pendingSale.cliente?.id_cliente || pendingSale.clienteId || pendingSale.id_cliente || 0;
 
-    // 🚩 CORRECCIÓN CRÍTICA: Verificar saldo y estado antes de cargar.
-    if (saldo <= 0.01 && !(String(pendingSale.estado).toUpperCase().includes('PENDIENTE') || String(pendingSale.estado).toUpperCase().includes('APARTADO'))) {
+    if (saldo <= 0.5 && !(String(pendingSale.estado).toUpperCase().includes('PENDIENTE') || String(pendingSale.estado).toUpperCase().includes('APARTADO'))) {
         showAlert({
             title: "Pedido ya Pagado/Cerrado",
             message: `El pedido #${pendingSale.id} ya está pagado (Saldo: C$${fmt(saldo)}).`,
             type: "warning"
         });
-        closeModal();
+        if (typeof closeModal === 'function') closeModal();
         return;
     }
-
-    // Buscar items en todas las ubicaciones posibles
-    const itemsFromPedido =
+    
+    const itemsFromPedido = 
         pendingSale.items ||
         pendingSale.detalles ||
         pendingSale.productos ||
         pendingSale.lineas ||
         [];
-
-    // Convertir items del pedido a items del carrito (Estructura del POS)
+    
     const cartItems = itemsFromPedido
         .map(i => {
             const productId = String(i.id_producto || i.producto_id || i.id);
 
-            // Buscar producto en catálogo (state `products`) para datos actualizados
-            const catProd = products.find(p =>
-                String(p.id) === productId ||
+            const catProd = products.find(p => 
+                String(p.id) === productId || 
                 String(p.codigo) === String(i.codigo || i.codigo_producto)
             );
-
-            // Usar precio del pedido, si no existe, usar el del catálogo (fallback)
+            
             const itemPrice = Number(i.precio || i.precio_unitario || i.precio_venta || i.precio_final || catProd?.precio_venta || catProd?.precio || 0);
 
-            // Evitar agregar ítems si no tienen precio o cantidad, o si no se pudo identificar
-            if (Number(i.cantidad || 0) <= 0) {
-                 console.warn("Ítem de pedido con cantidad cero/inválido/ignorado:", i);
-                 return null;
+            if (itemPrice === 0 || Number(i.cantidad || 0) === 0) {
+                return null;
             }
 
+            const finalId = catProd?.id || productId;
+
             return {
-                // ID que el POS usará para referencia (idealmente el ID del catálogo)
-                id: catProd?.id || productId, // Usar ID del catálogo si existe, si no, el ID de detalle
-                id_producto: catProd?.id || productId, // ✅ ID de producto mejorado (Punto 2)
+                id: finalId,
+                id_producto: finalId, 
                 nombre: i.nombre || i.producto || i.descripcion || catProd?.nombre || 'Producto Desconocido',
                 codigo: i.codigo || i.codigo_producto || catProd?.codigo,
                 quantity: Number(i.cantidad || i.quantity || 1),
-                precio_venta: itemPrice, // Precio unitario final
-                // Stock actual del catálogo para validación al vender
+                precio_venta: itemPrice, 
                 existencia: catProd?.existencia || 9999,
                 costo: catProd?.costo || i.costo || 0,
-                // Guardar la data original del ítem por si se necesita
                 originalOrderItem: i
             };
         })
-        .filter(Boolean); // Filtra cualquier ítem que sea `null` (como los inválidos)
+        .filter(Boolean);
 
-    // Si no hay items, pero hay total, dar opción de ticket manual.
-    if (cartItems.length === 0) {
-        if (totalPedido > 0) {
-            showAlert({
-                title: "Pedido sin productos detallados",
-                message: `El pedido #${pendingSale.id} tiene un total de C$${fmt(totalPedido)} pero no se encontraron productos específicos. Se creará un ticket vacío, el total deberá ajustarse manualmente.`,
-                type: "warning",
-                buttons: [
-                    {
-                        label: "Crear Ticket Manual",
-                        action: () => {
-                            const newTicketId = Date.now();
-                            const newTicket = {
-                                ...createEmptyTicket(pendingSale.cliente?.id_cliente || pendingSale.clienteId || pendingSale.id_cliente || 0),
-                                id: newTicketId,
-                                name: `Pedido Manual #${pendingSale.id}`,
-                                serverSaleId: pendingSale.id,
-                                originalOrderData: pendingSale,
-                                isPendingOrder: true,
-                            };
-
-                            setOrders(prev => [...prev, newTicket]);
-                            setActiveOrderId(newTicketId);
-                            closeModal();
-                        },
-                        isPrimary: true
+    if (cartItems.length === 0 && totalPedido > 0) {
+        showAlert({ 
+            title: "Pedido sin productos detallados", 
+            message: `El pedido #${pendingSale.id} tiene un total de C$${fmt(totalPedido)} pero no se encontraron productos.`,
+            type: "custom",
+            buttons: [
+                {
+                    label: "Crear Ticket Manual",
+                    action: () => {
+                        const newTicketId = Date.now();
+                        const newTicket = {
+                            ...createEmptyTicket(clienteId),
+                            id: newTicketId,
+                            name: `Pedido Manual #${pendingSale.id}`,
+                            serverSaleId: pendingSale.id,
+                            originalOrderData: pendingSale,
+                            isPendingOrder: true,
+                            pedidoInfo: { total: totalPedido, saldo: saldo }
+                        };
+                        setOrders(prev => [...prev, newTicket]);
+                        setActiveOrderId(newTicketId);
+                        if (typeof closeModal === 'function') closeModal();
+                        showAlert({title: "Ticket creado", message: `Ticket creado para Pedido #${pendingSale.id}. Total original: C$${fmt(totalPedido)}.`, type: "info"});
                     },
-                    { label: "Cancelar", action: closeModal, isCancel: true }
-                ]
-            });
-        } else {
-            showAlert({
-                title: "Pedido Vacío",
-                message: "Este pedido no tiene productos registrados y el total es cero.",
-                type: "error"
-            });
-            closeModal();
-        }
+                    isPrimary: true
+                },
+                { label: "No, cancelar", action: () => { if (typeof closeModal === 'function') closeModal(); }, isCancel: true }
+            ]
+        });
+        return;
+    } else if (cartItems.length === 0) {
+        showAlert({ title: "Pedido Vacío", message: "Este pedido no tiene productos registrados y el total es cero.", type: "error" });
+        if (typeof closeModal === 'function') closeModal();
         return;
     }
-
-    // Crear un nuevo ticket con los ítems encontrados
+    
     const newTicketId = Date.now();
     const newTicket = {
         id: newTicketId,
-        name: `Pedido #${pendingSale.id}`,
+        name: clienteNombre,
         items: cartItems,
-        clientId: pendingSale.cliente?.id_cliente || pendingSale.clienteId || pendingSale.id_cliente || 0,
-        serverSaleId: pendingSale.id, // <-- CLAVE: ID original del pedido para la venta final
+        clientId: clienteId,
+        serverSaleId: pendingSale.id,
         originalOrderData: pendingSale,
         discount: { type: 'none', value: 0 },
         createdAt: new Date().toISOString(),
         isPendingOrder: true
     };
-
-    // Agregar el nuevo ticket y hacerlo activo
+    
     setOrders(prev => [...prev, newTicket]);
     setActiveOrderId(newTicketId);
-
-    closeModal();
-
-    showAlert({
-        title: "✅ Pedido Cargado",
-        message: `Pedido #${pendingSale.id} cargado exitosamente.\n\nProductos: ${cartItems.length}\nSaldo pendiente: C$${fmt(saldo)}`,
+    
+    if (typeof closeModal === 'function') closeModal();
+    
+    showAlert({ 
+        title: "✅ Pedido Cargado", 
+        message: `Pedido #${pendingSale.id} de ${clienteNombre} cargado exitosamente. Saldo pendiente: C$${fmt(saldo)}`,
         type: "success"
     });
-  };
+};
 
   /* -----------------------------------------------------------------
    * 3.6. EFECTOS
@@ -533,11 +522,10 @@ const POS = () => {
     if (!current || !userId) return;
     const movimientoNetoEfectivo = (current.transactions || []).reduce((total, tx) => {
       if (tx.type === 'venta_credito') return total;
-      // Usar el campo de detalle 'ingresoCaja' si existe, sino 'amount'
-      const ingreso = Number(tx.pagoDetalles?.ingresoCaja || tx.amount || 0); 
+      const ingreso = Number(tx.pagoDetalles?.ingresoCaja || tx.amount || 0);
       if (tx.type === 'entrada') return total + Math.abs(ingreso);
       if (tx.type === 'salida') return total - Math.abs(ingreso);
-      return total + ingreso; // 'venta_contado'
+      return total + ingreso;
     }, 0);
     const efectivoEsperado = Number(current.initialAmount) + movimientoNetoEfectivo;
     const finalSession = {
@@ -575,7 +563,7 @@ const POS = () => {
       amount: amountVal,
       note: note || (type === 'entrada' ? 'Entrada de Dinero' : 'Salida de Dinero'),
       at: new Date().toISOString(),
-      pagoDetalles: { ingresoCaja } // Guardar el ingreso/egreso real a caja
+      pagoDetalles: { ingresoCaja }
     };
     addCajaTransaction(tx);
     try { await api.addCajaTx({ userId, tx }, token); } catch (e) {}
@@ -666,7 +654,7 @@ const POS = () => {
 
   const handleNewOrder = () => {
     setOrders(prev => {
-      const newTicket = createEmptyTicket(initialClientId);
+      const newTicket = createEmptyTicket(activeOrder.clientId || initialClientId);
       setActiveOrderId(newTicket.id);
       return [...prev, newTicket];
     });
@@ -742,7 +730,7 @@ const POS = () => {
     const productData = products.find(p => p.id === id);
     const refProd = productData || cart.find(c => c.id === id);
     if (!refProd) return;
-
+    
     const numQuantity = parseInt(newQuantity, 10) || 0;
 
     if (numQuantity <= 0) {
@@ -875,15 +863,12 @@ const POS = () => {
       return false;
     }
 
-    // 🟢 CORRECCIÓN DE TRAZABILIDAD (Punto 2)
     const itemsForSale = snapshotCart.map(item => ({
-      // Mantenemos campos esenciales (id y quantity)
       id: item.id || item.id_producto,
-      id_producto: item.id || item.id_producto, // Asegurar un campo coherente
+      id_producto: item.id || item.id_producto,
       quantity: Number(item.quantity || 0),
       precio: Number(item.precio_venta ?? item.precio ?? 0),
-
-      // ✅ Añadimos trazabilidad para el backend (reportes, devoluciones, re-impresión)
+      
       nombre: item.nombre || item.producto || 'Producto sin nombre',
       codigo: item.codigo || item.codigo_barras || '',
       costo: Number(item.costo || 0),
@@ -898,20 +883,15 @@ const POS = () => {
           : 0;
     const totalCalc = subtotalCalc - discountAmountCalc;
 
-    // 🟢 CORRECCIÓN CRÍTICA DE CAJA (Punto 1)
     const efectivoRecibido = Number(pagoDetalles.efectivo || 0);
     const cambioDevuelto = Number(pagoDetalles.cambio || 0);
     const pagoTarjeta = Number(pagoDetalles.tarjeta || 0);
     const pagoTransferencia = Number(pagoDetalles.transferencia || 0);
     const pagoOtros = Number(pagoDetalles.otros || 0);
-
-    // Calcular el efectivo neto (Efectivo - Cambio) - Esto es lo que entra físicamente a caja
+    
     const efectivoNeto = Math.max(0, efectivoRecibido - cambioDevuelto);
 
-    // Ingreso real a caja = Efectivo Neto + Pagos Electrónicos (Tarj, Transf, Otros)
     const ingresoCajaCalculado = efectivoNeto + pagoTarjeta + pagoTransferencia + pagoOtros;
-
-    // Usamos el valor CORRECTO para la venta
     const ingresoCaja = ingresoCajaCalculado;
 
     const saleToCreate = {
@@ -923,35 +903,32 @@ const POS = () => {
       userId,
       clientId: finalClientId,
       tasaDolarAlMomento: tasaDolar,
-      // IMPORTANTE: Enviamos el ID del pedido original para que el backend lo cierre
       originalOrderId: currentActiveOrder?.serverSaleId || null
     };
 
     try {
       const response = await api.createSale(saleToCreate, token);
 
-      // REGISTRO DE CAJA (ENTRADA DE DINERO EN TURNO ACTUAL)
+      // REGISTRO DE CAJA
       const esCredito = (pagoDetalles.credito || 0) > 0;
       const cajaTx = {
         id: `venta-${response?.saleId || Date.now()}`,
         type: esCredito ? 'venta_credito' : 'venta_contado',
-        // ✅ CORREGIDO: Usamos el ingreso real a caja, no el total de la venta
         amount: ingresoCaja,
         note: `Venta #${response?.saleId || ''} ${esCredito ? '(CRÉDITO)' : ''} ${saleToCreate.originalOrderId ? `(Pago Pedido #${saleToCreate.originalOrderId})` : ''}`,
         at: new Date().toISOString(),
-        // Enviamos el ingresoCaja calculado en los detalles para el cierre
         pagoDetalles: { ...pagoDetalles, clienteId: finalClientId, ingresoCaja }
       };
-
+      
       addCajaTransaction(cajaTx);
-
+      
       try {
-          await api.addCajaTx({ userId, tx: cajaTx }, token);
+        await api.addCajaTx({ userId, tx: cajaTx }, token);
       } catch (cajaError) {
-          console.error("Error sincronizando caja:", cajaError);
+        console.error("Error sincronizando caja:", cajaError);
       }
 
-      // Limpieza del ticket activo (Tu lógica original)
+      // Limpieza del ticket activo
       const filtered = orders.filter(o => String(o.id) !== String(orderIdToClose));
       let newOrders = filtered;
       let nextActiveId = null;
@@ -999,8 +976,7 @@ const POS = () => {
       await api.cancelSale(saleId, token);
 
       if (saleToReverse?.pagoDetalles) {
-        // Usar el ingresoCaja almacenado al momento de la venta para reversar
-        const montoARestar = Number(saleToReverse.pagoDetalles.ingresoCaja || 0); 
+        const montoARestar = Number(saleToReverse.pagoDetalles.ingresoCaja || 0);
         if (montoARestar !== 0) {
           const tx = {
             id: `cancelacion-${saleId}`,
@@ -1140,7 +1116,6 @@ const POS = () => {
         <div style={{ fontSize: '0.8rem', color: '#555' }}><FaKeyboard /> Atajos: <strong>F1</strong> Buscar, <strong>F2</strong> Pagar, <strong>F9</strong> Caja</div>
 
         <div className="right-actions">
-            {/* BOTÓN NUEVO: CARGAR PEDIDOS PENDIENTES */}
           <S.Button info onClick={loadPendingOrdersFromServer}>
              <FaClipboardList /> Cargar Pedido
           </S.Button>
@@ -1295,7 +1270,7 @@ const POS = () => {
         </S.CartPanel>
       </S.PageContentWrapper>
 
-      {/* MODAL NUEVO: LISTA DE PEDIDOS PENDIENTES */}
+      {/* MODAL LISTA DE PEDIDOS PENDIENTES */}
       {modal.name === 'pendingOrders' && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
               <div style={{ background: 'white', padding: '20px', borderRadius: '8px', maxWidth: '900px', width: '95%', maxHeight: '80vh', overflowY: 'auto' }}>
@@ -1305,13 +1280,13 @@ const POS = () => {
                           ✕ Cerrar
                       </button>
                   </div>
-
+                  
                   <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '20px' }}>
                       Seleccione un pedido para cargarlo al POS y completar el pago.
                       <br/>
                       <small>Total encontrados: {pendingOrdersList.length}</small>
                   </p>
-
+                  
                   {pendingOrdersList.length === 0 ? (
                       <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                           <div style={{ fontSize: '48px', marginBottom: '10px' }}>📭</div>
@@ -1338,7 +1313,7 @@ const POS = () => {
                                       const pagado = Number(order.abonado || order.pagado || order.monto_pagado || 0);
                                       const saldo = totalPedido - pagado;
                                       const estado = (order.estado || order.status || '').toUpperCase();
-
+                                      
                                       return (
                                           <tr key={order.id} style={{ borderBottom: '1px solid #eee', cursor: 'pointer' }} onClick={() => handleLoadPendingToPOS(order)}>
                                               <td style={{ padding: '12px', fontWeight: 'bold' }}>#{order.id}</td>
@@ -1360,8 +1335,8 @@ const POS = () => {
                                               <td style={{ padding: '12px' }}>
                                                   <span style={{
                                                       color: estado.includes('PENDIENTE') ? '#d97706' :
-                                                             estado.includes('APARTADO') ? '#7c3aed' :
-                                                             estado.includes('CREDITO') ? '#059669' : '#6b7280',
+                                                              estado.includes('APARTADO') ? '#7c3aed' :
+                                                              estado.includes('CREDITO') ? '#059669' : '#6b7280',
                                                       fontWeight: 'bold'
                                                   }}>
                                                       {estado}
@@ -1393,7 +1368,7 @@ const POS = () => {
                           </table>
                       </div>
                   )}
-
+                  
                   <div style={{ marginTop: '20px', padding: '15px', background: '#f8fafc', borderRadius: '6px' }}>
                       <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem' }}>💡 Notas:</h4>
                       <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.85rem', color: '#64748b' }}>

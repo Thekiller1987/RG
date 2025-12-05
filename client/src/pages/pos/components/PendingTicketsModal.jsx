@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { 
-  FaTimes, 
-  FaMoneyBillWave, 
-  FaSync, // <-- AQUÍ ESTÁ EL ICONO FALTANTE
-  FaFileInvoiceDollar, 
-  FaUserClock, 
-  FaBug 
+    FaTimes, 
+    FaSync, 
+    FaFileInvoiceDollar, 
+    FaBug, 
+    FaClipboardList 
 } from 'react-icons/fa';
 import * as api from '../../service/api'; 
+
+// Función de formato de moneda local (solo para este componente)
+const fmt = (n) =>
+  new Intl.NumberFormat('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n || 0));
 
 // --- ESTILOS DEL MODAL ---
 const Overlay = styled.div`
@@ -26,7 +29,7 @@ const Header = styled.div`
 `;
 const Body = styled.div`flex: 1; padding: 20px; overflow-y: auto; display: flex; gap: 20px;`;
 const ListSection = styled.div`flex: 2; display: flex; flex-direction: column; gap: 15px;`;
-const PaySection = styled.div`
+const DetailSection = styled.div`
   flex: 1; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 20px;
   display: flex; flex-direction: column; gap: 15px; height: fit-content;
 `;
@@ -53,220 +56,127 @@ const Badge = styled.span`
   background: ${p => p.bg}; color: ${p => p.txt};
 `;
 
-const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser, onPrintTicket }) => {
-    const token = localStorage.getItem('token');
+const PendingTicketsModal = ({ onClose, onLoadToPOS, token, showAlert }) => {
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [rawDataDebug, setRawDataDebug] = useState(null);
-    
-    // Estado del cobro
     const [selectedTicket, setSelectedTicket] = useState(null);
-    const [amount, setAmount] = useState('');
-    const [paymentMethod, setPaymentMethod] = useState('Efectivo');
-    const [processing, setProcessing] = useState(false);
+
+    // --- FUNCIONES HELPER LOCALES ---
+    const getNum = (val) => {
+         if (val === null || val === undefined) return 0;
+         const num = parseFloat(val);
+         return isNaN(num) ? 0 : num;
+    };
+
+    const getCliente = (obj) => {
+         return obj.clienteNombre || 
+                obj.cliente?.nombre || 
+                obj.nombre_cliente || 
+                'Consumidor Final';
+    };
+
+    const getEstado = (obj) => {
+         return (obj.estado || obj.status || 'PENDIENTE').toUpperCase();
+    };
 
     // --- CARGA DE DATOS ---
     const loadData = async () => {
         setLoading(true);
-        console.log("🔄 Iniciando carga de pendientes...");
+        setSelectedTicket(null); // Deseleccionar al recargar
+        showAlert({ title: "Cargando", message: "Buscando pedidos pendientes...", type: "loading" });
 
         try {
             let orders = [];
             let sales = [];
 
             try {
-                const resOrders = await api.fetchOrders(token);
-                console.log("📦 Respuesta de Pedidos:", resOrders);
-                
-                if (Array.isArray(resOrders)) {
-                    orders = resOrders;
-                } else if (resOrders && Array.isArray(resOrders.data)) {
-                    orders = resOrders.data;
-                } else if (resOrders && resOrders.orders) {
-                    orders = Array.isArray(resOrders.orders) ? resOrders.orders : [];
-                }
-                
-                if (orders.length > 0) {
-                    console.log("📋 Primer pedido:", orders[0]);
-                }
-            } catch (e) { 
-                console.error("❌ Error Pedidos:", e); 
-            }
+                 const resOrders = await api.fetchOrders(token);
+                 if (Array.isArray(resOrders)) { orders = resOrders; } 
+                 else if (resOrders && Array.isArray(resOrders.data)) { orders = resOrders.data; } 
+                 else if (resOrders && resOrders.orders) { orders = Array.isArray(resOrders.orders) ? resOrders.orders : []; }
+            } catch (e) { console.error("❌ Error Pedidos:", e); }
 
             try {
-                const resSales = await api.fetchSales(token);
-                console.log("💰 Respuesta de Ventas:", resSales);
-                
-                if (Array.isArray(resSales)) {
-                    sales = resSales;
-                } else if (resSales && Array.isArray(resSales.data)) {
-                    sales = resSales.data;
-                }
-            } catch (e) { 
-                console.error("❌ Error Ventas:", e); 
-            }
-
-            const getNum = (val) => {
-                if (val === null || val === undefined) return 0;
-                const num = parseFloat(val);
-                return isNaN(num) ? 0 : num;
-            };
-
-            const getCliente = (obj) => {
-                return obj.clienteNombre || 
-                       obj.cliente?.nombre || 
-                       obj.nombre_cliente || 
-                       'Consumidor Final';
-            };
-
-            const getEstado = (obj) => {
-                return (obj.estado || obj.status || 'PENDIENTE').toUpperCase();
-            };
+                 const resSales = await api.fetchSales(token);
+                 if (Array.isArray(resSales)) { sales = resSales; } 
+                 else if (resSales && Array.isArray(resSales.data)) { sales = resSales.data; }
+            } catch (e) { console.error("❌ Error Ventas:", e); }
 
             // Procesar pedidos
             const processedOrders = orders.map(o => {
-                const totalPedido = getNum(o.total || o.monto_total || o.precio_total || 0);
-                const abonadoPedido = getNum(o.abonado || o.pagado || 0);
-                
-                return {
-                    id: o.id || o.id_pedido,
-                    type: 'PEDIDO',
-                    raw: o,
-                    client: getCliente(o),
-                    date: o.created_at || o.fecha || o.fecha_creacion || new Date().toISOString(),
-                    total: totalPedido,
-                    paid: abonadoPedido,
-                    status: getEstado(o),
-                    saldo: totalPedido - abonadoPedido,
-                    debug: {
-                        total_raw: o.total,
-                        abonado_raw: o.abonado,
-                        estado_raw: o.estado
-                    }
-                };
+                 const totalPedido = getNum(o.total || o.monto_total || o.precio_total || 0);
+                 const abonadoPedido = getNum(o.abonado || o.pagado || 0);
+                 
+                 return {
+                     id: o.id || o.id_pedido,
+                     type: 'PEDIDO',
+                     raw: o,
+                     client: getCliente(o),
+                     date: o.created_at || o.fecha || o.fecha_creacion || new Date().toISOString(),
+                     total: totalPedido,
+                     paid: abonadoPedido,
+                     status: getEstado(o),
+                     saldo: totalPedido - abonadoPedido,
+                 };
             });
 
-            // Procesar ventas pendientes
+            // Procesar ventas pendientes (crédito/apartado que no estén completadas)
             const processedSales = sales.map(s => {
-                const totalVenta = getNum(s.total_venta || s.total || s.monto_final || 0);
-                const pagadoVenta = getNum(s.monto_pagado || s.abonado || 0);
-                const estadoVenta = getEstado(s);
-                
-                if (estadoVenta.includes('COMPLETADO') || estadoVenta.includes('CANCELADO')) {
-                    return null;
-                }
-                
-                return {
-                    id: s.id || s.id_venta,
-                    type: 'VENTA',
-                    raw: s,
-                    client: getCliente(s),
-                    date: s.fecha || s.created_at || s.fecha_creacion || new Date().toISOString(),
-                    total: totalVenta,
-                    paid: pagadoVenta,
-                    status: estadoVenta,
-                    saldo: totalVenta - pagadoVenta
-                };
+                 const totalVenta = getNum(s.total_venta || s.total || s.monto_final || 0);
+                 const pagadoVenta = getNum(s.monto_pagado || s.abonado || 0);
+                 const estadoVenta = getEstado(s);
+                 
+                 if (estadoVenta.includes('COMPLETADO') || estadoVenta.includes('CANCELADO')) {
+                     return null;
+                 }
+                 
+                 return {
+                     id: s.id || s.id_venta,
+                     type: 'VENTA',
+                     raw: s,
+                     client: getCliente(s),
+                     date: s.fecha || s.created_at || s.fecha_creacion || new Date().toISOString(),
+                     total: totalVenta,
+                     paid: pagadoVenta,
+                     status: estadoVenta,
+                     saldo: totalVenta - pagadoVenta
+                 };
             }).filter(Boolean);
 
-            // Combinar todo
             const allItems = [...processedOrders, ...processedSales];
-            console.log("📊 Total items procesados:", allItems.length);
-
-            // Filtrar solo los pendientes
+            
             const filteredList = allItems.filter(t => {
-                if (t.status.includes('CANCELADO') || 
-                    t.status.includes('ANULADO') || 
-                    t.status.includes('COMPLETADO')) {
-                    return false;
-                }
-                
-                if (t.saldo > 0.5) return true;
-                
-                if (t.status.includes('PENDIENTE') || 
-                    t.status.includes('APARTADO') || 
-                    t.status.includes('CREDITO') ||
-                    t.status.includes('POR COBRAR')) {
-                    return true;
-                }
-                
-                return false;
+                 if (t.status.includes('CANCELADO') || t.status.includes('ANULADO') || t.status.includes('COMPLETADO')) {
+                     return false;
+                 }
+                 if (t.saldo > 0.01) return true; // Si hay saldo pendiente
+                 if (t.status.includes('PENDIENTE') || t.status.includes('APARTADO') || t.status.includes('CREDITO') || t.status.includes('POR COBRAR')) {
+                     return true;
+                 }
+                 return false;
             });
 
-            // Ordenar por fecha más reciente
             filteredList.sort((a, b) => new Date(b.date) - new Date(a.date));
             
-            console.log("✅ Pendientes finales:", filteredList.length);
-            
             setTickets(filteredList);
-            setRawDataDebug({
-                totalProcesados: allItems.length,
-                pendientes: filteredList.length,
-                ejemplo: filteredList[0] || { mensaje: 'No hay items' },
-                rawCounts: {
-                    orders: orders.length,
-                    sales: sales.length
-                }
-            });
-
+            showAlert({ title: "Carga Completa", message: `Se encontraron ${filteredList.length} pedidos pendientes.`, type: "success" });
+            
         } catch (error) {
             console.error("❌ Error fatal:", error);
-            setRawDataDebug({ 
-                error: error.message,
-                stack: error.stack 
-            });
+            showAlert({ title: "Error de Carga", message: "No se pudieron obtener los pedidos pendientes." });
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => { loadData(); }, []);
+    useEffect(() => { loadData(); }, [token]);
 
-    // --- COBRO ---
-    const handlePay = async () => {
-        if (!selectedTicket || !amount) return;
-        const val = parseFloat(amount);
-        if (val <= 0 || val > (selectedTicket.saldo + 1)) {
-             alert("Monto inválido (no puede ser mayor a la deuda)."); return; 
-        }
-
-        setProcessing(true);
-        try {
-            const payload = {
-                saleId: selectedTicket.id,
-                amount: val,
-                method: paymentMethod,
-                userId: currentUser?.id || 1,
-                type: selectedTicket.type
-            };
-            
-            const res = await api.addPaymentToSale(payload, token);
-            
-            if (paymentMethod === 'Efectivo' && onRegisterTransaction) {
-                onRegisterTransaction('entrada', val, `Abono ${selectedTicket.type} #${selectedTicket.id}`);
-            }
-
-            if (onPrintTicket) {
-                 onPrintTicket({
-                     ...res?.data, 
-                     isAbono: true, 
-                     cliente: selectedTicket.client,
-                     montoAbonado: val,
-                     saldoRestante: selectedTicket.saldo - val
-                 });
-            }
-
-            alert("Pago registrado");
-            setSelectedTicket(null);
-            setAmount('');
-            loadData();
-        } catch (e) {
-            console.error(e);
-            alert("Error: " + (e.message || "No se pudo cobrar"));
-        } finally {
-            setProcessing(false);
-        }
+    const handleLoadTicket = (rawTicket) => {
+        if (!onLoadToPOS) return;
+        // Llama a la función del POS para cargar el ticket al carrito activo
+        onLoadToPOS(rawTicket);
     };
 
     const displayTickets = tickets.filter(t => 
@@ -278,7 +188,7 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser, onPr
             <Container>
                 <Header>
                     <h2 style={{margin:0, display:'flex', alignItems:'center', gap:10}}>
-                        <FaFileInvoiceDollar color="#2563eb"/> Cuentas por Cobrar ({tickets.length})
+                        <FaFileInvoiceDollar color="#2563eb"/> Pedidos Pendientes ({tickets.length})
                     </h2>
                     <Button onClick={onClose} color="#ef4444" style={{padding:'8px'}}><FaTimes/></Button>
                 </Header>
@@ -286,8 +196,8 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser, onPr
                 <Body>
                     <ListSection>
                         <div style={{display:'flex', gap:10}}>
-                            <Input placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} autoFocus/>
-                            <Button color="#64748b" onClick={loadData}><FaSync/></Button>
+                            <Input placeholder="Buscar por cliente o ID..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} autoFocus/>
+                            <Button color="#64748b" onClick={loadData} disabled={loading}>{loading ? 'Recargando...' : <FaSync/>}</Button>
                         </div>
                         
                         <div style={{overflow:'auto', border:'1px solid #e2e8f0', borderRadius:8, flex:1}}>
@@ -303,20 +213,23 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser, onPr
                                     ) : displayTickets.length === 0 ? (
                                         <tr><td colSpan={8} align="center" style={{padding:20}}>No hay tickets pendientes.</td></tr>
                                     ) : displayTickets.map(t => (
-                                        <tr key={`${t.type}-${t.id}`} style={{background: selectedTicket?.id === t.id ? '#eff6ff' : ''}}>
+                                        <tr key={`${t.type}-${t.id}`} 
+                                            style={{background: selectedTicket?.id === t.id ? '#eff6ff' : '', cursor: 'pointer'}} 
+                                            onClick={() => setSelectedTicket(t)}
+                                        >
                                             <td>#{t.id}</td>
                                             <td><Badge bg={t.type === 'PEDIDO'?'#fff7ed':'#f0f9ff'} txt={t.type==='PEDIDO'?'#c2410c':'#0369a1'}>{t.type}</Badge></td>
                                             <td>{new Date(t.date).toLocaleDateString()}</td>
                                             <td>{t.client}</td>
-                                            <td>{t.total.toFixed(2)}</td>
-                                            <td>{t.paid.toFixed(2)}</td>
-                                            <td style={{color:'red', fontWeight:'bold'}}>{t.saldo.toFixed(2)}</td>
+                                            <td>C$ {fmt(t.total)}</td>
+                                            <td>C$ {fmt(t.paid)}</td>
+                                            <td style={{color:t.saldo>0?'red':'green', fontWeight:'bold'}}>C$ {fmt(t.saldo)}</td>
                                             <td>
                                                 <Button 
-                                                    onClick={() => { setSelectedTicket(t); setAmount(''); }} 
-                                                    style={{padding:'5px 10px', fontSize:'0.8rem'}}
+                                                    onClick={() => handleLoadTicket(t.raw)} 
+                                                    style={{padding:'5px 10px', fontSize:'0.8rem', background: '#2563eb'}}
                                                 >
-                                                    Cobrar
+                                                    <FaClipboardList/> Cargar
                                                 </Button>
                                             </td>
                                         </tr>
@@ -324,83 +237,31 @@ const PendingTicketsModal = ({ onClose, onRegisterTransaction, currentUser, onPr
                                 </tbody>
                             </Table>
                         </div>
-
-                        {/* DEBUG BOX */}
-                        {rawDataDebug && (
-                            <div style={{marginTop: 10}}>
-                                <small style={{fontWeight:'bold', color:'#ef4444'}}> <FaBug/> Diagnóstico de Datos</small>
-                                <DebugBox>
-                                    {JSON.stringify(rawDataDebug, null, 2)}
-                                </DebugBox>
-                            </div>
-                        )}
                     </ListSection>
 
                     {selectedTicket && (
-                        <PaySection>
-                            <h3>Cobrar #{selectedTicket.id}</h3>
+                        <DetailSection>
+                            <h3>Ticket Seleccionado #{selectedTicket.id}</h3>
                             <p>Cliente: <strong>{selectedTicket.client}</strong></p>
-                            <p style={{fontSize:'1.2rem', color:'red'}}>Deuda: C$ {selectedTicket.saldo.toFixed(2)}</p>
+                            <p>Tipo: <strong>{selectedTicket.type}</strong></p>
+                            <p style={{fontSize:'1.1rem'}}>Total: C$ {fmt(selectedTicket.total)}</p>
+                            <p style={{fontSize:'1.1rem', color:'green'}}>Pagado: C$ {fmt(selectedTicket.paid)}</p>
+                            <p style={{fontSize:'1.4rem', color:'red'}}>Saldo Pendiente: C$ {fmt(selectedTicket.saldo)}</p>
                             
-                            <label>Monto a Abonar</label>
-                            <Input 
-                                type="number" 
-                                value={amount} 
-                                onChange={e => setAmount(e.target.value)} 
-                                style={{fontSize:'1.2rem'}}
-                                min="0"
-                                max={selectedTicket.saldo}
-                                step="0.01"
-                            />
-                            <div style={{display:'flex', gap:5, marginTop:5}}>
-                                <Badge 
-                                    bg="#d1fae5" 
-                                    txt="#059669" 
-                                    onClick={() => setAmount(selectedTicket.saldo.toFixed(2))} 
-                                    style={{cursor:'pointer', padding: '5px 10px'}}
-                                >
-                                    Todo
-                                </Badge>
-                                <Badge 
-                                    bg="#fef3c7" 
-                                    txt="#92400e" 
-                                    onClick={() => setAmount((selectedTicket.saldo / 2).toFixed(2))} 
-                                    style={{cursor:'pointer', padding: '5px 10px'}}
-                                >
-                                    Mitad
-                                </Badge>
-                            </div>
-
-                            <label style={{marginTop:10}}>Método de Pago</label>
-                            <select 
-                                style={{width:'100%', padding:10, borderRadius: '6px', border: '1px solid #cbd5e1'}} 
-                                value={paymentMethod} 
-                                onChange={e => setPaymentMethod(e.target.value)}
-                            >
-                                <option value="Efectivo">Efectivo</option>
-                                <option value="Tarjeta">Tarjeta</option>
-                                <option value="Transferencia">Transferencia</option>
-                                <option value="Mixto">Mixto</option>
-                            </select>
-
                             <Button 
-                                onClick={handlePay} 
-                                disabled={processing || !amount || parseFloat(amount) <= 0} 
-                                color="#10b981" 
+                                onClick={() => handleLoadTicket(selectedTicket.raw)} 
+                                color="#2563eb" 
                                 style={{width:'100%', marginTop:20, padding:15}}
                             >
-                                {processing ? 'Procesando...' : 'CONFIRMAR PAGO'}
+                                <FaClipboardList/> CARGAR AL POS
                             </Button>
                             
-                            {selectedTicket.type === 'PEDIDO' && (
-                                <div style={{marginTop: 15, padding: 10, background: '#fef3c7', borderRadius: 6}}>
-                                    <small>
-                                        <strong>Nota:</strong> Este es un pedido creado en "Pedidos y Consultas". 
-                                        Para facturarlo completamente, ve al POS y usa "Cargar Pedido".
-                                    </small>
-                                </div>
-                            )}
-                        </PaySection>
+                            <div style={{marginTop: 15, padding: 10, background: '#fef3c7', borderRadius: 6}}>
+                                <small>
+                                    <strong>Nota:</strong> Esto transfiere el detalle de los productos y el saldo pendiente al carrito del POS para que puedas proceder al pago/facturación final.
+                                </small>
+                            </div>
+                        </DetailSection>
                     )}
                 </Body>
             </Container>
