@@ -1,68 +1,73 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import styled from 'styled-components';
 import { 
-  FaSearch, FaShoppingCart, FaPlus, FaTrash, 
-  FaPaperPlane, FaSync, FaBarcode, FaFont, FaMinus 
+    FaSearch, FaShoppingCart, FaPlus, FaTrash, 
+    FaPaperPlane, FaSync, FaBarcode, FaFont, FaMinus 
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext'; 
 import * as api from '../service/api'; 
+import { toast } from 'react-toastify'; // Asumiendo que usas react-toastify para notificaciones
+import 'react-toastify/dist/ReactToastify.css';
 
 // =================================================================
 // ESTILOS RESPONSIVE (STYLED COMPONENTS) - Se asume que son correctos
 // =================================================================
 const Container = styled.div`
-  display: flex; height: 100vh; background: #f1f5f9; font-family: 'Segoe UI', sans-serif; overflow: hidden;
-  @media (max-width: 768px) { flex-direction: column; height: auto; min-height: 100vh; overflow-y: auto; }
+    display: flex; height: 100vh; background: #f1f5f9; font-family: 'Segoe UI', sans-serif; overflow: hidden;
+    @media (max-width: 768px) { flex-direction: column; height: auto; min-height: 100vh; overflow-y: auto; }
 `;
 const LeftPanel = styled.div`
-  flex: 2; padding: 20px; display: flex; flex-direction: column; gap: 15px; overflow-y: hidden;
-  @media (max-width: 768px) { flex: none; height: auto; overflow-y: visible; }
+    flex: 2; padding: 20px; display: flex; flex-direction: column; gap: 15px; overflow-y: hidden;
+    @media (max-width: 768px) { flex: none; height: auto; overflow-y: visible; }
 `;
 const RightPanel = styled.div`
-  flex: 1; background: white; padding: 20px; display: flex; flex-direction: column; box-shadow: -4px 0 15px rgba(0,0,0,0.05); border-left: 1px solid #e2e8f0; min-width: 350px;
-  @media (max-width: 768px) { flex: none; width: 100%; border-left: none; border-top: 1px solid #e2e8f0; min-width: 0; }
+    flex: 1; background: white; padding: 20px; display: flex; flex-direction: column; box-shadow: -4px 0 15px rgba(0,0,0,0.05); border-left: 1px solid #e2e8f0; min-width: 350px;
+    @media (max-width: 768px) { flex: none; width: 100%; border-left: none; border-top: 1px solid #e2e8f0; min-width: 0; }
 `;
 const Header = styled.div` display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; `;
 const SearchContainer = styled.div`
-  background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px;
+    background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px;
 `;
 const SearchTypeToggle = styled.div` display: flex; gap: 10px; `;
 const ToggleButton = styled.button`
-  flex: 1; padding: 8px; border-radius: 6px; border: 1px solid ${props => props.active ? '#3b82f6' : '#cbd5e1'};
-  background: ${props => props.active ? '#eff6ff' : 'white'}; color: ${props => props.active ? '#1d4ed8' : '#64748b'};
-  font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;
-  &:hover { background: #f1f5f9; }
+    flex: 1; padding: 8px; border-radius: 6px; border: 1px solid ${props => props.active ? '#3b82f6' : '#cbd5e1'};
+    background: ${props => props.active ? '#eff6ff' : 'white'}; color: ${props => props.active ? '#1d4ed8' : '#64748b'};
+    font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;
+    &:hover { background: #f1f5f9; }
 `;
 const SearchInputWrapper = styled.div`
-  display: flex; align-items: center; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; padding: 0 10px; &:focus-within { border-color: #3b82f6; background: white; }
+    display: flex; align-items: center; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; padding: 0 10px; &:focus-within { border-color: #3b82f6; background: white; }
 `;
 const Input = styled.input` flex: 1; padding: 12px; border: none; background: transparent; outline: none; font-size: 1rem; `;
 const ProductGrid = styled.div`
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; overflow-y: auto; padding-bottom: 20px; flex: 1;
-  @media (max-width: 768px) { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height: 50vh; }
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; overflow-y: auto; padding-bottom: 20px; flex: 1;
+    @media (max-width: 768px) { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height: 50vh; }
 `;
 const ProductCard = styled.div`
-  background: white; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; transition: transform 0.2s; cursor: pointer; 
-  &:hover { transform: translateY(-3px); border-color: #3b82f6; box-shadow: 0 5px 15px rgba(59,130,246,0.1); }
+    background: white; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; transition: transform 0.2s; cursor: pointer; 
+    &:hover { transform: translateY(-3px); border-color: #3b82f6; box-shadow: 0 5px 15px rgba(59,130,246,0.1); }
 `;
 const Badge = styled.span`
-  background: ${props => props.bg}; color: ${props => props.color}; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold;
+    background: ${props => props.bg}; color: ${props => props.color}; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold;
 `;
 const CartList = styled.div` flex: 1; overflow-y: auto; margin-top: 15px; `;
 const CartItem = styled.div` display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f1f5f9; `;
 const QtyControl = styled.div` display: flex; align-items: center; gap: 8px; background: #f8fafc; padding: 4px; border-radius: 6px; `;
 const RoundBtn = styled.button`
-  width: 24px; height: 24px; border-radius: 50%; border: none; background: white; box-shadow: 0 1px 2px rgba(0,0,0,0.1); cursor: pointer; display: flex; align-items: center; justify-content: center;
-  &:hover { background: #e2e8f0; }
+    width: 24px; height: 24px; border-radius: 50%; border: none; background: white; box-shadow: 0 1px 2px rgba(0,0,0,0.1); cursor: pointer; display: flex; align-items: center; justify-content: center;
+    &:hover { background: #e2e8f0; }
 `;
 const ActionButton = styled.button`
-  background: ${props => props.bg || '#3b82f6'}; color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 1rem; width: 100%; margin-top: 10px; 
-  &:disabled { background: #cbd5e1; cursor: not-allowed; } 
-  &:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    background: ${props => props.bg || '#3b82f6'}; color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 1rem; width: 100%; margin-top: 10px; 
+    &:disabled { background: #cbd5e1; cursor: not-allowed; } 
+    &:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
 `;
 
+// Función de utilidad para sanitizar texto
+const sanitizeText = (text) => String(text || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
 // =================================================================
-// COMPONENTE PRINCIPAL
+// COMPONENTE PRINCIPAL: SellerDashboard
 // =================================================================
 
 const SellerDashboard = () => {
@@ -86,16 +91,17 @@ const SellerDashboard = () => {
         }
     }, [authProducts]);
 
-    // 1. Cargar Productos
+    // 1. Cargar Productos (Si es necesario refrescar el inventario)
     const fetchProducts = useCallback(async () => {
         setLoading(true);
         try {
             const data = await api.fetchProducts(token); 
             const normalizedData = Array.isArray(data) ? data : (data?.data || []);
             setProducts(normalizedData);
+            toast.success("Inventario actualizado.");
         } catch (error) {
             console.error("Error cargando productos", error);
-            alert("Error de conexión al cargar productos.");
+            toast.error("Error de conexión al cargar productos.");
         } finally {
             setLoading(false);
         }
@@ -106,18 +112,19 @@ const SellerDashboard = () => {
         setCart(prev => {
             const stockAvailable = product.existencia;
             const existing = prev.find(p => p.id === product.id);
-            const finalPrice = product.precio_venta || product.precio || 0;
+            // Aseguramos que el precio sea un número flotante
+            const finalPrice = parseFloat(product.precio_venta || product.precio || 0); 
             
             if (existing) {
                 if (existing.quantity >= stockAvailable) {
-                    alert(`Stock máximo alcanzado para ${product.nombre}`);
+                    toast.warn(`Stock máximo (${stockAvailable}) alcanzado para ${product.nombre}`);
                     return prev;
                 }
                 return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
             }
             
             if (stockAvailable < 1) {
-                alert("Producto sin stock");
+                toast.error("Producto sin stock");
                 return prev;
             }
 
@@ -130,27 +137,61 @@ const SellerDashboard = () => {
     };
 
     const updateQuantity = (id, delta) => {
-        setCart(prev => prev.map(p => {
-            if (p.id === id) {
-                const newQty = p.quantity + delta;
-                if (newQty < 1) return p; 
-                if (newQty > p.existencia) { 
-                    alert("No hay suficiente stock");
-                    return p;
+        setCart(prev => {
+            const newCart = prev.map(p => {
+                if (p.id === id) {
+                    const newQty = p.quantity + delta;
+                    if (newQty < 1) {
+                        // Si se reduce a 0 o menos, se elimina
+                        return null; 
+                    }
+                    if (newQty > p.existencia) { 
+                        toast.warn("No hay suficiente stock");
+                        return p;
+                    }
+                    return { ...p, quantity: newQty };
                 }
-                return { ...p, quantity: newQty };
-            }
-            return p;
-        }));
+                return p;
+            }).filter(Boolean); // Elimina los items que retornaron null
+            return newCart;
+        });
     };
     
-    // 3. Lógica de Búsqueda Avanzada
+    // 3. Lógica de Búsqueda y Filtrado (Optimizada con Debounce Implícito)
+    
+    // Este useMemo se encarga de filtrar la lista GRANDE de productos
+    // El filtro de string directo es más rápido que usar useMemo con miles de elementos
+    // pero lo dejaré como filtro directo en el render para que la lista se actualice rápido.
+
+    const filteredProducts = useMemo(() => {
+        const term = sanitizeText(searchTerm);
+        if (term.length < 3 && searchType === 'nombre') {
+             // Si la búsqueda por nombre es muy corta, no filtrar (para evitar la carga de los 5000)
+            return products.slice(0, 100); 
+        }
+
+        const filtered = products.filter(p => {
+            if (!term) return true; // Si no hay término de búsqueda, muestra todos (o los primeros 100, si la lógica de arriba aplica)
+            
+            if (searchType === 'codigo') {
+                return sanitizeText(p.codigo).includes(term);
+            } else {
+                return sanitizeText(p.nombre).includes(term);
+            }
+        });
+
+        // Limita los resultados a 100 para evitar sobrecargar la interfaz
+        return filtered.slice(0, 100); 
+    }, [products, searchTerm, searchType]);
+
+
     const handleSearchSubmit = (e) => {
-        // Al presionar ENTER, si la búsqueda es por código, intenta agregarlo
+        // Al presionar ENTER, si la búsqueda es por código (código de barras), intenta agregarlo al carrito.
         if (e.key === 'Enter') {
+            e.preventDefault(); // Evitar cualquier envío de formulario predeterminado
             if (searchType === 'codigo' && searchTerm) {
                 const exactMatch = products.find(p => 
-                    String(p.codigo).toLowerCase() === searchTerm.toLowerCase()
+                    sanitizeText(p.codigo) === sanitizeText(searchTerm)
                 );
                 
                 if (exactMatch) {
@@ -158,26 +199,14 @@ const SellerDashboard = () => {
                     setSearchTerm(''); // Limpiar para el siguiente escaneo
                     searchInputRef.current?.focus();
                 } else {
-                    alert(`Producto con código ${searchTerm} no encontrado. Muestra la lista filtrada.`);
-                    // Opcional: No limpiar searchTerm para que el usuario vea el filtro
+                    toast.error(`Producto con código ${searchTerm} no encontrado.`);
                 }
+            } else {
+                 // Si es por nombre, al presionar enter solo asegura que el foco esté en la búsqueda
+                 searchInputRef.current?.focus();
             }
-            // Si es por nombre, solo filtra (el filtro ya ocurre en tiempo real)
         }
     };
-
-    const filteredProducts = products.filter(p => {
-        const term = searchTerm.toLowerCase();
-        if (!term) return true;
-        
-        if (searchType === 'codigo') {
-            // Buscamos código
-            return String(p.codigo || '').toLowerCase().includes(term);
-        } else {
-            // Buscamos nombre/descripción
-            return String(p.nombre).toLowerCase().includes(term);
-        }
-    });
 
     // Calcular Total
     const total = useMemo(() => {
@@ -189,35 +218,38 @@ const SellerDashboard = () => {
 
     // 4. Enviar a Caja (Crear Pedido Pendiente)
     const handleSendToCaja = async () => {
-        if (cart.length === 0) return alert("El carrito está vacío");
-        if (userId === 0) return alert("Error: Usuario no identificado para crear el pedido.");
-
+        if (cart.length === 0) return toast.warn("El carrito está vacío");
+        if (userId === 0) return toast.error("Error: Usuario no identificado para crear el pedido.");
+        
+        setLoading(true);
         const orderData = {
             userId: userId, 
             clienteNombre: clientName.trim() || "Consumidor Final",
             items: cart.map(i => ({
-                id_producto: i.id, // ID del producto
+                id_producto: i.id, 
                 cantidad: i.quantity,
-                precio: parseFloat(i.precio_venta || i.precio || 0), // Precio unitario de venta
+                precio: parseFloat(i.precio_venta), 
                 nombre: i.nombre,
                 codigo: i.codigo 
             })),
             total: total,
-            estado: 'PENDIENTE', // CLAVE para el POS
+            estado: 'PENDIENTE', // CLAVE para el POS (El POS lo buscará en este estado)
             tipo: 'PEDIDO'
         };
 
         try {
             await api.createOrder(orderData, token); 
             
-            alert("✅ Pedido enviado a caja. El cajero ya puede cobrarlo.");
+            toast.success("✅ Pedido enviado a caja. El cajero ya puede cobrarlo.");
             setCart([]);
             setClientName('');
             setSearchTerm('');
             searchInputRef.current?.focus();
         } catch (error) {
             console.error("Error al enviar pedido:", error);
-            alert("Error al enviar: " + (error.response?.data?.message || error.message || "Error desconocido"));
+            toast.error("Error al enviar pedido: " + (error.response?.data?.message || "Error de conexión"));
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -227,8 +259,13 @@ const SellerDashboard = () => {
             <LeftPanel>
                 <Header>
                     <h2 style={{margin:0, color:'#1e293b'}}>Pedidos</h2>
-                    <button onClick={fetchProducts} style={{background:'white', border:'1px solid #cbd5e1', padding:8, borderRadius:6, cursor:'pointer'}}>
+                    <button 
+                        onClick={fetchProducts} 
+                        disabled={loading}
+                        style={{background:'white', border:'1px solid #cbd5e1', padding:'8px 12px', borderRadius:6, cursor:'pointer', display:'flex', alignItems:'center', gap:5}}
+                    >
                         <FaSync className={loading ? 'fa-spin' : ''}/>
+                        {loading ? 'Cargando...' : 'Recargar'}
                     </button>
                 </Header>
 
@@ -252,13 +289,16 @@ const SellerDashboard = () => {
                         <FaSearch color="#94a3b8" />
                         <Input 
                             ref={searchInputRef}
-                            placeholder={searchType === 'codigo' ? "Escanea o escribe código y pulsa Enter..." : "Busca por descripción..."}
+                            placeholder={searchType === 'codigo' ? "Escanea o escribe código y pulsa Enter..." : "Busca por descripción (mínimo 3 letras)..."}
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                             onKeyDown={handleSearchSubmit}
                             autoFocus
                         />
                     </SearchInputWrapper>
+                    <p style={{margin:0, fontSize:'0.8rem', color:'#64748b'}}>
+                        Mostrando **{filteredProducts.length}** productos filtrados.
+                    </p>
                 </SearchContainer>
 
                 <ProductGrid>
@@ -269,7 +309,7 @@ const SellerDashboard = () => {
                         return (
                             <ProductCard key={p.id} onClick={() => addToCart(p)}>
                                 <div>
-                                    <div style={{fontWeight:'600', color:'#334155', lineHeight:'1.2'}}>{p.nombre}</div>
+                                    <div style={{fontWeight:'600', color:'#334155', lineHeight:'1.2', maxHeight: '2.4em', overflow: 'hidden'}} title={p.nombre}>{p.nombre}</div>
                                     <div style={{fontSize:'0.8rem', color:'#64748b', marginTop:4}}>
                                         {p.codigo || `ID: ${p.id}`}
                                     </div>
@@ -298,10 +338,10 @@ const SellerDashboard = () => {
                     <h3 style={{margin:0, display:'flex', alignItems:'center', gap:10}}>
                         <FaShoppingCart color="#3b82f6"/> Ticket de Venta
                     </h3>
-                    <input 
+                    <Input 
                         style={{
                             width:'100%', padding: '10px', marginTop: 15, 
-                            border: '1px solid #cbd5e1', borderRadius: 6, outline:'none'
+                            border: '1px solid #cbd5e1', borderRadius: 6, outline:'none', background:'white'
                         }}
                         placeholder="Nombre del Cliente (Opcional)"
                         value={clientName}
@@ -321,13 +361,13 @@ const SellerDashboard = () => {
                                 <div style={{flex:1, paddingRight:10}}>
                                     <div style={{fontWeight:'600', fontSize:'0.9rem'}}>{item.nombre}</div>
                                     <div style={{color:'#64748b', fontSize:'0.8rem'}}>
-                                        C$ {parseFloat(item.precio_venta || item.precio).toFixed(2)} x {item.quantity}
+                                        C$ {parseFloat(item.precio_venta).toFixed(2)} x {item.quantity}
                                     </div>
                                 </div>
                                 
                                 <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:5}}>
                                     <div style={{fontWeight:'bold', color:'#334155'}}>
-                                        C$ {(parseFloat(item.precio_venta || item.precio) * item.quantity).toFixed(2)}
+                                        C$ {(parseFloat(item.precio_venta) * item.quantity).toFixed(2)}
                                     </div>
                                     
                                     <div style={{display:'flex', alignItems:'center', gap:5}}>
@@ -355,7 +395,7 @@ const SellerDashboard = () => {
                         <span>C$ {total.toFixed(2)}</span>
                     </div>
 
-                    <ActionButton onClick={handleSendToCaja} disabled={cart.length === 0}>
+                    <ActionButton onClick={handleSendToCaja} disabled={cart.length === 0 || loading}>
                         <FaPaperPlane /> ENVIAR A CAJA
                     </ActionButton>
                 </div>
