@@ -1,25 +1,29 @@
 // Archivo: src/pages/PedidosYApartados.jsx
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import styled, { keyframes } from 'styled-components'; // Importa keyframes para la animación
+import styled, { keyframes } from 'styled-components'; 
 import { 
     FaSearch, FaFilePdf, FaPlus, FaTrash, 
     FaSync, FaBarcode, FaFont, FaMinus, FaFileAlt 
-} from 'react-icons/fa'; // Se cambia FaShoppingCart por FaFileAlt
+} from 'react-icons/fa'; 
 
 import { useAuth } from '../context/AuthContext'; 
 import * as api from '../service/api'; 
-// NOTA: Se ha eliminado la dependencia de fetchActiveBoxes y createOrder para enfocarse solo en Proformas.
+
+// 1. IMPORTAMOS EL MODAL DE PROFORMA - RUTA CORREGIDA
+// Desde: src/pages/     Necesita ir a: src/pages/POS/components/
+// RUTA ANTERIOR: './POS/components/ProformaModal.jsx'; (Ruta relativa incorrecta desde 'pages')
+// RUTA CORREGIDA: './pos/components/ProformaModal.jsx'; 
+import ProformaModal from './pos/components/ProformaModal.jsx'; 
+
 
 // =================================================================
-// ESTILOS RESPONSIVE (STYLED COMPONENTS)
-// Se mantiene igual, solo se añade el keyframe para el loading
+// ESTILOS RESPONSIVE (STYLED COMPONENTS) - (Se mantiene igual)
 // =================================================================
 const spin = keyframes`
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 `;
-
 const Container = styled.div`
     display: flex; height: 100vh; background: #f1f5f9; font-family: 'Segoe UI', sans-serif; overflow: hidden;
     @media (max-width: 768px) { flex-direction: column; height: auto; min-height: 100vh; overflow-y: auto; }
@@ -66,21 +70,20 @@ const RoundBtn = styled.button`
     &:hover { background: #e2e8f0; }
 `;
 const ActionButton = styled.button`
-    background: ${props => props.bg || '#ef4444'}; 
-    background: ${props => props.bg || '#059669'}; /* Verde para generar PDF */
+    background: ${props => props.bg || '#059669'}; 
     color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 1rem; width: 100%; margin-top: 10px; 
     &:disabled { background: #cbd5e1; cursor: not-allowed; } 
     &:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
 `;
 const LoadingIcon = styled(FaSync)`
-  animation: ${spin} 1s linear infinite;
+    animation: ${spin} 1s linear infinite;
 `;
 
 
 const sanitizeText = (text) => String(text || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 // =================================================================
-// COMPONENTE PRINCIPAL: SellerDashboard (Renombrado Lógicamente a ProformaGenerator)
+// COMPONENTE PRINCIPAL: ProformaGenerator
 // =================================================================
 
 const ProformaGenerator = () => {
@@ -94,17 +97,20 @@ const ProformaGenerator = () => {
     const [loading, setLoading] = useState(false);
     const [clientName, setClientName] = useState('');
     
-    const searchInputRef = useRef(null);
-    // const userId = user?.id_usuario || user?.id || 0; // Ya no es necesario el ID del usuario
+    // 2. NUEVOS ESTADOS PARA MANEJAR EL MODAL
+    const [isProformaModalOpen, setIsProformaModalOpen] = useState(false);
+    const [proformaDetails, setProformaDetails] = useState(null);
 
+    const searchInputRef = useRef(null);
+    
     useEffect(() => {
         if (authProducts?.length) {
             setProducts(authProducts);
         }
     }, [authProducts]);
 
-    // 1. Cargar Productos
     const fetchProducts = useCallback(async () => {
+        // ... (función fetchProducts se mantiene igual)
         setLoading(true);
         try {
             const data = await api.fetchProducts(token); 
@@ -119,14 +125,13 @@ const ProformaGenerator = () => {
         }
     }, [token]);
 
-    // 2. Lógica de Carrito (Sin validación de stock)
     const addToCart = (product) => {
+        // ... (función addToCart se mantiene igual)
         setCart(prev => {
             const existing = prev.find(p => p.id === product.id);
             const finalPrice = parseFloat(product.precio_venta || product.precio || 0); 
             
             if (existing) {
-                // Ya no validamos stock para proformas
                 return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
             }
 
@@ -139,6 +144,7 @@ const ProformaGenerator = () => {
     };
 
     const updateQuantity = (id, delta) => {
+        // ... (función updateQuantity se mantiene igual)
         setCart(prev => {
             const newCart = prev.map(p => {
                 if (p.id === id) {
@@ -146,7 +152,6 @@ const ProformaGenerator = () => {
                     if (newQty < 1) {
                         return null; 
                     }
-                    // Ya no validamos stock para proformas
                     return { ...p, quantity: newQty };
                 }
                 return p;
@@ -155,8 +160,8 @@ const ProformaGenerator = () => {
         });
     };
     
-    // 3. Lógica de Búsqueda y Filtrado (Se mantiene igual)
     const filteredProducts = useMemo(() => {
+        // ... (filteredProducts se mantiene igual)
         const term = sanitizeText(searchTerm);
         if (term.length < 3 && searchType === 'nombre') {
             return products.slice(0, 100); 
@@ -177,6 +182,7 @@ const ProformaGenerator = () => {
 
 
     const handleSearchSubmit = (e) => {
+        // ... (handleSearchSubmit se mantiene igual)
         if (e.key === 'Enter') {
             e.preventDefault(); 
             if (searchType === 'codigo' && searchTerm) {
@@ -204,64 +210,62 @@ const ProformaGenerator = () => {
         }, 0);
     }, [cart]);
 
-    // =================================================================
-    // 4. NUEVA FUNCIONALIDAD: GENERAR PROFORMA PDF
-    // =================================================================
+    // Calcular Subtotal y Descuento (Asumiendo que no hay impuestos ni descuentos fijos aquí)
+    const subtotal = total;
+    const discount = 0;
+
+    const resetCart = useCallback(() => {
+        setCart([]);
+        setClientName('');
+        setProformaDetails(null);
+        setIsProformaModalOpen(false);
+        searchInputRef.current?.focus();
+    }, []);
+
+    // 3. FUNCIÓN MEJORADA: PREPARA LOS DATOS Y ABRE EL MODAL
     const handleGenerateProforma = async () => {
         if (cart.length === 0) return alert("El carrito está vacío. Agrega productos para generar la proforma.");
         
-        // El nombre del cliente es obligatorio para la proforma
-        if (!clientName.trim()) {
+        const clientTrimmed = clientName.trim();
+        if (!clientTrimmed) {
             return alert("🚨 Por favor, introduce el Nombre del Cliente antes de generar la proforma.");
         }
         
         setLoading(true);
 
-        // 1. Construir el objeto de la Proforma
-        const proformaData = {
-            fecha: new Date().toLocaleDateString('es-NI'),
-            hora: new Date().toLocaleTimeString('es-NI'),
-            clienteNombre: clientName.trim(),
-            total: total.toFixed(2),
-            items: cart.map(i => ({
-                codigo: i.codigo,
-                nombre: i.nombre,
-                cantidad: i.quantity,
-                precioUnitario: parseFloat(i.precio_venta).toFixed(2),
-                subTotal: (parseFloat(i.precio_venta) * i.quantity).toFixed(2),
-            })),
+        // 1. Prepara el objeto de la Proforma con todos los datos necesarios
+        const newProformaDetails = {
+            cart: cart,
+            total: total,
+            subtotal: subtotal,
+            discount: discount,
+            proformaFor: clientTrimmed, // El nombre a quien se emitirá la proforma (el campo de texto)
+            client: { nombre: clientTrimmed, telefono: 'N/D' }, // Datos simulados del cliente
+            // currentUser: user, // Ya está disponible a través de useAuth en ProformaModal si es necesario
         };
 
-        // 2. Simular la generación del PDF (Aquí iría la llamada API para generar el PDF)
-        
-        // Simulación de API call para generar PDF (podría ser api.generateProforma(proformaData, token))
-        await new Promise(resolve => setTimeout(resolve, 1500)); // Espera de 1.5s para simular carga
+        // Simula la espera de la API si fuera necesario (la quitamos ya que el modal es inmediato)
+        // await new Promise(resolve => setTimeout(resolve, 500)); 
 
-        // 3. Simulación de descarga/alerta de éxito
-        const pdfSimulacion = `
---- PROFORMA / COTIZACIÓN ---
-Fecha: ${proformaData.fecha}
-Cliente: ${proformaData.clienteNombre}
-
-Items:
-${proformaData.items.map(i => 
-    ` - ${i.cantidad} x ${i.nombre} (C$ ${i.precioUnitario}) = C$ ${i.subTotal}`
-).join('\n')}
-
-TOTAL: C$ ${proformaData.total}
---- FIN ---
-`;
-
-        alert(`✅ Proforma generada exitosamente para ${proformaData.clienteNombre}.\n\n(Simulación de contenido PDF:\n${pdfSimulacion})`);
-        
-        // Después de generar la proforma (opcionalmente) limpiar
-        setCart([]);
-        setClientName('');
-        setSearchTerm('');
-        searchInputRef.current?.focus();
-        
+        // 2. Guarda los detalles y abre el modal
+        setProformaDetails(newProformaDetails);
+        setIsProformaModalOpen(true);
         setLoading(false);
     };
+
+    // 4. FUNCIÓN DUMMY PARA setTicketData (necesaria para ProformaModal)
+    // El ProformaModal usa setTicketData para pasar la transacción al componente de impresión.
+    // Como estamos en un contexto de solo proforma, esta función solo limpia el carrito después de la impresión simulada.
+    const handleSetTicketData = useCallback((data) => {
+        console.log("Simulación de envío a impresión/PDF:", data.transaction);
+        // Aquí podrías agregar la lógica real para llamar al servicio de impresión de PDF
+        
+        // Asumiendo que la impresión/generación es exitosa, limpiamos la pantalla.
+        // En una aplicación real, esto se haría DENTRO de la función de impresión del TicketModal.
+        alert(`🎉 Proforma lista para imprimir. Limpiando carro de cotización.`);
+        resetCart();
+    }, [resetCart]);
+
 
     return (
         <Container>
@@ -278,7 +282,7 @@ TOTAL: C$ ${proformaData.total}
                         {loading ? 'Cargando...' : 'Recargar Productos'}
                     </button>
                 </Header>
-
+                {/* ... (Contenedor de búsqueda y ProductGrid se mantienen iguales) ... */}
                 <SearchContainer>
                     <SearchTypeToggle>
                         <ToggleButton 
@@ -414,6 +418,17 @@ TOTAL: C$ ${proformaData.total}
                     </ActionButton>
                 </div>
             </RightPanel>
+
+            {/* 5. RENDERING CONDICIONAL DEL MODAL DE PROFORMA */}
+            {isProformaModalOpen && proformaDetails && (
+                <ProformaModal 
+                    {...proformaDetails} // Pasa cart, total, subtotal, discount, proformaFor, client
+                    onClose={() => setIsProformaModalOpen(false)} // Cierra el modal
+                    // Este prop es lo que el modal usará para "confirmar" la impresión y limpiar el carrito.
+                    setTicketData={handleSetTicketData} 
+                    currentUser={user} // Pasamos el usuario para que ProformaModal pueda obtener el nombre del vendedor.
+                />
+            )}
         </Container>
     );
 };
