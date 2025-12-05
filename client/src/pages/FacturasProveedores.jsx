@@ -160,6 +160,36 @@ const StatCard = styled.div`
     .sub { font-size: 0.9rem; color: ${props => props.color}; font-weight: 500; }
 `;
 
+// --- MODAL BASE STYLES (MOVIDOS ARRIBA) ---
+const ModalOverlay = styled.div`
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: flex; justify-content: center; align-items: center; z-index: 1100; animation: ${fadeIn} 0.2s;
+`;
+const ModalContent = styled.div`
+    background: white; padding: 2.5rem; border-radius: 24px; width: 95%; max-width: 550px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); animation: ${scaleIn} 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    max-height: 90vh; overflow-y: auto;
+    
+    h2 { margin: 0 0 1.5rem 0; color: #0f172a; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.025em; }
+`;
+/**
+ * Importante: FormGroup debe estar definido antes de FilterGroup para evitar el ReferenceError
+ * (El error "Cannot access 'a' before initialization" en React/Styled-components)
+ */
+const FormGroup = styled.div`
+    margin-bottom: 1.25rem;
+    label { display: block; font-size: 0.9rem; color: #334155; margin-bottom: 0.5rem; font-weight: 600; }
+    input, select, textarea { 
+        width: 100%; padding: 0.85rem 1rem; border: 1px solid #cbd5e1; border-radius: 12px; font-size: 1rem; color: #0f172a; background: #fff; transition: all 0.2s; 
+        &:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); }
+        &::placeholder { color: #94a3b8; }
+    }
+`;
+
+const CloseButton = styled.button`
+    position: absolute; top: 1.5rem; right: 1.5rem; background: transparent; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;
+    &:hover { color: #0f172a; }
+`;
+// --- FIN MODAL BASE STYLES ---
+
 // --- FILTROS Y BÚSQUEDA ---
 const Toolbar = styled.div`
     background: white;
@@ -167,7 +197,7 @@ const Toolbar = styled.div`
     border-radius: 16px;
     border: 1px solid #e2e8f0;
     display: flex;
-    flex-direction: column; /* Cambiado a columna para mejor manejo de filtros */
+    flex-direction: column; 
     gap: 1rem;
     margin-bottom: 2rem;
     box-shadow: 0 1px 3px rgba(0,0,0,0.02);
@@ -234,8 +264,10 @@ const SearchContainer = styled.div`
         &:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
     }
 `;
-
-const FilterGroup = styled(FormGroup)`
+/**
+ * CORREGIDO: FilterGroup ahora usa FormGroup que ya está definido.
+ */
+const FilterGroup = styled(FormGroup)` 
     margin-bottom: 0;
     min-width: 150px;
     flex: 1;
@@ -345,30 +377,6 @@ const StatusBadge = styled.span`
     background: ${props => props.bg}; color: ${props => props.text}; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 `;
 
-// --- MODAL ---
-const ModalOverlay = styled.div`
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: flex; justify-content: center; align-items: center; z-index: 1100; animation: ${fadeIn} 0.2s;
-`;
-const ModalContent = styled.div`
-    background: white; padding: 2.5rem; border-radius: 24px; width: 95%; max-width: 550px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); animation: ${scaleIn} 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    max-height: 90vh; overflow-y: auto;
-    
-    h2 { margin: 0 0 1.5rem 0; color: #0f172a; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.025em; }
-`;
-const FormGroup = styled.div`
-    margin-bottom: 1.25rem;
-    label { display: block; font-size: 0.9rem; color: #334155; margin-bottom: 0.5rem; font-weight: 600; }
-    input, select, textarea { 
-        width: 100%; padding: 0.85rem 1rem; border: 1px solid #cbd5e1; border-radius: 12px; font-size: 1rem; color: #0f172a; background: #fff; transition: all 0.2s; 
-        &:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); }
-        &::placeholder { color: #94a3b8; }
-    }
-`;
-
-const CloseButton = styled.button`
-    position: absolute; top: 1.5rem; right: 1.5rem; background: transparent; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;
-    &:hover { color: #0f172a; }
-`;
 
 // =================================================================
 // COMPONENTE PRINCIPAL: FacturasProveedores
@@ -427,6 +435,7 @@ const FacturasProveedores = () => {
             setLoading(true);
             try {
                 // 1. Cargar Facturas
+                // NOTA: Asume que api.fetchProviderInvoices existe y es correcto
                 const invData = await api.fetchProviderInvoices(token);
                 setInvoices(Array.isArray(invData) ? invData : []);
 
@@ -439,7 +448,7 @@ const FacturasProveedores = () => {
 
             } catch (err) {
                 console.error("Error cargando datos:", err);
-                showAlert("Error", "Error al cargar facturas o proveedores.", "error");
+                showAlert("Error", "Error al cargar facturas o proveedores. Verifique la API.", "error");
             } finally {
                 setLoading(false);
             }
@@ -465,34 +474,36 @@ const FacturasProveedores = () => {
         if (!selectedInvoice || !payData.amount) return;
         
         const payAmount = parseFloat(payData.amount);
-        const maxPay = parseFloat(selectedInvoice.monto_total) - parseFloat(selectedInvoice.monto_abonado);
+        const maxPay = (parseFloat(selectedInvoice.monto_total) || 0) - (parseFloat(selectedInvoice.monto_abonado) || 0);
         
         if(payAmount <= 0) return showAlert("Error", "El monto debe ser mayor a cero.", "error");
-        if(payAmount > maxPay) return showAlert("Error", `El monto no puede ser mayor a la deuda (C$${maxPay.toLocaleString()})`, "error");
+        if(payAmount > maxPay) return showAlert("Error", `El monto no puede ser mayor a la deuda (C$${maxPay.toLocaleString(undefined, { minimumFractionDigits: 2 })})`, "error");
 
         const isFullPayment = payAmount >= maxPay - 0.01; // Considera un margen por si acaso
-        const newStatus = isFullPayment ? 'PAGADA' : selectedInvoice.estado;
+        // Se asume que el backend actualiza el estado a 'PAGADA' si se abona el total.
+        const newStatus = isFullPayment ? 'PAGADA' : selectedInvoice.estado; 
 
         try {
-            // Se asume que api.payProviderInvoice fue modificado para aceptar la referencia
+            // Se asume que api.payProviderInvoice existe y acepta id, monto, referencia y nuevo estado
             await api.payProviderInvoice(selectedInvoice.id, payAmount, payData.reference, newStatus, token);
             
             setRefreshTrigger(prev => prev + 1);
             setShowPayModal(false);
             
-            showAlert("Éxito", `Abono de C$${payAmount.toLocaleString()} registrado. ${isFullPayment ? 'Factura PAGADA.' : ''}`, "success");
+            showAlert("Éxito", `Abono de C$${payAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} registrado. ${isFullPayment ? 'Factura PAGADA.' : ''}`, "success");
         } catch (error) {
             console.error("Error al registrar el pago:", error);
             showAlert("Error", "Error al registrar el pago.", "error");
         }
     };
     
-    // ... (handleCreate y handleDelete se mantienen iguales)
+    // Función para crear nueva factura
     const handleCreate = async (e) => {
         e.preventDefault();
         if (!formData.proveedor) return showAlert("Atención", "Seleccione un proveedor de la lista", "warning");
 
         try {
+            // Se asume que api.createProviderInvoice existe
             await api.createProviderInvoice(formData, token);
             setRefreshTrigger(prev => prev + 1);
             setShowCreateModal(false);
@@ -507,9 +518,11 @@ const FacturasProveedores = () => {
         }
     };
 
+    // Función para eliminar factura
     const handleDelete = async () => {
         if (!selectedInvoice) return;
         try {
+            // Se asume que api.deleteProviderInvoice existe
             await api.deleteProviderInvoice(selectedInvoice.id, token);
             setRefreshTrigger(prev => prev + 1);
             setShowConfirmDelete(false);
@@ -535,7 +548,7 @@ const FacturasProveedores = () => {
         const venc = invoices.filter(i => i.estado === 'VENCIDA').length;
         const pag = invoices.filter(i => i.estado === 'PAGADA').length;
         const totalDebt = invoices.reduce((acc, curr) => {
-            const deuda = parseFloat(curr.monto_total) - parseFloat(curr.monto_abonado);
+            const deuda = (parseFloat(curr.monto_total) || 0) - (parseFloat(curr.monto_abonado) || 0);
             return curr.estado !== 'PAGADA' ? acc + deuda : acc;
         }, 0);
         return { pend, venc, pag, totalDebt };
@@ -551,6 +564,7 @@ const FacturasProveedores = () => {
 
         // 2. Filtrar por Proveedor (Dropdown)
         if (filterProvider) {
+            // Se asume que i.proveedor es el 'nombre' del proveedor (valor en el select)
             data = data.filter(i => i.proveedor === filterProvider);
         }
 
@@ -559,8 +573,11 @@ const FacturasProveedores = () => {
             data = data.filter(i => {
                 const emissionDate = new Date(i.fecha_emision).getTime();
                 const fromDate = new Date(filterDateFrom).getTime();
-                const toDate = new Date(filterDateTo).getTime();
-                return emissionDate >= fromDate && emissionDate <= toDate;
+                // Añadir un día a la fecha 'hasta' para incluir todo el último día
+                const toDate = new Date(filterDateTo);
+                toDate.setDate(toDate.getDate() + 1);
+                
+                return emissionDate >= new Date(filterDateFrom).getTime() && emissionDate < toDate.getTime();
             });
         }
         
@@ -727,9 +744,6 @@ const FacturasProveedores = () => {
                                         <div className="balance-text">
                                             Abonado: C${abonado.toLocaleString(undefined, { minimumFractionDigits: 2 })} &bull; <strong>Resta: C${saldo.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
                                         </div>
-                                        {/* <div className="reference-text">
-                                            {reference ? `Ref: ${reference}` : (inv.estado === 'PAGADA' ? 'Ref. No disponible' : '')}
-                                        </div> */}
                                     </div>
                                 </div>
 
@@ -821,7 +835,7 @@ const FacturasProveedores = () => {
                             <div style={{fontSize:'1.1rem', fontWeight:'700', color:'#0f172a'}}>{selectedInvoice.proveedor}</div>
                             <div style={{marginTop:'0.5rem', display:'flex', justifyContent:'space-between', fontSize:'0.9rem'}}>
                                 <span>Saldo Pendiente:</span>
-                                <strong style={{color:'#ef4444'}}>C${(parseFloat(selectedInvoice.monto_total) - parseFloat(selectedInvoice.monto_abonado)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
+                                <strong style={{color:'#ef4444'}}>C${((parseFloat(selectedInvoice.monto_total) || 0) - (parseFloat(selectedInvoice.monto_abonado) || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
                             </div>
                         </div>
                         <form onSubmit={handlePay}>
@@ -829,7 +843,7 @@ const FacturasProveedores = () => {
                                 <label>Monto a Abonar (C$)</label>
                                 <input 
                                     required type="number" step="0.01" autoFocus
-                                    max={parseFloat(selectedInvoice.monto_total) - parseFloat(selectedInvoice.monto_abonado)}
+                                    max={(parseFloat(selectedInvoice.monto_total) || 0) - (parseFloat(selectedInvoice.monto_abonado) || 0)}
                                     value={payData.amount} onChange={e => setPayData({...payData, amount: e.target.value})}
                                     placeholder="0.00"
                                 />
