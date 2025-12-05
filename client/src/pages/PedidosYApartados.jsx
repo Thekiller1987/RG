@@ -1,22 +1,25 @@
 // Archivo: src/pages/PedidosYApartados.jsx
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components'; // Importa keyframes para la animación
 import { 
-    FaSearch, FaShoppingCart, FaPlus, FaTrash, 
-    FaPaperPlane, FaSync, FaBarcode, FaFont, FaMinus 
-} from 'react-icons/fa';
+    FaSearch, FaFilePdf, FaPlus, FaTrash, 
+    FaSync, FaBarcode, FaFont, FaMinus, FaFileAlt 
+} from 'react-icons/fa'; // Se cambia FaShoppingCart por FaFileAlt
+
 import { useAuth } from '../context/AuthContext'; 
 import * as api from '../service/api'; 
-// Asegúrate de que tu api.js exporte una función fetchActiveBoxes.
-// Si no existe, deberás añadirla a tu api.js
-// IMPORTANTE: Se asume que api.js tiene una función 'fetchActiveBoxes'.
-
+// NOTA: Se ha eliminado la dependencia de fetchActiveBoxes y createOrder para enfocarse solo en Proformas.
 
 // =================================================================
 // ESTILOS RESPONSIVE (STYLED COMPONENTS)
-// ... (Tus estilos se mantienen sin cambios)
+// Se mantiene igual, solo se añade el keyframe para el loading
 // =================================================================
+const spin = keyframes`
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+`;
+
 const Container = styled.div`
     display: flex; height: 100vh; background: #f1f5f9; font-family: 'Segoe UI', sans-serif; overflow: hidden;
     @media (max-width: 768px) { flex-direction: column; height: auto; min-height: 100vh; overflow-y: auto; }
@@ -63,18 +66,24 @@ const RoundBtn = styled.button`
     &:hover { background: #e2e8f0; }
 `;
 const ActionButton = styled.button`
-    background: ${props => props.bg || '#3b82f6'}; color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 1rem; width: 100%; margin-top: 10px; 
+    background: ${props => props.bg || '#ef4444'}; 
+    background: ${props => props.bg || '#059669'}; /* Verde para generar PDF */
+    color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 1rem; width: 100%; margin-top: 10px; 
     &:disabled { background: #cbd5e1; cursor: not-allowed; } 
     &:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
 `;
+const LoadingIcon = styled(FaSync)`
+  animation: ${spin} 1s linear infinite;
+`;
+
 
 const sanitizeText = (text) => String(text || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 // =================================================================
-// COMPONENTE PRINCIPAL: SellerDashboard
+// COMPONENTE PRINCIPAL: SellerDashboard (Renombrado Lógicamente a ProformaGenerator)
 // =================================================================
 
-const SellerDashboard = () => {
+const ProformaGenerator = () => {
     const { user, products: authProducts } = useAuth(); 
     const token = localStorage.getItem('token');
     
@@ -86,7 +95,7 @@ const SellerDashboard = () => {
     const [clientName, setClientName] = useState('');
     
     const searchInputRef = useRef(null);
-    const userId = user?.id_usuario || user?.id || 0;
+    // const userId = user?.id_usuario || user?.id || 0; // Ya no es necesario el ID del usuario
 
     useEffect(() => {
         if (authProducts?.length) {
@@ -101,7 +110,7 @@ const SellerDashboard = () => {
             const data = await api.fetchProducts(token); 
             const normalizedData = Array.isArray(data) ? data : (data?.data || []);
             setProducts(normalizedData);
-            alert("Inventario actualizado.");
+            alert("Inventario de productos actualizado.");
         } catch (error) {
             const msg = error.message || (error.response?.data?.message) || "Verifique su conexión de red o token.";
             alert(`Error de conexión al cargar productos: ${msg}`);
@@ -110,25 +119,15 @@ const SellerDashboard = () => {
         }
     }, [token]);
 
-    // 2. Lógica de Carrito
-    // ... (Lógica de Carrito se mantiene sin cambios)
+    // 2. Lógica de Carrito (Sin validación de stock)
     const addToCart = (product) => {
         setCart(prev => {
-            const stockAvailable = product.existencia;
             const existing = prev.find(p => p.id === product.id);
             const finalPrice = parseFloat(product.precio_venta || product.precio || 0); 
             
             if (existing) {
-                if (existing.quantity >= stockAvailable) {
-                    alert(`Stock máximo (${stockAvailable}) alcanzado para ${product.nombre}`);
-                    return prev;
-                }
+                // Ya no validamos stock para proformas
                 return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
-            }
-            
-            if (stockAvailable < 1) {
-                alert("Producto sin stock");
-                return prev;
             }
 
             return [...prev, { 
@@ -147,10 +146,7 @@ const SellerDashboard = () => {
                     if (newQty < 1) {
                         return null; 
                     }
-                    if (newQty > p.existencia) { 
-                        alert("No hay suficiente stock");
-                        return p;
-                    }
+                    // Ya no validamos stock para proformas
                     return { ...p, quantity: newQty };
                 }
                 return p;
@@ -159,8 +155,7 @@ const SellerDashboard = () => {
         });
     };
     
-    // 3. Lógica de Búsqueda y Filtrado
-    // ... (Lógica de Búsqueda y Filtrado se mantiene sin cambios)
+    // 3. Lógica de Búsqueda y Filtrado (Se mantiene igual)
     const filteredProducts = useMemo(() => {
         const term = sanitizeText(searchTerm);
         if (term.length < 3 && searchType === 'nombre') {
@@ -210,96 +205,62 @@ const SellerDashboard = () => {
     }, [cart]);
 
     // =================================================================
-    // 4. FUNCIONALIDAD SOLICITADA: CREAR TICKET CON SELECCIÓN DE CAJA
+    // 4. NUEVA FUNCIONALIDAD: GENERAR PROFORMA PDF
     // =================================================================
-    const handleCreateTicket = async () => {
-        if (cart.length === 0) return alert("El carrito está vacío");
-        if (userId === 0) return alert("Error: Usuario no identificado para crear el ticket.");
+    const handleGenerateProforma = async () => {
+        if (cart.length === 0) return alert("El carrito está vacío. Agrega productos para generar la proforma.");
+        
+        // El nombre del cliente es obligatorio para la proforma
+        if (!clientName.trim()) {
+            return alert("🚨 Por favor, introduce el Nombre del Cliente antes de generar la proforma.");
+        }
         
         setLoading(true);
 
-        // --- INICIO DE LÓGICA DE SELECCIÓN DE CAJA ---
-        let selectedBoxId = null;
-        try {
-            // Se asume que api.fetchActiveBoxes existe y devuelve [{ id: 1, name: 'Caja 1' }, ...]
-            const activeBoxes = await api.fetchActiveBoxes(token); 
-
-            if (!activeBoxes || activeBoxes.length === 0) {
-                alert("🚨 No hay cajas activas. No se puede crear el ticket de venta.");
-                setLoading(false);
-                return;
-            }
-
-            const boxOptions = activeBoxes
-                .map(box => `[${box.id}] - ${box.nombre || box.name}`) // Usar .name si es el campo
-                .join('\n');
-            
-            // Usamos prompt para forzar la selección, como se solicitó para simplificar.
-            const promptMessage = `Selecciona el ID de la Caja Activa para registrar el Ticket:\n\n${boxOptions}`;
-            const input = prompt(promptMessage);
-
-            if (input === null || input.trim() === '') {
-                alert("Creación de ticket cancelada por el usuario.");
-                setLoading(false);
-                return;
-            }
-
-            const id = parseInt(input.trim());
-            const boxExists = activeBoxes.some(box => box.id === id);
-
-            if (isNaN(id) || !boxExists) {
-                alert("🚫 ID de caja inválido. Intenta de nuevo.");
-                setLoading(false);
-                return;
-            }
-
-            selectedBoxId = id;
-
-        } catch (error) {
-            console.error("Error al obtener cajas activas:", error);
-            alert("Error de conexión al obtener las cajas. No se puede crear el ticket.");
-            setLoading(false);
-            return;
-        }
-        // --- FIN DE LÓGICA DE SELECCIÓN DE CAJA ---
-
-        // Preparación de los datos del pedido/ticket
-        const orderData = {
-            id_caja: selectedBoxId, // CAMPO CLAVE AGREGADO
-            userId: userId, 
-            clienteNombre: clientName.trim() || "Consumidor Final",
+        // 1. Construir el objeto de la Proforma
+        const proformaData = {
+            fecha: new Date().toLocaleDateString('es-NI'),
+            hora: new Date().toLocaleTimeString('es-NI'),
+            clienteNombre: clientName.trim(),
+            total: total.toFixed(2),
             items: cart.map(i => ({
-                id_producto: i.id, 
-                cantidad: i.quantity,
-                precio: parseFloat(i.precio_venta), 
+                codigo: i.codigo,
                 nombre: i.nombre,
-                codigo: i.codigo 
+                cantidad: i.quantity,
+                precioUnitario: parseFloat(i.precio_venta).toFixed(2),
+                subTotal: (parseFloat(i.precio_venta) * i.quantity).toFixed(2),
             })),
-            total: total,
-            estado: 'COMPLETADO', // Cambiado a COMPLETO para reflejar un Ticket de Venta
-            tipo: 'TICKET' // Cambiado a TICKET
         };
 
-        try {
-            await api.createOrder(orderData, token); 
-            
-            alert(`✅ Ticket creado y asignado a la Caja ID: ${selectedBoxId}.`);
-            setCart([]);
-            setClientName('');
-            setSearchTerm('');
-            searchInputRef.current?.focus();
-        } catch (error) {
-            console.error("Error al crear el ticket:", error);
-            const apiMessage = error.response?.data?.message || error.message;
+        // 2. Simular la generación del PDF (Aquí iría la llamada API para generar el PDF)
+        
+        // Simulación de API call para generar PDF (podría ser api.generateProforma(proformaData, token))
+        await new Promise(resolve => setTimeout(resolve, 1500)); // Espera de 1.5s para simular carga
 
-            if (error.response?.status === 401) {
-                 alert("Error de autenticación: Token expirado o inválido. Cierre sesión e inicie nuevamente.");
-            } else {
-                 alert("❌ Error al crear el ticket: " + (apiMessage || "Fallo desconocido en el servidor."));
-            }
-        } finally {
-            setLoading(false);
-        }
+        // 3. Simulación de descarga/alerta de éxito
+        const pdfSimulacion = `
+--- PROFORMA / COTIZACIÓN ---
+Fecha: ${proformaData.fecha}
+Cliente: ${proformaData.clienteNombre}
+
+Items:
+${proformaData.items.map(i => 
+    ` - ${i.cantidad} x ${i.nombre} (C$ ${i.precioUnitario}) = C$ ${i.subTotal}`
+).join('\n')}
+
+TOTAL: C$ ${proformaData.total}
+--- FIN ---
+`;
+
+        alert(`✅ Proforma generada exitosamente para ${proformaData.clienteNombre}.\n\n(Simulación de contenido PDF:\n${pdfSimulacion})`);
+        
+        // Después de generar la proforma (opcionalmente) limpiar
+        setCart([]);
+        setClientName('');
+        setSearchTerm('');
+        searchInputRef.current?.focus();
+        
+        setLoading(false);
     };
 
     return (
@@ -307,14 +268,14 @@ const SellerDashboard = () => {
             {/* ================= PANEL IZQUIERDO (PRODUCTOS) ================= */}
             <LeftPanel>
                 <Header>
-                    <h2 style={{margin:0, color:'#1e293b'}}>Punto de Venta</h2>
+                    <h2 style={{margin:0, color:'#1e293b'}}>Catálogo y Proformas</h2>
                     <button 
                         onClick={fetchProducts} 
                         disabled={loading}
                         style={{background:'white', border:'1px solid #cbd5e1', padding:'8px 12px', borderRadius:6, cursor:'pointer', display:'flex', alignItems:'center', gap:5}}
                     >
-                        <FaSync className={loading ? 'fa-spin' : ''}/>
-                        {loading ? 'Cargando...' : 'Recargar'}
+                        {loading ? <LoadingIcon size={14}/> : <FaSync size={14}/>}
+                        {loading ? 'Cargando...' : 'Recargar Productos'}
                     </button>
                 </Header>
 
@@ -381,18 +342,18 @@ const SellerDashboard = () => {
                 </ProductGrid>
             </LeftPanel>
 
-            {/* ================= PANEL DERECHO (CARRITO) ================= */}
+            {/* ================= PANEL DERECHO (DETALLE DE PROFORMA) ================= */}
             <RightPanel>
                 <div style={{borderBottom:'1px solid #e2e8f0', paddingBottom:15}}>
                     <h3 style={{margin:0, display:'flex', alignItems:'center', gap:10}}>
-                        <FaShoppingCart color="#3b82f6"/> Ticket de Venta
+                        <FaFileAlt color="#059669"/> Detalle de Proforma
                     </h3>
                     <Input 
                         style={{
                             width:'100%', padding: '10px', marginTop: 15, 
                             border: '1px solid #cbd5e1', borderRadius: 6, outline:'none', background:'white'
                         }}
-                        placeholder="Nombre del Cliente (Opcional)"
+                        placeholder="Nombre del Cliente (Obligatorio)"
                         value={clientName}
                         onChange={e => setClientName(e.target.value)}
                     />
@@ -401,8 +362,8 @@ const SellerDashboard = () => {
                 <CartList>
                     {cart.length === 0 ? (
                         <div style={{textAlign:'center', color:'#94a3b8', marginTop: 40}}>
-                            <FaShoppingCart size={40} style={{opacity:0.3}}/>
-                            <p>El carrito está vacío</p>
+                            <FaFilePdf size={40} style={{opacity:0.3}}/>
+                            <p>Agrega productos para cotizar</p>
                         </div>
                     ) : (
                         cart.map(item => (
@@ -445,10 +406,11 @@ const SellerDashboard = () => {
                     </div>
 
                     <ActionButton 
-                        onClick={handleCreateTicket} // Llama a la nueva función
-                        disabled={cart.length === 0 || loading}
+                        bg="#059669" // Color verde
+                        onClick={handleGenerateProforma}
+                        disabled={cart.length === 0 || loading || !clientName.trim()}
                     >
-                        <FaPaperPlane /> REGISTRAR TICKET Y ASIGNAR CAJA
+                        {loading ? <LoadingIcon /> : <FaFilePdf />} GENERAR PROFORMA PDF
                     </ActionButton>
                 </div>
             </RightPanel>
@@ -456,4 +418,4 @@ const SellerDashboard = () => {
     );
 };
 
-export default SellerDashboard;
+export default ProformaGenerator;
