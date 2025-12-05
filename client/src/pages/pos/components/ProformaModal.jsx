@@ -10,16 +10,19 @@ import {
 import { useAuth } from '../context/AuthContext'; 
 import * as api from '../service/api'; 
 
-// 1. IMPORTAMOS EL MODAL DE PROFORMA QUE PROPORCIONASTE
-import ProformaModal from './POS/components/ProformaModal.jsx'; 
+// 1. IMPORTAMOS EL MODAL DE PROFORMA - RUTA CORREGIDA
+// Desde: src/pages/     Necesita ir a: src/pages/POS/components/
+// RUTA ANTERIOR: './POS/components/ProformaModal.jsx'; (Ruta relativa incorrecta desde 'pages')
+// RUTA CORREGIDA: './pos/components/ProformaModal.jsx'; 
+import ProformaModal from './pos/components/ProformaModal.jsx'; 
 
 
 // =================================================================
 // ESTILOS RESPONSIVE (STYLED COMPONENTS) - (Se mantiene igual)
 // =================================================================
 const spin = keyframes`
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 `;
 const Container = styled.div`
     display: flex; height: 100vh; background: #f1f5f9; font-family: 'Segoe UI', sans-serif; overflow: hidden;
@@ -73,7 +76,7 @@ const ActionButton = styled.button`
     &:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
 `;
 const LoadingIcon = styled(FaSync)`
-  animation: ${spin} 1s linear infinite;
+    animation: ${spin} 1s linear infinite;
 `;
 
 
