@@ -1,4 +1,5 @@
-// Archivo: src/pages/PedidosYApartados.jsx (COMPLETO)
+// Archivo: src/pages/PedidosYApartados.jsx (SIN react-toastify)
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import styled from 'styled-components';
 import { 
@@ -7,12 +8,10 @@ import {
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext'; 
 import * as api from '../service/api'; 
-import { toast } from 'react-toastify'; // Importación de JS
-// IMPORTACIÓN DE CSS ELIMINADA: import 'react-toastify/dist/ReactToastify.css';
+// ELIMINADA: import { toast } from 'react-toastify'; 
 
 // =================================================================
 // ESTILOS RESPONSIVE (STYLED COMPONENTS)
-// ... [El resto de tus Styled Components se mantiene] ...
 // =================================================================
 const Container = styled.div`
     display: flex; height: 100vh; background: #f1f5f9; font-family: 'Segoe UI', sans-serif; overflow: hidden;
@@ -100,10 +99,10 @@ const SellerDashboard = () => {
             const data = await api.fetchProducts(token); 
             const normalizedData = Array.isArray(data) ? data : (data?.data || []);
             setProducts(normalizedData);
-            toast.success("Inventario actualizado.");
+            alert("Inventario actualizado."); // Reemplazo de toast.success
         } catch (error) {
             console.error("Error cargando productos", error);
-            toast.error("Error de conexión al cargar productos.");
+            alert("Error de conexión al cargar productos."); // Reemplazo de toast.error
         } finally {
             setLoading(false);
         }
@@ -119,14 +118,14 @@ const SellerDashboard = () => {
             
             if (existing) {
                 if (existing.quantity >= stockAvailable) {
-                    toast.warn(`Stock máximo (${stockAvailable}) alcanzado para ${product.nombre}`);
+                    alert(`Stock máximo (${stockAvailable}) alcanzado para ${product.nombre}`); // Reemplazo de toast.warn
                     return prev;
                 }
                 return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
             }
             
             if (stockAvailable < 1) {
-                toast.error("Producto sin stock");
+                alert("Producto sin stock"); // Reemplazo de toast.error
                 return prev;
             }
 
@@ -148,7 +147,7 @@ const SellerDashboard = () => {
                         return null; 
                     }
                     if (newQty > p.existencia) { 
-                        toast.warn("No hay suficiente stock");
+                        alert("No hay suficiente stock"); // Reemplazo de toast.warn
                         return p;
                     }
                     return { ...p, quantity: newQty };
@@ -197,7 +196,7 @@ const SellerDashboard = () => {
                     setSearchTerm(''); // Limpiar para el siguiente escaneo
                     searchInputRef.current?.focus();
                 } else {
-                    toast.error(`Producto con código ${searchTerm} no encontrado.`);
+                    alert(`Producto con código ${searchTerm} no encontrado.`); // Reemplazo de toast.error
                 }
             } else {
                  // Si es por nombre, al presionar enter solo asegura que el foco esté en la búsqueda
@@ -216,8 +215,8 @@ const SellerDashboard = () => {
 
     // 4. Enviar a Caja (Crear Pedido Pendiente)
     const handleSendToCaja = async () => {
-        if (cart.length === 0) return toast.warn("El carrito está vacío");
-        if (userId === 0) return toast.error("Error: Usuario no identificado para crear el pedido.");
+        if (cart.length === 0) return alert("El carrito está vacío"); // Reemplazo de toast.warn
+        if (userId === 0) return alert("Error: Usuario no identificado para crear el pedido."); // Reemplazo de toast.error
         
         setLoading(true);
         const orderData = {
@@ -229,7 +228,7 @@ const SellerDashboard = () => {
                 precio: parseFloat(i.precio_venta), 
                 nombre: i.nombre,
                 codigo: i.codigo 
-            ))),
+            })),
             total: total,
             estado: 'PENDIENTE', // CLAVE para el POS (El POS lo buscará en este estado)
             tipo: 'PEDIDO'
@@ -238,14 +237,14 @@ const SellerDashboard = () => {
         try {
             await api.createOrder(orderData, token); 
             
-            toast.success("✅ Pedido enviado a caja. El cajero ya puede cobrarlo.");
+            alert("✅ Pedido enviado a caja. El cajero ya puede cobrarlo."); // Reemplazo de toast.success
             setCart([]);
             setClientName('');
             setSearchTerm('');
             searchInputRef.current?.focus();
         } catch (error) {
             console.error("Error al enviar pedido:", error);
-            toast.error("Error al enviar pedido: " + (error.response?.data?.message || "Error de conexión"));
+            alert("Error al enviar pedido: " + (error.response?.data?.message || "Error de conexión")); // Reemplazo de toast.error
         } finally {
             setLoading(false);
         }
