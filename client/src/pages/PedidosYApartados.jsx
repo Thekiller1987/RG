@@ -1,4 +1,4 @@
-// Archivo: src/pages/PedidosYApartados.jsx (SIN react-toastify)
+// Archivo: src/pages/PedidosYApartados.jsx
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import styled from 'styled-components';
@@ -8,7 +8,6 @@ import {
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext'; 
 import * as api from '../service/api'; 
-// ELIMINADA: import { toast } from 'react-toastify'; 
 
 // =================================================================
 // ESTILOS RESPONSIVE (STYLED COMPONENTS)
@@ -64,7 +63,6 @@ const ActionButton = styled.button`
     &:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
 `;
 
-// Función de utilidad para sanitizar texto
 const sanitizeText = (text) => String(text || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 // =================================================================
@@ -75,11 +73,10 @@ const SellerDashboard = () => {
     const { user, products: authProducts } = useAuth(); 
     const token = localStorage.getItem('token');
     
-    // Estados
     const [products, setProducts] = useState(authProducts || []); 
     const [cart, setCart] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
-    const [searchType, setSearchType] = useState('nombre'); // 'nombre' | 'codigo'
+    const [searchType, setSearchType] = useState('nombre'); 
     const [loading, setLoading] = useState(false);
     const [clientName, setClientName] = useState('');
     
@@ -92,17 +89,17 @@ const SellerDashboard = () => {
         }
     }, [authProducts]);
 
-    // 1. Cargar Productos (Si es necesario refrescar el inventario)
+    // 1. Cargar Productos
     const fetchProducts = useCallback(async () => {
         setLoading(true);
         try {
             const data = await api.fetchProducts(token); 
             const normalizedData = Array.isArray(data) ? data : (data?.data || []);
             setProducts(normalizedData);
-            alert("Inventario actualizado."); // Reemplazo de toast.success
+            alert("Inventario actualizado.");
         } catch (error) {
-            console.error("Error cargando productos", error);
-            alert("Error de conexión al cargar productos."); // Reemplazo de toast.error
+            const msg = error.message || (error.response?.data?.message) || "Verifique su conexión de red o token.";
+            alert(`Error de conexión al cargar productos: ${msg}`);
         } finally {
             setLoading(false);
         }
@@ -113,19 +110,18 @@ const SellerDashboard = () => {
         setCart(prev => {
             const stockAvailable = product.existencia;
             const existing = prev.find(p => p.id === product.id);
-            // Aseguramos que el precio sea un número flotante
             const finalPrice = parseFloat(product.precio_venta || product.precio || 0); 
             
             if (existing) {
                 if (existing.quantity >= stockAvailable) {
-                    alert(`Stock máximo (${stockAvailable}) alcanzado para ${product.nombre}`); // Reemplazo de toast.warn
+                    alert(`Stock máximo (${stockAvailable}) alcanzado para ${product.nombre}`);
                     return prev;
                 }
                 return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
             }
             
             if (stockAvailable < 1) {
-                alert("Producto sin stock"); // Reemplazo de toast.error
+                alert("Producto sin stock");
                 return prev;
             }
 
@@ -143,32 +139,29 @@ const SellerDashboard = () => {
                 if (p.id === id) {
                     const newQty = p.quantity + delta;
                     if (newQty < 1) {
-                        // Si se reduce a 0 o menos, se elimina
                         return null; 
                     }
                     if (newQty > p.existencia) { 
-                        alert("No hay suficiente stock"); // Reemplazo de toast.warn
+                        alert("No hay suficiente stock");
                         return p;
                     }
                     return { ...p, quantity: newQty };
                 }
                 return p;
-            }).filter(Boolean); // Elimina los items que retornaron null
+            }).filter(Boolean);
             return newCart;
         });
     };
     
-    // 3. Lógica de Búsqueda y Filtrado (Optimizada con Debounce Implícito)
-
+    // 3. Lógica de Búsqueda y Filtrado
     const filteredProducts = useMemo(() => {
         const term = sanitizeText(searchTerm);
         if (term.length < 3 && searchType === 'nombre') {
-             // Si la búsqueda por nombre es muy corta, no filtrar (para evitar la carga de los 5000)
             return products.slice(0, 100); 
         }
 
         const filtered = products.filter(p => {
-            if (!term) return true; // Si no hay término de búsqueda, muestra todos (o los primeros 100, si la lógica de arriba aplica)
+            if (!term) return true; 
             
             if (searchType === 'codigo') {
                 return sanitizeText(p.codigo).includes(term);
@@ -177,15 +170,13 @@ const SellerDashboard = () => {
             }
         });
 
-        // Limita los resultados a 100 para evitar sobrecargar la interfaz
         return filtered.slice(0, 100); 
     }, [products, searchTerm, searchType]);
 
 
     const handleSearchSubmit = (e) => {
-        // Al presionar ENTER, si la búsqueda es por código (código de barras), intenta agregarlo al carrito.
         if (e.key === 'Enter') {
-            e.preventDefault(); // Evitar cualquier envío de formulario predeterminado
+            e.preventDefault(); 
             if (searchType === 'codigo' && searchTerm) {
                 const exactMatch = products.find(p => 
                     sanitizeText(p.codigo) === sanitizeText(searchTerm)
@@ -193,19 +184,17 @@ const SellerDashboard = () => {
                 
                 if (exactMatch) {
                     addToCart(exactMatch);
-                    setSearchTerm(''); // Limpiar para el siguiente escaneo
+                    setSearchTerm(''); 
                     searchInputRef.current?.focus();
                 } else {
-                    alert(`Producto con código ${searchTerm} no encontrado.`); // Reemplazo de toast.error
+                    alert(`Producto con código ${searchTerm} no encontrado.`);
                 }
             } else {
-                 // Si es por nombre, al presionar enter solo asegura que el foco esté en la búsqueda
-                 searchInputRef.current?.focus();
+                searchInputRef.current?.focus();
             }
         }
     };
 
-    // Calcular Total
     const total = useMemo(() => {
         return cart.reduce((acc, item) => {
             const precio = parseFloat(item.precio_venta || item.precio || 0); 
@@ -215,8 +204,8 @@ const SellerDashboard = () => {
 
     // 4. Enviar a Caja (Crear Pedido Pendiente)
     const handleSendToCaja = async () => {
-        if (cart.length === 0) return alert("El carrito está vacío"); // Reemplazo de toast.warn
-        if (userId === 0) return alert("Error: Usuario no identificado para crear el pedido."); // Reemplazo de toast.error
+        if (cart.length === 0) return alert("El carrito está vacío");
+        if (userId === 0) return alert("Error: Usuario no identificado para crear el pedido.");
         
         setLoading(true);
         const orderData = {
@@ -230,21 +219,30 @@ const SellerDashboard = () => {
                 codigo: i.codigo 
             })),
             total: total,
-            estado: 'PENDIENTE', // CLAVE para el POS (El POS lo buscará en este estado)
+            estado: 'PENDIENTE',
             tipo: 'PEDIDO'
         };
 
         try {
             await api.createOrder(orderData, token); 
             
-            alert("✅ Pedido enviado a caja. El cajero ya puede cobrarlo."); // Reemplazo de toast.success
+            alert("✅ Pedido enviado a caja. El cajero ya puede cobrarlo.");
             setCart([]);
             setClientName('');
             setSearchTerm('');
             searchInputRef.current?.focus();
         } catch (error) {
             console.error("Error al enviar pedido:", error);
-            alert("Error al enviar pedido: " + (error.response?.data?.message || "Error de conexión")); // Reemplazo de toast.error
+            
+            const apiMessage = error.response?.data?.message || error.message;
+
+            if (error.message === 'Failed to fetch' || error.message.includes('network error') || !error.response) {
+                alert("Error de conexión: No se pudo conectar con el servidor. Revise su internet o la URL del API.");
+            } else if (error.response?.status === 401) {
+                 alert("Error de autenticación: Token expirado o inválido. Cierre sesión e inicie nuevamente.");
+            } else {
+                 alert("Error al enviar pedido: " + (apiMessage || "Fallo desconocido en el servidor."));
+            }
         } finally {
             setLoading(false);
         }
