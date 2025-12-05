@@ -1,228 +1,64 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import styled from 'styled-components';
 import { 
-  FaSearch, FaShoppingCart, FaPlus, FaTrash, 
-  FaPaperPlane, FaSync, FaBarcode, FaFont, FaMinus 
+  FaSearch, FaShoppingCart, FaPlus, FaTrash, 
+  FaPaperPlane, FaSync, FaBarcode, FaFont, FaMinus 
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext'; 
 import * as api from '../service/api'; 
 
 // =================================================================
-// ESTILOS RESPONSIVE (STYLED COMPONENTS)
+// ESTILOS RESPONSIVE (STYLED COMPONENTS) - Se asume que son correctos
 // =================================================================
-
 const Container = styled.div`
-  display: flex;
-  height: 100vh;
-  background: #f1f5f9;
-  font-family: 'Segoe UI', sans-serif;
-  overflow: hidden;
-
-  @media (max-width: 768px) {
-    flex-direction: column; /* En celular se pone uno debajo de otro */
-    height: auto;
-    min-height: 100vh;
-    overflow-y: auto;
-  }
+  display: flex; height: 100vh; background: #f1f5f9; font-family: 'Segoe UI', sans-serif; overflow: hidden;
+  @media (max-width: 768px) { flex-direction: column; height: auto; min-height: 100vh; overflow-y: auto; }
 `;
-
 const LeftPanel = styled.div`
-  flex: 2;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  overflow-y: hidden; /* Scroll interno en escritorio */
-
-  @media (max-width: 768px) {
-    flex: none;
-    height: auto;
-    overflow-y: visible;
-  }
+  flex: 2; padding: 20px; display: flex; flex-direction: column; gap: 15px; overflow-y: hidden;
+  @media (max-width: 768px) { flex: none; height: auto; overflow-y: visible; }
 `;
-
 const RightPanel = styled.div`
-  flex: 1;
-  background: white;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  box-shadow: -4px 0 15px rgba(0,0,0,0.05);
-  border-left: 1px solid #e2e8f0;
-  min-width: 350px;
-
-  @media (max-width: 768px) {
-    flex: none;
-    width: 100%;
-    border-left: none;
-    border-top: 1px solid #e2e8f0;
-    min-width: 0;
-  }
+  flex: 1; background: white; padding: 20px; display: flex; flex-direction: column; box-shadow: -4px 0 15px rgba(0,0,0,0.05); border-left: 1px solid #e2e8f0; min-width: 350px;
+  @media (max-width: 768px) { flex: none; width: 100%; border-left: none; border-top: 1px solid #e2e8f0; min-width: 0; }
 `;
-
-const Header = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-`;
-
-// --- BARRA DE BÚSQUEDA AVANZADA ---
+const Header = styled.div` display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; `;
 const SearchContainer = styled.div`
-  background: white;
-  padding: 15px;
-  border-radius: 12px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px;
 `;
-
-const SearchTypeToggle = styled.div`
-  display: flex;
-  gap: 10px;
-`;
-
+const SearchTypeToggle = styled.div` display: flex; gap: 10px; `;
 const ToggleButton = styled.button`
-  flex: 1;
-  padding: 8px;
-  border-radius: 6px;
-  border: 1px solid ${props => props.active ? '#3b82f6' : '#cbd5e1'};
-  background: ${props => props.active ? '#eff6ff' : 'white'};
-  color: ${props => props.active ? '#1d4ed8' : '#64748b'};
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: all 0.2s;
-
-  &:hover { background: #f1f5f9; }
+  flex: 1; padding: 8px; border-radius: 6px; border: 1px solid ${props => props.active ? '#3b82f6' : '#cbd5e1'};
+  background: ${props => props.active ? '#eff6ff' : 'white'}; color: ${props => props.active ? '#1d4ed8' : '#64748b'};
+  font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;
+  &:hover { background: #f1f5f9; }
 `;
-
 const SearchInputWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  background: #f8fafc;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 0 10px;
-  &:focus-within { border-color: #3b82f6; background: white; }
+  display: flex; align-items: center; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; padding: 0 10px; &:focus-within { border-color: #3b82f6; background: white; }
 `;
-
-const Input = styled.input`
-  flex: 1;
-  padding: 12px;
-  border: none;
-  background: transparent;
-  outline: none;
-  font-size: 1rem;
-`;
-
-// --- GRILLA DE PRODUCTOS ---
+const Input = styled.input` flex: 1; padding: 12px; border: none; background: transparent; outline: none; font-size: 1rem; `;
 const ProductGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 15px;
-  overflow-y: auto;
-  padding-bottom: 20px;
-  flex: 1;
-
-  @media (max-width: 768px) {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* Más pequeños en celular */
-    max-height: 50vh; /* Limitar altura en móvil para que no ocupe todo */
-  }
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; overflow-y: auto; padding-bottom: 20px; flex: 1;
+  @media (max-width: 768px) { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height: 50vh; }
 `;
-
 const ProductCard = styled.div`
-  background: white;
-  padding: 15px;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 8px;
-  transition: transform 0.2s;
-  cursor: pointer;
-  
-  &:hover {
-    transform: translateY(-3px);
-    border-color: #3b82f6;
-    box-shadow: 0 5px 15px rgba(59,130,246,0.1);
-  }
+  background: white; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; transition: transform 0.2s; cursor: pointer; 
+  &:hover { transform: translateY(-3px); border-color: #3b82f6; box-shadow: 0 5px 15px rgba(59,130,246,0.1); }
 `;
-
 const Badge = styled.span`
-  background: ${props => props.bg};
-  color: ${props => props.color};
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: bold;
+  background: ${props => props.bg}; color: ${props => props.color}; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold;
 `;
-
-// --- CARRITO ---
-const CartList = styled.div`
-  flex: 1;
-  overflow-y: auto;
-  margin-top: 15px;
-`;
-
-const CartItem = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #f1f5f9;
-`;
-
-const QtyControl = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #f8fafc;
-  padding: 4px;
-  border-radius: 6px;
-`;
-
+const CartList = styled.div` flex: 1; overflow-y: auto; margin-top: 15px; `;
+const CartItem = styled.div` display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f1f5f9; `;
+const QtyControl = styled.div` display: flex; align-items: center; gap: 8px; background: #f8fafc; padding: 4px; border-radius: 6px; `;
 const RoundBtn = styled.button`
-  width: 24px; height: 24px;
-  border-radius: 50%;
-  border: none;
-  background: white;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  &:hover { background: #e2e8f0; }
+  width: 24px; height: 24px; border-radius: 50%; border: none; background: white; box-shadow: 0 1px 2px rgba(0,0,0,0.1); cursor: pointer; display: flex; align-items: center; justify-content: center;
+  &:hover { background: #e2e8f0; }
 `;
-
 const ActionButton = styled.button`
-  background: ${props => props.bg || '#3b82f6'};
-  color: white;
-  border: none;
-  padding: 15px;
-  border-radius: 8px;
-  font-weight: bold;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-size: 1rem;
-  width: 100%;
-  margin-top: 10px;
-  
-  &:disabled {
-    background: #cbd5e1;
-    cursor: not-allowed;
-  }
-  
-  &:hover:not(:disabled) {
-    opacity: 0.9;
-    transform: translateY(-1px);
-  }
+  background: ${props => props.bg || '#3b82f6'}; color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 1rem; width: 100%; margin-top: 10px; 
+  &:disabled { background: #cbd5e1; cursor: not-allowed; } 
+  &:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
 `;
 
 // =================================================================
@@ -230,11 +66,11 @@ const ActionButton = styled.button`
 // =================================================================
 
 const SellerDashboard = () => {
-    const { user } = useAuth(); 
+    const { user, products: authProducts } = useAuth(); 
     const token = localStorage.getItem('token');
     
     // Estados
-    const [products, setProducts] = useState([]);
+    const [products, setProducts] = useState(authProducts || []); 
     const [cart, setCart] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [searchType, setSearchType] = useState('nombre'); // 'nombre' | 'codigo'
@@ -242,55 +78,63 @@ const SellerDashboard = () => {
     const [clientName, setClientName] = useState('');
     
     const searchInputRef = useRef(null);
+    const userId = user?.id_usuario || user?.id || 0;
+
+    useEffect(() => {
+        if (authProducts?.length) {
+            setProducts(authProducts);
+        }
+    }, [authProducts]);
 
     // 1. Cargar Productos
-    const fetchProducts = async () => {
+    const fetchProducts = useCallback(async () => {
         setLoading(true);
         try {
             const data = await api.fetchProducts(token); 
-            // Aseguramos que data sea un array
-            setProducts(Array.isArray(data) ? data : []);
+            const normalizedData = Array.isArray(data) ? data : (data?.data || []);
+            setProducts(normalizedData);
         } catch (error) {
             console.error("Error cargando productos", error);
             alert("Error de conexión al cargar productos.");
         } finally {
             setLoading(false);
         }
-    };
-
-    useEffect(() => { fetchProducts(); }, []);
+    }, [token]);
 
     // 2. Lógica de Carrito
     const addToCart = (product) => {
         setCart(prev => {
+            const stockAvailable = product.existencia;
             const existing = prev.find(p => p.id === product.id);
+            const finalPrice = product.precio_venta || product.precio || 0;
+            
             if (existing) {
-                // Si existe, sumamos 1, validando stock
-                if (existing.quantity >= product.existencia) {
+                if (existing.quantity >= stockAvailable) {
                     alert(`Stock máximo alcanzado para ${product.nombre}`);
                     return prev;
                 }
                 return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
             }
-            // Si no existe, agregamos con cantidad 1
-            if (product.existencia < 1) {
+            
+            if (stockAvailable < 1) {
                 alert("Producto sin stock");
                 return prev;
             }
-            return [...prev, { ...product, quantity: 1 }];
-        });
-    };
 
-    const removeFromCart = (id) => {
-        setCart(prev => prev.filter(p => p.id !== id));
+            return [...prev, { 
+                ...product, 
+                quantity: 1, 
+                precio_venta: finalPrice 
+            }]; 
+        });
     };
 
     const updateQuantity = (id, delta) => {
         setCart(prev => prev.map(p => {
             if (p.id === id) {
                 const newQty = p.quantity + delta;
-                if (newQty < 1) return p; // Mínimo 1
-                if (newQty > p.existencia) {
+                if (newQty < 1) return p; 
+                if (newQty > p.existencia) { 
                     alert("No hay suficiente stock");
                     return p;
                 }
@@ -299,25 +143,26 @@ const SellerDashboard = () => {
             return p;
         }));
     };
-
+    
     // 3. Lógica de Búsqueda Avanzada
     const handleSearchSubmit = (e) => {
-        // Si presiona ENTER
+        // Al presionar ENTER, si la búsqueda es por código, intenta agregarlo
         if (e.key === 'Enter') {
-            if (searchType === 'codigo') {
-                // Búsqueda exacta por código
+            if (searchType === 'codigo' && searchTerm) {
                 const exactMatch = products.find(p => 
-                    p.codigo && p.codigo.toLowerCase() === searchTerm.toLowerCase()
+                    String(p.codigo).toLowerCase() === searchTerm.toLowerCase()
                 );
                 
                 if (exactMatch) {
                     addToCart(exactMatch);
                     setSearchTerm(''); // Limpiar para el siguiente escaneo
-                    // Reproducir sonidito opcional o feedback visual
+                    searchInputRef.current?.focus();
                 } else {
-                    alert("Producto no encontrado por código");
+                    alert(`Producto con código ${searchTerm} no encontrado. Muestra la lista filtrada.`);
+                    // Opcional: No limpiar searchTerm para que el usuario vea el filtro
                 }
             }
+            // Si es por nombre, solo filtra (el filtro ya ocurre en tiempo real)
         }
     };
 
@@ -326,16 +171,18 @@ const SellerDashboard = () => {
         if (!term) return true;
         
         if (searchType === 'codigo') {
-            return p.codigo && p.codigo.toLowerCase().includes(term);
+            // Buscamos código
+            return String(p.codigo || '').toLowerCase().includes(term);
         } else {
-            return p.nombre.toLowerCase().includes(term);
+            // Buscamos nombre/descripción
+            return String(p.nombre).toLowerCase().includes(term);
         }
     });
 
     // Calcular Total
     const total = useMemo(() => {
         return cart.reduce((acc, item) => {
-            const precio = parseFloat(item.precio || item.precio_venta || 0);
+            const precio = parseFloat(item.precio_venta || item.precio || 0); 
             return acc + (precio * item.quantity);
         }, 0);
     }, [cart]);
@@ -343,32 +190,34 @@ const SellerDashboard = () => {
     // 4. Enviar a Caja (Crear Pedido Pendiente)
     const handleSendToCaja = async () => {
         if (cart.length === 0) return alert("El carrito está vacío");
+        if (userId === 0) return alert("Error: Usuario no identificado para crear el pedido.");
 
         const orderData = {
-            userId: user?.id || user?.id_usuario || 0,
+            userId: userId, 
             clienteNombre: clientName.trim() || "Consumidor Final",
             items: cart.map(i => ({
-                id_producto: i.id,
+                id_producto: i.id, // ID del producto
                 cantidad: i.quantity,
-                precio: parseFloat(i.precio || i.precio_venta),
-                nombre: i.nombre
+                precio: parseFloat(i.precio_venta || i.precio || 0), // Precio unitario de venta
+                nombre: i.nombre,
+                codigo: i.codigo 
             })),
             total: total,
-            estado: 'PENDIENTE', // IMPORTANTE para que el cajero lo vea
+            estado: 'PENDIENTE', // CLAVE para el POS
             tipo: 'PEDIDO'
         };
 
         try {
-            // Asegúrate de que api.createOrder envíe POST a /orders o /ventas
-            await api.createOrder(orderData, token);
+            await api.createOrder(orderData, token); 
             
             alert("✅ Pedido enviado a caja. El cajero ya puede cobrarlo.");
             setCart([]);
             setClientName('');
             setSearchTerm('');
+            searchInputRef.current?.focus();
         } catch (error) {
-            console.error(error);
-            alert("Error al enviar: " + (error.message || "Error desconocido"));
+            console.error("Error al enviar pedido:", error);
+            alert("Error al enviar: " + (error.response?.data?.message || error.message || "Error desconocido"));
         }
     };
 
@@ -387,13 +236,13 @@ const SellerDashboard = () => {
                     <SearchTypeToggle>
                         <ToggleButton 
                             active={searchType === 'nombre'} 
-                            onClick={() => { setSearchType('nombre'); searchInputRef.current?.focus(); }}
+                            onClick={() => { setSearchType('nombre'); setSearchTerm(''); searchInputRef.current?.focus(); }}
                         >
                             <FaFont /> Nombre
                         </ToggleButton>
                         <ToggleButton 
                             active={searchType === 'codigo'} 
-                            onClick={() => { setSearchType('codigo'); searchInputRef.current?.focus(); }}
+                            onClick={() => { setSearchType('codigo'); setSearchTerm(''); searchInputRef.current?.focus(); }}
                         >
                             <FaBarcode /> Código
                         </ToggleButton>
@@ -414,7 +263,7 @@ const SellerDashboard = () => {
 
                 <ProductGrid>
                     {filteredProducts.map(p => {
-                        const precio = parseFloat(p.precio || p.precio_venta || 0);
+                        const precio = parseFloat(p.precio_venta || p.precio || 0);
                         const tieneStock = p.existencia > 0;
                         
                         return (
@@ -422,7 +271,7 @@ const SellerDashboard = () => {
                                 <div>
                                     <div style={{fontWeight:'600', color:'#334155', lineHeight:'1.2'}}>{p.nombre}</div>
                                     <div style={{fontSize:'0.8rem', color:'#64748b', marginTop:4}}>
-                                        {p.codigo || 'Sin Código'}
+                                        {p.codigo || `ID: ${p.id}`}
                                     </div>
                                 </div>
                                 
@@ -472,13 +321,13 @@ const SellerDashboard = () => {
                                 <div style={{flex:1, paddingRight:10}}>
                                     <div style={{fontWeight:'600', fontSize:'0.9rem'}}>{item.nombre}</div>
                                     <div style={{color:'#64748b', fontSize:'0.8rem'}}>
-                                        C$ {parseFloat(item.precio).toFixed(2)} x {item.quantity}
+                                        C$ {parseFloat(item.precio_venta || item.precio).toFixed(2)} x {item.quantity}
                                     </div>
                                 </div>
                                 
                                 <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:5}}>
                                     <div style={{fontWeight:'bold', color:'#334155'}}>
-                                        C$ {(parseFloat(item.precio) * item.quantity).toFixed(2)}
+                                        C$ {(parseFloat(item.precio_venta || item.precio) * item.quantity).toFixed(2)}
                                     </div>
                                     
                                     <div style={{display:'flex', alignItems:'center', gap:5}}>
@@ -488,7 +337,7 @@ const SellerDashboard = () => {
                                             <RoundBtn onClick={() => updateQuantity(item.id, 1)}><FaPlus size={10}/></RoundBtn>
                                         </QtyControl>
                                         <button 
-                                            onClick={() => removeFromCart(item.id)} 
+                                            onClick={() => setCart(prev => prev.filter(p => p.id !== item.id))} 
                                             style={{border:'none', background:'none', color:'#ef4444', cursor:'pointer', padding:5}}
                                         >
                                             <FaTrash />
