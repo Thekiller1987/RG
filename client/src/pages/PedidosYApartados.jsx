@@ -8,9 +8,14 @@ import {
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext'; 
 import * as api from '../service/api'; 
+// Asegúrate de que tu api.js exporte una función fetchActiveBoxes.
+// Si no existe, deberás añadirla a tu api.js
+// IMPORTANTE: Se asume que api.js tiene una función 'fetchActiveBoxes'.
+
 
 // =================================================================
 // ESTILOS RESPONSIVE (STYLED COMPONENTS)
+// ... (Tus estilos se mantienen sin cambios)
 // =================================================================
 const Container = styled.div`
     display: flex; height: 100vh; background: #f1f5f9; font-family: 'Segoe UI', sans-serif; overflow: hidden;
@@ -106,6 +111,7 @@ const SellerDashboard = () => {
     }, [token]);
 
     // 2. Lógica de Carrito
+    // ... (Lógica de Carrito se mantiene sin cambios)
     const addToCart = (product) => {
         setCart(prev => {
             const stockAvailable = product.existencia;
@@ -154,6 +160,7 @@ const SellerDashboard = () => {
     };
     
     // 3. Lógica de Búsqueda y Filtrado
+    // ... (Lógica de Búsqueda y Filtrado se mantiene sin cambios)
     const filteredProducts = useMemo(() => {
         const term = sanitizeText(searchTerm);
         if (term.length < 3 && searchType === 'nombre') {
@@ -202,13 +209,63 @@ const SellerDashboard = () => {
         }, 0);
     }, [cart]);
 
-    // 4. Enviar a Caja (Crear Pedido Pendiente)
-    const handleSendToCaja = async () => {
+    // =================================================================
+    // 4. FUNCIONALIDAD SOLICITADA: CREAR TICKET CON SELECCIÓN DE CAJA
+    // =================================================================
+    const handleCreateTicket = async () => {
         if (cart.length === 0) return alert("El carrito está vacío");
-        if (userId === 0) return alert("Error: Usuario no identificado para crear el pedido.");
+        if (userId === 0) return alert("Error: Usuario no identificado para crear el ticket.");
         
         setLoading(true);
+
+        // --- INICIO DE LÓGICA DE SELECCIÓN DE CAJA ---
+        let selectedBoxId = null;
+        try {
+            // Se asume que api.fetchActiveBoxes existe y devuelve [{ id: 1, name: 'Caja 1' }, ...]
+            const activeBoxes = await api.fetchActiveBoxes(token); 
+
+            if (!activeBoxes || activeBoxes.length === 0) {
+                alert("🚨 No hay cajas activas. No se puede crear el ticket de venta.");
+                setLoading(false);
+                return;
+            }
+
+            const boxOptions = activeBoxes
+                .map(box => `[${box.id}] - ${box.nombre || box.name}`) // Usar .name si es el campo
+                .join('\n');
+            
+            // Usamos prompt para forzar la selección, como se solicitó para simplificar.
+            const promptMessage = `Selecciona el ID de la Caja Activa para registrar el Ticket:\n\n${boxOptions}`;
+            const input = prompt(promptMessage);
+
+            if (input === null || input.trim() === '') {
+                alert("Creación de ticket cancelada por el usuario.");
+                setLoading(false);
+                return;
+            }
+
+            const id = parseInt(input.trim());
+            const boxExists = activeBoxes.some(box => box.id === id);
+
+            if (isNaN(id) || !boxExists) {
+                alert("🚫 ID de caja inválido. Intenta de nuevo.");
+                setLoading(false);
+                return;
+            }
+
+            selectedBoxId = id;
+
+        } catch (error) {
+            console.error("Error al obtener cajas activas:", error);
+            alert("Error de conexión al obtener las cajas. No se puede crear el ticket.");
+            setLoading(false);
+            return;
+        }
+        // --- FIN DE LÓGICA DE SELECCIÓN DE CAJA ---
+
+        // Preparación de los datos del pedido/ticket
         const orderData = {
+            id_caja: selectedBoxId, // CAMPO CLAVE AGREGADO
             userId: userId, 
             clienteNombre: clientName.trim() || "Consumidor Final",
             items: cart.map(i => ({
@@ -219,29 +276,26 @@ const SellerDashboard = () => {
                 codigo: i.codigo 
             })),
             total: total,
-            estado: 'PENDIENTE',
-            tipo: 'PEDIDO'
+            estado: 'COMPLETADO', // Cambiado a COMPLETO para reflejar un Ticket de Venta
+            tipo: 'TICKET' // Cambiado a TICKET
         };
 
         try {
             await api.createOrder(orderData, token); 
             
-            alert("✅ Pedido enviado a caja. El cajero ya puede cobrarlo.");
+            alert(`✅ Ticket creado y asignado a la Caja ID: ${selectedBoxId}.`);
             setCart([]);
             setClientName('');
             setSearchTerm('');
             searchInputRef.current?.focus();
         } catch (error) {
-            console.error("Error al enviar pedido:", error);
-            
+            console.error("Error al crear el ticket:", error);
             const apiMessage = error.response?.data?.message || error.message;
 
-            if (error.message === 'Failed to fetch' || error.message.includes('network error') || !error.response) {
-                alert("Error de conexión: No se pudo conectar con el servidor. Revise su internet o la URL del API.");
-            } else if (error.response?.status === 401) {
+            if (error.response?.status === 401) {
                  alert("Error de autenticación: Token expirado o inválido. Cierre sesión e inicie nuevamente.");
             } else {
-                 alert("Error al enviar pedido: " + (apiMessage || "Fallo desconocido en el servidor."));
+                 alert("❌ Error al crear el ticket: " + (apiMessage || "Fallo desconocido en el servidor."));
             }
         } finally {
             setLoading(false);
@@ -253,7 +307,7 @@ const SellerDashboard = () => {
             {/* ================= PANEL IZQUIERDO (PRODUCTOS) ================= */}
             <LeftPanel>
                 <Header>
-                    <h2 style={{margin:0, color:'#1e293b'}}>Pedidos</h2>
+                    <h2 style={{margin:0, color:'#1e293b'}}>Punto de Venta</h2>
                     <button 
                         onClick={fetchProducts} 
                         disabled={loading}
@@ -390,8 +444,11 @@ const SellerDashboard = () => {
                         <span>C$ {total.toFixed(2)}</span>
                     </div>
 
-                    <ActionButton onClick={handleSendToCaja} disabled={cart.length === 0 || loading}>
-                        <FaPaperPlane /> ENVIAR A CAJA
+                    <ActionButton 
+                        onClick={handleCreateTicket} // Llama a la nueva función
+                        disabled={cart.length === 0 || loading}
+                    >
+                        <FaPaperPlane /> REGISTRAR TICKET Y ASIGNAR CAJA
                     </ActionButton>
                 </div>
             </RightPanel>

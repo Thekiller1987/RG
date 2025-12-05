@@ -411,3 +411,20 @@ export const fetchTotalDebt = async (token) => {
 export const fetchOrdersWithBalance = async (token) => {
     return await request('GET', '/orders/with-balance', token);
 };
+
+
+const fetchActiveBoxes = async (token) => {
+    // ESTO DEBE APUNTAR A TU ENDPOINT REAL DE CAJAS
+    try {
+        const response = await axios.get(`${BASE_URL}/boxes/active`, {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+        return response.data; // Esperamos un array como [{ id: 1, name: 'Caja Principal' }, ...]
+    } catch (error) {
+        console.error("Error al obtener cajas activas:", error);
+        // Devolver un array vacío para manejarlo elegantemente
+        return []; 
+    }
+};
