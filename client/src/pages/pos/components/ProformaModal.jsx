@@ -1,329 +1,433 @@
-// client/src/pages/POS/components/ProformaModal.jsx
-import React from 'react';
-import { FaFileInvoice, FaPrint, FaWindowClose } from 'react-icons/fa';
-import styled from 'styled-components';
-import { ModalOverlay, ModalContent, Button, TotalsRow } from '../POS.styles.jsx';
-import AlertModal from './AlertModal.jsx';
-import { useAuth } from '../../../context/AuthContext.jsx';
+// Archivo: src/pages/PedidosYApartados.jsx
 
-/* =================================================================
- * DATOS DE TU NEGOCIO (para el encabezado descriptivo de la proforma)
- * ================================================================= */
-const COMPANY = {
-  NAME: 'Multirepuestos RG',
-  RUC: '[Número de RUC aquí]',
-  PHONE: '84031936 / 84058142',
-  ADDRESS: 'Del portón de la normal 75 varas al este. Juigalpa, Chontales.',
-  SLOGAN: 'Tu mejor opción en repuestos de moto y carro',
-};
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import styled, { keyframes } from 'styled-components'; 
+import { 
+    FaSearch, FaFilePdf, FaPlus, FaTrash, 
+    FaSync, FaBarcode, FaFont, FaMinus, FaFileAlt 
+} from 'react-icons/fa'; 
 
-/* =================================================================
- * ESTILOS LOCALES
- * ================================================================= */
-const ProformaWrapper = styled.div`
-  width: 100%;
-  max-width: 650px;
-  padding: 1.5rem;
-  background: #fff;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+import { useAuth } from '../context/AuthContext'; 
+import * as api from '../service/api'; 
+
+// 1. IMPORTAMOS EL MODAL DE PROFORMA QUE PROPORCIONASTE
+import ProformaModal from './POS/components/ProformaModal.jsx'; 
+
+
+// =================================================================
+// ESTILOS RESPONSIVE (STYLED COMPONENTS) - (Se mantiene igual)
+// =================================================================
+const spin = keyframes`
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+`;
+const Container = styled.div`
+    display: flex; height: 100vh; background: #f1f5f9; font-family: 'Segoe UI', sans-serif; overflow: hidden;
+    @media (max-width: 768px) { flex-direction: column; height: auto; min-height: 100vh; overflow-y: auto; }
+`;
+const LeftPanel = styled.div`
+    flex: 2; padding: 20px; display: flex; flex-direction: column; gap: 15px; overflow-y: hidden;
+    @media (max-width: 768px) { flex: none; height: auto; overflow-y: visible; }
+`;
+const RightPanel = styled.div`
+    flex: 1; background: white; padding: 20px; display: flex; flex-direction: column; box-shadow: -4px 0 15px rgba(0,0,0,0.05); border-left: 1px solid #e2e8f0; min-width: 350px;
+    @media (max-width: 768px) { flex: none; width: 100%; border-left: none; border-top: 1px solid #e2e8f0; min-width: 0; }
+`;
+const Header = styled.div` display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; `;
+const SearchContainer = styled.div`
+    background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px;
+`;
+const SearchTypeToggle = styled.div` display: flex; gap: 10px; `;
+const ToggleButton = styled.button`
+    flex: 1; padding: 8px; border-radius: 6px; border: 1px solid ${props => props.active ? '#3b82f6' : '#cbd5e1'};
+    background: ${props => props.active ? '#eff6ff' : 'white'}; color: ${props => props.active ? '#1d4ed8' : '#64748b'};
+    font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;
+    &:hover { background: #f1f5f9; }
+`;
+const SearchInputWrapper = styled.div`
+    display: flex; align-items: center; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; padding: 0 10px; &:focus-within { border-color: #3b82f6; background: white; }
+`;
+const Input = styled.input` flex: 1; padding: 12px; border: none; background: transparent; outline: none; font-size: 1rem; `;
+const ProductGrid = styled.div`
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; overflow-y: auto; padding-bottom: 20px; flex: 1;
+    @media (max-width: 768px) { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height: 50vh; }
+`;
+const ProductCard = styled.div`
+    background: white; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; transition: transform 0.2s; cursor: pointer; 
+    &:hover { transform: translateY(-3px); border-color: #3b82f6; box-shadow: 0 5px 15px rgba(59,130,246,0.1); }
+`;
+const Badge = styled.span`
+    background: ${props => props.bg}; color: ${props => props.color}; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold;
+`;
+const CartList = styled.div` flex: 1; overflow-y: auto; margin-top: 15px; `;
+const CartItem = styled.div` display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f1f5f9; `;
+const QtyControl = styled.div` display: flex; align-items: center; gap: 8px; background: #f8fafc; padding: 4px; border-radius: 6px; `;
+const RoundBtn = styled.button`
+    width: 24px; height: 24px; border-radius: 50%; border: none; background: white; box-shadow: 0 1px 2px rgba(0,0,0,0.1); cursor: pointer; display: flex; align-items: center; justify-content: center;
+    &:hover { background: #e2e8f0; }
+`;
+const ActionButton = styled.button`
+    background: ${props => props.bg || '#059669'}; 
+    color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 1rem; width: 100%; margin-top: 10px; 
+    &:disabled { background: #cbd5e1; cursor: not-allowed; } 
+    &:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+`;
+const LoadingIcon = styled(FaSync)`
+  animation: ${spin} 1s linear infinite;
 `;
 
-const ProformaHeader = styled.div`
-  text-align: center;
-  border-bottom: 2px solid #ccc;
-  padding-bottom: 1rem;
 
-  h2 {
-    margin: 0;
-    font-size: 1.5rem;
-    color: #0b72b9;
-  }
-  p {
-    margin: 0.25rem 0;
-    font-size: 0.9rem;
-  }
-`;
+const sanitizeText = (text) => String(text || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-const CompanyDetails = styled.div`
-  font-size: 0.9rem;
-  color: #555;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 1rem;
+// =================================================================
+// COMPONENTE PRINCIPAL: ProformaGenerator
+// =================================================================
 
-  strong { color: #333; }
-`;
+const ProformaGenerator = () => {
+    const { user, products: authProducts } = useAuth(); 
+    const token = localStorage.getItem('token');
+    
+    const [products, setProducts] = useState(authProducts || []); 
+    const [cart, setCart] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [searchType, setSearchType] = useState('nombre'); 
+    const [loading, setLoading] = useState(false);
+    const [clientName, setClientName] = useState('');
+    
+    // 2. NUEVOS ESTADOS PARA MANEJAR EL MODAL
+    const [isProformaModalOpen, setIsProformaModalOpen] = useState(false);
+    const [proformaDetails, setProformaDetails] = useState(null);
 
-const ClientDetails = styled.div`
-  display: flex;
-  justify-content: space-between;
-  padding: 0.5rem 0;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background-color: #f9f9f9;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-`;
+    const searchInputRef = useRef(null);
+    
+    useEffect(() => {
+        if (authProducts?.length) {
+            setProducts(authProducts);
+        }
+    }, [authProducts]);
 
-const ClientDetailItem = styled.div`
-  flex: 1 1 250px;
-  padding: 0 1rem;
-  p { margin: 3px 0; }
-  span { font-weight: bold; color: #000; }
-`;
+    const fetchProducts = useCallback(async () => {
+        // ... (función fetchProducts se mantiene igual)
+        setLoading(true);
+        try {
+            const data = await api.fetchProducts(token); 
+            const normalizedData = Array.isArray(data) ? data : (data?.data || []);
+            setProducts(normalizedData);
+            alert("Inventario de productos actualizado.");
+        } catch (error) {
+            const msg = error.message || (error.response?.data?.message) || "Verifique su conexión de red o token.";
+            alert(`Error de conexión al cargar productos: ${msg}`);
+        } finally {
+            setLoading(false);
+        }
+    }, [token]);
 
-const ProformaTable = styled.table`
-  width: 100%;
-  border-collapse: collapse;
+    const addToCart = (product) => {
+        // ... (función addToCart se mantiene igual)
+        setCart(prev => {
+            const existing = prev.find(p => p.id === product.id);
+            const finalPrice = parseFloat(product.precio_venta || product.precio || 0); 
+            
+            if (existing) {
+                return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
+            }
 
-  th, td {
-    padding: 8px 12px;
-    text-align: left;
-    font-size: 0.95rem;
-    border-bottom: 1px dashed #eee;
-  }
-
-  th {
-    background-color: #f7f7f7;
-    font-weight: bold;
-    color: #333;
-  }
-
-  .text-right { text-align: right; }
-`;
-
-const FooterDetails = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding-top: 1rem;
-  gap: 1rem;
-  flex-wrap: wrap;
-`;
-
-const TotalsArea = styled.div`
-  width: 260px;
-  max-width: 100%;
-
-  ${TotalsRow} { padding: 4px 0; }
-
-  ${TotalsRow}.grand-total {
-    border-top: 2px solid #333;
-    font-size: 1.1rem;
-  }
-`;
-
-/* =================================================================
- * COMPONENTE PRINCIPAL
- * ================================================================= */
-const ProformaModal = ({
-  cart = [],
-  total = 0,
-  subtotal = 0,
-  discount = 0,
-  proformaFor = '',
-  onClose,
-  setTicketData,
-  currentUser,
-  client
-}) => {
-  const [modal, setModal] = React.useState({ name: null, props: {} });
-  const { user: authUser } = (typeof useAuth === 'function' ? useAuth() : { user: null });
-
-  const fmt = (n) =>
-    new Intl.NumberFormat('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      .format(Number(n || 0));
-
-  const openModal  = React.useCallback((name, props = {}) => setModal({ name, props }), []);
-  const closeModal = React.useCallback(() => setModal({ name: null, props: {} }), []);
-  const showAlert  = React.useCallback((props) => openModal('alert', props), [openModal]);
-
-  // -------- Resolver nombre del operador con fallbacks (¡adiós "Cajero POS"!)
-  const getName = (u) =>
-    u?.usuarioNombre ||
-    u?.nombre_usuario ||
-    u?.name ||
-    u?.nombre ||
-    u?.displayName ||
-    u?.username ||
-    null;
-
-  let lsUser = null;
-  try { lsUser = JSON.parse(localStorage.getItem('authUser') || 'null'); } catch { /* noop */ }
-
-  const userName =
-    getName(currentUser) ||
-    getName(authUser)   ||
-    getName(lsUser)     ||
-    'Cajero POS';
-
-  // -------- Datos del cliente mostrado en la proforma
-  const clientName  = client?.nombre  || 'Consumidor Final';
-  const clientPhone = client?.telefono || 'N/D';
-
-  /**
-   * Prepara la transacción de proforma y abre el TicketModal con el modo elegido.
-   */
-  const handlePrintProforma = React.useCallback((printMode) => {
-    const proformaTransaction = {
-      isProforma: true,
-      proformaNombre: proformaFor,         // “A nombre de”
-      // Datos del vendedor/cajero
-      userId: (currentUser?.id_usuario ?? currentUser?.id ?? authUser?.id_usuario ?? authUser?.id),
-      usuarioNombre: userName,
-      // Carrito y totales
-      items: cart,
-      subtotal,
-      descuento: discount,
-      totalVenta: total,
-      // Metadatos
-      saleId: Date.now(),                  // id temporal
-      fecha: new Date().toISOString(),
-      shouldPrintNow: true                 // auto-impresión en TicketModal
+            return [...prev, { 
+                ...product, 
+                quantity: 1, 
+                precio_venta: finalPrice 
+            }]; 
+        });
     };
 
-    setTicketData({
-      transaction: proformaTransaction,
-      creditStatus: null,
-      shouldOpen: true,
-      printMode                          // '80' | 'A4'
-    });
+    const updateQuantity = (id, delta) => {
+        // ... (función updateQuantity se mantiene igual)
+        setCart(prev => {
+            const newCart = prev.map(p => {
+                if (p.id === id) {
+                    const newQty = p.quantity + delta;
+                    if (newQty < 1) {
+                        return null; 
+                    }
+                    return { ...p, quantity: newQty };
+                }
+                return p;
+            }).filter(Boolean);
+            return newCart;
+        });
+    };
+    
+    const filteredProducts = useMemo(() => {
+        // ... (filteredProducts se mantiene igual)
+        const term = sanitizeText(searchTerm);
+        if (term.length < 3 && searchType === 'nombre') {
+            return products.slice(0, 100); 
+        }
 
-    onClose && onClose();
-  }, [cart, subtotal, discount, total, proformaFor, setTicketData, onClose, currentUser, authUser, userName]);
+        const filtered = products.filter(p => {
+            if (!term) return true; 
+            
+            if (searchType === 'codigo') {
+                return sanitizeText(p.codigo).includes(term);
+            } else {
+                return sanitizeText(p.nombre).includes(term);
+            }
+        });
 
-  /**
-   * Diálogo para elegir formato de impresión (usa el mismo AlertModal del POS).
-   */
-  const askForProformaPrint = React.useCallback(() => {
-    showAlert({
-      title: 'Imprimir Proforma',
-      message: '¿En qué formato desea imprimir la Proforma?',
-      type: 'custom',
-      buttons: [
-        {
-          label: '80 mm (Recibo)',
-          action: () => { handlePrintProforma('80'); closeModal(); },
-          isPrimary: true
-        },
-        {
-          label: 'A4 (Completo)',
-          action: () => { handlePrintProforma('A4'); closeModal(); }
-        },
-        { label: 'Cancelar', action: closeModal, isCancel: true }
-      ]
-    });
-  }, [showAlert, closeModal, handlePrintProforma]);
+        return filtered.slice(0, 100); 
+    }, [products, searchTerm, searchType]);
 
-  return (
-    <ModalOverlay>
-      <ModalContent style={{ maxWidth: '680px', width: '95%' }}>
-        <ProformaWrapper>
-          <ProformaHeader>
-            <FaFileInvoice size={32} style={{ color: '#0b72b9', marginBottom: 8 }} />
-            <h2>PROFORMA</h2>
-            <p>Documento No Válido como Factura Fiscal</p>
-          </ProformaHeader>
 
-          <CompanyDetails>
-            <p style={{ margin: 0, fontWeight: 'bold' }}>
-              {COMPANY.NAME} - {COMPANY.SLOGAN}
-            </p>
-            <p style={{ margin: '3px 0' }}>{COMPANY.ADDRESS}</p>
-            <p style={{ margin: 0 }}>
-              Teléfonos: {COMPANY.PHONE} &nbsp;|&nbsp; RUC: {COMPANY.RUC}
-            </p>
-          </CompanyDetails>
+    const handleSearchSubmit = (e) => {
+        // ... (handleSearchSubmit se mantiene igual)
+        if (e.key === 'Enter') {
+            e.preventDefault(); 
+            if (searchType === 'codigo' && searchTerm) {
+                const exactMatch = products.find(p => 
+                    sanitizeText(p.codigo) === sanitizeText(searchTerm)
+                );
+                
+                if (exactMatch) {
+                    addToCart(exactMatch);
+                    setSearchTerm(''); 
+                    searchInputRef.current?.focus();
+                } else {
+                    alert(`Producto con código ${searchTerm} no encontrado.`);
+                }
+            } else {
+                searchInputRef.current?.focus();
+            }
+        }
+    };
 
-          <ClientDetails>
-            <ClientDetailItem>
-              <p>Emitida a nombre de: <span>{proformaFor || 'Consumidor Final'}</span></p>
-              <p>Cliente asociado: <span>{clientName}</span></p>
-              <p>Teléfono cliente: <span>{clientPhone}</span></p>
-            </ClientDetailItem>
-            <ClientDetailItem>
-              <p>Emitida por: <span>{userName}</span></p>
-              <p>Fecha: <span>{new Date().toLocaleDateString('es-NI')}</span></p>
-            </ClientDetailItem>
-          </ClientDetails>
+    const total = useMemo(() => {
+        return cart.reduce((acc, item) => {
+            const precio = parseFloat(item.precio_venta || item.precio || 0); 
+            return acc + (precio * item.quantity);
+        }, 0);
+    }, [cart]);
 
-          <ProformaTable>
-            <thead>
-              <tr>
-                <th style={{ width: '10%' }}>CANT.</th>
-                <th style={{ width: '45%' }}>DESCRIPCIÓN</th>
-                <th className="text-right" style={{ width: '25%' }}>PRECIO UNIT.</th>
-                <th className="text-right" style={{ width: '20%' }}>TOTAL</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cart.length === 0 ? (
-                <tr>
-                  <td colSpan="4" style={{ textAlign: 'center', color: '#777' }}>
-                    No hay artículos en el carrito para la Proforma.
-                  </td>
-                </tr>
-              ) : cart.map((item, idx) => {
-                  const unit = Number(item.precio_venta ?? item.precio ?? 0);
-                  const qty  = Number(item.quantity ?? 0);
-                  return (
-                    <tr key={idx}>
-                      <td>{qty}</td>
-                      <td>{item.nombre || 'Artículo sin nombre'}</td>
-                      <td className="text-right">C${fmt(unit)}</td>
-                      <td className="text-right">C${fmt(qty * unit)}</td>
-                    </tr>
-                  );
-                })
-              }
-            </tbody>
-          </ProformaTable>
+    // Calcular Subtotal y Descuento (Asumiendo que no hay impuestos ni descuentos fijos aquí)
+    const subtotal = total;
+    const discount = 0;
 
-          <FooterDetails>
-            <div>
-              <p style={{ fontWeight: 'bold' }}>Nota:</p>
-              <p style={{ fontSize: '0.85rem' }}>{COMPANY.SLOGAN}</p>
-              <p style={{ fontSize: '0.85rem' }}>
-                Los precios de la Proforma están sujetos a cambios y disponibilidad de inventario.
-              </p>
-            </div>
+    const resetCart = useCallback(() => {
+        setCart([]);
+        setClientName('');
+        setProformaDetails(null);
+        setIsProformaModalOpen(false);
+        searchInputRef.current?.focus();
+    }, []);
 
-            <TotalsArea>
-              <TotalsRow>
-                <span>Subtotal:</span>
-                <span className="text-right">C${fmt(subtotal)}</span>
-              </TotalsRow>
-              {discount > 0 && (
-                <TotalsRow>
-                  <span>Descuento:</span>
-                  <span className="text-right">- C${fmt(discount)}</span>
-                </TotalsRow>
-              )}
-              <TotalsRow $bold className="grand-total">
-                <span>TOTAL ESTIMADO:</span>
-                <span className="text-right">C${fmt(total)}</span>
-              </TotalsRow>
-            </TotalsArea>
-          </FooterDetails>
+    // 3. FUNCIÓN MEJORADA: PREPARA LOS DATOS Y ABRE EL MODAL
+    const handleGenerateProforma = async () => {
+        if (cart.length === 0) return alert("El carrito está vacío. Agrega productos para generar la proforma.");
+        
+        const clientTrimmed = clientName.trim();
+        if (!clientTrimmed) {
+            return alert("🚨 Por favor, introduce el Nombre del Cliente antes de generar la proforma.");
+        }
+        
+        setLoading(true);
 
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-            <Button $cancel onClick={onClose} style={{ flex: 1 }}>
-              <FaWindowClose /> Cerrar
-            </Button>
-            <Button pay onClick={askForProformaPrint} disabled={cart.length === 0} style={{ flex: 1 }}>
-              <FaPrint /> Imprimir Proforma
-            </Button>
-          </div>
-        </ProformaWrapper>
-      </ModalContent>
+        // 1. Prepara el objeto de la Proforma con todos los datos necesarios
+        const newProformaDetails = {
+            cart: cart,
+            total: total,
+            subtotal: subtotal,
+            discount: discount,
+            proformaFor: clientTrimmed, // El nombre a quien se emitirá la proforma (el campo de texto)
+            client: { nombre: clientTrimmed, telefono: 'N/D' }, // Datos simulados del cliente
+            // currentUser: user, // Ya está disponible a través de useAuth en ProformaModal si es necesario
+        };
 
-      {modal.name === 'alert' && (
-        <AlertModal isOpen={true} onClose={closeModal} {...modal.props} />
-      )}
-    </ModalOverlay>
-  );
+        // Simula la espera de la API si fuera necesario (la quitamos ya que el modal es inmediato)
+        // await new Promise(resolve => setTimeout(resolve, 500)); 
+
+        // 2. Guarda los detalles y abre el modal
+        setProformaDetails(newProformaDetails);
+        setIsProformaModalOpen(true);
+        setLoading(false);
+    };
+
+    // 4. FUNCIÓN DUMMY PARA setTicketData (necesaria para ProformaModal)
+    // El ProformaModal usa setTicketData para pasar la transacción al componente de impresión.
+    // Como estamos en un contexto de solo proforma, esta función solo limpia el carrito después de la impresión simulada.
+    const handleSetTicketData = useCallback((data) => {
+        console.log("Simulación de envío a impresión/PDF:", data.transaction);
+        // Aquí podrías agregar la lógica real para llamar al servicio de impresión de PDF
+        
+        // Asumiendo que la impresión/generación es exitosa, limpiamos la pantalla.
+        // En una aplicación real, esto se haría DENTRO de la función de impresión del TicketModal.
+        alert(`🎉 Proforma lista para imprimir. Limpiando carro de cotización.`);
+        resetCart();
+    }, [resetCart]);
+
+
+    return (
+        <Container>
+            {/* ================= PANEL IZQUIERDO (PRODUCTOS) ================= */}
+            <LeftPanel>
+                <Header>
+                    <h2 style={{margin:0, color:'#1e293b'}}>Catálogo y Proformas</h2>
+                    <button 
+                        onClick={fetchProducts} 
+                        disabled={loading}
+                        style={{background:'white', border:'1px solid #cbd5e1', padding:'8px 12px', borderRadius:6, cursor:'pointer', display:'flex', alignItems:'center', gap:5}}
+                    >
+                        {loading ? <LoadingIcon size={14}/> : <FaSync size={14}/>}
+                        {loading ? 'Cargando...' : 'Recargar Productos'}
+                    </button>
+                </Header>
+                {/* ... (Contenedor de búsqueda y ProductGrid se mantienen iguales) ... */}
+                <SearchContainer>
+                    <SearchTypeToggle>
+                        <ToggleButton 
+                            active={searchType === 'nombre'} 
+                            onClick={() => { setSearchType('nombre'); setSearchTerm(''); searchInputRef.current?.focus(); }}
+                        >
+                            <FaFont /> Nombre
+                        </ToggleButton>
+                        <ToggleButton 
+                            active={searchType === 'codigo'} 
+                            onClick={() => { setSearchType('codigo'); setSearchTerm(''); searchInputRef.current?.focus(); }}
+                        >
+                            <FaBarcode /> Código
+                        </ToggleButton>
+                    </SearchTypeToggle>
+
+                    <SearchInputWrapper>
+                        <FaSearch color="#94a3b8" />
+                        <Input 
+                            ref={searchInputRef}
+                            placeholder={searchType === 'codigo' ? "Escanea o escribe código y pulsa Enter..." : "Busca por descripción (mínimo 3 letras)..."}
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            onKeyDown={handleSearchSubmit}
+                            autoFocus
+                        />
+                    </SearchInputWrapper>
+                    <p style={{margin:0, fontSize:'0.8rem', color:'#64748b'}}>
+                        Mostrando **{filteredProducts.length}** productos filtrados.
+                    </p>
+                </SearchContainer>
+
+                <ProductGrid>
+                    {filteredProducts.map(p => {
+                        const precio = parseFloat(p.precio_venta || p.precio || 0);
+                        const tieneStock = p.existencia > 0;
+                        
+                        return (
+                            <ProductCard key={p.id} onClick={() => addToCart(p)}>
+                                <div>
+                                    <div style={{fontWeight:'600', color:'#334155', lineHeight:'1.2', maxHeight: '2.4em', overflow: 'hidden'}} title={p.nombre}>{p.nombre}</div>
+                                    <div style={{fontSize:'0.8rem', color:'#64748b', marginTop:4}}>
+                                        {p.codigo || `ID: ${p.id}`}
+                                    </div>
+                                </div>
+                                
+                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginTop:'auto'}}>
+                                    <div style={{fontSize:'1.1rem', fontWeight:'bold', color:'#2563eb'}}>
+                                        C$ {precio.toFixed(2)}
+                                    </div>
+                                    <Badge 
+                                        bg={tieneStock ? '#dcfce7' : '#fee2e2'} 
+                                        color={tieneStock ? '#166534' : '#991b1b'}
+                                    >
+                                        Stock: {p.existencia}
+                                    </Badge>
+                                </div>
+                            </ProductCard>
+                        );
+                    })}
+                </ProductGrid>
+            </LeftPanel>
+
+            {/* ================= PANEL DERECHO (DETALLE DE PROFORMA) ================= */}
+            <RightPanel>
+                <div style={{borderBottom:'1px solid #e2e8f0', paddingBottom:15}}>
+                    <h3 style={{margin:0, display:'flex', alignItems:'center', gap:10}}>
+                        <FaFileAlt color="#059669"/> Detalle de Proforma
+                    </h3>
+                    <Input 
+                        style={{
+                            width:'100%', padding: '10px', marginTop: 15, 
+                            border: '1px solid #cbd5e1', borderRadius: 6, outline:'none', background:'white'
+                        }}
+                        placeholder="Nombre del Cliente (Obligatorio)"
+                        value={clientName}
+                        onChange={e => setClientName(e.target.value)}
+                    />
+                </div>
+
+                <CartList>
+                    {cart.length === 0 ? (
+                        <div style={{textAlign:'center', color:'#94a3b8', marginTop: 40}}>
+                            <FaFilePdf size={40} style={{opacity:0.3}}/>
+                            <p>Agrega productos para cotizar</p>
+                        </div>
+                    ) : (
+                        cart.map(item => (
+                            <CartItem key={item.id}>
+                                <div style={{flex:1, paddingRight:10}}>
+                                    <div style={{fontWeight:'600', fontSize:'0.9rem'}}>{item.nombre}</div>
+                                    <div style={{color:'#64748b', fontSize:'0.8rem'}}>
+                                        C$ {parseFloat(item.precio_venta).toFixed(2)} x {item.quantity}
+                                    </div>
+                                </div>
+                                
+                                <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:5}}>
+                                    <div style={{fontWeight:'bold', color:'#334155'}}>
+                                        C$ {(parseFloat(item.precio_venta) * item.quantity).toFixed(2)}
+                                    </div>
+                                    
+                                    <div style={{display:'flex', alignItems:'center', gap:5}}>
+                                        <QtyControl>
+                                            <RoundBtn onClick={() => updateQuantity(item.id, -1)}><FaMinus size={10}/></RoundBtn>
+                                            <span style={{fontSize:'0.9rem', minWidth:15, textAlign:'center'}}>{item.quantity}</span>
+                                            <RoundBtn onClick={() => updateQuantity(item.id, 1)}><FaPlus size={10}/></RoundBtn>
+                                        </QtyControl>
+                                        <button 
+                                            onClick={() => setCart(prev => prev.filter(p => p.id !== item.id))} 
+                                            style={{border:'none', background:'none', color:'#ef4444', cursor:'pointer', padding:5}}
+                                        >
+                                            <FaTrash />
+                                        </button>
+                                    </div>
+                                </div>
+                            </CartItem>
+                        ))
+                    )}
+                </CartList>
+
+                <div style={{borderTop:'2px dashed #cbd5e1', paddingTop:20, marginTop:10}}>
+                    <div style={{display:'flex', justifyContent:'space-between', fontSize:'1.3rem', fontWeight:'bold', marginBottom:15, color:'#1e293b'}}>
+                        <span>Total:</span>
+                        <span>C$ {total.toFixed(2)}</span>
+                    </div>
+
+                    <ActionButton 
+                        bg="#059669" // Color verde
+                        onClick={handleGenerateProforma}
+                        disabled={cart.length === 0 || loading || !clientName.trim()}
+                    >
+                        {loading ? <LoadingIcon /> : <FaFilePdf />} GENERAR PROFORMA PDF
+                    </ActionButton>
+                </div>
+            </RightPanel>
+
+            {/* 5. RENDERING CONDICIONAL DEL MODAL DE PROFORMA */}
+            {isProformaModalOpen && proformaDetails && (
+                <ProformaModal 
+                    {...proformaDetails} // Pasa cart, total, subtotal, discount, proformaFor, client
+                    onClose={() => setIsProformaModalOpen(false)} // Cierra el modal
+                    // Este prop es lo que el modal usará para "confirmar" la impresión y limpiar el carrito.
+                    setTicketData={handleSetTicketData} 
+                    currentUser={user} // Pasamos el usuario para que ProformaModal pueda obtener el nombre del vendedor.
+                />
+            )}
+        </Container>
+    );
 };
 
-export default ProformaModal;
+export default ProformaGenerator;
