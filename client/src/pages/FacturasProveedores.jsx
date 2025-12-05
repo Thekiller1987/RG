@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { Link } from 'react-router-dom';
 import axios from 'axios'; 
 import { 
     FaArrowLeft, FaPlus, FaSearch, FaFileInvoiceDollar, 
     FaCalendarAlt, FaCheckCircle, FaExclamationCircle, FaClock,
-    FaMoneyBillWave, FaBuilding, FaList, FaTrashAlt, FaTimes, FaStore
+    FaMoneyBillWave, FaBuilding, FaList, FaTrashAlt, FaTimes, FaStore,
+    FaFilter, FaReceipt // Nuevo ícono para la referencia
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../service/api';
@@ -166,17 +167,15 @@ const Toolbar = styled.div`
     border-radius: 16px;
     border: 1px solid #e2e8f0;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column; /* Cambiado a columna para mejor manejo de filtros */
     gap: 1rem;
-    justify-content: space-between;
     margin-bottom: 2rem;
     box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-    
-    @media (max-width: 768px) { flex-direction: column-reverse; gap: 0.5rem; padding: 1rem; }
 `;
 
 const FilterTabs = styled.div`
     display: flex; gap: 0.5rem; overflow-x: auto; padding: 0.5rem;
+    border-bottom: 1px solid #f1f5f9;
     &::-webkit-scrollbar { height: 0; width: 0; }
 `;
 
@@ -205,11 +204,23 @@ const TabButton = styled.button`
     }
 `;
 
+const SearchAndFilters = styled.div`
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 0.5rem 0.5rem 1rem 0.5rem;
+    justify-content: space-between;
+
+    @media (max-width: 768px) {
+        flex-direction: column;
+        & > * { width: 100% !important; }
+    }
+`;
+
 const SearchContainer = styled.div`
     position: relative;
     min-width: 300px;
-    margin: 0.5rem;
-    @media (max-width: 768px) { width: calc(100% - 1rem); }
+    flex: 1;
 
     svg { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; }
     
@@ -223,6 +234,28 @@ const SearchContainer = styled.div`
         &:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
     }
 `;
+
+const FilterGroup = styled(FormGroup)`
+    margin-bottom: 0;
+    min-width: 150px;
+    flex: 1;
+
+    label {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+    }
+
+    select, input {
+        padding: 0.65rem 1rem;
+        border-radius: 10px;
+        font-size: 0.95rem;
+        height: 40px;
+        margin-top: 0;
+    }
+`;
+
 
 // --- GRID DE FACTURAS ---
 const InvoicesGrid = styled.div`
@@ -292,6 +325,11 @@ const InvoiceCard = styled.div`
         font-size: 0.85rem; text-align: right; color: #64748b;
         strong { color: ${props => props.balanceColor}; }
     }
+    
+    .reference-text {
+        font-size: 0.75rem; color: #64748b; text-align: left; margin-top: 0.5rem;
+        strong { color: #0f172a; font-family: 'Monaco', monospace; }
+    }
 
     .card-footer {
         padding: 1rem 1.25rem;
@@ -332,7 +370,10 @@ const CloseButton = styled.button`
     &:hover { color: #0f172a; }
 `;
 
-// --- COMPONENTE LÓGICO ---
+// =================================================================
+// COMPONENTE PRINCIPAL: FacturasProveedores
+// =================================================================
+
 const FacturasProveedores = () => {
     const { token } = useAuth();
     
@@ -345,6 +386,11 @@ const FacturasProveedores = () => {
     // Estados de UI
     const [filter, setFilter] = useState('PENDIENTE'); 
     const [searchTerm, setSearchTerm] = useState('');
+    
+    // FILTROS AVANZADOS
+    const [filterProvider, setFilterProvider] = useState('');
+    const [filterDateFrom, setFilterDateFrom] = useState('');
+    const [filterDateTo, setFilterDateTo] = useState('');
     
     // ESTADO PARA LA ALERTA BONITA
     const [alertInfo, setAlertInfo] = useState({ show: false, title: '', message: '', type: 'info' });
@@ -364,7 +410,11 @@ const FacturasProveedores = () => {
         monto_total: '', 
         notas: ''
     });
-    const [payAmount, setPayAmount] = useState('');
+    // Nuevo estado para el formulario de pago
+    const [payData, setPayData] = useState({
+        amount: '',
+        reference: '' // <--- CAMPO AÑADIDO
+    });
 
     // --- HELPER PARA ALERTAS ---
     const showAlert = (title, message, type = 'info') => {
@@ -380,8 +430,7 @@ const FacturasProveedores = () => {
                 const invData = await api.fetchProviderInvoices(token);
                 setInvoices(Array.isArray(invData) ? invData : []);
 
-                // 2. Cargar Proveedores Directamente con Axios
-                // Utilizamos el mismo patrón que en el inventario
+                // 2. Cargar Proveedores
                 const provResponse = await axios.get(`${API_URL}/providers`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
@@ -390,6 +439,7 @@ const FacturasProveedores = () => {
 
             } catch (err) {
                 console.error("Error cargando datos:", err);
+                showAlert("Error", "Error al cargar facturas o proveedores.", "error");
             } finally {
                 setLoading(false);
             }
@@ -398,6 +448,46 @@ const FacturasProveedores = () => {
     }, [token, refreshTrigger]);
 
     // --- LOGICA DE NEGOCIO ---
+    
+    // Función de inicialización de modal de pago
+    const openPayModal = (invoice) => {
+        setSelectedInvoice(invoice);
+        setPayData({
+            amount: '',
+            reference: ''
+        });
+        setShowPayModal(true);
+    };
+
+    // MODIFICADO: Ahora maneja la referencia y el estado PAGADA
+    const handlePay = async (e) => {
+        e.preventDefault();
+        if (!selectedInvoice || !payData.amount) return;
+        
+        const payAmount = parseFloat(payData.amount);
+        const maxPay = parseFloat(selectedInvoice.monto_total) - parseFloat(selectedInvoice.monto_abonado);
+        
+        if(payAmount <= 0) return showAlert("Error", "El monto debe ser mayor a cero.", "error");
+        if(payAmount > maxPay) return showAlert("Error", `El monto no puede ser mayor a la deuda (C$${maxPay.toLocaleString()})`, "error");
+
+        const isFullPayment = payAmount >= maxPay - 0.01; // Considera un margen por si acaso
+        const newStatus = isFullPayment ? 'PAGADA' : selectedInvoice.estado;
+
+        try {
+            // Se asume que api.payProviderInvoice fue modificado para aceptar la referencia
+            await api.payProviderInvoice(selectedInvoice.id, payAmount, payData.reference, newStatus, token);
+            
+            setRefreshTrigger(prev => prev + 1);
+            setShowPayModal(false);
+            
+            showAlert("Éxito", `Abono de C$${payAmount.toLocaleString()} registrado. ${isFullPayment ? 'Factura PAGADA.' : ''}`, "success");
+        } catch (error) {
+            console.error("Error al registrar el pago:", error);
+            showAlert("Error", "Error al registrar el pago.", "error");
+        }
+    };
+    
+    // ... (handleCreate y handleDelete se mantienen iguales)
     const handleCreate = async (e) => {
         e.preventDefault();
         if (!formData.proveedor) return showAlert("Atención", "Seleccione un proveedor de la lista", "warning");
@@ -417,24 +507,6 @@ const FacturasProveedores = () => {
         }
     };
 
-    const handlePay = async (e) => {
-        e.preventDefault();
-        if (!selectedInvoice || !payAmount) return;
-        
-        const maxPay = parseFloat(selectedInvoice.monto_total) - parseFloat(selectedInvoice.monto_abonado);
-        if(parseFloat(payAmount) > maxPay) return showAlert("Error", `El monto no puede ser mayor a la deuda (C$${maxPay})`, "error");
-
-        try {
-            await api.payProviderInvoice(selectedInvoice.id, payAmount, token);
-            setRefreshTrigger(prev => prev + 1);
-            setShowPayModal(false);
-            setPayAmount('');
-            showAlert("Éxito", "Abono registrado correctamente.", "success");
-        } catch (error) {
-            showAlert("Error", "Error al registrar el pago.", "error");
-        }
-    };
-
     const handleDelete = async () => {
         if (!selectedInvoice) return;
         try {
@@ -447,16 +519,17 @@ const FacturasProveedores = () => {
         }
     };
 
-    // --- HELPERS ---
-    const getStatusStyles = (status) => {
+
+    // --- COMPUTED Y FILTRADO AVANZADO ---
+    
+    const getStatusStyles = useCallback((status) => {
         switch(status) {
             case 'VENCIDA': return { color: '#dc2626', bg: '#fef2f2', activeColor: '#dc2626', activeBg: '#fee2e2' };
             case 'PAGADA': return { color: '#16a34a', bg: '#f0fdf4', activeColor: '#16a34a', activeBg: '#dcfce7' };
             default: return { color: '#2563eb', bg: '#eff6ff', activeColor: '#2563eb', activeBg: '#dbeafe' };
         }
-    };
+    }, []);
 
-    // --- COMPUTED ---
     const stats = useMemo(() => {
         const pend = invoices.filter(i => i.estado === 'PENDIENTE').length;
         const venc = invoices.filter(i => i.estado === 'VENCIDA').length;
@@ -470,7 +543,28 @@ const FacturasProveedores = () => {
 
     const filteredInvoices = useMemo(() => {
         let data = invoices;
-        if (filter !== 'TODAS') data = data.filter(i => i.estado === filter);
+        
+        // 1. Filtrar por Estado (Tabs)
+        if (filter !== 'TODAS') {
+            data = data.filter(i => i.estado === filter);
+        }
+
+        // 2. Filtrar por Proveedor (Dropdown)
+        if (filterProvider) {
+            data = data.filter(i => i.proveedor === filterProvider);
+        }
+
+        // 3. Filtrar por Rango de Fechas (Emisión)
+        if (filterDateFrom && filterDateTo) {
+            data = data.filter(i => {
+                const emissionDate = new Date(i.fecha_emision).getTime();
+                const fromDate = new Date(filterDateFrom).getTime();
+                const toDate = new Date(filterDateTo).getTime();
+                return emissionDate >= fromDate && emissionDate <= toDate;
+            });
+        }
+        
+        // 4. Filtrar por Búsqueda (Texto)
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
             data = data.filter(i => 
@@ -478,8 +572,9 @@ const FacturasProveedores = () => {
                 (i.numero_factura && i.numero_factura.toLowerCase().includes(term))
             );
         }
+        
         return data;
-    }, [invoices, filter, searchTerm]);
+    }, [invoices, filter, searchTerm, filterProvider, filterDateFrom, filterDateTo]);
 
     return (
         <PageWrapper>
@@ -514,12 +609,12 @@ const FacturasProveedores = () => {
                 <StatCard color="#f59e0b" bg="#fffbeb">
                     <div className="icon-wrapper"><FaMoneyBillWave /></div>
                     <div className="label">Deuda Total</div>
-                    <div className="value" style={{color:'#b45309'}}>C${stats.totalDebt.toLocaleString()}</div>
+                    <div className="value" style={{color:'#b45309'}}>C${stats.totalDebt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                     <div className="sub" style={{color:'#b45309'}}>Flujo de caja comprometido</div>
                 </StatCard>
             </StatsGrid>
 
-            {/* TOOLBAR */}
+            {/* TOOLBAR con Filtros Avanzados */}
             <Toolbar>
                 <FilterTabs>
                     {[
@@ -540,15 +635,43 @@ const FacturasProveedores = () => {
                         </TabButton>
                     ))}
                 </FilterTabs>
-                <SearchContainer>
-                    <FaSearch />
-                    <input 
-                        type="text" 
-                        placeholder="Buscar por proveedor, factura..." 
-                        value={searchTerm} 
-                        onChange={e => setSearchTerm(e.target.value)} 
-                    />
-                </SearchContainer>
+                
+                <SearchAndFilters>
+                    <SearchContainer>
+                        <FaSearch />
+                        <input 
+                            type="text" 
+                            placeholder="Buscar por proveedor, factura..." 
+                            value={searchTerm} 
+                            onChange={e => setSearchTerm(e.target.value)} 
+                        />
+                    </SearchContainer>
+
+                    <FilterGroup>
+                        <label>Proveedor</label>
+                        <select 
+                            value={filterProvider} 
+                            onChange={e => setFilterProvider(e.target.value)}
+                        >
+                            <option value="">Todos</option>
+                            {providers.map(p => (
+                                <option key={p.id_proveedor || p.id} value={p.nombre}>
+                                    {p.nombre}
+                                </option>
+                            ))}
+                        </select>
+                    </FilterGroup>
+
+                    <FilterGroup style={{minWidth:'120px'}}>
+                        <label>Emisión Desde</label>
+                        <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} />
+                    </FilterGroup>
+
+                    <FilterGroup style={{minWidth:'120px'}}>
+                        <label>Emisión Hasta</label>
+                        <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} />
+                    </FilterGroup>
+                </SearchAndFilters>
             </Toolbar>
 
             {/* CONTENT GRID */}
@@ -562,6 +685,8 @@ const FacturasProveedores = () => {
                         const abonado = parseFloat(inv.monto_abonado) || 0;
                         const saldo = total - abonado;
                         const progress = total > 0 ? (abonado / total) * 100 : 0;
+                        // Mostrar la referencia solo si está pagada y existe
+                        const reference = inv.estado === 'PAGADA' ? inv.referencia_pago : null;
 
                         return (
                             <InvoiceCard key={inv.id} color={styles.color} balanceColor={saldo > 0 ? '#ef4444' : '#16a34a'}>
@@ -584,24 +709,33 @@ const FacturasProveedores = () => {
                                             {new Date(inv.fecha_vencimiento).toLocaleDateString()}
                                         </span>
                                     </div>
+                                    {reference && (
+                                        <div className="meta-row">
+                                            <span className="label"><FaReceipt/> Referencia</span>
+                                            <span className="value">{reference}</span>
+                                        </div>
+                                    )}
 
                                     <div className="financial-block">
                                         <div className="total-row">
                                             <span className="label">Total</span>
-                                            <span className="amount">C${total.toLocaleString()}</span>
+                                            <span className="amount">C${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                         </div>
                                         <div className="progress-bar">
                                             <div style={{width: `${progress}%`, background: styles.color}}></div>
                                         </div>
                                         <div className="balance-text">
-                                            Abonado: C${abonado.toLocaleString()} &bull; <strong>Resta: C${saldo.toLocaleString()}</strong>
+                                            Abonado: C${abonado.toLocaleString(undefined, { minimumFractionDigits: 2 })} &bull; <strong>Resta: C${saldo.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
                                         </div>
+                                        {/* <div className="reference-text">
+                                            {reference ? `Ref: ${reference}` : (inv.estado === 'PAGADA' ? 'Ref. No disponible' : '')}
+                                        </div> */}
                                     </div>
                                 </div>
 
                                 <div className="card-footer">
                                     {saldo > 0 && (
-                                        <Button $primary style={{flex: 1, justifyContent:'center'}} onClick={() => { setSelectedInvoice(inv); setShowPayModal(true); }}>
+                                        <Button $primary style={{flex: 1, justifyContent:'center'}} onClick={() => openPayModal(inv)}>
                                             <FaMoneyBillWave /> Abonar
                                         </Button>
                                     )}
@@ -621,7 +755,7 @@ const FacturasProveedores = () => {
                 </div>
             )}
 
-            {/* --- MODAL: CREAR FACTURA --- */}
+            {/* --- MODAL: CREAR FACTURA (Sin cambios sustanciales) --- */}
             {showCreateModal && (
                 <ModalOverlay onClick={() => setShowCreateModal(false)}>
                     <ModalContent onClick={e => e.stopPropagation()}>
@@ -630,7 +764,6 @@ const FacturasProveedores = () => {
                         <form onSubmit={handleCreate}>
                             <FormGroup>
                                 <label>Proveedor</label>
-                                {/* AQUÍ ESTÁ LA SELECCIÓN DE PROVEEDORES CARGADA DESDE LA BD */}
                                 <select 
                                     required 
                                     value={formData.proveedor} 
@@ -677,7 +810,7 @@ const FacturasProveedores = () => {
                 </ModalOverlay>
             )}
 
-            {/* --- MODAL: ABONAR --- */}
+            {/* --- MODAL: ABONAR (MODIFICADO para Referencia de Pago) --- */}
             {showPayModal && selectedInvoice && (
                 <ModalOverlay onClick={() => setShowPayModal(false)}>
                     <ModalContent onClick={e => e.stopPropagation()}>
@@ -688,7 +821,7 @@ const FacturasProveedores = () => {
                             <div style={{fontSize:'1.1rem', fontWeight:'700', color:'#0f172a'}}>{selectedInvoice.proveedor}</div>
                             <div style={{marginTop:'0.5rem', display:'flex', justifyContent:'space-between', fontSize:'0.9rem'}}>
                                 <span>Saldo Pendiente:</span>
-                                <strong style={{color:'#ef4444'}}>C${(parseFloat(selectedInvoice.monto_total) - parseFloat(selectedInvoice.monto_abonado)).toLocaleString()}</strong>
+                                <strong style={{color:'#ef4444'}}>C${(parseFloat(selectedInvoice.monto_total) - parseFloat(selectedInvoice.monto_abonado)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
                             </div>
                         </div>
                         <form onSubmit={handlePay}>
@@ -697,10 +830,22 @@ const FacturasProveedores = () => {
                                 <input 
                                     required type="number" step="0.01" autoFocus
                                     max={parseFloat(selectedInvoice.monto_total) - parseFloat(selectedInvoice.monto_abonado)}
-                                    value={payAmount} onChange={e => setPayAmount(e.target.value)}
+                                    value={payData.amount} onChange={e => setPayData({...payData, amount: e.target.value})}
                                     placeholder="0.00"
                                 />
                             </FormGroup>
+                            
+                            {/* NUEVO CAMPO: REFERENCIA DE PAGO */}
+                            <FormGroup>
+                                <label>Referencia de Pago (Cheque, Depósito, Transf.)</label>
+                                <input 
+                                    type="text" 
+                                    value={payData.reference} 
+                                    onChange={e => setPayData({...payData, reference: e.target.value})}
+                                    placeholder="Ej. BDA-T89012 o Cheque #001"
+                                />
+                            </FormGroup>
+                            
                             <div style={{display:'flex', gap:'1rem', marginTop:'1.5rem'}}>
                                 <Button type="button" $secondary style={{flex:1, justifyContent:'center'}} onClick={() => setShowPayModal(false)}>Cancelar</Button>
                                 <Button type="submit" $primary style={{flex:1, justifyContent:'center'}}>Confirmar Pago</Button>
@@ -730,5 +875,5 @@ const FacturasProveedores = () => {
         </PageWrapper>
     );
 };
-
+ 
 export default FacturasProveedores;
