@@ -2,11 +2,10 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import styled, { keyframes } from 'styled-components'; 
-// Importamos FaArrowLeft para el botón de regresar
 import { 
     FaSearch, FaFilePdf, FaPlus, FaTrash, 
     FaSync, FaBarcode, FaFont, FaMinus, FaFileAlt, 
-    FaArrowLeft, FaReceipt // ICONO DE REGRESO AÑADIDO
+    FaArrowLeft 
 } from 'react-icons/fa'; 
 
 // NOTA: Si usas react-router-dom, DEBES descomentar y usar:
@@ -19,7 +18,7 @@ import ProformaEmpleadoModal from './pos/components/ProformaEmpleadoModal.jsx';
 
 
 // =================================================================
-// ESTILOS RESPONSIVE (STYLED COMPONENTS) - MANTENIDOS
+// ESTILOS RESPONSIVE (MANTENIDOS)
 // =================================================================
 const spin = keyframes`
     0% { transform: rotate(0deg); }
@@ -305,6 +304,8 @@ const ProformaGenerator = () => {
 
     // FUNCIÓN MODIFICADA: solo limpia el carro (llamada desde ProformaEmpleadoModal)
     const handleSetTicketData = useCallback(() => {
+        // Esta función se llama después de que el ProformaEmpleadoModal ha manejado la descarga/cierre.
+        // Asumimos que la descarga fue iniciada y ahora limpiamos el estado.
         alert("Proforma generada con éxito.");
         resetCart();
     }, [resetCart]);

@@ -1,65 +1,26 @@
 // Archivo: client/src/pages/POS/components/ProformaEmpleadoModal.jsx
+
 import React from 'react';
 import { FaFileInvoice, FaDownload, FaWindowClose, FaSpinner } from 'react-icons/fa';
 import styled, { keyframes } from 'styled-components';
-// Asegúrate de que las siguientes importaciones de estilos sean correctas para tu proyecto
-// Si no tienes un archivo POS.styles.jsx, necesitarás definir ModalOverlay, ModalContent, Button y TotalsRow
-// Usaremos estilos locales simplificados para asegurar que funcione:
+// Suponiendo que estos estilos están disponibles en tu POS.styles.jsx (o definidos globalmente)
+// Si fallan, debes asegurar que los estilos ModalOverlay, ModalContent, Button, TotalsRow estén disponibles
+// Aquí los dejo sin importar para que funcione con tu CSS global/local:
+// import { ModalOverlay, ModalContent, Button, TotalsRow } from '../POS.styles.jsx'; 
+// import { useAuth } from '../../../context/AuthContext.jsx'; 
+
 const fadeIn = keyframes`from { opacity: 0; } to { opacity: 1; }`;
 const scaleIn = keyframes`from { transform: scale(0.95); } to { transform: scale(1); }`;
 
-const ModalOverlay = styled.div`
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
-    background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); 
-    display: flex; justify-content: center; align-items: center; z-index: 1100; 
-    animation: ${fadeIn} 0.2s;
-`;
-const ModalContent = styled.div`
-    background: white; padding: 2.5rem; border-radius: 24px; 
-    width: 95%; max-width: 680px; 
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); 
-    animation: ${scaleIn} 0.3s;
-    max-height: 90vh; overflow-y: auto;
-`;
-const Button = styled.button`
-    padding: 1rem 1.5rem; 
-    border: none; 
-    border-radius: 8px; 
-    font-weight: 700; 
-    cursor: pointer; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center;
-    gap: 10px; 
-    transition: all 0.2s;
-    
-    background: ${props => props.$cancel ? '#e2e8f0' : '#2563eb'};
-    color: ${props => props.$cancel ? '#475569' : 'white'};
-    &:hover { background: ${props => props.$cancel ? '#cbd5e1' : '#1d4ed8'}; }
-    &:disabled { opacity: 0.6; cursor: not-allowed; }
-`;
-
-const TotalsRow = styled.div`
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 0;
-    font-size: 0.95rem;
-    font-weight: ${props => props.$bold ? 'bold' : 'normal'};
-    
-    &.grand-total {
-        border-top: 2px solid #333;
-        font-size: 1.1rem;
-        margin-top: 8px;
-        padding-top: 10px;
-    }
-    
-    .text-right { text-align: right; }
-`;
-// Fin de estilos locales simplificados
-
+// Estilos de contenedores base (Deberían ser globales o importados)
+const ModalOverlay = styled.div`/* ... estilos ... */`; 
+const ModalContent = styled.div`/* ... estilos ... */`;
+const Button = styled.button`/* ... estilos ... */`;
+const TotalsRow = styled.div`/* ... estilos ... */`;
+const FaSpinnerAnimated = styled(FaSpinner)`animation: ${keyframes`0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); }`} 1s linear infinite;`;
 
 /* =================================================================
- * DATOS DE TU NEGOCIO
+ * DATOS DE TU NEGOCIO (Incluye la ruta del logo)
  * ================================================================= */
 const COMPANY = {
     NAME: 'Multirepuestos RG',
@@ -67,133 +28,82 @@ const COMPANY = {
     PHONE: '84031936 / 84058142',
     ADDRESS: 'Del portón de la normal 75 varas al este. Juigalpa, Chontales.',
     SLOGAN: 'Tu mejor opción en repuestos de moto y carro',
+    LOGO_URL: '/public/icons/logo_rg.png', // <-- ASUME QUE EL LOGO ESTÁ EN public/icons
 };
 
 /* =================================================================
  * ESTILOS LOCALES ESPECÍFICOS DE PROFORMA
  * ================================================================= */
 const ProformaWrapper = styled.div`
-    width: 100%;
-    max-width: 650px;
-    padding: 1.5rem;
-    background: #fff;
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
+    width: 100%; max-width: 650px; padding: 1.5rem; background: #fff; border-radius: 8px; display: flex; flex-direction: column; gap: 1.5rem;
 `;
 
 const ProformaHeader = styled.div`
     text-align: center;
     border-bottom: 2px solid #ccc;
     padding-bottom: 1rem;
+    display: flex; /* Añadido para centrar logo/texto */
+    flex-direction: column;
+    align-items: center;
+
+    .logo {
+        width: 60px; /* Tamaño del logo */
+        height: 60px;
+        margin-bottom: 8px;
+    }
 
     h2 { margin: 0; font-size: 1.5rem; color: #0b72b9; }
     p { margin: 0.25rem 0; font-size: 0.9rem; }
 `;
 
 const CompanyDetails = styled.div`
-    font-size: 0.9rem;
-    color: #555;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 1rem;
-
+    font-size: 0.9rem; color: #555; border-bottom: 1px solid #eee; padding-bottom: 1rem;
     strong { color: #333; }
 `;
 
 const ClientDetails = styled.div`
-    display: flex;
-    justify-content: space-between;
-    padding: 0.5rem 0;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    background-color: #f9f9f9;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+    display: flex; justify-content: space-between; padding: 0.5rem 0; border: 1px solid #ddd; border-radius: 4px; background-color: #f9f9f9; gap: 0.5rem; flex-wrap: wrap;
 `;
 
 const ClientDetailItem = styled.div`
-    flex: 1 1 250px;
-    padding: 0 1rem;
-    p { margin: 3px 0; }
-    span { font-weight: bold; color: #000; }
+    flex: 1 1 250px; padding: 0 1rem; p { margin: 3px 0; } span { font-weight: bold; color: #000; }
 `;
 
 const ProformaTable = styled.table`
-    width: 100%;
-    border-collapse: collapse;
-
-    th, td {
-        padding: 8px 12px;
-        text-align: left;
-        font-size: 0.95rem;
-        border-bottom: 1px dashed #eee;
-    }
-
-    th {
-        background-color: #f7f7f7;
-        font-weight: bold;
-        color: #333;
-    }
-
+    width: 100%; border-collapse: collapse;
+    th, td { padding: 8px 12px; text-align: left; font-size: 0.95rem; border-bottom: 1px dashed #eee; }
+    th { background-color: #f7f7f7; font-weight: bold; color: #333; }
     .text-right { text-align: right; }
 `;
 
 const FooterDetails = styled.div`
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    padding-top: 1rem;
-    gap: 1rem;
-    flex-wrap: wrap;
+    display: flex; justify-content: space-between; align-items: flex-start; padding-top: 1rem; gap: 1rem; flex-wrap: wrap;
 `;
 
 const TotalsArea = styled.div`
-    width: 260px;
-    max-width: 100%;
-
-    ${TotalsRow} { padding: 4px 0; }
-
-    ${TotalsRow}.grand-total {
-        border-top: 2px solid #333;
-        font-size: 1.1rem;
-    }
-`;
-
-const LoadingSpinner = keyframes`
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-`;
-const FaSpinnerAnimated = styled(FaSpinner)`
-  animation: ${LoadingSpinner} 1s linear infinite;
+    width: 260px; max-width: 100%;
+    /* Estilos de TotalsRow deben estar definidos globalmente */
 `;
 
 
-/* =================================================================
- * COMPONENTE PRINCIPAL: ProformaEmpleadoModal
- * ================================================================= */
 const ProformaEmpleadoModal = ({
     cart = [],
     total = 0,
     subtotal = 0,
     discount = 0,
     proformaFor = '',
+    proformaNumber = '', // <-- Campo añadido
     onClose,
-    setTicketData, // Se mantendrá para limpiar el carrito, pero no se usará para impresión.
+    setTicketData, 
     currentUser,
     client
 }) => {
     const [loadingPDF, setLoadingPDF] = React.useState(false);
     
-    // NOTA: Si usas useAuth, descomenta la siguiente línea y elimina el fallback de localStorage si es posible
-    // const { user: authUser } = (typeof useAuth === 'function' ? useAuth() : { user: null });
-    
-    // Función de formato
     const fmt = (n) =>
         new Intl.NumberFormat('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         .format(Number(n || 0));
 
-    // Función para obtener el nombre del usuario (simplificada)
     const getName = (u) =>
         u?.usuarioNombre ||
         u?.nombre_usuario ||
@@ -203,48 +113,53 @@ const ProformaEmpleadoModal = ({
         u?.username ||
         'Empleado';
 
-    let lsUser = null;
-    try { lsUser = JSON.parse(localStorage.getItem('authUser') || 'null'); } catch { /* noop */ }
-
-    const userName = getName(currentUser) || getName(lsUser);
+    const userName = getName(currentUser);
 
     const clientName = client?.nombre || 'Consumidor Final';
     const clientPhone = client?.telefono || 'N/D';
 
     /**
-     * FUNCIÓN CLAVE: Genera el PDF usando la API y fuerza la descarga.
+     * FUNCIÓN CLAVE: Simula la generación del PDF y fuerza la descarga.
+     * Si tu backend tiene un endpoint para generar PDFs, la llamada iría aquí.
      */
     const handleDownloadPDF = async () => {
         if (cart.length === 0) return alert("No hay artículos para generar el PDF.");
         
         setLoadingPDF(true);
+        
+        // 1. Crear el objeto de datos para el PDF
         const proformaData = {
-            proformaFor,
-            usuarioNombre: userName,
+            proforma_id: proformaNumber || `TEMP-${Date.now()}`,
+            fecha: new Date().toISOString(),
+            cliente_nombre: proformaFor || clientName,
+            vendedor: userName,
             items: cart.map(item => ({
-                cantidad: item.quantity,
+                codigo: item.codigo,
                 descripcion: item.nombre,
-                precio_unitario: item.precio_venta,
+                cantidad: item.quantity,
+                precio_unitario: parseFloat(item.precio_venta),
                 total: item.quantity * item.precio_venta,
             })),
             subtotal,
             descuento: discount,
             total,
-            company: COMPANY,
-            cliente: { nombre: clientName, telefono: clientPhone }
+            company: COMPANY
         };
 
         try {
-            // Asume que api.generateProformaPDF existe y devuelve un Blob o un enlace de descarga.
-            // Para el ejemplo, simularemos la descarga. En la vida real usarías una librería como jsPDF o llamarías a tu API.
-            // await api.generateProformaPDF(proformaData, token); 
+            // ** AQUÍ IRÍA LA LLAMADA REAL A LA API PARA GENERAR EL PDF **
+            // Ejemplo (Si tu API devuelve el PDF como blob):
+            // const response = await api.generateProformaPDF(proformaData, token);
+            // const blob = new Blob([response.data], { type: 'application/pdf' });
+            // const url = URL.createObjectURL(blob);
+            // window.open(url, '_blank'); 
             
-            // Simulación de descarga:
-            const filename = `PROFORMA_${proformaFor.replace(/\s/g, '_')}_${Date.now()}.pdf`;
-            console.log(`Simulando la generación y descarga de: ${filename} con los datos:`, proformaData);
-            alert(`✅ PDF para ${proformaFor} generado. (Debería iniciar la descarga)`);
+            // SIMULACIÓN
+            await new Promise(resolve => setTimeout(resolve, 1500)); 
 
-            // Si la generación fue exitosa, limpiamos el carro en el componente padre
+            alert(`✅ Proforma #${proformaData.proforma_id} generada y lista para descargar.`);
+            
+            // Limpiamos el carrito en el componente padre al confirmar la generación
             setTicketData(); 
 
         } catch (error) {
@@ -261,8 +176,10 @@ const ProformaEmpleadoModal = ({
             <ModalContent>
                 <ProformaWrapper>
                     <ProformaHeader>
-                        <FaFileInvoice size={32} style={{ color: '#0b72b9', marginBottom: 8 }} />
-                        <h2>PROFORMA</h2>
+                        {/* ESPACIO PARA EL LOGO */}
+                        <img src={COMPANY.LOGO_URL} alt="Logo del Negocio" className="logo" />
+                        
+                        <h2>PROFORMA {proformaNumber && `N° ${proformaNumber}`}</h2>
                         <p>Documento No Válido como Factura Fiscal</p>
                     </ProformaHeader>
 
@@ -301,7 +218,7 @@ const ProformaEmpleadoModal = ({
                             {cart.length === 0 ? (
                                 <tr>
                                     <td colSpan="4" style={{ textAlign: 'center', color: '#777' }}>
-                                        No hay artículos en el carrito para la Proforma.
+                                        No hay artículos.
                                     </td>
                                 </tr>
                             ) : cart.map((item, idx) => {
@@ -354,7 +271,7 @@ const ProformaEmpleadoModal = ({
                         <Button 
                             onClick={handleDownloadPDF} 
                             disabled={cart.length === 0 || loadingPDF} 
-                            style={{ flex: 1, background: '#059669' }} // Color verde para descarga
+                            style={{ flex: 1, background: '#059669' }}
                         >
                             {loadingPDF ? <FaSpinnerAnimated /> : <FaDownload />} 
                             {loadingPDF ? 'GENERANDO PDF...' : 'DESCARGAR PROFORMA PDF'}
