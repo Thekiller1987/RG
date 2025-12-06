@@ -1,11 +1,12 @@
 // Archivo: src/pages/PedidosYApartados.jsx
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import styled, { keyframes } from 'styled-components'; 
 // Importamos FaArrowLeft para el botón de regresar
 import { 
     FaSearch, FaFilePdf, FaPlus, FaTrash, 
     FaSync, FaBarcode, FaFont, FaMinus, FaFileAlt, 
-    FaArrowLeft // ICONO DE REGRESO AÑADIDO
+    FaArrowLeft, FaReceipt // ICONO DE REGRESO AÑADIDO
 } from 'react-icons/fa'; 
 
 // NOTA: Si usas react-router-dom, DEBES descomentar y usar:
@@ -14,12 +15,11 @@ import {
 import { useAuth } from '../context/AuthContext'; 
 import * as api from '../service/api'; 
 
-// Importamos el NUEVO componente
 import ProformaEmpleadoModal from './pos/components/ProformaEmpleadoModal.jsx'; 
 
 
 // =================================================================
-// ESTILOS RESPONSIVE (STYLED COMPONENTS)
+// ESTILOS RESPONSIVE (STYLED COMPONENTS) - MANTENIDOS
 // =================================================================
 const spin = keyframes`
     0% { transform: rotate(0deg); }
@@ -71,7 +71,7 @@ const HeaderActions = styled.div`
 `;
 
 const BackButton = styled.button`
-    background: #3b82f6; /* Cambiado a primario para mejor visibilidad */
+    background: #3b82f6; 
     border: none;
     color: white;
     &:hover { background: #1d4ed8; }
@@ -148,7 +148,8 @@ const ProformaGenerator = () => {
     const [loading, setLoading] = useState(false);
     const [clientName, setClientName] = useState('');
     
-    // Cambiamos el nombre del modal para que coincida con el nuevo componente
+    const [proformaNumber, setProformaNumber] = useState(''); // Estado para número opcional
+    
     const [isProformaModalOpen, setIsProformaModalOpen] = useState(false);
     const [proformaDetails, setProformaDetails] = useState(null);
 
@@ -271,6 +272,7 @@ const ProformaGenerator = () => {
         setClientName('');
         setProformaDetails(null);
         setIsProformaModalOpen(false);
+        setProformaNumber(''); // Limpiar número de proforma
         searchInputRef.current?.focus();
     }, []);
 
@@ -285,13 +287,13 @@ const ProformaGenerator = () => {
         
         setLoading(true);
 
-        // Aquí podrías hacer una llamada a la API si necesitas un número de proforma o un ID de transacción
-        
+        // 1. Prepara el objeto de la Proforma con todos los datos necesarios
         const newProformaDetails = {
             cart: cart,
             total: total,
             subtotal: subtotal,
             discount: discount,
+            proformaNumber: proformaNumber.trim(), // <- Número opcional
             proformaFor: clientTrimmed, 
             client: { nombre: clientTrimmed, telefono: 'N/D' }, 
         };
@@ -303,6 +305,7 @@ const ProformaGenerator = () => {
 
     // FUNCIÓN MODIFICADA: solo limpia el carro (llamada desde ProformaEmpleadoModal)
     const handleSetTicketData = useCallback(() => {
+        alert("Proforma generada con éxito.");
         resetCart();
     }, [resetCart]);
 
@@ -409,6 +412,17 @@ const ProformaGenerator = () => {
                         value={clientName}
                         onChange={e => setClientName(e.target.value)}
                     />
+                    
+                    {/* CAMPO DE NÚMERO DE PROFORMA (OPCIONAL) */}
+                    <Input 
+                        style={{
+                            width:'100%', padding: '10px', marginTop: 10, 
+                            border: '1px solid #cbd5e1', borderRadius: 6, outline:'none', background:'white'
+                        }}
+                        placeholder="Número de Proforma (Opcional)"
+                        value={proformaNumber}
+                        onChange={e => setProformaNumber(e.target.value)}
+                    />
                 </div>
 
                 <CartList>
@@ -479,13 +493,11 @@ const ProformaGenerator = () => {
 
             {/* 5. RENDERING CONDICIONAL DEL MODAL DE PROFORMA - Usa el nuevo componente */}
             {isProformaModalOpen && proformaDetails && (
-                <ProformaEmpleadoModal // <-- Componente NUEVO
+                <ProformaEmpleadoModal 
                     {...proformaDetails} 
                     onClose={() => setIsProformaModalOpen(false)} 
-                    // Se llama para limpiar el carro después de que el PDF se descarga.
                     setTicketData={handleSetTicketData} 
                     currentUser={user} 
-                    // Ya no se necesita el prop onlyPDF, el modal lo sabe implícitamente
                 />
             )}
         </Container>
