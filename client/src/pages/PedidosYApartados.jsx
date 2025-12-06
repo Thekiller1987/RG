@@ -5,7 +5,7 @@ import styled, { keyframes } from 'styled-components';
 import { 
     FaSearch, FaFilePdf, FaPlus, FaTrash, 
     FaSync, FaBarcode, FaFont, FaMinus, FaFileAlt, 
-    FaArrowLeft 
+    FaArrowLeft, FaPhone 
 } from 'react-icons/fa'; 
 
 // NOTA: Si usas react-router-dom, DEBES descomentar y usar:
@@ -90,6 +90,34 @@ const SearchInputWrapper = styled.div`
     display: flex; align-items: center; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; padding: 0 10px; &:focus-within { border-color: #3b82f6; background: white; }
 `;
 const Input = styled.input` flex: 1; padding: 12px; border: none; background: transparent; outline: none; font-size: 1rem; `;
+const InputGroup = styled.div`
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 0;
+    margin-top: 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: white;
+
+    &:focus-within {
+        border-color: #3b82f6;
+    }
+
+    input {
+        flex: 1;
+        padding: 10px;
+        border: none;
+        outline: none;
+        background: transparent;
+        font-size: 1rem;
+    }
+
+    svg {
+        margin-left: 10px;
+        color: #94a3b8;
+    }
+`;
 const ProductGrid = styled.div`
     display: grid; 
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
@@ -145,9 +173,11 @@ const ProformaGenerator = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [searchType, setSearchType] = useState('nombre'); 
     const [loading, setLoading] = useState(false);
-    const [clientName, setClientName] = useState('');
     
-    const [proformaNumber, setProformaNumber] = useState(''); // Estado para número opcional
+    // ESTADOS AGREGADOS/MODIFICADOS
+    const [clientName, setClientName] = useState('');
+    const [clientPhone, setClientPhone] = useState(''); // <- NUEVO ESTADO PARA EL TELÉFONO
+    const [proformaNumber, setProformaNumber] = useState(''); 
     
     const [isProformaModalOpen, setIsProformaModalOpen] = useState(false);
     const [proformaDetails, setProformaDetails] = useState(null);
@@ -269,9 +299,10 @@ const ProformaGenerator = () => {
     const resetCart = useCallback(() => {
         setCart([]);
         setClientName('');
+        setClientPhone(''); // Limpiar teléfono
         setProformaDetails(null);
         setIsProformaModalOpen(false);
-        setProformaNumber(''); // Limpiar número de proforma
+        setProformaNumber(''); 
         searchInputRef.current?.focus();
     }, []);
 
@@ -292,9 +323,12 @@ const ProformaGenerator = () => {
             total: total,
             subtotal: subtotal,
             discount: discount,
-            proformaNumber: proformaNumber.trim(), // <- Número opcional
+            proformaNumber: proformaNumber.trim(), 
             proformaFor: clientTrimmed, 
-            client: { nombre: clientTrimmed, telefono: 'N/D' }, 
+            client: { 
+                nombre: clientTrimmed, 
+                telefono: clientPhone.trim() || 'N/D' // <- TELÉFONO INCLUIDO (o 'N/D')
+            }, 
         };
 
         setProformaDetails(newProformaDetails);
@@ -404,6 +438,8 @@ const ProformaGenerator = () => {
                     <h3 style={{margin:0, display:'flex', alignItems:'center', gap:10}}>
                         <FaFileAlt color="#059669"/> Detalle de Proforma
                     </h3>
+                    
+                    {/* CAMPO DE NOMBRE DEL CLIENTE (OBLIGATORIO) */}
                     <Input 
                         style={{
                             width:'100%', padding: '10px', marginTop: 15, 
@@ -414,6 +450,17 @@ const ProformaGenerator = () => {
                         onChange={e => setClientName(e.target.value)}
                     />
                     
+                    {/* CAMPO DE NÚMERO DE TELÉFONO (OPCIONAL) */}
+                    <InputGroup>
+                        <FaPhone size={14} />
+                        <input 
+                            type="tel"
+                            placeholder="Teléfono del Cliente (Opcional)"
+                            value={clientPhone}
+                            onChange={e => setClientPhone(e.target.value)}
+                        />
+                    </InputGroup>
+
                     {/* CAMPO DE NÚMERO DE PROFORMA (OPCIONAL) */}
                     <Input 
                         style={{
@@ -499,6 +546,8 @@ const ProformaGenerator = () => {
                     onClose={() => setIsProformaModalOpen(false)} 
                     setTicketData={handleSetTicketData} 
                     currentUser={user} 
+                    // El objeto client ya contiene el nombre y el teléfono (si se ingresó)
+                    client={proformaDetails.client}
                 />
             )}
         </Container>
