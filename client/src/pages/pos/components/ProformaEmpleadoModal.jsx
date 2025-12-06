@@ -57,7 +57,7 @@ const COMPANY = {
     PHONE: '84031936 / 84058142',
     ADDRESS: 'Del portón de la normal 75 varas al este. Juigalpa, Chontales.',
     SLOGAN: 'Tu mejor opción en repuestos de moto y carro',
-    LOGO_URL: '/logos/logo_rg.png', // Asegúrate que la ruta sea accesible desde /public
+    LOGO_URL: '/icons/logo.png', 
 };
 
 /* =================================================================
@@ -138,7 +138,7 @@ const ProformaEmpleadoModal = ({
     onClose,
     setTicketData, 
     currentUser,
-    client // Objeto client que ahora incluye el teléfono
+    client
 }) => {
     const [loadingPDF, setLoadingPDF] = React.useState(false);
     const proformaRef = useRef(null); 
@@ -152,19 +152,21 @@ const ProformaEmpleadoModal = ({
 
     const userName = getName(currentUser);
     const clientName = client?.nombre || proformaFor || 'Consumidor Final'; 
-    const clientPhone = client?.telefono || 'N/D'; // **USO DEL TELÉFONO RECIBIDO**
+    const clientPhone = client?.telefono || 'N/D';
 
     /**
      * FUNCIÓN CLAVE: Genera el PDF real usando html2canvas y jsPDF
      */
     const handleDownloadPDF = async () => {
-        if (cart.length === 0) return alert("No hay artículos para generar el PDF.");
+        if (cart.length === 0) return;
         
         setLoadingPDF(true);
         
         const input = proformaRef.current;
+        // Nombre del archivo: PROFORMA_CLIENTE_NUMERO.pdf (ej: PROFORMA_RAMON_N123.pdf)
+        const clientCleaned = proformaFor.replace(/\s/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
         const numberSuffix = proformaNumber.trim() ? `N${proformaNumber.trim()}` : `TEMP`;
-        const filename = `PROFORMA_${numberSuffix}_${proformaFor.replace(/\s/g, '_')}.pdf`;
+        const filename = `PROFORMA_${clientCleaned}_${numberSuffix}.pdf`;
 
         // 2. Clonar y añadir clase para ocultar botones
         const elementToCapture = input.cloneNode(true);
@@ -189,10 +191,10 @@ const ProformaEmpleadoModal = ({
             const imgWidth = 210; 
             const imgHeight = canvas.height * imgWidth / canvas.width;
             const pageHeight = 297; 
-            let heightLeft = imgHeight;
             let position = 0;
 
             pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+            let heightLeft = imgHeight;
             heightLeft -= pageHeight;
 
             // Manejar paginación si es necesario
@@ -205,17 +207,16 @@ const ProformaEmpleadoModal = ({
 
             // 6. Guardar el archivo (fuerza la descarga)
             pdf.save(filename);
-
-            alert(`✅ Proforma ${numberSuffix} generada y descargada exitosamente.`);
             
-            // Llama a la función de limpieza del componente padre
+            // 7. Llama a la función de limpieza del componente padre (silenciosa)
             setTicketData(); 
 
         } catch (error) {
             console.error("Error al generar PDF:", error);
-            alert("❌ Error al generar y descargar el PDF de la proforma. Verifique la consola.");
+            // Si el error es de CORS o imagen (común con html2canvas), notificar, pero no detener el flujo
+            alert("❌ Error al generar y descargar el PDF. Verifique la consola (F12) para detalles."); 
         } finally {
-            // 7. Limpiar: Remover el clon del DOM
+            // 8. Limpiar: Remover el clon del DOM
             if (document.body.contains(elementToCapture)) {
                 document.body.removeChild(elementToCapture);
             }
@@ -253,7 +254,7 @@ const ProformaEmpleadoModal = ({
                             <p>Emitida por: <span>{userName}</span></p>
                         </ClientDetailItem>
                         <ClientDetailItem>
-                            <p>Teléfono cliente: <span>{clientPhone}</span></p> {/* TELÉFONO MOSTRADO */}
+                            <p>Teléfono cliente: <span>{clientPhone}</span></p>
                             <p>Fecha: <span>{new Date().toLocaleDateString('es-NI')}</span></p>
                         </ClientDetailItem>
                     </ClientDetails>

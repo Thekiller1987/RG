@@ -1,3 +1,5 @@
+// Archivo: src/pages/PedidosYApartados.jsx
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import styled, { keyframes } from 'styled-components'; 
 import { 
@@ -335,7 +337,7 @@ const ProformaGenerator = () => {
 
     // FUNCIÓN MODIFICADA: solo limpia el carro (llamada desde ProformaEmpleadoModal)
     const handleSetTicketData = useCallback(() => {
-        // Esta función se llama después de que el ProformaEmpleadoModal ha manejado la descarga/cierre.
+        // Asumimos que la descarga fue iniciada y ahora limpiamos el estado.
         resetCart();
     }, [resetCart]);
 
