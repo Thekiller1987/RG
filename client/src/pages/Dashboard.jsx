@@ -198,8 +198,8 @@ const Dashboard = () => {
                     {canAccessOrders && (
                         <Card to="/orders" color="#ffc107"> 
                             <CardIcon color="#ffc107"><FaFileInvoice /></CardIcon> 
-                            <h2>Pedidos y Apartados</h2> 
-                            <p>Crear tickets, apartados y pedidos.</p> 
+                            <h2>Proformas y precios </h2> 
+                            <p>CCrear Proformas y ver Productos</p> 
                         </Card>
                     )}
                     

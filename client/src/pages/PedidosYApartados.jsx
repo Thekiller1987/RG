@@ -1,5 +1,4 @@
 // Archivo: src/pages/PedidosYApartados.jsx
-
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import styled, { keyframes } from 'styled-components'; 
 // Importamos FaArrowLeft para el botón de regresar
@@ -15,11 +14,12 @@ import {
 import { useAuth } from '../context/AuthContext'; 
 import * as api from '../service/api'; 
 
-import ProformaModal from './pos/components/ProformaModal.jsx'; 
+// Importamos el NUEVO componente
+import ProformaEmpleadoModal from './pos/components/ProformaEmpleadoModal.jsx'; 
 
 
 // =================================================================
-// ESTILOS RESPONSIVE (STYLED COMPONENTS) - ACTUALIZADO
+// ESTILOS RESPONSIVE (STYLED COMPONENTS)
 // =================================================================
 const spin = keyframes`
     0% { transform: rotate(0deg); }
@@ -31,11 +31,11 @@ const Container = styled.div`
 `;
 const LeftPanel = styled.div`
     flex: 2; padding: 20px; display: flex; flex-direction: column; gap: 15px; overflow-y: hidden;
-    @media (max-width: 768px) { flex: none; height: auto; overflow-y: visible; padding: 15px; } /* Ajuste padding en móvil */
+    @media (max-width: 768px) { flex: none; height: auto; overflow-y: visible; padding: 15px; } 
 `;
 const RightPanel = styled.div`
     flex: 1; background: white; padding: 20px; display: flex; flex-direction: column; box-shadow: -4px 0 15px rgba(0,0,0,0.05); border-left: 1px solid #e2e8f0; min-width: 350px;
-    @media (max-width: 768px) { flex: none; width: 100%; border-left: none; border-top: 1px solid #e2e8f0; min-width: 0; padding: 15px; } /* Ajuste padding en móvil */
+    @media (max-width: 768px) { flex: none; width: 100%; border-left: none; border-top: 1px solid #e2e8f0; min-width: 0; padding: 15px; } 
 `;
 const Header = styled.div` 
     display: flex; 
@@ -57,7 +57,7 @@ const HeaderActions = styled.div`
         align-items: center;
         gap: 5px;
         transition: background 0.2s;
-        white-space: nowrap; /* Evita que el texto se rompa */
+        white-space: nowrap; 
     }
 
     @media (max-width: 768px) {
@@ -70,12 +70,11 @@ const HeaderActions = styled.div`
     }
 `;
 
-// Nuevo estilo para el botón de regreso
 const BackButton = styled.button`
-    background: #f8fafc;
-    border: 1px solid #cbd5e1;
-    color: #475569;
-    &:hover { background: #e2e8f0; }
+    background: #3b82f6; /* Cambiado a primario para mejor visibilidad */
+    border: none;
+    color: white;
+    &:hover { background: #1d4ed8; }
 `;
 
 const SearchContainer = styled.div`
@@ -100,10 +99,9 @@ const ProductGrid = styled.div`
     padding-bottom: 20px; 
     flex: 1;
     
-    /* Mejorar la visualización en móviles */
     @media (max-width: 768px) { 
-        grid-template-columns: repeat(2, 1fr); /* Dos columnas más manejables en móvil */
-        max-height: 60vh; /* Altura máxima para que el usuario pueda ver el carrito */
+        grid-template-columns: repeat(2, 1fr); 
+        max-height: 60vh; 
     }
 `;
 const ProductCard = styled.div`
@@ -138,8 +136,7 @@ const sanitizeText = (text) => String(text || '').toLowerCase().normalize("NFD")
 // =================================================================
 
 const ProformaGenerator = () => {
-    // Si usas react-router-dom, descomenta la siguiente línea:
-    // const navigate = useNavigate(); 
+    // const navigate = useNavigate(); // Descomenta si usas React Router
     
     const { user, products: authProducts } = useAuth(); 
     const token = localStorage.getItem('token');
@@ -151,6 +148,7 @@ const ProformaGenerator = () => {
     const [loading, setLoading] = useState(false);
     const [clientName, setClientName] = useState('');
     
+    // Cambiamos el nombre del modal para que coincida con el nuevo componente
     const [isProformaModalOpen, setIsProformaModalOpen] = useState(false);
     const [proformaDetails, setProformaDetails] = useState(null);
 
@@ -178,18 +176,15 @@ const ProformaGenerator = () => {
     }, [token]);
 
     const goToDashboard = () => {
-        // Lógica de navegación.
-        // Si usas React Router: navigate('/dashboard');
-        // Si no tienes enrutamiento aquí:
-        alert("Navegando al Dashboard. (Reemplaza esta función con tu lógica de enrutamiento, ej: useNavigate)");
-        window.location.href = '/dashboard'; // Navegación de respaldo
+        // CORRECCIÓN: Usar navigate() si está disponible, sino, fallback
+        // navigate('/dashboard'); 
+        window.location.href = '/dashboard'; 
     };
 
 
     const addToCart = (product) => {
         setCart(prev => {
             const existing = prev.find(p => p.id === product.id);
-            // Aseguramos que el precio sea un número flotante
             const finalPrice = parseFloat(product.precio_venta || product.precio || 0); 
             
             if (existing) {
@@ -290,6 +285,8 @@ const ProformaGenerator = () => {
         
         setLoading(true);
 
+        // Aquí podrías hacer una llamada a la API si necesitas un número de proforma o un ID de transacción
+        
         const newProformaDetails = {
             cart: cart,
             total: total,
@@ -304,10 +301,8 @@ const ProformaGenerator = () => {
         setLoading(false);
     };
 
-    // FUNCIÓN MODIFICADA: SOLO CIERRA EL MODAL Y LIMPIA EL CARRO
+    // FUNCIÓN MODIFICADA: solo limpia el carro (llamada desde ProformaEmpleadoModal)
     const handleSetTicketData = useCallback(() => {
-        // En una aplicación real, el modal de proforma manejaría la generación del PDF.
-        // Al cerrarse (o al generar el PDF exitosamente), llama a esta función para limpiar.
         resetCart();
     }, [resetCart]);
 
@@ -321,7 +316,6 @@ const ProformaGenerator = () => {
                     <HeaderActions>
                         <BackButton 
                             onClick={goToDashboard} 
-                            style={{ background: '#3b82f6', color: 'white', border: 'none' }}
                         >
                             <FaArrowLeft size={14}/> Regresar
                         </BackButton>
@@ -483,16 +477,15 @@ const ProformaGenerator = () => {
                 </div>
             </RightPanel>
 
-            {/* 5. RENDERING CONDICIONAL DEL MODAL DE PROFORMA */}
+            {/* 5. RENDERING CONDICIONAL DEL MODAL DE PROFORMA - Usa el nuevo componente */}
             {isProformaModalOpen && proformaDetails && (
-                <ProformaModal 
+                <ProformaEmpleadoModal // <-- Componente NUEVO
                     {...proformaDetails} 
                     onClose={() => setIsProformaModalOpen(false)} 
-                    // Se llama para limpiar el carro después de que el PDF se genera/cierra.
+                    // Se llama para limpiar el carro después de que el PDF se descarga.
                     setTicketData={handleSetTicketData} 
                     currentUser={user} 
-                    // Nuevo prop para asegurar que el modal sepa que NO debe imprimir.
-                    onlyPDF={true} 
+                    // Ya no se necesita el prop onlyPDF, el modal lo sabe implícitamente
                 />
             )}
         </Container>
