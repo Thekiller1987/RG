@@ -1,5 +1,3 @@
-// Archivo: src/pages/PedidosYApartados.jsx
-
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import styled, { keyframes } from 'styled-components'; 
 import { 
@@ -174,10 +172,9 @@ const ProformaGenerator = () => {
     const [searchType, setSearchType] = useState('nombre'); 
     const [loading, setLoading] = useState(false);
     
-    // ESTADOS AGREGADOS/MODIFICADOS
     const [clientName, setClientName] = useState('');
-    const [clientPhone, setClientPhone] = useState(''); // <- NUEVO ESTADO PARA EL TELÉFONO
-    const [proformaNumber, setProformaNumber] = useState(''); 
+    const [clientPhone, setClientPhone] = useState(''); // Estado para teléfono
+    const [proformaNumber, setProformaNumber] = useState(''); // Estado para número opcional
     
     const [isProformaModalOpen, setIsProformaModalOpen] = useState(false);
     const [proformaDetails, setProformaDetails] = useState(null);
@@ -339,8 +336,6 @@ const ProformaGenerator = () => {
     // FUNCIÓN MODIFICADA: solo limpia el carro (llamada desde ProformaEmpleadoModal)
     const handleSetTicketData = useCallback(() => {
         // Esta función se llama después de que el ProformaEmpleadoModal ha manejado la descarga/cierre.
-        // Asumimos que la descarga fue iniciada y ahora limpiamos el estado.
-        alert("Proforma generada con éxito.");
         resetCart();
     }, [resetCart]);
 
@@ -546,7 +541,6 @@ const ProformaGenerator = () => {
                     onClose={() => setIsProformaModalOpen(false)} 
                     setTicketData={handleSetTicketData} 
                     currentUser={user} 
-                    // El objeto client ya contiene el nombre y el teléfono (si se ingresó)
                     client={proformaDetails.client}
                 />
             )}
