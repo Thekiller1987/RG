@@ -1,9 +1,8 @@
-
 import React, { useMemo, useState } from 'react';
 import { ModalOverlay, ModalContent, Button, SearchInput, TotalsRow } from '../POS.styles.jsx';
 import {
   FaLockOpen, FaFileInvoiceDollar, FaRegCreditCard,
-  FaMoneyBillWave, FaExchangeAlt, FaUserClock, FaPrint
+  FaMoneyBillWave, FaExchangeAlt, FaUserClock, FaPrint, FaExclamationCircle
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
@@ -45,11 +44,13 @@ const CajaModal = ({
     cancelaciones,
     entradas,
     salidas,
-    abonos, // <--- NUEVA CATEGORÍA
+    abonos, 
     totalTarjeta,
     totalTransferencia,
     totalCredito,
-    totalNoEfectivo
+    totalNoEfectivo,
+    // NUEVOS TOTALES PARA VISUALIZACIÓN
+    sumDevolucionesCancelaciones
   } = useMemo(() => {
     const cajaInicialN = Number(session?.initialAmount || 0);
 
@@ -59,13 +60,16 @@ const CajaModal = ({
       cancelaciones: [],
       entradas: [],
       salidas: [],
-      abonos: [] // <--- Array para guardar los abonos/pedidos
+      abonos: [] 
     };
 
     let netCash = 0;
     let tTarjeta = 0;
     let tTransf = 0;
     let tCredito = 0;
+    
+    // Acumuladores para devoluciones y cancelaciones
+    let sumDevsCancels = 0;
 
     for (const tx of transactions) {
       // Normalizamos el tipo a minúsculas para evitar errores
@@ -74,8 +78,6 @@ const CajaModal = ({
       const ingresoCaja = Number(pd.ingresoCaja || 0);
 
       // --- 1. CASH NETO (Efectivo) ---
-      // Si entra dinero a caja y no es venta a crédito pura, lo sumamos.
-      // Esto debería capturar tus abonos si tienen ingresoCaja > 0
       if (t === 'venta_credito') {
         // no afecta caja
       } else {
@@ -83,21 +85,26 @@ const CajaModal = ({
       }
 
       // --- 2. TOTALES NO EFECTIVO ---
-      // CORRECCIÓN: Antes solo sumaba si empezaba con 'venta'. 
-      // Ahora incluimos abonos, pedidos y apartados.
       if (t.startsWith('venta') || t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
         tTarjeta += Number(pd.tarjeta || 0);
         tTransf += Number(pd.transferencia || 0);
         tCredito += Number(pd.credito || 0);
       }
 
-      // --- 3. CLASIFICACIÓN PARA LISTAS ---
-      if (t === 'venta_contado' || t === 'venta_mixta') cls.ventasContado.push(tx);
-      else if (t === 'devolucion') cls.devoluciones.push(tx);
-      else if (t === 'cancelacion') cls.cancelaciones.push(tx);
+      // --- 3. CLASIFICACIÓN PARA LISTAS Y SUMAS ESPECÍFICAS ---
+      if (t === 'venta_contado' || t === 'venta_mixta') {
+        cls.ventasContado.push(tx);
+      }
+      else if (t === 'devolucion') {
+        cls.devoluciones.push(tx);
+        sumDevsCancels += ingresoCaja; // Sumamos el impacto en caja (generalmente negativo)
+      }
+      else if (t === 'cancelacion') {
+        cls.cancelaciones.push(tx);
+        sumDevsCancels += ingresoCaja; // Sumamos el impacto en caja
+      }
       else if (t === 'entrada') cls.entradas.push(tx);
       else if (t === 'salida') cls.salidas.push(tx);
-      // CORRECCIÓN: Capturar cualquier cosa que parezca un abono o pago de pedido
       else if (t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
          cls.abonos.push(tx);
       }
@@ -112,11 +119,12 @@ const CajaModal = ({
       cancelaciones: cls.cancelaciones,
       entradas: cls.entradas,
       salidas: cls.salidas,
-      abonos: cls.abonos, // Retornamos la lista nueva
+      abonos: cls.abonos,
       totalTarjeta: tTarjeta,
       totalTransferencia: tTransf,
       totalCredito: tCredito,
-      totalNoEfectivo: tTarjeta + tTransf + tCredito
+      totalNoEfectivo: tTarjeta + tTransf + tCredito,
+      sumDevolucionesCancelaciones: sumDevsCancels // Total combinado
     };
   }, [transactions, session]);
 
@@ -186,6 +194,7 @@ const CajaModal = ({
           th, td { border-bottom:1px solid #eee; padding:6px; font-size:14px;}
           .sep { border-top:2px dashed #ccc; margin:8px 0; }
           .diff { font-size:16px; padding:6px; background:#eef7ee; border-radius:6px; }
+          .red { color: #dc3545; }
         </style>
       </head>
       <body>
@@ -198,6 +207,9 @@ const CajaModal = ({
         <div class="box">
           <div class="row"><div>Fondo Inicial:</div><div>${fmt(cajaInicial)}</div></div>
           <div class="row"><div>Movimiento Neto Efectivo:</div><div>${fmt(movimientoNetoEfectivo)}</div></div>
+          
+          <div class="row red"><div>(-) Devoluciones/Cancelaciones:</div><div>${fmt(sumDevolucionesCancelaciones)}</div></div>
+
           <div class="sep"></div>
           <div class="row bold"><div>Efectivo Esperado:</div><div>${fmt(efectivoEsperado)}</div></div>
           <div class="row"><div>Monto Físico Contado:</div><div>${fmt(montoContado)}</div></div>
@@ -314,6 +326,12 @@ const CajaModal = ({
                 <span>C${movimientoNetoEfectivo.toFixed(2)}</span>
               </TotalsRow>
 
+              {/* AQUÍ AÑADIDO: VISUALIZACIÓN DEL TOTAL DE DEVOLUCIONES Y CANCELACIONES */}
+              <TotalsRow style={{ color: '#dc3545', fontSize: '0.9rem' }}>
+                <span><FaExclamationCircle /> Salidas por Dev/Cancel:</span>
+                <span>C${sumDevolucionesCancelaciones.toFixed(2)}</span>
+              </TotalsRow>
+
               <hr style={{margin: '6px 0', border: 'none', borderTop: '2px dashed #ccc'}}/>
 
               <TotalsRow $bold>
@@ -351,7 +369,6 @@ const CajaModal = ({
             </div>
 
             {/* Listados compactos */}
-            {/* AÑADIDO: Lista de Abonos para visualización */}
             <SectionList title="Abonos y Otros Pagos" items={abonos} positive />
 
             <SectionList title="Entradas" items={entradas} positive />

@@ -599,6 +599,77 @@ function SalesHistoryModal({
                   </OriginalButton>
                 </div>
               </RightPanel>
+            ) : selectedSale.estado === 'CANCELADA' ? (
+              // ───────────────────────── VISTA NUEVA PARA CANCELADAS ─────────────────────────
+              <RightPanel>
+                <h3 style={{ marginTop: 0, color: '#dc3545' }}>
+                  Detalle de Venta Cancelada #{selectedSale.id}
+                </h3>
+
+                <div className="box" style={{ marginTop: 10 }}>
+                  <p>
+                    <strong>Cliente:</strong>{' '}
+                    {safeClients.find(
+                      (c) =>
+                        c.id_cliente ===
+                        (selectedSale.clientId || selectedSale.idCliente)
+                    )?.nombre || 'Consumidor Final'}
+                  </p>
+                  <p>
+                    <strong>Fecha:</strong>{' '}
+                    {new Date(selectedSale.fecha).toLocaleString('es-NI')}
+                  </p>
+                  <p>
+                    <strong>Estado:</strong>{' '}
+                    <span
+                      style={{
+                        background: '#f8d7da',
+                        color: '#721c24',
+                        padding: '2px 8px',
+                        borderRadius: 8,
+                        fontWeight: 700,
+                      }}
+                    >
+                      CANCELADA
+                    </span>
+                  </p>
+                </div>
+
+                <div className="box" style={{ marginTop: 10 }}>
+                  <h4 style={{ marginTop: 0 }}>Productos Cancelados</h4>
+                  {(!selectedSale.items || selectedSale.items.length === 0) ? (
+                    <p style={{ color: '#6c757d', fontStyle: 'italic' }}>
+                      No hay detalles de productos disponibles.
+                    </p>
+                  ) : (
+                    <ul style={{ margin: 0, paddingLeft: 18, color: '#6c757d' }}>
+                      {selectedSale.items.map((it, i) => (
+                        <li key={`${it.id || it.id_producto}-${i}`}>
+                          <strong>{safeItemName(it, i)}</strong>
+                          {' '}— {Number(it.quantity || it.cantidad || 0)} u.
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p style={{ marginTop: 8, color: '#dc3545', textDecoration: 'line-through' }}>
+                    Total Anulado: <strong>C$ {money(selectedSale.totalVenta)}</strong>
+                  </p>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'flex-start',
+                    gap: 10,
+                    marginTop: 12,
+                  }}
+                >
+                  <OriginalButton onClick={handleReprint}>
+                    Reimprimir Comprobante
+                  </OriginalButton>
+                </div>
+              </RightPanel>
+              // ───────────────────────────────────────────────────────────────────────────────
             ) : (
               <SaleDetailView
                 sale={selectedSale}
