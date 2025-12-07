@@ -1,4 +1,3 @@
-// client/src/pages/POS/components/SalesHistoryModal.jsx
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import styled, { css } from 'styled-components';
 import {
@@ -26,7 +25,6 @@ const todayLocal = () => {
   const now = new Date();
 
   // Formatea esa fecha al formato YYYY-MM-DD usando la zona horaria de Nicaragua.
-  // Esto es más explícito y seguro que los cálculos manuales.
   const year = now.toLocaleString('en-US', { year: 'numeric', timeZone: 'America/Managua' });
   const month = now.toLocaleString('en-US', { month: '2-digit', timeZone: 'America/Managua' });
   const day = now.toLocaleString('en-US', { day: '2-digit', timeZone: 'America/Managua' });
@@ -339,6 +337,7 @@ function SalesHistoryModal({
   }, [selectedSale, onCancelSale, afterMutationRefresh]);
 
   // Devolver (usa la firma: onReturnItem(selectedSale, item, qty))
+  // MODIFICACIÓN ELEVENTA: Actualización visual INMEDIATA
   const handleReturn = useCallback((item, index = 0) => {
     if (!selectedSale) return;
     if (!onReturnItem) {
@@ -363,9 +362,29 @@ function SalesHistoryModal({
           return;
         }
         try {
+          // 1. Llamada al Backend
           await onReturnItem(selectedSale, item, qty);
           openAlert('Éxito', `Se devolvieron ${qty} unidad(es) de ${safeItemName(item, index)}.`);
-          await afterMutationRefresh(selectedSale.id);
+          
+          // 2. ACTUALIZACIÓN VISUAL INMEDIATA (Efecto Eleventa)
+          // Calculamos los items restantes sin tener que recargar toda la venta del servidor
+          const updatedItems = selectedSale.items.map(it => {
+              // Identificamos el item por objeto o ID
+              if (it === item || (it.id && it.id === item.id) || (it.id_producto && it.id_producto === item.id_producto)) {
+                  return { ...it, cantidad: (it.quantity || it.cantidad) - qty };
+              }
+              return it;
+          }).filter(it => (it.quantity || it.cantidad) > 0); // Eliminamos visualmente si llega a 0
+
+          const updatedSaleObj = { ...selectedSale, items: updatedItems };
+
+          // 3. Setear estado local inmediatamente
+          setSelectedSale(updatedSaleObj);
+          setSalesData(prevSales => prevSales.map(s => s.id === selectedSale.id ? updatedSaleObj : s));
+
+          // 4. Refrescar en segundo plano para obtener el nuevo ticket de devolución generado
+          fetchSalesByDate(currentApiDate);
+
         } catch (error) {
           const msg = (error?.message || '').toLowerCase();
           const cleaned =
@@ -378,7 +397,7 @@ function SalesHistoryModal({
         }
       }
     );
-  }, [selectedSale, onReturnItem, afterMutationRefresh]);
+  }, [selectedSale, onReturnItem, fetchSalesByDate, currentApiDate]);
 
   // Reimprimir (tu lógica)
   const handleReprint = useCallback(() => {
