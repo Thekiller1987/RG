@@ -71,30 +71,35 @@ const CajaModal = ({
 
     for (const tx of transactions) {
       const t = (tx?.type || '').toLowerCase();
-      const txId = String(tx?.id || '').toLowerCase(); // Normalizamos ID para detectar tipo
+      const txId = String(tx?.id || '').toLowerCase(); 
       const pd = tx?.pagoDetalles || {};
       
-      // Monto que afectó a la caja (puede ser negativo para salidas)
-      const ingresoCaja = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
+      // Monto total que se registró en la transacción (Total Pagado)
+      const ingresoTotal = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
 
-      // --- 1. CASH NETO (Efectivo) ---
-      // Sumamos todo lo que no sea venta a crédito pura
+      // Montos NO EFECTIVO de esta transacción
+      const txTarjeta = Number(pd.tarjeta || 0);
+      const txTransf = Number(pd.transferencia || 0);
+      const txCredito = Number(pd.credito || 0);
+
+      // --- 1. CÁLCULO DE EFECTIVO REAL (CORRECCIÓN) ---
+      // Si el ingreso incluye tarjeta o transferencia, lo restamos para que no infle la caja física.
+      const ingresoEfectivoReal = ingresoTotal - txTarjeta - txTransf;
+
+      // Sumamos al neto solo si no es una venta puramente a crédito (que no mueve caja)
       if (t !== 'venta_credito') {
-        netCash += ingresoCaja;
+        netCash += ingresoEfectivoReal;
       }
 
-      // --- 2. TOTALES NO EFECTIVO ---
+      // --- 2. ACUMULADORES GLOBALES (Para reporte) ---
       if (t.startsWith('venta') || t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
-        tTarjeta += Number(pd.tarjeta || 0);
-        tTransf += Number(pd.transferencia || 0);
-        tCredito += Number(pd.credito || 0);
+        tTarjeta += txTarjeta;
+        tTransf += txTransf;
+        tCredito += txCredito;
       }
 
-      // --- 3. CLASIFICACIÓN INTELIGENTE ---
-      
-      // Detectar Devolución (por tipo O por ID generado en POS)
+      // --- 3. CLASIFICACIÓN DE LISTAS ---
       const esDevolucion = t === 'devolucion' || txId.includes('devolucion');
-      // Detectar Cancelación
       const esCancelacion = t === 'cancelacion' || txId.includes('cancelacion');
 
       if (t === 'venta_contado' || t === 'venta_mixta') {
@@ -102,18 +107,16 @@ const CajaModal = ({
       }
       else if (esDevolucion) {
         cls.devoluciones.push(tx);
-        // Sumamos valor absoluto porque ingresoCaja viene negativo (-10) y queremos mostrar "10"
-        sumDevsCancels += Math.abs(ingresoCaja); 
+        sumDevsCancels += Math.abs(ingresoTotal); 
       }
       else if (esCancelacion) {
         cls.cancelaciones.push(tx);
-        sumDevsCancels += Math.abs(ingresoCaja);
+        sumDevsCancels += Math.abs(ingresoTotal);
       }
       else if (t === 'entrada') {
         cls.entradas.push(tx);
       }
       else if (t === 'salida') {
-        // Solo si NO fue detectado como dev/cancel arriba, cae aquí como salida genérica
         cls.salidas.push(tx);
       }
       else if (t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
