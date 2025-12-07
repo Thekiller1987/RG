@@ -9,10 +9,8 @@ function safeParseJSON(v) {
 /* ───────────────────────── createSale (SIN CAMBIOS) ───────────────────────── */
 const createSale = async (req, res) => {
   const connection = await pool.getConnection();
-
   const { totalVenta, items, pagoDetalles, userId, clientId } = req.body;
-  console.log(`LOG: Iniciando transacción para nueva venta. Cliente ID: ${clientId}, Total: ${totalVenta}`);
-
+  
   try {
     await connection.beginTransaction();
 
@@ -21,7 +19,6 @@ const createSale = async (req, res) => {
     }
 
     const montoCredito = pagoDetalles.credito || 0;
-
     const saleData = {
       fecha: new Date(),
       total_venta: totalVenta,
@@ -50,19 +47,10 @@ const createSale = async (req, res) => {
         'INSERT INTO detalle_ventas (id_venta, id_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?)',
         [saleId, item.id || item.id_producto, item.quantity, item.precio]
       );
-
-      const [product] = await connection.query('SELECT existencia, nombre FROM productos WHERE id_producto = ? FOR UPDATE', [item.id || item.id_producto]);
-
-      if (product.length === 0 || product[0].existencia < item.quantity) {
-        await connection.rollback();
-        throw new Error(`Stock insuficiente para el producto: ${product[0]?.nombre || item.nombre}`);
-      }
-
       await connection.query('UPDATE productos SET existencia = existencia - ? WHERE id_producto = ?', [item.quantity, item.id || item.id_producto]);
     }
 
     await connection.commit();
-    
     const [newSale] = await connection.query('SELECT * FROM ventas WHERE id_venta = ?', [saleId]);
 
     res.status(201).json({
@@ -73,8 +61,8 @@ const createSale = async (req, res) => {
 
   } catch (error) {
     await connection.rollback();
-    console.error('ERROR CRÍTICO en transacción de venta:', error);
-    res.status(500).json({ message: error.message || 'Error en el servidor al crear la venta' });
+    console.error('ERROR en createSale:', error);
+    res.status(500).json({ message: error.message || 'Error en el servidor' });
   } finally {
     if (connection) connection.release();
   }
@@ -84,23 +72,16 @@ const createSale = async (req, res) => {
 const cancelSale = async (req, res) => {
   const { id } = req.params;
   const connection = await pool.getConnection();
-  
   try {
     await connection.beginTransaction();
-
     const [sale] = await connection.query('SELECT id_cliente, estado, pago_detalles FROM ventas WHERE id_venta = ? FOR UPDATE', [id]);
 
-    if (sale.length === 0) throw new Error('La venta no existe.');
-    if (sale[0].estado === 'CANCELADA') throw new Error('Esta venta ya fue cancelada.');
+    if (sale.length === 0) throw new Error('Venta no encontrada.');
+    if (sale[0].estado === 'CANCELADA') throw new Error('Venta ya cancelada.');
 
     const saleData = sale[0];
     const clientId = saleData.id_cliente;
-
-    let detalles = {};
-    try {
-      detalles = typeof saleData.pago_detalles === 'string' ? JSON.parse(saleData.pago_detalles) : saleData.pago_detalles;
-    } catch (e) {}
-
+    let detalles = safeParseJSON(saleData.pago_detalles);
     const montoCredito = detalles.credito || 0;
 
     const [items] = await connection.query('SELECT id_producto, cantidad FROM detalle_ventas WHERE id_venta = ?', [id]);
@@ -109,159 +90,126 @@ const cancelSale = async (req, res) => {
     }
 
     if (montoCredito > 0 && clientId) {
-      await connection.query(
-        'UPDATE clientes SET saldo_pendiente = GREATEST(0, saldo_pendiente - ?) WHERE id_cliente = ?',
-        [montoCredito, clientId]
-      );
+      await connection.query('UPDATE clientes SET saldo_pendiente = GREATEST(0, saldo_pendiente - ?) WHERE id_cliente = ?', [montoCredito, clientId]);
     }
 
     await connection.query('UPDATE ventas SET estado = ? WHERE id_venta = ?', ['CANCELADA', id]);
-
     await connection.commit();
     res.status(200).json({ message: 'Venta cancelada exitosamente.' });
-
   } catch (error) {
     await connection.rollback();
-    res.status(500).json({ message: error.message || 'Error al cancelar la venta' });
+    res.status(500).json({ message: error.message });
   } finally {
     if (connection) connection.release();
   }
 };
 
-/* ───────────────────────── createReturn (REESCRITA - SPLIT TICKET) ───────────────────────── */
+/* ───────────────────────── createReturn (MODIFICADO: ACTUALIZA TICKET ORIGINAL) ───────────────────────── */
 const createReturn = async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
     
-    // Recibimos datos
-    const { originalSaleId, item, quantity, userId } = req.body; // item es el producto a devolver
+    const { originalSaleId, item, quantity, userId } = req.body;
     const qtyToReturn = Number(quantity);
 
     if (!originalSaleId || !item || !qtyToReturn || !userId) {
-      throw new Error('Faltan datos para procesar la devolución.');
+      throw new Error('Faltan datos para la devolución.');
     }
 
-    // 1. Obtener la venta original y bloquearla
+    // 1. Obtener venta original
     const [originalSaleRows] = await connection.query('SELECT * FROM ventas WHERE id_venta = ? FOR UPDATE', [originalSaleId]);
     if (originalSaleRows.length === 0) throw new Error('Venta original no encontrada');
     const originalSale = originalSaleRows[0];
 
-    if (originalSale.estado === 'CANCELADA') throw new Error('La venta ya está cancelada, no se puede devolver.');
+    if (originalSale.estado === 'CANCELADA') throw new Error('No se puede devolver sobre una venta cancelada.');
 
-    // 2. Obtener los items originales
-    const [originalItems] = await connection.query(
-      `SELECT dv.*, p.nombre, p.existencia as stock_actual 
-       FROM detalle_ventas dv 
-       JOIN productos p ON dv.id_producto = p.id_producto 
-       WHERE dv.id_venta = ?`, 
-      [originalSaleId]
-    );
+    // 2. Devolver Stock al inventario (siempre se suma lo que entra)
+    const productId = item.id || item.id_producto;
+    await connection.query('UPDATE productos SET existencia = existencia + ? WHERE id_producto = ?', [qtyToReturn, productId]);
 
-    // 3. Verificar que el item a devolver existe en la venta
-    const targetItemIndex = originalItems.findIndex(i => i.id_producto == (item.id || item.id_producto));
-    if (targetItemIndex === -1) throw new Error('El producto a devolver no pertenece a esta venta.');
+    // 3. Buscar el item en detalle_ventas para modificarlo
+    const [detalleRows] = await connection.query('SELECT * FROM detalle_ventas WHERE id_venta = ? AND id_producto = ?', [originalSaleId, productId]);
     
-    const targetItem = originalItems[targetItemIndex];
-    if (targetItem.cantidad < qtyToReturn) throw new Error('No puedes devolver más cantidad de la que se vendió.');
+    if (detalleRows.length === 0) throw new Error('El producto no existe en esta venta.');
+    const currentItem = detalleRows[0];
 
-    // 4. REVERTIR TODO EL STOCK de la venta original (Para limpiar)
-    //    Devolvemos todo al inventario primero.
-    for (const prod of originalItems) {
-      await connection.query('UPDATE productos SET existencia = existencia + ? WHERE id_producto = ?', [prod.cantidad, prod.id_producto]);
+    if (currentItem.cantidad < qtyToReturn) throw new Error('No puedes devolver más cantidad de la que se vendió.');
+
+    // 4. Actualizar o Borrar la línea del producto en el ticket
+    if (currentItem.cantidad === qtyToReturn) {
+        // Se devuelve TODO: borrar la línea
+        await connection.query('DELETE FROM detalle_ventas WHERE id_venta = ? AND id_producto = ?', [originalSaleId, productId]);
+    } else {
+        // Se devuelve PARTE: restar cantidad
+        await connection.query('UPDATE detalle_ventas SET cantidad = cantidad - ? WHERE id_venta = ? AND id_producto = ?', [qtyToReturn, originalSaleId, productId]);
     }
 
-    // 5. CANCELAR la venta original (Ticket viejo "Borrado" lógicamente)
-    //    También revertimos saldo cliente si fue crédito
-    let pagoDetallesOrig = safeParseJSON(originalSale.pago_detalles);
-    if ((pagoDetallesOrig.credito || 0) > 0 && originalSale.id_cliente) {
-       await connection.query(
-        'UPDATE clientes SET saldo_pendiente = GREATEST(0, saldo_pendiente - ?) WHERE id_cliente = ?',
-        [pagoDetallesOrig.credito, originalSale.id_cliente]
-      );
-    }
-    await connection.query('UPDATE ventas SET estado = "CANCELADA" WHERE id_venta = ?', [originalSaleId]);
+    // 5. Recalcular el Ticket Original (Sumar lo que quedó)
+    const [remainingItems] = await connection.query('SELECT * FROM detalle_ventas WHERE id_venta = ?', [originalSaleId]);
+    
+    let newSubtotal = 0;
+    remainingItems.forEach(i => {
+        newSubtotal += (Number(i.cantidad) * Number(i.precio_unitario));
+    });
 
-
-    // 6. CALCULAR NUEVA LISTA DE ITEMS (Restando lo devuelto)
-    //    Si devolvimos todo de un producto, se elimina de la lista.
-    //    Si devolvimos parcial, se reduce la cantidad.
-    const newItemsList = [];
-    let refundTotal = 0; // Dinero a devolver al cliente
-
-    for (const prod of originalItems) {
-      let newQty = prod.cantidad;
-      
-      // Si este es el producto que estamos devolviendo
-      if (prod.id_producto == (item.id || item.id_producto)) {
-        newQty = prod.cantidad - qtyToReturn;
-        refundTotal += (Number(prod.precio_unitario) * qtyToReturn);
-      }
-
-      if (newQty > 0) {
-        newItemsList.push({
-          id_producto: prod.id_producto,
-          cantidad: newQty,
-          precio_unitario: Number(prod.precio_unitario)
-        });
-      }
-    }
-
-    // 7. CREAR NUEVO TICKET con los items restantes (si quedó algo)
-    let newSaleId = null;
-
-    if (newItemsList.length > 0) {
-      // Calcular nuevos totales
-      const newSubtotal = newItemsList.reduce((acc, curr) => acc + (curr.cantidad * curr.precio_unitario), 0);
-      
-      // Recalcular descuento proporcional (si había)
-      let newDiscount = 0;
-      if (originalSale.subtotal > 0 && originalSale.descuento > 0) {
+    // Calcular descuento proporcional si existía
+    let newDiscount = 0;
+    if (originalSale.subtotal > 0 && originalSale.descuento > 0) {
         const discountRate = originalSale.descuento / originalSale.subtotal;
         newDiscount = newSubtotal * discountRate;
-      }
-      const newTotal = newSubtotal - newDiscount;
-
-      // Ajustar pagoDetalles para el nuevo ticket
-      // Asumimos que la diferencia se devolvió en efectivo, así que el nuevo pago es el nuevo total
-      const newPagoDetalles = {
-        ...pagoDetallesOrig,
-        efectivo: newTotal, // Simplificación: asumimos que se ajusta a lo que quedó
-        ingresoCaja: newTotal, // Importante para reportes futuros
-        credito: 0 // Si había crédito, se asume pagado o reajustado, simplificado para efectivo
-      };
-      
-      // Insertar Venta Nueva
-      const [insertResult] = await connection.query(
-        'INSERT INTO ventas (fecha, total_venta, subtotal, descuento, estado, id_usuario, id_cliente, pago_detalles, tipo_venta, referencia_pedido) VALUES (NOW(), ?, ?, ?, "COMPLETADA", ?, ?, ?, ?, ?)',
-        [newTotal, newSubtotal, newDiscount, userId, originalSale.id_cliente, JSON.stringify(newPagoDetalles), originalSale.tipo_venta, originalSale.referencia_pedido]
-      );
-      newSaleId = insertResult.insertId;
-
-      // Insertar Detalles Nuevos y RESTAR STOCK NUEVAMENTE (solo de lo que se queda)
-      for (const newItem of newItemsList) {
-        await connection.query(
-          'INSERT INTO detalle_ventas (id_venta, id_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?)',
-          [newSaleId, newItem.id_producto, newItem.cantidad, newItem.precio_unitario]
-        );
-        await connection.query('UPDATE productos SET existencia = existencia - ? WHERE id_producto = ?', [newItem.cantidad, newItem.id_producto]);
-      }
     }
+    const newTotal = newSubtotal - newDiscount;
+
+    // Calcular cuánto dinero estamos devolviendo
+    const refundAmount = (Number(originalSale.total_venta) - newTotal);
+
+    // 6. Actualizar Cabecera de Venta (Total, Subtotal)
+    // También ajustamos pago_detalles para que cuadre con el nuevo total
+    let pagoDetalles = safeParseJSON(originalSale.pago_detalles);
+    
+    // Si era crédito, ajustamos crédito. Si era contado, ajustamos efectivo/ingresoCaja.
+    if ((pagoDetalles.credito || 0) > 0) {
+        const creditoRevertir = Math.min(pagoDetalles.credito, refundAmount);
+        pagoDetalles.credito -= creditoRevertir;
+        // También actualizar saldo del cliente en tabla clientes
+        if (originalSale.id_cliente) {
+             await connection.query('UPDATE clientes SET saldo_pendiente = GREATEST(0, saldo_pendiente - ?) WHERE id_cliente = ?', [creditoRevertir, originalSale.id_cliente]);
+        }
+    } else {
+        // Asumimos que se devuelve efectivo y el ingreso de caja baja
+        pagoDetalles.ingresoCaja = (pagoDetalles.ingresoCaja || originalSale.total_venta) - refundAmount;
+        pagoDetalles.efectivo = (pagoDetalles.efectivo || originalSale.total_venta) - refundAmount;
+    }
+
+    // Si no quedan items, marcar como CANCELADA, sino mantener COMPLETADA con nuevos montos
+    const nuevoEstado = remainingItems.length === 0 ? 'CANCELADA' : 'COMPLETADA';
+
+    await connection.query(
+        'UPDATE ventas SET total_venta = ?, subtotal = ?, descuento = ?, pago_detalles = ?, estado = ? WHERE id_venta = ?', 
+        [newTotal, newSubtotal, newDiscount, JSON.stringify(pagoDetalles), nuevoEstado, originalSaleId]
+    );
+
+    // 7. Insertar registro de auditoría (opcional, para saber que hubo devolución)
+    // Creamos un registro tipo "DEVOLUCION" con monto negativo para el historial, pero no afecta al ticket original ya modificado
+    const logPagoDetalles = { efectivo: refundAmount, ingresoCaja: -refundAmount, nota: `Devolución s/Ticket #${originalSaleId}` };
+    await connection.query(
+        "INSERT INTO ventas (fecha, total_venta, estado, id_usuario, pago_detalles, tipo_venta) VALUES (NOW(), ?, 'DEVOLUCION', ?, ?, 'DEVOLUCION')",
+        [-refundAmount, userId, JSON.stringify(logPagoDetalles)]
+    );
 
     await connection.commit();
 
-    // 8. Responder
-    // refundTotal: es la cantidad de dinero que salió de la caja (importante para el Frontend)
+    // Enviamos refundAmount para que el Frontend reste de la caja (POS.jsx lo maneja)
     res.status(201).json({ 
-      message: 'Devolución procesada. Ticket antiguo cancelado, ticket nuevo creado.', 
-      originalSaleId,
-      newSaleId,
-      refundAmount: refundTotal 
+      message: 'Devolución procesada. Ticket original actualizado.', 
+      originalSaleId, 
+      refundAmount 
     });
 
   } catch (error) {
     await connection.rollback();
-    console.error('Error en transacción de devolución:', error);
+    console.error('Error en devolución:', error);
     res.status(500).json({ message: error.message || 'Error al procesar la devolución' });
   } finally {
     if (connection) connection.release();
