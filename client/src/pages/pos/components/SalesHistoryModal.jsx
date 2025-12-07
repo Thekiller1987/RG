@@ -150,7 +150,7 @@ const SaleListItem = React.memo(function SaleListItem({
   const statusColors = {
     COMPLETADA: '#28a745',
     CANCELADA: '#dc3545',
-    DEVOLUCION: '#ffc107',
+    DEVOLUCION: '#dc3545', // Visualmente rojo como cancelación
     ABONO_CREDITO: '#17a2b8',
   };
 
@@ -163,13 +163,16 @@ const SaleListItem = React.memo(function SaleListItem({
     [safeClients, sale.clientId, sale.idCliente]
   );
 
-  // total normalizado y absoluto
   const totalRaw = Number(sale.totalVenta ?? sale.total_venta ?? sale.total ?? 0);
   const pay = getPaymentTypeLabel(sale.pagoDetalles);
 
-  const leftLabel = sale.estado === 'ABONO_CREDITO'
-    ? <><FaHandHoldingUsd style={{ marginRight: 6 }} /> ABONO</>
-    : <>#{sale.id} - {sale.estado.replace('_', ' ')}</>;
+  let leftLabel = <>#{sale.id} - {sale.estado.replace('_', ' ')}</>;
+  if (sale.estado === 'ABONO_CREDITO') {
+    leftLabel = <><FaHandHoldingUsd style={{ marginRight: 6 }} /> ABONO</>;
+  } else if (sale.estado === 'DEVOLUCION') {
+    // Si queremos que se lea como cancelación visualmente
+    leftLabel = <>#{sale.id} - CANCELACIÓN</>; 
+  }
 
   return (
     <Row
@@ -201,7 +204,7 @@ function SalesHistoryModal({
   clients = [],
   onReprintTicket,
   onCancelSale,
-  onReturnItem,   // firma: (selectedSale, item, qty)
+  onReturnItem, 
   onAbonoSuccess,
 }) {
   const [currentApiDate, setCurrentApiDate] = useState(todayLocal());
@@ -315,14 +318,9 @@ function SalesHistoryModal({
       openAlert('Venta ya cancelada', `La venta #${saleId} ya fue cancelada.`);
       return;
     }
-    if (!onCancelSale) {
-      openAlert('Error de Configuración', 'onCancelSale no fue proporcionada.');
-      return;
-    }
-
     openConfirm(
       'Cancelar Venta',
-      `¿Seguro que deseas cancelar la venta #${saleId}? Esta acción revierte inventario y no se puede deshacer.`,
+      `¿Seguro que deseas cancelar la venta #${saleId}?`,
       async () => {
         closeConfirm();
         try {
@@ -336,70 +334,73 @@ function SalesHistoryModal({
     );
   }, [selectedSale, onCancelSale, afterMutationRefresh]);
 
-  // Devolver (usa la firma: onReturnItem(selectedSale, item, qty))
-  // MODIFICACIÓN ELEVENTA: Actualización visual INMEDIATA
+  // --- "DEVOLUCIÓN" que actúa como CANCELACIÓN DE ITEM ---
   const handleReturn = useCallback((item, index = 0) => {
     if (!selectedSale) return;
-    if (!onReturnItem) {
-      openAlert('Error de Configuración', 'onReturnItem no fue proporcionada.');
-      return;
-    }
+    if (!onReturnItem) { openAlert('Error', 'Falta onReturnItem'); return; }
 
     const maxQty = Number(item?.quantity || item?.cantidad || 0);
-    if (!Number.isFinite(maxQty) || maxQty <= 0) {
-      openAlert('No se puede devolver', 'Este artículo no tiene cantidad disponible para devolver.');
-      return;
-    }
+    if (maxQty <= 0) { openAlert('Error', 'No hay cantidad disponible.'); return; }
 
     openPrompt(
-      'Devolver producto',
-      `Cantidad a devolver para "${safeItemName(item, index)}" (máx. ${maxQty})`,
+      'Cancelar Producto del Ticket',
+      `Cantidad a cancelar (máx. ${maxQty})`,
       '1',
       async (qtyStr) => {
         const qty = Number(qtyStr);
-        if (!Number.isFinite(qty) || qty <= 0 || qty > maxQty) {
-          openAlert('Cantidad inválida', `Ingresa un número entre 1 y ${maxQty}.`);
-          return;
-        }
+        if (qty <= 0 || qty > maxQty) { openAlert('Error', 'Cantidad inválida.'); return; }
+
         try {
-          // 1. Llamada al Backend
+          // 1. Backend: Procesa la "devolución" (internamente en DB se guarda, pero la trataremos como cancelacion)
           await onReturnItem(selectedSale, item, qty);
-          openAlert('Éxito', `Se devolvieron ${qty} unidad(es) de ${safeItemName(item, index)}.`);
-          
-          // 2. ACTUALIZACIÓN VISUAL INMEDIATA (Efecto Eleventa)
-          // Calculamos los items restantes sin tener que recargar toda la venta del servidor
+          openAlert('Éxito', `Producto cancelado/devuelto.`);
+
+          // 2. BORRADO VISUAL INMEDIATO DEL TICKET ORIGINAL
+          // Filtramos para quitar el item o reducir su cantidad
           const updatedItems = selectedSale.items.map(it => {
-              // Identificamos el item por objeto o ID
               if (it === item || (it.id && it.id === item.id) || (it.id_producto && it.id_producto === item.id_producto)) {
                   return { ...it, cantidad: (it.quantity || it.cantidad) - qty };
               }
               return it;
-          }).filter(it => (it.quantity || it.cantidad) > 0); // Eliminamos visualmente si llega a 0
+          }).filter(it => (it.quantity || it.cantidad) > 0); // <-- ESTO LO BORRA SI QUEDA EN 0
 
-          const updatedSaleObj = { ...selectedSale, items: updatedItems };
+          // Calculamos un nuevo total visual aproximado
+          // (Opcional, pero ayuda a que se vea consistente)
+          const precioItem = Number(item.precio || item.precio_unitario || 0);
+          const currentTotal = Number(selectedSale.totalVenta || selectedSale.total || 0);
+          const newTotal = currentTotal - (precioItem * qty);
 
-          // 3. Setear estado local inmediatamente
+          const updatedSaleObj = { 
+              ...selectedSale, 
+              items: updatedItems,
+              totalVenta: newTotal,
+              total: newTotal
+          };
+
+          // 3. Forzamos la actualización local
           setSelectedSale(updatedSaleObj);
+          
+          // Actualizamos la lista grande también
           setSalesData(prevSales => prevSales.map(s => s.id === selectedSale.id ? updatedSaleObj : s));
 
-          // 4. Refrescar en segundo plano para obtener el nuevo ticket de devolución generado
-          fetchSalesByDate(currentApiDate);
+          // 4. EVITAR QUE EL FETCH SOBRESCRIBA EL TICKET BORRADO
+          // Traemos los datos nuevos (donde aparecerá el ticket de cancelación nuevo)
+          // pero conservamos nuestra versión modificada del ticket original.
+          const newData = await loadSales(currentApiDate);
+          if (Array.isArray(newData)) {
+             const mergedData = newData.map(s => s.id === selectedSale.id ? updatedSaleObj : s);
+             setSalesData(mergedData);
+          }
 
         } catch (error) {
-          const msg = (error?.message || '').toLowerCase();
-          const cleaned =
-            msg.includes('not found') || msg.includes('404')
-              ? 'Ruta de API no encontrada. Verifica POST /api/sales/returns.'
-              : (error.message || 'No se pudo devolver el producto.');
-          openAlert('Error al Devolver', cleaned);
+          openAlert('Error', error.message || 'No se pudo procesar.');
         } finally {
           closePrompt();
         }
       }
     );
-  }, [selectedSale, onReturnItem, fetchSalesByDate, currentApiDate]);
+  }, [selectedSale, onReturnItem, loadSales, currentApiDate]);
 
-  // Reimprimir (tu lógica)
   const handleReprint = useCallback(() => {
     if (!selectedSale) return;
     onReprintTicket?.(selectedSale);
@@ -462,7 +463,7 @@ function SalesHistoryModal({
               <option value="">Todos</option>
               <option value="COMPLETADA">Completadas</option>
               <option value="CANCELADA">Canceladas</option>
-              <option value="DEVOLUCION">Devoluciones</option>
+              <option value="DEVOLUCION">Devoluciones / Cancelaciones</option>
               <option value="ABONO_CREDITO">Abonos</option>
             </SearchInput>
           </div>
@@ -498,7 +499,7 @@ function SalesHistoryModal({
                   ))
                 ) : (
                   <p style={{ textAlign: 'center', color: '#6c757d', marginTop: '1rem' }}>
-                    No se encontraron transacciones para la fecha y filtros seleccionados.
+                    No se encontraron transacciones.
                   </p>
                 )}
               </List>
@@ -529,101 +530,38 @@ function SalesHistoryModal({
             selectedSale.estado === 'ABONO_CREDITO' ? (
               <RightPanel>
                 <h3 style={{ marginTop: 0 }}>Detalle de Abono</h3>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '.75rem',
-                  }}
-                >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.75rem' }}>
                   <div />
                   <OriginalButton onClick={handleReprint}>Imprimir Recibo</OriginalButton>
                 </div>
               </RightPanel>
-            ) : selectedSale.estado === 'DEVOLUCION' ? (
+            ) : (selectedSale.estado === 'DEVOLUCION' || selectedSale.estado === 'CANCELADA') ? (
               <RightPanel>
                 <h3 style={{ marginTop: 0 }}>
-                  Detalle de Transacción #{selectedSale.id}
+                  Detalle de Cancelación #{selectedSale.id}
                 </h3>
-
                 <div className="box" style={{ marginTop: 10 }}>
-                  <p>
-                    <strong>Cliente:</strong>{' '}
-                    {safeClients.find(
-                      (c) =>
-                        c.id_cliente ===
-                        (selectedSale.clientId || selectedSale.idCliente)
-                    )?.nombre || 'Consumidor Final'}
-                  </p>
-                  <p>
-                    <strong>Fecha:</strong>{' '}
-                    {new Date(selectedSale.fecha).toLocaleString('es-NI')}
-                  </p>
-                  <p>
-                    <strong>Estado:</strong>{' '}
-                    <span
-                      style={{
-                        background: '#fff3cd',
-                        color: '#856404',
-                        padding: '2px 8px',
-                        borderRadius: 8,
-                        fontWeight: 700,
-                      }}
-                    >
-                      DEVOLUCIÓN
-                    </span>
-                  </p>
+                  <p><strong>Cliente:</strong> {safeClients.find((c) => c.id_cliente === (selectedSale.clientId || selectedSale.idCliente))?.nombre || 'Consumidor Final'}</p>
+                  <p><strong>Fecha:</strong> {new Date(selectedSale.fecha).toLocaleString('es-NI')}</p>
+                  <p><strong>Estado:</strong> <span style={{ background: '#f8d7da', color: '#721c24', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>CANCELACIÓN</span></p>
                 </div>
-
                 <div className="box" style={{ marginTop: 10 }}>
-                  <h4 style={{ marginTop: 0 }}>Detalle de Devolución</h4>
+                  <h4 style={{ marginTop: 0 }}>Productos Cancelados</h4>
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
                     {(selectedSale.items || []).map((it, i) => (
-                      <li key={`${it.id || it.id_producto}-${i}`}>
-                        <strong>
-                          {safeItemName(it, i)}
-                        </strong>{' '}
-                        — {Number(it.quantity || it.cantidad || 0)} u. @ C$
-                        {Number(it.precio || it.precio_unitario || 0).toFixed(2)}
-                      </li>
+                      <li key={i}><strong>{safeItemName(it, i)}</strong> — {Number(it.quantity || it.cantidad || 0)} u.</li>
                     ))}
                   </ul>
-                  <p style={{ marginTop: 8 }}>
-                    Importe devuelto:{' '}
-                    <strong>
-                      C$
-                      {(() => {
-                        const totalNorm = Number(
-                          (selectedSale.totalVenta ?? selectedSale.total_venta ?? selectedSale.total ?? 0)
-                        );
-                        return Math.abs(totalNorm).toFixed(2);
-                      })()}
-                    </strong>
-                  </p>
+                  <p style={{ marginTop: 8 }}>Monto restado de caja: <strong>C${Math.abs(Number(selectedSale.totalVenta ?? selectedSale.total_venta ?? selectedSale.total ?? 0)).toFixed(2)}</strong></p>
                 </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'flex-start',
-                    gap: 10,
-                    marginTop: 12,
-                  }}
-                >
-                  <OriginalButton onClick={handleReprint}>
-                    Reimprimir Ticket
-                  </OriginalButton>
+                <div style={{ display: 'flex', marginTop: 12 }}>
+                  <OriginalButton onClick={handleReprint}>Reimprimir Ticket</OriginalButton>
                 </div>
               </RightPanel>
             ) : (
               <SaleDetailView
                 sale={selectedSale}
-                client={safeClients.find(
-                  (c) =>
-                    c.id_cliente ===
-                    (selectedSale.clientId || selectedSale.idCliente)
-                )}
+                client={safeClients.find((c) => c.id_cliente === (selectedSale.clientId || selectedSale.idCliente))}
                 creditStatus={null}
                 dailySales={salesData}
                 isAdmin={isAdmin}
@@ -631,12 +569,8 @@ function SalesHistoryModal({
                 onCancelSale={(saleId) => handleCancel(saleId)}
                 onReturnItem={(item, index) => handleReturn(item, index)}
                 onReprintTicket={handleReprint}
-                showConfirmation={({ onConfirm }) =>
-                  openConfirm('Confirmación', '¿Confirmar acción?', onConfirm)
-                }
-                showPrompt={({ title, message, defaultValue, onConfirm }) =>
-                  openPrompt(title, message, defaultValue, onConfirm)
-                }
+                showConfirmation={({ onConfirm }) => openConfirm('Confirmación', '¿Confirmar?', onConfirm)}
+                showPrompt={({ title, message, defaultValue, onConfirm }) => openPrompt(title, message, defaultValue, onConfirm)}
                 showAlert={({ title, message }) => openAlert(title, message)}
               />
             )
@@ -659,74 +593,22 @@ function SalesHistoryModal({
         )}
       </ModalContent>
 
-      {/* Modales locales */}
-      <AlertModal
-        isOpen={alertState.open}
-        onClose={closeAlert}
-        title={alertState.title}
-        message={alertState.message}
-      />
-      <LocalConfirm
-        isOpen={!!confirmState.open}
-        title={confirmState.title}
-        message={confirmState.message}
-        onCancel={closeConfirm}
-        onConfirm={confirmState.onConfirm || closeConfirm}
-      />
-      <LocalPrompt
-        isOpen={!!promptState.open}
-        title={promptState.title}
-        message={promptState.message}
-        initialValue={promptState.initialValue}
-        onCancel={closePrompt}
-        onConfirm={(v) => { const fn = promptState.onConfirm; closePrompt(); fn && fn(v); }}
-      />
+      <AlertModal isOpen={alertState.open} onClose={closeAlert} title={alertState.title} message={alertState.message} />
+      <LocalConfirm isOpen={!!confirmState.open} title={confirmState.title} message={confirmState.message} onCancel={closeConfirm} onConfirm={confirmState.onConfirm || closeConfirm} />
+      <LocalPrompt isOpen={!!promptState.open} title={promptState.title} message={promptState.message} initialValue={promptState.initialValue} onCancel={closePrompt} onConfirm={(v) => { const fn = promptState.onConfirm; closePrompt(); fn && fn(v); }} />
     </ModalOverlay>
   );
 }
 
-/* ───────────────────────── Modales locales ───────────────────────── */
 const LocalModal = ({ isOpen, children, maxWidth = 450 }) => {
   if (!isOpen) return null;
-  return (
-    <ModalOverlay style={{ zIndex: 99999, backgroundColor: 'rgba(0,0,0,0.6)' }}>
-      <OriginalModalContent style={{ maxWidth: `${maxWidth}px`, textAlign: 'center' }}>
-        {children}
-      </OriginalModalContent>
-    </ModalOverlay>
-  );
+  return ( <ModalOverlay style={{ zIndex: 99999, backgroundColor: 'rgba(0,0,0,0.6)' }}><OriginalModalContent style={{ maxWidth: `${maxWidth}px`, textAlign: 'center' }}>{children}</OriginalModalContent></ModalOverlay> );
 };
-
-const LocalConfirm = ({ isOpen, title, message, onCancel, onConfirm }) => (
-  <LocalModal isOpen={isOpen}>
-    <h2 style={{ marginTop: 0 }}>{title}</h2>
-    <p style={{ color: '#6c757d', lineHeight: 1.5 }}>{message}</p>
-    <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 10 }}>
-      <Button onClick={onCancel} $cancel>Cancelar</Button>
-      <Button onClick={onConfirm} primary>Aceptar</Button>
-    </div>
-  </LocalModal>
-);
-
+const LocalConfirm = ({ isOpen, title, message, onCancel, onConfirm }) => ( <LocalModal isOpen={isOpen}><h2 style={{ marginTop: 0 }}>{title}</h2><p style={{ color: '#6c757d', lineHeight: 1.5 }}>{message}</p><div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 10 }}><Button onClick={onCancel} $cancel>Cancelar</Button><Button onClick={onConfirm} primary>Aceptar</Button></div></LocalModal> );
 const LocalPrompt = ({ isOpen, title, message, initialValue = '1', inputType = 'number', onCancel, onConfirm }) => {
   const [val, setVal] = useState(initialValue);
   useEffect(() => { setVal(initialValue); }, [initialValue, isOpen]);
-  return (
-    <LocalModal isOpen={isOpen}>
-      <h2 style={{ marginTop: 0 }}>{title}</h2>
-      {message && <p style={{ color: '#6c757d' }}>{message}</p>}
-      <input
-        style={{ width: '100%', padding: '.6rem', borderRadius: 8, border: '1px solid #dee2e6', margin: '8px 0 14px' }}
-        type={inputType}
-        value={val}
-        onChange={e => setVal(e.target.value)}
-      />
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
-        <Button onClick={onCancel} $cancel>Cancelar</Button>
-        <Button onClick={() => onConfirm(val)} primary>Aceptar</Button>
-      </div>
-    </LocalModal>
-  );
+  return ( <LocalModal isOpen={isOpen}><h2 style={{ marginTop: 0 }}>{title}</h2>{message && <p style={{ color: '#6c757d' }}>{message}</p>}<input style={{ width: '100%', padding: '.6rem', borderRadius: 8, border: '1px solid #dee2e6', margin: '8px 0 14px' }} type={inputType} value={val} onChange={e => setVal(e.target.value)} /><div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}><Button onClick={onCancel} $cancel>Cancelar</Button><Button onClick={() => onConfirm(val)} primary>Aceptar</Button></div></LocalModal> );
 };
 
 export default React.memo(SalesHistoryModal);

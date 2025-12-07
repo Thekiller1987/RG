@@ -40,27 +40,26 @@ const CajaModal = ({
     movimientoNetoEfectivo,
     efectivoEsperado,
     ventasContado,
-    devoluciones,
+    // devoluciones, <-- YA NO USAMOS LISTA APARTE PARA DEVOLUCIONES, SE VAN A CANCELACIONES
     cancelaciones,
     entradas,
     salidas,
-    abonos, // <--- NUEVA CATEGORÍA
+    abonos,
     totalTarjeta,
     totalTransferencia,
     totalCredito,
     totalNoEfectivo,
-    totalEfectivoDevoluciones, // AÑADIDO
-    totalEfectivoCancelaciones // AÑADIDO
+    totalEfectivoCancelaciones // Ahora incluye devoluciones
   } = useMemo(() => {
     const cajaInicialN = Number(session?.initialAmount || 0);
 
     const cls = {
       ventasContado: [],
-      devoluciones: [],
-      cancelaciones: [],
+      // devoluciones: [], <-- Eliminamos lista separada
+      cancelaciones: [], // AQUÍ IRÁN CANCELACIONES Y DEVOLUCIONES
       entradas: [],
       salidas: [],
-      abonos: [] // <--- Array para guardar los abonos/pedidos
+      abonos: [] 
     };
 
     let netCash = 0;
@@ -69,77 +68,81 @@ const CajaModal = ({
     let tCredito = 0;
 
     for (const tx of transactions) {
-      // Detección de tipo robusta (incluyendo tx.estado si tx.type es débil)
-      const t = (tx?.estado || tx?.type || '').toLowerCase();
-      const pd = tx?.pagoDetalles || {};
-      
-      // Monto de efectivo/transacción: Prioriza ingresoCaja, sino amount/monto/total, etc.
+      // Normalizamos el tipo a minúsculas y buscamos palabras clave
+      // Usamos tanto 'type' como 'estado' para mayor seguridad
+      const typeRaw = (tx.type || tx.estado || '').toLowerCase();
+      const pd = tx.pagoDetalles || {};
+
+      // Determinamos el monto efectivo involucrado
       let ingresoCaja = Number(pd.ingresoCaja || 0);
 
-      // --- 1. CASH NETO (Efectivo) ---
-      // Lógica CLAVE: Si es Egresos (devolución, cancelación, salida), RESTAMOS.
-      if (t === 'devolucion' || t === 'cancelacion' || t === 'salida') {
-        // Corrección Eleventa: Si ingresoCaja viene en 0, usamos el total/amount como salida
-        if (ingresoCaja === 0) {
-             ingresoCaja = Number(tx.amount || tx.total || tx.monto || 0);
-        }
-        netCash -= Math.abs(ingresoCaja); // ¡CORRECCIÓN: RESTAMOS EGRESOS!
-      } else if (t === 'venta_credito') {
-        // no afecta caja
-      } else {
-        netCash += Math.abs(ingresoCaja); // Sumamos ingresos
+      // --- LÓGICA DE UNIFICACIÓN: DEVOLUCIÓN = CANCELACIÓN ---
+
+      // 1. EGRESOS (Devoluciones, Cancelaciones, Salidas)
+      if (
+          typeRaw.includes('devolucion') || 
+          typeRaw.includes('cancelacion') || 
+          typeRaw === 'salida'
+      ) {
+          // Si el backend mandó ingresoCaja en 0, usamos el total de la transacción como respaldo
+          if (ingresoCaja === 0) {
+              ingresoCaja = Number(tx.amount || tx.total || tx.monto || 0);
+          }
+          
+          // RESTA FORZOSA: Todo esto es dinero que SALE de la caja
+          netCash -= Math.abs(ingresoCaja);
+
+          // CLASIFICACIÓN
+          // Si es salida manual, va a salidas. Si es dev/cancel, va a cancelaciones.
+          if (typeRaw === 'salida' || typeRaw === 'gasto') {
+            cls.salidas.push(tx);
+          } else {
+            // AQUÍ OCURRE LA MAGIA: Las devoluciones se guardan en la lista de cancelaciones
+            cls.cancelaciones.push(tx);
+          }
+      } 
+      // 2. VENTAS A CRÉDITO (Sin efectivo)
+      else if (typeRaw === 'venta_credito') {
+          // No afecta efectivo
+      } 
+      // 3. INGRESOS (Ventas contado, Abonos, Entradas)
+      else {
+          netCash += Math.abs(ingresoCaja);
+
+          if (typeRaw.includes('entrada')) cls.entradas.push(tx);
+          else if (typeRaw.includes('abono') || typeRaw.includes('pedido') || typeRaw.includes('apartado')) {
+              cls.abonos.push(tx);
+          } else {
+              cls.ventasContado.push(tx);
+          }
       }
 
-      // --- 2. TOTALES NO EFECTIVO ---
-      if (t.startsWith('venta') || t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
+      // --- CÁLCULO DE MÉTODOS DE PAGO (NO EFECTIVO) ---
+      if (typeRaw.startsWith('venta') || typeRaw.includes('abono') || typeRaw.includes('pedido')) {
         tTarjeta += Number(pd.tarjeta || 0);
         tTransf += Number(pd.transferencia || 0);
         tCredito += Number(pd.credito || 0);
       }
-
-      // --- 3. CLASIFICACIÓN PARA LISTAS ---
-      if (t === 'venta_contado' || t === 'venta_mixta') cls.ventasContado.push(tx);
-      else if (t === 'devolucion') cls.devoluciones.push(tx); // Clasificación para el reporte
-      else if (t === 'cancelacion') cls.cancelaciones.push(tx); // Clasificación para el reporte
-      else if (t === 'entrada') cls.entradas.push(tx);
-      else if (t === 'salida') cls.salidas.push(tx);
-      else if (t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
-          cls.abonos.push(tx);
-      }
     }
 
-    // Función robusta para obtener el monto de egreso/reporte
-    const getReportAmount = (tx) => {
-        const pd = tx?.pagoDetalles || {};
-        // Utilizamos la lógica más segura para encontrar el monto devuelto/cancelado:
-        // 1. ingresoCaja (para efectivo) 2. amount 3. monto 4. total
-        return Math.abs(Number((pd.ingresoCaja ?? tx.amount ?? tx.monto ?? tx.total) || 0));
-    };
-
-    // --- 4. CÁLCULO DE EGRESOS REPORTABLES ---
-    const totalEfectivoDevoluciones = cls.devoluciones.reduce(
-        (sum, tx) => sum + getReportAmount(tx), 0
-    );
-    const totalEfectivoCancelaciones = cls.cancelaciones.reduce(
-        (sum, tx) => sum + getReportAmount(tx), 0
-    );
-
+    // Calculamos totales de cancelaciones (que ahora incluyen devoluciones)
+    const getAbsAmount = (tx) => Math.abs(Number((tx.pagoDetalles?.ingresoCaja ?? tx.amount ?? tx.total) || 0));
+    const totalEfectivoCancelaciones = cls.cancelaciones.reduce((acc, tx) => acc + getAbsAmount(tx), 0);
 
     return {
       cajaInicial: cajaInicialN,
       movimientoNetoEfectivo: netCash,
       efectivoEsperado: cajaInicialN + netCash,
       ventasContado: cls.ventasContado,
-      devoluciones: cls.devoluciones,
-      cancelaciones: cls.cancelaciones,
+      // devoluciones: cls.devoluciones, <-- Eliminado
+      cancelaciones: cls.cancelaciones, // Contiene ambas
       entradas: cls.entradas,
       salidas: cls.salidas,
-      abonos: cls.abonos, // Retornamos la lista nueva
+      abonos: cls.abonos,
       totalTarjeta: tTarjeta,
       totalTransferencia: tTransf,
       totalCredito: tCredito,
       totalNoEfectivo: tTarjeta + tTransf + tCredito,
-      totalEfectivoDevoluciones,
       totalEfectivoCancelaciones
     };
   }, [transactions, session]);
@@ -188,17 +191,16 @@ const CajaModal = ({
     const fmt = (n) => `C$${Number(n || 0).toFixed(2)}`;
     const fmtDate = (d) => d ? d.toLocaleString('es-NI', { timeZone: 'America/Managua' }) : '—';
     
-    // Función para obtener monto de transacción (para impresión)
-    const getMonto = (tx) => {
-      const pd = tx?.pagoDetalles || {};
-      return Math.abs(Number((pd.ingresoCaja ?? tx.amount ?? tx.monto ?? tx.total) || 0));
+    const getPrintAmount = (tx) => {
+        const pd = tx?.pagoDetalles || {};
+        return Math.abs(Number((pd.ingresoCaja ?? tx.amount ?? tx.total) || 0));
     };
 
     const rows = (arr, color = '#222') => arr.map(tx => `
       <tr>
         <td>${new Date(tx.at).toLocaleString('es-NI', { timeZone: 'America/Managua' })}</td>
         <td>${tx.note || tx.type || ''}</td>
-        <td style="text-align:right;color:${color}">${fmt(getMonto(tx))}</td>
+        <td style="text-align:right;color:${color}">${fmt(getPrintAmount(tx))}</td>
       </tr>`).join('');
 
     win.document.write(`
@@ -235,9 +237,8 @@ const CajaModal = ({
         </div>
 
         <div class="box">
-          <div class="bold" style="margin-bottom:6px;">Resumen de Egresos en Efectivo</div>
-          <div class="row" style="color:#dc3545;"><div>Efectivo Devuelto (Devoluciones):</div><div>${fmt(totalEfectivoDevoluciones)}</div></div>
-          <div class="row" style="color:#dc3545;"><div>Efectivo Devuelto (Cancelaciones):</div><div>${fmt(totalEfectivoCancelaciones)}</div></div>
+           <div class="bold" style="margin-bottom:6px;">Detalle de Egresos (Restados)</div>
+           <div class="row" style="color:#dc3545;"><div>Cancelaciones Totales:</div><div>${fmt(totalEfectivoCancelaciones)}</div></div>
         </div>
 
         <div class="box">
@@ -267,16 +268,10 @@ const CajaModal = ({
             <tbody>${rows(salidas, '#dc3545')}</tbody>
           </table>
 
-          <h3>Cancelaciones</h3>
+          <h3>Cancelaciones (Incluye Devoluciones)</h3>
           <table>
             <thead><tr><th>Fecha</th><th>Nota</th><th style="text-align:right">Efectivo</th></tr></thead>
             <tbody>${rows(cancelaciones, '#6c757d')}</tbody>
-          </table>
-
-          <h3>Devoluciones</h3>
-          <table>
-            <thead><tr><th>Fecha</th><th>Nota</th><th style="text-align:right">Efectivo</th></tr></thead>
-            <tbody>${rows(devoluciones, '#6c757d')}</tbody>
           </table>
         </div>
 
@@ -367,10 +362,10 @@ const CajaModal = ({
 
               <hr style={{margin: '6px 0', border: 'none', borderTop: '1px solid #eee'}}/>
 
-              {/* MOSTRAR TOTAL DEVOLUCIONES EXPLÍCITO */}
+              {/* MOSTRAR TOTAL CANCELACIONES EXPLÍCITO */}
               <TotalsRow style={{color:'#dc3545'}}>
-                 <span>Total Devoluciones (Restado):</span>
-                 <span>-C${totalEfectivoDevoluciones.toFixed(2)}</span>
+                 <span>Total Cancelaciones (Restado):</span>
+                 <span>-C${totalEfectivoCancelaciones.toFixed(2)}</span>
               </TotalsRow>
 
               <p style={{fontWeight: 'bold', color: '#6c757d', margin: '6px 0 0'}}>Resumen de Ingresos (No Efectivo):</p>
@@ -397,8 +392,7 @@ const CajaModal = ({
             <SectionList title="Entradas" items={entradas} positive />
             <SectionList title="Salidas" items={salidas} />
             {cancelaciones?.length > 0 && <SectionList title="Cancelaciones" items={cancelaciones} neutral />}
-            {devoluciones?.length > 0 && <SectionList title="Devoluciones" items={devoluciones} neutral />}
-
+            
             <div style={{ display: 'flex', gap: 8, marginTop: 16, alignItems:'center' }}>
               <Button primary onClick={handleConfirmClose} style={{flex: 1}} disabled={!isAdmin}>
                 Confirmar y Cerrar Caja
@@ -467,7 +461,7 @@ function SectionList({ title, items, positive = false, neutral = false }) {
   // Función robusta para obtener el monto de egreso/reporte
   const getReportAmount = (tx) => {
       const pd = tx?.pagoDetalles || {};
-      return Math.abs(Number((pd.ingresoCaja ?? tx.amount ?? tx.monto ?? tx.total) || 0));
+      return Math.abs(Number((pd.ingresoCaja ?? tx.amount ?? tx.total) || 0));
   };
   
   const fmt = (n) => `C$${Number(n || 0).toFixed(2)}`;
