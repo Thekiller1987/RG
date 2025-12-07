@@ -117,7 +117,8 @@ function SalesHistoryModal({ dailySales = [], loadSales, onClose, isAdmin, users
     try {
       const data = await loadSales(date);
       setSalesData(Array.isArray(data) ? data : []);
-    } catch (e) { openAlert('Error', 'Error cargando ventas.'); }
+      return data; // Retornamos los datos para usarlos en el handleReturn
+    } catch (e) { openAlert('Error', 'Error cargando ventas.'); return []; }
     finally { setLoadingSales(false); }
   }, [loadSales]);
 
@@ -134,6 +135,7 @@ function SalesHistoryModal({ dailySales = [], loadSales, onClose, isAdmin, users
   const pageItems = filteredSales.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   useEffect(() => { if (!selectedSale || !pageItems.find(i => i.id === selectedSale.id)) setSelectedSale(pageItems[0] || null); }, [pageItems]);
 
+  // --- FUNCIÓN CLAVE CORREGIDA PARA ELEVENTA ---
   const handleReturn = useCallback((item, index = 0) => {
     if (!selectedSale || !onReturnItem) return;
     const maxQty = Number(item?.quantity || item?.cantidad || 0);
@@ -143,45 +145,59 @@ function SalesHistoryModal({ dailySales = [], loadSales, onClose, isAdmin, users
       if (qty <= 0 || qty > maxQty) { openAlert('Error', 'Cantidad inválida'); return; }
       
       try {
-        // 1. Backend: Procesar la cancelación
+        // 1. LLAMADA AL BACKEND (Genera la devolución real)
         await onReturnItem(selectedSale, item, qty);
         openAlert('Éxito', 'Producto cancelado correctamente.');
 
-        // 2. BORRADO VISUAL AGRESIVO
-        // Recorremos los items y restamos la cantidad. Si es <= 0, filtramos.
+        // 2. CREAR VERSIÓN "LIMPIA" DEL TICKET (Sin el artículo)
         const updatedItems = selectedSale.items.map(it => {
-            // Comparación muy flexible para asegurar que encontremos el item
             const sameId = (it.id && it.id === item.id) || (it.id_producto && it.id_producto === item.id_producto);
-            // Si no tiene ID unico, usamos el indice del array como fallback
-            const sameIndex = (salesData.indexOf(it) === index); 
-            
+            // Si coincide, restamos cantidad.
             if (it === item || sameId) {
                 return { ...it, cantidad: (it.quantity || it.cantidad) - qty };
             }
             return it;
-        }).filter(it => (it.quantity || it.cantidad) > 0); // SI LA CANTIDAD ES 0, LO BORRAMOS
+        }).filter(it => (it.quantity || it.cantidad) > 0); // SI ES 0, SE VA.
 
-        // Calculamos nuevo total visual
-        const deductedAmount = Number(item.precio || item.precio_unitario || 0) * qty;
-        const newTotal = Number(selectedSale.totalVenta || selectedSale.total || 0) - deductedAmount;
-
-        const updatedSaleObj = { 
+        // Calcular nuevo total visual (restando lo devuelto)
+        const price = Number(item.precio || item.precio_unitario || 0);
+        const deducted = price * qty;
+        const currentTotal = Number(selectedSale.totalVenta || selectedSale.total || 0);
+        
+        // Objeto de venta modificado (ESTE ES EL QUE QUEREMOS VER)
+        const cleanTicket = { 
             ...selectedSale, 
-            items: updatedItems, 
-            totalVenta: newTotal,
-            total: newTotal
+            items: updatedItems,
+            totalVenta: currentTotal - deducted,
+            total: currentTotal - deducted
         };
 
-        // 3. Actualizamos estados
-        setSelectedSale(updatedSaleObj);
+        // 3. ACTUALIZAR ESTADO LOCAL INMEDIATAMENTE
+        setSelectedSale(cleanTicket);
+
+        // 4. ESTRATEGIA DE FUSIÓN (MERGE) PARA EVITAR QUE LA BD LO SOBRESCRIBA
+        // Cargamos los datos nuevos (para que aparezca el ticket amarillo nuevo)
+        const freshData = await loadSales(currentApiDate);
         
-        // Actualizamos la lista global reemplazando el ticket viejo por el nuevo "limpio"
-        setSalesData(prev => prev.map(s => s.id === selectedSale.id ? updatedSaleObj : s));
+        if (Array.isArray(freshData)) {
+            // Recorremos los datos que vienen del servidor.
+            // Si encontramos el ticket ID #343 (el original), NO usamos el del servidor,
+            // usamos nuestro "cleanTicket" modificado.
+            const mergedData = freshData.map(serverSale => {
+                if (String(serverSale.id) === String(selectedSale.id)) {
+                    return cleanTicket; // Inyectamos nuestra versión sin el artículo
+                }
+                return serverSale;
+            });
+            
+            // Guardamos la lista fusionada
+            setSalesData(mergedData);
+        }
 
       } catch (e) { openAlert('Error', e.message || 'No se pudo cancelar.'); }
       finally { setPromptState(prev => ({ ...prev, open: false })); }
     });
-  }, [selectedSale, onReturnItem, salesData]);
+  }, [selectedSale, onReturnItem, loadSales, currentApiDate]);
 
   const handleCancel = useCallback((id) => {
     const saleId = id || selectedSale?.id;
@@ -250,5 +266,16 @@ function SalesHistoryModal({ dailySales = [], loadSales, onClose, isAdmin, users
     </ModalOverlay>
   );
 }
+
+const LocalModal = ({ isOpen, children, maxWidth = 450 }) => {
+  if (!isOpen) return null;
+  return ( <ModalOverlay style={{ zIndex: 99999, backgroundColor: 'rgba(0,0,0,0.6)' }}><OriginalModalContent style={{ maxWidth: `${maxWidth}px`, textAlign: 'center' }}>{children}</OriginalModalContent></ModalOverlay> );
+};
+const LocalConfirm = ({ isOpen, title, message, onCancel, onConfirm }) => ( <LocalModal isOpen={isOpen}><h2 style={{ marginTop: 0 }}>{title}</h2><p style={{ color: '#6c757d', lineHeight: 1.5 }}>{message}</p><div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 10 }}><Button onClick={onCancel} $cancel>Cancelar</Button><Button onClick={onConfirm} primary>Aceptar</Button></div></LocalModal> );
+const LocalPrompt = ({ isOpen, title, message, initialValue = '1', inputType = 'number', onCancel, onConfirm }) => {
+  const [val, setVal] = useState(initialValue);
+  useEffect(() => { setVal(initialValue); }, [initialValue, isOpen]);
+  return ( <LocalModal isOpen={isOpen}><h2 style={{ marginTop: 0 }}>{title}</h2>{message && <p style={{ color: '#6c757d' }}>{message}</p>}<input style={{ width: '100%', padding: '.6rem', borderRadius: 8, border: '1px solid #dee2e6', margin: '8px 0 14px' }} type={inputType} value={val} onChange={e => setVal(e.target.value)} /><div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}><Button onClick={onCancel} $cancel>Cancelar</Button><Button onClick={() => onConfirm(val)} primary>Aceptar</Button></div></LocalModal> );
+};
 
 export default React.memo(SalesHistoryModal);
