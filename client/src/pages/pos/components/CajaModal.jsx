@@ -69,13 +69,13 @@ const CajaModal = ({
     let tCredito = 0;
 
     for (const tx of transactions) {
-      // Normalizamos el tipo a minúsculas para evitar errores
-      const t = (tx?.type || '').toLowerCase();
+      // CORRECCIÓN CLAVE: Usamos tx.estado o tx.type para clasificar la transacción de forma robusta.
+      const t = (tx?.estado || tx?.type || '').toLowerCase();
       const pd = tx?.pagoDetalles || {};
       const ingresoCaja = Number(pd.ingresoCaja || 0);
 
       // --- 1. CASH NETO (Efectivo) ---
-      // CORRECCIÓN 1: Si es devolución, cancelación o salida, el efectivo debe RESTAR (para el arqueo)
+      // Si es devolución, cancelación o salida, el efectivo debe RESTAR (para el arqueo)
       if (t === 'devolucion' || t === 'cancelacion' || t === 'salida') {
         netCash -= ingresoCaja; 
       } else if (t === 'venta_credito') {
@@ -84,7 +84,7 @@ const CajaModal = ({
         netCash += ingresoCaja; 
       }
 
-      // --- 2. TOTALES NO EFECTIVO ---
+      // --- 2. TOTALES NO EFECTIVO (Solo Ingreso) ---
       if (t.startsWith('venta') || t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
         tTarjeta += Number(pd.tarjeta || 0);
         tTransf += Number(pd.transferencia || 0);
@@ -93,7 +93,7 @@ const CajaModal = ({
 
       // --- 3. CLASIFICACIÓN PARA LISTAS ---
       if (t === 'venta_contado' || t === 'venta_mixta') cls.ventasContado.push(tx);
-      else if (t === 'devolucion') cls.devoluciones.push(tx);
+      else if (t === 'devolucion') cls.devoluciones.push(tx); // Clasificación que alimenta el reporte
       else if (t === 'cancelacion') cls.cancelaciones.push(tx);
       else if (t === 'entrada') cls.entradas.push(tx);
       else if (t === 'salida') cls.salidas.push(tx);
@@ -103,15 +103,13 @@ const CajaModal = ({
       }
     }
 
-    // --- 4. TOTALES DE EGRESOS PARA REPORTE (Nuevos) ---
-    // CORRECCIÓN DE SINTAXIS: Se añaden paréntesis para mezclar ?? y ||.
+    // --- 4. TOTALES DE EGRESOS PARA REPORTE (Sintaxis Corregida) ---
+    // Usamos el operador ?? junto con el paréntesis para la sintaxis correcta en React.
     const totalEfectivoDevoluciones = cls.devoluciones.reduce(
-        // SUMA + Number((Valor preferido o tx.amount) o 0)
         (sum, tx) => sum + Number((tx.pagoDetalles?.ingresoCaja ?? tx.amount) || 0), 
       0
     );
     const totalEfectivoCancelaciones = cls.cancelaciones.reduce(
-        // SUMA + Number((Valor preferido o tx.amount) o 0)
         (sum, tx) => sum + Number((tx.pagoDetalles?.ingresoCaja ?? tx.amount) || 0), 
       0
     );
@@ -125,7 +123,7 @@ const CajaModal = ({
       cancelaciones: cls.cancelaciones,
       entradas: cls.entradas,
       salidas: cls.salidas,
-      abonos: cls.abonos, // Retornamos la lista nueva
+      abonos: cls.abonos, 
       totalTarjeta: tTarjeta,
       totalTransferencia: tTransf,
       totalCredito: tCredito,
@@ -482,7 +480,6 @@ function SectionList({ title, items, positive = false, neutral = false }) {
             ))}
           </tbody>
         </table>
-        
       </div>
     </div>
   );
@@ -490,4 +487,3 @@ function SectionList({ title, items, positive = false, neutral = false }) {
 
 const thS = { borderBottom: '1px solid #eee', padding: '6px', textAlign: 'left', fontSize: 13, color: '#555' };
 const tdS = { borderBottom: '1px solid #f3f3f3', padding: '6px', fontSize: 14 };
-//s
