@@ -49,8 +49,8 @@ const CajaModal = ({
     totalTransferencia,
     totalCredito,
     totalNoEfectivo,
-    totalEfectivoDevoluciones, // <--- NUEVO
-    totalEfectivoCancelaciones // <--- NUEVO
+    totalEfectivoDevoluciones, // <--- AÑADIDO
+    totalEfectivoCancelaciones // <--- AÑADIDO
   } = useMemo(() => {
     const cajaInicialN = Number(session?.initialAmount || 0);
 
@@ -75,19 +75,16 @@ const CajaModal = ({
       const ingresoCaja = Number(pd.ingresoCaja || 0);
 
       // --- 1. CASH NETO (Efectivo) ---
-      // CORRECCIÓN: Si es devolución, cancelación o salida, el efectivo debe RESTAR
+      // CORRECCIÓN 1: Si es devolución, cancelación o salida, el efectivo debe RESTAR (para el arqueo)
       if (t === 'devolucion' || t === 'cancelacion' || t === 'salida') {
-        netCash -= ingresoCaja; // El efectivo sale de caja (RESTA)
+        netCash -= ingresoCaja; 
       } else if (t === 'venta_credito') {
         // no afecta caja
       } else {
-        netCash += ingresoCaja; // Cualquier otro tipo (ventas, entradas, abonos) SUMA
+        netCash += ingresoCaja; 
       }
-      // FIN DE LA CORRECCIÓN
 
       // --- 2. TOTALES NO EFECTIVO ---
-      // CORRECCIÓN: Antes solo sumaba si empezaba con 'venta'. 
-      // Ahora incluimos abonos, pedidos y apartados.
       if (t.startsWith('venta') || t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
         tTarjeta += Number(pd.tarjeta || 0);
         tTransf += Number(pd.transferencia || 0);
@@ -100,16 +97,22 @@ const CajaModal = ({
       else if (t === 'cancelacion') cls.cancelaciones.push(tx);
       else if (t === 'entrada') cls.entradas.push(tx);
       else if (t === 'salida') cls.salidas.push(tx);
-      // CORRECCIÓN: Capturar cualquier cosa que parezca un abono o pago de pedido
+      // Capturar cualquier cosa que parezca un abono o pago de pedido
       else if (t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
          cls.abonos.push(tx);
       }
     }
 
     // --- 4. TOTALES DE EGRESOS PARA REPORTE (Nuevos) ---
-    // Calculamos el total de efectivo que salió para cada categoría para visualización
-    const totalEfectivoDevoluciones = cls.devoluciones.reduce((sum, tx) => sum + Number(tx.pagoDetalles?.ingresoCaja || 0), 0);
-    const totalEfectivoCancelaciones = cls.cancelaciones.reduce((sum, tx) => sum + Number(tx.pagoDetalles?.ingresoCaja || 0), 0);
+    // CORRECCIÓN 2: Usar 'tx.amount' si 'ingresoCaja' es nulo/cero para asegurar que se reporte el egreso.
+    const totalEfectivoDevoluciones = cls.devoluciones.reduce(
+        (sum, tx) => sum + Number(tx.pagoDetalles?.ingresoCaja ?? tx.amount || 0), 
+      0
+    );
+    const totalEfectivoCancelaciones = cls.cancelaciones.reduce(
+        (sum, tx) => sum + Number(tx.pagoDetalles?.ingresoCaja ?? tx.amount || 0), 
+      0
+    );
 
     return {
       cajaInicial: cajaInicialN,
@@ -125,8 +128,8 @@ const CajaModal = ({
       totalTransferencia: tTransf,
       totalCredito: tCredito,
       totalNoEfectivo: tTarjeta + tTransf + tCredito,
-      totalEfectivoDevoluciones, // <--- AÑADIDO
-      totalEfectivoCancelaciones // <--- AÑADIDO
+      totalEfectivoDevoluciones, // <--- CORREGIDO
+      totalEfectivoCancelaciones // <--- CORREGIDO
     };
   }, [transactions, session]);
 
@@ -227,7 +230,7 @@ const CajaModal = ({
           <div class="row" style="color:#dc3545;"><div>Efectivo Devuelto (Devoluciones):</div><div>${fmt(totalEfectivoDevoluciones)}</div></div>
           <div class="row" style="color:#dc3545;"><div>Efectivo Devuelto (Cancelaciones):</div><div>${fmt(totalEfectivoCancelaciones)}</div></div>
         </div>
-        
+        
         <div class="box">
           <h3>Abonos y Otros Ingresos</h3>
           <table>
@@ -346,8 +349,8 @@ const CajaModal = ({
               </TotalsRow>
 
               <hr style={{margin: '6px 0', border: 'none', borderTop: '1px solid #eee'}}/>
-              
-              {/* === NUEVOS TOTALES AGREGADOS PARA EL REPORTE === */}
+              
+              {/* === NUEVOS TOTALES AGREGADOS PARA EL REPORTE === */}
               <p style={{fontWeight: 'bold', color: '#dc3545', margin: '6px 0 0'}}>Resumen de Egresos en Efectivo:</p>
               <TotalsRow style={{ color: totalEfectivoDevoluciones > 0 ? '#dc3545' : 'inherit' }}>
                 <span>Efectivo Devuelto (Devoluciones):</span>
@@ -357,7 +360,7 @@ const CajaModal = ({
                 <span>Efectivo Devuelto (Cancelaciones):</span>
                 <span>C${totalEfectivoCancelaciones.toFixed(2)}</span>
               </TotalsRow>
-              {/* === FIN NUEVOS TOTALES === */}
+              {/* === FIN NUEVOS TOTALES === */}
 
               <hr style={{margin: '6px 0', border: 'none', borderTop: '1px solid #eee'}}/>
 
