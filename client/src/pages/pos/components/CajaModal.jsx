@@ -104,13 +104,15 @@ const CajaModal = ({
     }
 
     // --- 4. TOTALES DE EGRESOS PARA REPORTE (Nuevos) ---
-    // CORRECCIÓN 2: Usar 'tx.amount' si 'ingresoCaja' es nulo/cero para asegurar que se reporte el egreso.
+    // CORRECCIÓN DE SINTAXIS: Se añaden paréntesis para mezclar ?? y ||.
     const totalEfectivoDevoluciones = cls.devoluciones.reduce(
-        (sum, tx) => sum + Number(tx.pagoDetalles?.ingresoCaja ?? tx.amount || 0), 
+        // SUMA + Number((Valor preferido o tx.amount) o 0)
+        (sum, tx) => sum + Number((tx.pagoDetalles?.ingresoCaja ?? tx.amount) || 0), 
       0
     );
     const totalEfectivoCancelaciones = cls.cancelaciones.reduce(
-        (sum, tx) => sum + Number(tx.pagoDetalles?.ingresoCaja ?? tx.amount || 0), 
+        // SUMA + Number((Valor preferido o tx.amount) o 0)
+        (sum, tx) => sum + Number((tx.pagoDetalles?.ingresoCaja ?? tx.amount) || 0), 
       0
     );
 
@@ -128,8 +130,8 @@ const CajaModal = ({
       totalTransferencia: tTransf,
       totalCredito: tCredito,
       totalNoEfectivo: tTarjeta + tTransf + tCredito,
-      totalEfectivoDevoluciones, // <--- CORREGIDO
-      totalEfectivoCancelaciones // <--- CORREGIDO
+      totalEfectivoDevoluciones, 
+      totalEfectivoCancelaciones 
     };
   }, [transactions, session]);
 
@@ -350,7 +352,7 @@ const CajaModal = ({
 
               <hr style={{margin: '6px 0', border: 'none', borderTop: '1px solid #eee'}}/>
               
-              {/* === NUEVOS TOTALES AGREGADOS PARA EL REPORTE === */}
+              {/* === RESUMEN EGRESOS EN EFECTIVO === */}
               <p style={{fontWeight: 'bold', color: '#dc3545', margin: '6px 0 0'}}>Resumen de Egresos en Efectivo:</p>
               <TotalsRow style={{ color: totalEfectivoDevoluciones > 0 ? '#dc3545' : 'inherit' }}>
                 <span>Efectivo Devuelto (Devoluciones):</span>
@@ -360,7 +362,7 @@ const CajaModal = ({
                 <span>Efectivo Devuelto (Cancelaciones):</span>
                 <span>C${totalEfectivoCancelaciones.toFixed(2)}</span>
               </TotalsRow>
-              {/* === FIN NUEVOS TOTALES === */}
+              {/* === FIN RESUMEN EGRESOS === */}
 
               <hr style={{margin: '6px 0', border: 'none', borderTop: '1px solid #eee'}}/>
 
@@ -480,6 +482,7 @@ function SectionList({ title, items, positive = false, neutral = false }) {
             ))}
           </tbody>
         </table>
+        
       </div>
     </div>
   );
@@ -487,3 +490,4 @@ function SectionList({ title, items, positive = false, neutral = false }) {
 
 const thS = { borderBottom: '1px solid #eee', padding: '6px', textAlign: 'left', fontSize: 13, color: '#555' };
 const tdS = { borderBottom: '1px solid #f3f3f3', padding: '6px', fontSize: 14 };
+//s
