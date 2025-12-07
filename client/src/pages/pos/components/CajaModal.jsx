@@ -74,31 +74,33 @@ const CajaModal = ({
       const txId = String(tx?.id || '').toLowerCase(); 
       const pd = tx?.pagoDetalles || {};
       
-      // Monto total que se registró en la transacción (Total Pagado)
+      // 1. Obtener el monto TOTAL que afectó la caja (Ventas, Abonos, Devoluciones, etc.)
+      // Este valor incluye Efectivo + Tarjeta + Transferencia
       const ingresoTotal = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
 
-      // Montos NO EFECTIVO de esta transacción
+      // 2. Extraer los montos NO EFECTIVO
       const txTarjeta = Number(pd.tarjeta || 0);
       const txTransf = Number(pd.transferencia || 0);
       const txCredito = Number(pd.credito || 0);
 
-      // --- 1. CÁLCULO DE EFECTIVO REAL (CORRECCIÓN) ---
-      // Si el ingreso incluye tarjeta o transferencia, lo restamos para que no infle la caja física.
+      // 3. CALCULAR EFECTIVO REAL (LA CORRECCIÓN CLAVE)
+      // Al total le restamos lo que fue digital para saber cuánto dinero físico se movió.
+      // Funciona tanto para ventas (positivos) como para devoluciones (negativos) si se registran correctamente.
       const ingresoEfectivoReal = ingresoTotal - txTarjeta - txTransf;
 
-      // Sumamos al neto solo si no es una venta puramente a crédito (que no mueve caja)
+      // Sumamos al neto de efectivo (solo si no es venta a crédito pura, que no mueve caja)
       if (t !== 'venta_credito') {
         netCash += ingresoEfectivoReal;
       }
 
-      // --- 2. ACUMULADORES GLOBALES (Para reporte) ---
+      // --- Acumuladores Globales (Solo informativos) ---
       if (t.startsWith('venta') || t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
         tTarjeta += txTarjeta;
         tTransf += txTransf;
         tCredito += txCredito;
       }
 
-      // --- 3. CLASIFICACIÓN DE LISTAS ---
+      // --- Clasificación en Listas ---
       const esDevolucion = t === 'devolucion' || txId.includes('devolucion');
       const esCancelacion = t === 'cancelacion' || txId.includes('cancelacion');
 
@@ -107,6 +109,7 @@ const CajaModal = ({
       }
       else if (esDevolucion) {
         cls.devoluciones.push(tx);
+        // Para el reporte visual, sumamos el valor absoluto del total de la operación
         sumDevsCancels += Math.abs(ingresoTotal); 
       }
       else if (esCancelacion) {
@@ -126,7 +129,7 @@ const CajaModal = ({
 
     return {
       cajaInicial: cajaInicialN,
-      movimientoNetoEfectivo: netCash,
+      movimientoNetoEfectivo: netCash, // Ahora sí es SOLO efectivo
       efectivoEsperado: cajaInicialN + netCash,
       ventasContado: cls.ventasContado,
       devoluciones: cls.devoluciones,
