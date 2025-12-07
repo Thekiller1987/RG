@@ -996,6 +996,8 @@ const handleLoadPendingToPOS = (pendingSale) => {
     }
   };
 
+  // En client/src/pages/POS/POS.jsx
+
   const handleReturnItem = async (sale, item, qty) => {
     if (!token) return;
 
@@ -1017,9 +1019,36 @@ const handleLoadPendingToPOS = (pendingSale) => {
     };
 
     showAlert({ title: "Procesando", message: `Devolviendo ${quantity} de ${item.nombre || 'producto'}...`, type: "loading" });
+    
     try {
-      await api.returnItem(body, token);
-      showAlert({ title: "Éxito", message: `Devolución registrada. ↩️` });
+      // 1. Llamar al backend (que ahora hace el SPLIT del ticket)
+      const response = await api.returnItem(body, token);
+      
+      // 2. Extraer el monto de reembolso calculado por el backend
+      const refundAmount = Number(response.refundAmount || (unitPrice * quantity) || 0);
+
+      // 3. REGISTRAR SALIDA DE CAJA AUTOMÁTICA
+      // Esto soluciona que la caja no restaba el dinero.
+      if (refundAmount > 0) {
+        const txReturn = {
+          id: `devolucion-${sale.id}-${Date.now()}`,
+          type: 'salida', // Salida de dinero
+          amount: refundAmount,
+          note: `Devolución s/Venta #${sale.id} (${quantity}x ${item.nombre})`,
+          at: new Date().toISOString(),
+          pagoDetalles: { ingresoCaja: -refundAmount }
+        };
+        
+        // Agregar a contexto local y enviar al backend
+        addCajaTransaction(txReturn);
+        try { await api.addCajaTx({ userId: userIdLocal, tx: txReturn }, token); } catch(e) { console.error("Error sync caja devolución", e); }
+      }
+
+      showAlert({ 
+        title: "Éxito", 
+        message: `Devolución procesada.\nTicket #${sale.id} cancelado.\nTicket Nuevo #${response.newSaleId || 'N/A'} creado.\nDinero devuelto: C$${refundAmount.toFixed(2)}` 
+      });
+
       await refreshData();
     } catch (error) {
       const msg = (error?.message || '').includes('Faltan datos')
