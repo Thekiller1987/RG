@@ -49,7 +49,6 @@ const CajaModal = ({
     totalTransferencia,
     totalCredito,
     totalNoEfectivo,
-    // NUEVOS TOTALES PARA VISUALIZACIÓN
     sumDevolucionesCancelaciones
   } = useMemo(() => {
     const cajaInicialN = Number(session?.initialAmount || 0);
@@ -68,19 +67,19 @@ const CajaModal = ({
     let tTransf = 0;
     let tCredito = 0;
     
-    // Acumuladores para devoluciones y cancelaciones
     let sumDevsCancels = 0;
 
     for (const tx of transactions) {
-      // Normalizamos el tipo a minúsculas para evitar errores
       const t = (tx?.type || '').toLowerCase();
+      const txId = String(tx?.id || '').toLowerCase(); // Normalizamos ID para detectar tipo
       const pd = tx?.pagoDetalles || {};
-      const ingresoCaja = Number(pd.ingresoCaja || 0);
+      
+      // Monto que afectó a la caja (puede ser negativo para salidas)
+      const ingresoCaja = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
 
       // --- 1. CASH NETO (Efectivo) ---
-      if (t === 'venta_credito') {
-        // no afecta caja
-      } else {
+      // Sumamos todo lo que no sea venta a crédito pura
+      if (t !== 'venta_credito') {
         netCash += ingresoCaja;
       }
 
@@ -91,20 +90,32 @@ const CajaModal = ({
         tCredito += Number(pd.credito || 0);
       }
 
-      // --- 3. CLASIFICACIÓN PARA LISTAS Y SUMAS ESPECÍFICAS ---
+      // --- 3. CLASIFICACIÓN INTELIGENTE ---
+      
+      // Detectar Devolución (por tipo O por ID generado en POS)
+      const esDevolucion = t === 'devolucion' || txId.includes('devolucion');
+      // Detectar Cancelación
+      const esCancelacion = t === 'cancelacion' || txId.includes('cancelacion');
+
       if (t === 'venta_contado' || t === 'venta_mixta') {
         cls.ventasContado.push(tx);
       }
-      else if (t === 'devolucion') {
+      else if (esDevolucion) {
         cls.devoluciones.push(tx);
-        sumDevsCancels += ingresoCaja; // Sumamos el impacto en caja (generalmente negativo)
+        // Sumamos valor absoluto porque ingresoCaja viene negativo (-10) y queremos mostrar "10"
+        sumDevsCancels += Math.abs(ingresoCaja); 
       }
-      else if (t === 'cancelacion') {
+      else if (esCancelacion) {
         cls.cancelaciones.push(tx);
-        sumDevsCancels += ingresoCaja; // Sumamos el impacto en caja
+        sumDevsCancels += Math.abs(ingresoCaja);
       }
-      else if (t === 'entrada') cls.entradas.push(tx);
-      else if (t === 'salida') cls.salidas.push(tx);
+      else if (t === 'entrada') {
+        cls.entradas.push(tx);
+      }
+      else if (t === 'salida') {
+        // Solo si NO fue detectado como dev/cancel arriba, cae aquí como salida genérica
+        cls.salidas.push(tx);
+      }
       else if (t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
          cls.abonos.push(tx);
       }
@@ -124,7 +135,7 @@ const CajaModal = ({
       totalTransferencia: tTransf,
       totalCredito: tCredito,
       totalNoEfectivo: tTarjeta + tTransf + tCredito,
-      sumDevolucionesCancelaciones: sumDevsCancels // Total combinado
+      sumDevolucionesCancelaciones: sumDevsCancels
     };
   }, [transactions, session]);
 
@@ -304,7 +315,6 @@ const CajaModal = ({
               <FaFileInvoiceDollar /> Reporte de Arqueo
             </h3>
 
-            {/* Encabezado: quién y cuándo */}
             <div className="info" style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '12px', marginBottom: 12 }}>
               <TotalsRow>
                 <span><FaUserClock /> Abrió:</span>
@@ -326,7 +336,6 @@ const CajaModal = ({
                 <span>C${movimientoNetoEfectivo.toFixed(2)}</span>
               </TotalsRow>
 
-              {/* AQUÍ AÑADIDO: VISUALIZACIÓN DEL TOTAL DE DEVOLUCIONES Y CANCELACIONES */}
               <TotalsRow style={{ color: '#dc3545', fontSize: '0.9rem' }}>
                 <span><FaExclamationCircle /> Salidas por Dev/Cancel:</span>
                 <span>C${sumDevolucionesCancelaciones.toFixed(2)}</span>
@@ -368,9 +377,7 @@ const CajaModal = ({
               </TotalsRow>
             </div>
 
-            {/* Listados compactos */}
             <SectionList title="Abonos y Otros Pagos" items={abonos} positive />
-
             <SectionList title="Entradas" items={entradas} positive />
             <SectionList title="Salidas" items={salidas} />
             {cancelaciones?.length > 0 && <SectionList title="Cancelaciones" items={cancelaciones} neutral />}
@@ -434,8 +441,6 @@ const CajaModal = ({
 };
 
 export default CajaModal;
-
-/* ---------- Sub-componentes ---------- */
 
 function SectionList({ title, items, positive = false, neutral = false }) {
   if (!items?.length) return null;

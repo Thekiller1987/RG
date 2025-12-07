@@ -3,7 +3,7 @@ import { FaQuestionCircle } from 'react-icons/fa';
 import { ModalOverlay, ModalContent, Button, SearchInput } from '../POS.styles.jsx';
 
 const PromptModal = ({ isOpen, onClose, onConfirm, title, message, inputType = 'number' }) => {
-    const [inputValue, setInputValue] = useState('1');
+    const [inputValue, setInputValue] = useState('');
 
     if (!isOpen) return null;
 
