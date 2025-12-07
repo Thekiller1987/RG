@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ModalOverlay, ModalContent, Button, SearchInput, TotalsRow } from '../POS.styles.jsx';
 import {
   FaLockOpen, FaFileInvoiceDollar, FaRegCreditCard,
@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
  * - session (obj persistido en utils/caja)
  * - onOpenCaja(montoInicial, tasaDolar)
  * - onCloseCaja(montoContado)
- * - onClose()  -> cerrar modal
+ * - onClose()  -> cerrar modal
  * - isAdmin
  * - showConfirmation({title, message, onConfirm})
  * - showAlert({title, message})
@@ -44,13 +44,13 @@ const CajaModal = ({
     cancelaciones,
     entradas,
     salidas,
-    abonos, 
+    abonos, // <--- NUEVA CATEGORÍA
     totalTarjeta,
     totalTransferencia,
     totalCredito,
     totalNoEfectivo,
-    totalEfectivoDevoluciones, 
-    totalEfectivoCancelaciones 
+    totalEfectivoDevoluciones, // AÑADIDO
+    totalEfectivoCancelaciones // AÑADIDO
   } = useMemo(() => {
     const cajaInicialN = Number(session?.initialAmount || 0);
 
@@ -60,7 +60,7 @@ const CajaModal = ({
       cancelaciones: [],
       entradas: [],
       salidas: [],
-      abonos: [] 
+      abonos: [] // <--- Array para guardar los abonos/pedidos
     };
 
     let netCash = 0;
@@ -68,97 +68,56 @@ const CajaModal = ({
     let tTransf = 0;
     let tCredito = 0;
 
-    // Función para calcular monto de efectivo (Búsqueda exhaustiva)
-    const calcularMontoEfectivo = (tx) => {
-      const pd = tx?.pagoDetalles || {};
-      
-      // Prioridad 1: Monto específico de efectivo
-      if (pd?.ingresoCaja !== undefined && pd?.ingresoCaja !== null) return Number(pd.ingresoCaja) || 0;
-      if (pd?.efectivo !== undefined && pd?.efectivo !== null) return Number(pd.efectivo) || 0;
-
-      // Prioridad 2: Monto total de la transacción (usado en salidas/devoluciones simples)
-      if (tx?.amount !== undefined && tx?.amount !== null) return Number(tx.amount) || 0;
-      if (tx?.monto !== undefined && tx?.monto !== null) return Number(tx.monto) || 0;
-      if (tx?.total !== undefined && tx?.total !== null) return Number(tx.total) || 0;
-      
-      return 0;
-    };
-    
-    // Función para obtener el monto de pago no efectivo (para totalTarjeta, etc.)
-    const getMontoPago = (pd, key) => {
-      if (pd?.[key] !== undefined && pd?.[key] !== null) return Number(pd[key]) || 0;
-      // Buscamos también en la raíz de la transacción por si no se anida en pagoDetalles
-      if (tx?.[key] !== undefined && tx?.[key] !== null) return Number(tx[key]) || 0;
-      return 0;
+    // Función robusta para obtener el monto de egreso/reporte
+    const getReportAmount = (tx) => {
+        const pd = tx?.pagoDetalles || {};
+        // Busca el valor en ingresoCaja o amount, o en otros campos de monto
+        return Number((pd.ingresoCaja ?? tx.amount ?? tx.monto ?? tx.total) || 0);
     };
 
 
     for (const tx of transactions) {
-      // 1. DETECCIÓN DEL TIPO - BÚSQUEDA EXHAUSTIVA
-      let tipoDetectado = '';
-      
-      // Prioridad 1: Campos específicos de tipo/estado
-      if (tx?.tipo) tipoDetectado = tx.tipo;
-      else if (tx?.type) tipoDetectado = tx.type;
-      else if (tx?.estado) tipoDetectado = tx.estado;
-      else if (tx?.transaction_type) tipoDetectado = tx.transaction_type;
-      
-      // Prioridad 2: Buscar en note o description (como último recurso)
-      if (!tipoDetectado && tx?.note) {
-        const noteLower = tx.note.toLowerCase();
-        if (noteLower.includes('devolucion') || noteLower.includes('devolución')) tipoDetectado = 'devolucion';
-        else if (noteLower.includes('cancelacion') || noteLower.includes('cancelación')) tipoDetectado = 'cancelacion';
-        else if (noteLower.includes('venta')) tipoDetectado = 'venta';
-        else if (noteLower.includes('entrada')) tipoDetectado = 'entrada';
-        else if (noteLower.includes('salida')) tipoDetectado = 'salida';
-        else if (noteLower.includes('abono') || noteLower.includes('apartado') || noteLower.includes('pedido')) tipoDetectado = 'abono';
-      }
-      
-      const t = tipoDetectado.toLowerCase();
-      const montoEfectivo = calcularMontoEfectivo(tx);
+      // Normalizamos el tipo, usando `estado` como respaldo
+      const t = (tx?.estado || tx?.type || '').toLowerCase();
       const pd = tx?.pagoDetalles || {};
-      
-      // 2. LÓGICA DE ARQUEO EN EFECTIVO
-      // Egresos (restan de netCash)
-      if (t.includes('devolucion') || t.includes('cancelacion') || t.includes('salida')) {
-        netCash -= montoEfectivo;
-        
-        // Clasificación para el reporte de egresos
-        if (t.includes('cancelacion')) cls.cancelaciones.push(tx);
-        else if (t.includes('devolucion')) cls.devoluciones.push(tx); 
-        else if (t.includes('salida')) cls.salidas.push(tx);
+      const ingresoCaja = Number(pd.ingresoCaja || 0);
+
+      // --- 1. CASH NETO (Efectivo) ---
+      // Lógica CLAVE: Si es Egresos (devolución, cancelación, salida), RESTAMOS.
+      if (t === 'devolucion' || t === 'cancelacion' || t === 'salida') {
+        netCash -= ingresoCaja; // ¡CORRECCIÓN: RESTAMOS EGRESOS!
+      } else if (t === 'venta_credito') {
+        // no afecta caja
+      } else {
+        netCash += ingresoCaja; // Sumamos ingresos (ventas, entradas, abonos)
       }
-      // Ingresos (suman a netCash)
-      else if (t.includes('venta_contado') || t.includes('venta_mixta') || t.includes('entrada') || 
-                t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
-        netCash += montoEfectivo;
-        
-        // Clasificación
-        if (t.includes('venta_contado') || t.includes('venta_mixta')) cls.ventasContado.push(tx);
-        else if (t.includes('entrada')) cls.entradas.push(tx);
-        else if (t.includes('abono') || t.includes('pedido') || t.includes('apartado')) cls.abonos.push(tx);
+
+      // --- 2. TOTALES NO EFECTIVO ---
+      if (t.startsWith('venta') || t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
+        tTarjeta += Number(pd.tarjeta || 0);
+        tTransf += Number(pd.transferencia || 0);
+        tCredito += Number(pd.credito || 0);
       }
-      // No afecta caja en efectivo
-      else if (t.includes('venta_credito') || t.includes('credito')) {
-        // Solo se clasifica si es venta a crédito (para propósitos de lista, aunque no afecta netCash directamente)
-        if (t.includes('venta_credito')) cls.ventasContado.push(tx); // Usamos ventasContado como lista general de ventas
-      }
-      
-      // 3. CÁLCULO DE TOTALES NO EFECTIVO (Solo para ingresos/ventas/abonos)
-      if (t.includes('venta') || t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
-        tTarjeta += getMontoPago(pd, 'tarjeta');
-        tTransf += getMontoPago(pd, 'transferencia');
-        tCredito += getMontoPago(pd, 'credito');
+
+      // --- 3. CLASIFICACIÓN PARA LISTAS ---
+      if (t === 'venta_contado' || t === 'venta_mixta') cls.ventasContado.push(tx);
+      else if (t === 'devolucion') cls.devoluciones.push(tx); // Clasificación para el reporte
+      else if (t === 'cancelacion') cls.cancelaciones.push(tx); // Clasificación para el reporte
+      else if (t === 'entrada') cls.entradas.push(tx);
+      else if (t === 'salida') cls.salidas.push(tx);
+      else if (t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
+         cls.abonos.push(tx);
       }
     }
 
-    // 4. CÁLCULO FINAL DE EGRESOS PARA REPORTE (Sumamos el monto total devuelto/cancelado)
-    const calcularTotalEgreso = (transacciones) => {
-      return transacciones.reduce((sum, tx) => sum + getMonto(tx), 0);
-    };
+    // --- 4. CÁLCULO DE EGRESOS REPORTABLES ---
+    const totalEfectivoDevoluciones = cls.devoluciones.reduce(
+        (sum, tx) => sum + getReportAmount(tx), 0
+    );
+    const totalEfectivoCancelaciones = cls.cancelaciones.reduce(
+        (sum, tx) => sum + getReportAmount(tx), 0
+    );
 
-    const totalEfectivoDevoluciones = calcularTotalEgreso(cls.devoluciones);
-    const totalEfectivoCancelaciones = calcularTotalEgreso(cls.cancelaciones);
 
     return {
       cajaInicial: cajaInicialN,
@@ -169,27 +128,15 @@ const CajaModal = ({
       cancelaciones: cls.cancelaciones,
       entradas: cls.entradas,
       salidas: cls.salidas,
-      abonos: cls.abonos,
+      abonos: cls.abonos, // Retornamos la lista nueva
       totalTarjeta: tTarjeta,
       totalTransferencia: tTransf,
       totalCredito: tCredito,
       totalNoEfectivo: tTarjeta + tTransf + tCredito,
-      totalEfectivoDevoluciones,
-      totalEfectivoCancelaciones
+      totalEfectivoDevoluciones,
+      totalEfectivoCancelaciones
     };
   }, [transactions, session]);
-
-  // DEBUG: Para ver qué datos están llegando (Líneas de la Consola)
-  useEffect(() => {
-    console.log("=== DEBUG ARQUEO DE CAJA ===");
-    console.log("Transacciones totales:", transactions.length);
-    console.log("Devoluciones encontradas:", devoluciones.length, devoluciones);
-    console.log("Cancelaciones encontradas:", cancelaciones.length, cancelaciones);
-    console.log("Total efectivo devoluciones:", totalEfectivoDevoluciones);
-    console.log("Total efectivo cancelaciones:", totalEfectivoCancelaciones);
-    console.log("Movimiento neto efectivo:", movimientoNetoEfectivo);
-    console.log("=== FIN DEBUG ===");
-  }, [transactions, devoluciones, cancelaciones, totalEfectivoDevoluciones, totalEfectivoCancelaciones, movimientoNetoEfectivo]);
 
   const diferencia = (Number(montoContado || 0) - efectivoEsperado);
 
@@ -234,22 +181,17 @@ const CajaModal = ({
     if (!win) return;
     const fmt = (n) => `C$${Number(n || 0).toFixed(2)}`;
     const fmtDate = (d) => d ? d.toLocaleString('es-NI', { timeZone: 'America/Managua' }) : '—';
-
-    // Función para obtener monto de transacción
-    const getMonto = (tx) => {
+    
+    // Función para obtener monto de transacción (para impresión)
+    const getMonto = (tx) => {
       const pd = tx?.pagoDetalles || {};
-      if (pd?.ingresoCaja !== undefined && pd?.ingresoCaja !== null) return Number(pd.ingresoCaja);
-      if (tx?.monto !== undefined && tx?.monto !== null) return Number(tx.monto);
-      if (tx?.amount !== undefined && tx?.amount !== null) return Number(tx.amount);
-      if (tx?.total !== undefined && tx?.total !== null) return Number(tx.total);
-      if (tx?.efectivo !== undefined && tx?.efectivo !== null) return Number(tx.efectivo);
-      return 0;
+      return Number((pd.ingresoCaja ?? tx.amount ?? tx.monto ?? tx.total) || 0);
     };
 
     const rows = (arr, color = '#222') => arr.map(tx => `
       <tr>
         <td>${new Date(tx.at).toLocaleString('es-NI', { timeZone: 'America/Managua' })}</td>
-        <td>${tx.note || tx.type || tx.tipo || ''}</td>
+        <td>${tx.note || tx.type || ''}</td>
         <td style="text-align:right;color:${color}">${fmt(getMonto(tx))}</td>
       </tr>`).join('');
 
@@ -293,18 +235,18 @@ const CajaModal = ({
           <div class="row"><div>Crédito:</div><div>${fmt(totalCredito)}</div></div>
           <div class="row bold"><div>Total No Efectivo:</div><div>${fmt(totalNoEfectivo)}</div></div>
         </div>
-
-        <div class="box">
+        
+                <div class="box">
           <div class="bold" style="margin-bottom:6px;">Resumen de Egresos en Efectivo</div>
           <div class="row" style="color:#dc3545;"><div>Efectivo Devuelto (Devoluciones):</div><div>${fmt(totalEfectivoDevoluciones)}</div></div>
           <div class="row" style="color:#dc3545;"><div>Efectivo Devuelto (Cancelaciones):</div><div>${fmt(totalEfectivoCancelaciones)}</div></div>
         </div>
-        
+
         <div class="box">
           <h3>Abonos y Otros Ingresos</h3>
           <table>
-            <thead><tr><th>Fecha</th><th>Nota / Tipo</th><th style="text-align:right">Monto</th></tr></thead>
-            <tbody>${abonos.length > 0 ? rows(abonos, '#198754') : '<tr><td colspan="3" style="text-align:center; color:#999;">Sin abonos</td></tr>'}</tbody>
+             <thead><tr><th>Fecha</th><th>Nota / Tipo</th><th style="text-align:right">Monto</th></tr></thead>
+             <tbody>${abonos.length > 0 ? rows(abonos, '#198754') : '<tr><td colspan="3" style="text-align:center; color:#999;">Sin abonos</td></tr>'}</tbody>
           </table>
 
           <h3>Entradas</h3>
@@ -319,19 +261,17 @@ const CajaModal = ({
             <tbody>${rows(salidas, '#dc3545')}</tbody>
           </table>
 
-          ${cancelaciones.length > 0 ? `
           <h3>Cancelaciones</h3>
           <table>
             <thead><tr><th>Fecha</th><th>Nota</th><th style="text-align:right">Efectivo</th></tr></thead>
             <tbody>${rows(cancelaciones, '#6c757d')}</tbody>
-          </table>` : ''}
+          </table>
 
-          ${devoluciones.length > 0 ? `
           <h3>Devoluciones</h3>
           <table>
             <thead><tr><th>Fecha</th><th>Nota</th><th style="text-align:right">Efectivo</th></tr></thead>
             <tbody>${rows(devoluciones, '#6c757d')}</tbody>
-          </table>` : ''}
+          </table>
         </div>
 
         <script>
@@ -420,8 +360,8 @@ const CajaModal = ({
               </TotalsRow>
 
               <hr style={{margin: '6px 0', border: 'none', borderTop: '1px solid #eee'}}/>
-              
-              {/* === RESUMEN EGRESOS EN EFECTIVO === */}
+              
+              {/* INYECCIÓN DEL RESUMEN DE EGRESOS EN EFECTIVO */}
               <p style={{fontWeight: 'bold', color: '#dc3545', margin: '6px 0 0'}}>Resumen de Egresos en Efectivo:</p>
               <TotalsRow style={{ color: totalEfectivoDevoluciones > 0 ? '#dc3545' : 'inherit' }}>
                 <span>Efectivo Devuelto (Devoluciones):</span>
@@ -431,9 +371,7 @@ const CajaModal = ({
                 <span>Efectivo Devuelto (Cancelaciones):</span>
                 <span>C${totalEfectivoCancelaciones.toFixed(2)}</span>
               </TotalsRow>
-              {/* === FIN RESUMEN EGRESOS === */}
-
-              <hr style={{margin: '6px 0', border: 'none', borderTop: '1px solid #eee'}}/>
+              <hr style={{margin: '6px 0', border: 'none', borderTop: '1px solid #eee'}}/>
 
               <p style={{fontWeight: 'bold', color: '#6c757d', margin: '6px 0 0'}}>Resumen de Ingresos (No Efectivo):</p>
               <TotalsRow>
@@ -455,6 +393,7 @@ const CajaModal = ({
             </div>
 
             {/* Listados compactos */}
+            {/* AÑADIDO: Lista de Abonos para visualización */}
             <SectionList title="Abonos y Otros Pagos" items={abonos} positive />
 
             <SectionList title="Entradas" items={entradas} positive />
@@ -527,15 +466,10 @@ function SectionList({ title, items, positive = false, neutral = false }) {
   if (!items?.length) return null;
   const color = neutral ? '#6c757d' : (positive ? '#198754' : '#dc3545');
   
-  // Función para obtener monto de transacción (Duplicada para seguridad en el Subcomponente)
-  const getMonto = (tx) => {
-    const pd = tx?.pagoDetalles || {};
-    if (pd?.ingresoCaja !== undefined && pd?.ingresoCaja !== null) return Number(pd.ingresoCaja);
-    if (tx?.monto !== undefined && tx?.monto !== null) return Number(tx.monto);
-    if (tx?.amount !== undefined && tx?.amount !== null) return Number(tx.amount);
-    if (tx?.total !== undefined && tx?.total !== null) return Number(tx.total);
-    if (tx?.efectivo !== undefined && tx?.efectivo !== null) return Number(tx.efectivo);
-    return 0;
+  // Función robusta para obtener el monto de egreso/reporte
+  const getReportAmount = (tx) => {
+      const pd = tx?.pagoDetalles || {};
+      return Number((pd.ingresoCaja ?? tx.amount ?? tx.monto ?? tx.total) || 0);
   };
   
   const fmt = (n) => `C$${Number(n || 0).toFixed(2)}`;
@@ -556,8 +490,8 @@ function SectionList({ title, items, positive = false, neutral = false }) {
             {items.map(tx => (
               <tr key={tx.id || Math.random()}>
                 <td style={tdS}>{new Date(tx.at).toLocaleString('es-NI', { timeZone: 'America/Managua' })}</td>
-                <td style={tdS}>{tx.note || tx.type || tx.tipo || ''}</td>
-                <td style={{ ...tdS, textAlign: 'right', color }}>{fmt(getMonto(tx))}</td>
+                <td style={tdS}>{tx.note || tx.type || ''}</td>
+                <td style={{ ...tdS, textAlign: 'right', color }}>{fmt(getReportAmount(tx))}</td>
               </tr>
             ))}
           </tbody>
