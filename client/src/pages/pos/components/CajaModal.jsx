@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { ModalOverlay, ModalContent, Button, SearchInput, TotalsRow } from '../POS.styles.jsx';
 import {
   FaLockOpen, FaFileInvoiceDollar, FaRegCreditCard,
@@ -68,66 +68,148 @@ const CajaModal = ({
     let tTransf = 0;
     let tCredito = 0;
 
-    for (const tx of transactions) {
-      // CORRECCIÓN MEJORADA: Buscar tipo en múltiples campos posibles
-      const t = (tx?.tipo || tx?.type || tx?.estado || tx?.transaction_type || '').toLowerCase();
+    // Función para calcular monto de efectivo
+    const calcularMontoEfectivo = (tx) => {
       const pd = tx?.pagoDetalles || {};
       
-      // CORRECCIÓN CLAVE: Usar el monto correcto según tipo de transacción
-      let montoEfectivo = 0;
+      // Primero buscar en pagoDetalles.ingresoCaja
+      if (pd?.ingresoCaja !== undefined && pd?.ingresoCaja !== null) {
+        return Number(pd.ingresoCaja) || 0;
+      }
       
+      // Luego buscar en campos directos de la transacción
+      if (tx?.monto !== undefined && tx?.monto !== null) {
+        return Number(tx.monto) || 0;
+      }
+      
+      if (tx?.amount !== undefined && tx?.amount !== null) {
+        return Number(tx.amount) || 0;
+      }
+      
+      if (tx?.total !== undefined && tx?.total !== null) {
+        return Number(tx.total) || 0;
+      }
+      
+      if (tx?.efectivo !== undefined && tx?.efectivo !== null) {
+        return Number(tx.efectivo) || 0;
+      }
+      
+      return 0;
+    };
+
+    for (const tx of transactions) {
+      // 1. DETECCIÓN DEL TIPO - BÚSQUEDA EXHAUSTIVA
+      let tipoDetectado = '';
+      
+      // Prioridad 1: Campos específicos de tipo
+      if (tx?.tipo) tipoDetectado = tx.tipo;
+      else if (tx?.type) tipoDetectado = tx.type;
+      else if (tx?.estado) tipoDetectado = tx.estado;
+      else if (tx?.transaction_type) tipoDetectado = tx.transaction_type;
+      
+      // Prioridad 2: Buscar en note o description
+      if (!tipoDetectado && tx?.note) {
+        const noteLower = tx.note.toLowerCase();
+        if (noteLower.includes('devolucion') || noteLower.includes('devolución')) {
+          tipoDetectado = 'devolucion';
+        } else if (noteLower.includes('cancelacion') || noteLower.includes('cancelación')) {
+          tipoDetectado = 'cancelacion';
+        } else if (noteLower.includes('venta')) {
+          tipoDetectado = 'venta';
+        } else if (noteLower.includes('entrada')) {
+          tipoDetectado = 'entrada';
+        } else if (noteLower.includes('salida')) {
+          tipoDetectado = 'salida';
+        } else if (noteLower.includes('abono') || noteLower.includes('apartado') || noteLower.includes('pedido')) {
+          tipoDetectado = 'abono';
+        }
+      }
+      
+      const t = tipoDetectado.toLowerCase();
+      const montoEfectivo = calcularMontoEfectivo(tx);
+      
+      // 2. CLASIFICACIÓN POR TIPO
+      // Egresos (restan de caja)
       if (t.includes('devolucion') || t.includes('cancelacion') || t.includes('salida')) {
-        // Para egresos: usar monto de la transacción
-        montoEfectivo = Number(tx.monto || tx.amount || 0);
+        // RESTAR de caja
         netCash -= montoEfectivo;
-      } else if (t.includes('venta_credito') || t.includes('credito')) {
-        // Crédito no afecta caja en efectivo
-        montoEfectivo = 0;
-      } else {
-        // Para ingresos: usar ingresoCaja de pagoDetalles
-        montoEfectivo = Number(pd.ingresoCaja || 0);
+        
+        // Determinar si es cancelación o devolución
+        const esCancelacion = (
+          t.includes('cancelacion') ||
+          (tx?.esCancelacionTotal === true) ||
+          (tx?.esDevolucionTotal === true) ||
+          (tx?.note?.toLowerCase().includes('total') && t.includes('devolucion')) ||
+          (tx?.items?.length === 1 && 
+           tx?.items?.[0]?.cantidadDevuelta === tx?.items?.[0]?.cantidadOriginal)
+        );
+        
+        if (esCancelacion) {
+          cls.cancelaciones.push(tx);
+        } else if (t.includes('devolucion')) {
+          cls.devoluciones.push(tx);
+        } else if (t.includes('salida')) {
+          cls.salidas.push(tx);
+        }
+      }
+      // Ingresos (suman a caja)
+      else if (t.includes('venta_contado') || t.includes('venta_mixta')) {
         netCash += montoEfectivo;
-      }
-
-      // --- 2. TOTALES NO EFECTIVO (Solo Ingreso) ---
-      if (t.includes('venta') || t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
-        tTarjeta += Number(pd.tarjeta || 0);
-        tTransf += Number(pd.transferencia || 0);
-        tCredito += Number(pd.credito || 0);
-      }
-
-      // --- 3. CLASIFICACIÓN PARA LISTAS ---
-      if (t.includes('venta_contado') || t.includes('venta_mixta')) {
         cls.ventasContado.push(tx);
       }
-      else if (t.includes('devolucion')) {
-        cls.devoluciones.push(tx);
-      }
-      else if (t.includes('cancelacion')) {
-        cls.cancelaciones.push(tx);
-      }
       else if (t.includes('entrada')) {
+        netCash += montoEfectivo;
         cls.entradas.push(tx);
       }
-      else if (t.includes('salida')) {
-        cls.salidas.push(tx);
-      }
       else if (t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
+        netCash += montoEfectivo;
         cls.abonos.push(tx);
+      }
+      // No afecta caja en efectivo
+      else if (t.includes('venta_credito') || t.includes('credito')) {
+        // No se suma ni resta efectivo
+      }
+      
+      // 3. TOTALES NO EFECTIVO (solo para ingresos)
+      const pd = tx?.pagoDetalles || {};
+      if (t.includes('venta') || t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
+        tTarjeta += Number(pd.tarjeta || tx?.tarjeta || 0);
+        tTransf += Number(pd.transferencia || tx?.transferencia || 0);
+        tCredito += Number(pd.credito || tx?.credito || 0);
       }
     }
 
-    // --- 4. TOTALES DE EGRESOS PARA REPORTE ---
-    // CORRECCIÓN: Usar tx.monto o tx.amount para devoluciones y cancelaciones
-    const totalEfectivoDevoluciones = cls.devoluciones.reduce(
-      (sum, tx) => sum + Number(tx.monto || tx.amount || 0),
-      0
-    );
-    
-    const totalEfectivoCancelaciones = cls.cancelaciones.reduce(
-      (sum, tx) => sum + Number(tx.monto || tx.amount || 0),
-      0
-    );
+    // 4. CÁLCULO FINAL DE TOTALES
+    const calcularTotalEgreso = (transacciones) => {
+      return transacciones.reduce((sum, tx) => {
+        const pd = tx?.pagoDetalles || {};
+        
+        if (pd?.ingresoCaja !== undefined && pd?.ingresoCaja !== null) {
+          return sum + (Number(pd.ingresoCaja) || 0);
+        }
+        
+        if (tx?.monto !== undefined && tx?.monto !== null) {
+          return sum + (Number(tx.monto) || 0);
+        }
+        
+        if (tx?.amount !== undefined && tx?.amount !== null) {
+          return sum + (Number(tx.amount) || 0);
+        }
+        
+        if (tx?.total !== undefined && tx?.total !== null) {
+          return sum + (Number(tx.total) || 0);
+        }
+        
+        if (tx?.efectivo !== undefined && tx?.efectivo !== null) {
+          return sum + (Number(tx.efectivo) || 0);
+        }
+        
+        return sum;
+      }, 0);
+    };
+
+    const totalEfectivoDevoluciones = calcularTotalEgreso(cls.devoluciones);
+    const totalEfectivoCancelaciones = calcularTotalEgreso(cls.cancelaciones);
 
     return {
       cajaInicial: cajaInicialN,
@@ -147,6 +229,18 @@ const CajaModal = ({
       totalEfectivoCancelaciones
     };
   }, [transactions, session]);
+
+  // DEBUG: Para ver qué datos están llegando
+  useEffect(() => {
+    console.log("=== DEBUG ARQUEO DE CAJA ===");
+    console.log("Transacciones totales:", transactions.length);
+    console.log("Devoluciones encontradas:", devoluciones.length, devoluciones);
+    console.log("Cancelaciones encontradas:", cancelaciones.length, cancelaciones);
+    console.log("Total efectivo devoluciones:", totalEfectivoDevoluciones);
+    console.log("Total efectivo cancelaciones:", totalEfectivoCancelaciones);
+    console.log("Movimiento neto efectivo:", movimientoNetoEfectivo);
+    console.log("=== FIN DEBUG ===");
+  }, [transactions, devoluciones, cancelaciones, totalEfectivoDevoluciones, totalEfectivoCancelaciones, movimientoNetoEfectivo]);
 
   const diferencia = (Number(montoContado || 0) - efectivoEsperado);
 
@@ -192,11 +286,22 @@ const CajaModal = ({
     const fmt = (n) => `C$${Number(n || 0).toFixed(2)}`;
     const fmtDate = (d) => d ? d.toLocaleString('es-NI', { timeZone: 'America/Managua' }) : '—';
 
+    // Función para obtener monto de transacción
+    const getMonto = (tx) => {
+      const pd = tx?.pagoDetalles || {};
+      if (pd?.ingresoCaja !== undefined && pd?.ingresoCaja !== null) return Number(pd.ingresoCaja);
+      if (tx?.monto !== undefined && tx?.monto !== null) return Number(tx.monto);
+      if (tx?.amount !== undefined && tx?.amount !== null) return Number(tx.amount);
+      if (tx?.total !== undefined && tx?.total !== null) return Number(tx.total);
+      if (tx?.efectivo !== undefined && tx?.efectivo !== null) return Number(tx.efectivo);
+      return 0;
+    };
+
     const rows = (arr, color = '#222') => arr.map(tx => `
       <tr>
         <td>${new Date(tx.at).toLocaleString('es-NI', { timeZone: 'America/Managua' })}</td>
-        <td>${tx.note || tx.type || ''}</td>
-        <td style="text-align:right;color:${color}">${fmt(tx.monto || tx.amount || 0)}</td>
+        <td>${tx.note || tx.type || tx.tipo || ''}</td>
+        <td style="text-align:right;color:${color}">${fmt(getMonto(tx))}</td>
       </tr>`).join('');
 
     win.document.write(`
@@ -265,17 +370,19 @@ const CajaModal = ({
             <tbody>${rows(salidas, '#dc3545')}</tbody>
           </table>
 
+          ${cancelaciones.length > 0 ? `
           <h3>Cancelaciones</h3>
           <table>
             <thead><tr><th>Fecha</th><th>Nota</th><th style="text-align:right">Efectivo</th></tr></thead>
             <tbody>${rows(cancelaciones, '#6c757d')}</tbody>
-          </table>
+          </table>` : ''}
 
+          ${devoluciones.length > 0 ? `
           <h3>Devoluciones</h3>
           <table>
             <thead><tr><th>Fecha</th><th>Nota</th><th style="text-align:right">Efectivo</th></tr></thead>
             <tbody>${rows(devoluciones, '#6c757d')}</tbody>
-          </table>
+          </table>` : ''}
         </div>
 
         <script>
@@ -399,7 +506,6 @@ const CajaModal = ({
             </div>
 
             {/* Listados compactos */}
-            {/* AÑADIDO: Lista de Abonos para visualización */}
             <SectionList title="Abonos y Otros Pagos" items={abonos} positive />
 
             <SectionList title="Entradas" items={entradas} positive />
@@ -471,6 +577,18 @@ export default CajaModal;
 function SectionList({ title, items, positive = false, neutral = false }) {
   if (!items?.length) return null;
   const color = neutral ? '#6c757d' : (positive ? '#198754' : '#dc3545');
+  
+  // Función para obtener monto de transacción
+  const getMonto = (tx) => {
+    const pd = tx?.pagoDetalles || {};
+    if (pd?.ingresoCaja !== undefined && pd?.ingresoCaja !== null) return Number(pd.ingresoCaja);
+    if (tx?.monto !== undefined && tx?.monto !== null) return Number(tx.monto);
+    if (tx?.amount !== undefined && tx?.amount !== null) return Number(tx.amount);
+    if (tx?.total !== undefined && tx?.total !== null) return Number(tx.total);
+    if (tx?.efectivo !== undefined && tx?.efectivo !== null) return Number(tx.efectivo);
+    return 0;
+  };
+  
   const fmt = (n) => `C$${Number(n || 0).toFixed(2)}`;
 
   return (
@@ -489,8 +607,8 @@ function SectionList({ title, items, positive = false, neutral = false }) {
             {items.map(tx => (
               <tr key={tx.id || Math.random()}>
                 <td style={tdS}>{new Date(tx.at).toLocaleString('es-NI', { timeZone: 'America/Managua' })}</td>
-                <td style={tdS}>{tx.note || tx.type || ''}</td>
-                <td style={{ ...tdS, textAlign: 'right', color }}>{fmt(tx.monto || tx.amount || 0)}</td>
+                <td style={tdS}>{tx.note || tx.type || tx.tipo || ''}</td>
+                <td style={{ ...tdS, textAlign: 'right', color }}>{fmt(getMonto(tx))}</td>
               </tr>
             ))}
           </tbody>
