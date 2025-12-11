@@ -125,7 +125,12 @@ function calculateReportStats(session) {
     const pd = tx?.pagoDetalles || {};
 
     // Monto base total de la operación
-    let montoBase = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
+    // CORRECCION AUDITORIA: Forzar signo negativo si es salida o devolución
+    let rawAmount = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
+    if (t === 'salida' || t.includes('devolucion')) {
+      rawAmount = -Math.abs(rawAmount);
+    }
+    const montoBase = rawAmount;
 
     // Desglose
     const txTarjeta = Number(pd.tarjeta || 0);
@@ -140,16 +145,23 @@ function calculateReportStats(session) {
     }
 
     // Efectivo Real = Total - Digital
+    // Nota: Si es salida (montoBase negativo), esto restará al efectivo al final.
     const ingresoEfectivoReal = montoBase - txTarjeta - txTransf - txCredito;
 
-    if (t !== 'venta_credito') {
-      netCash += ingresoEfectivoReal;
-    }
+    // Actualizar Caja (Solo Efectivo)
+    // CORRECCION AUDITORIA: Se eliminó check 'venta_credito' para incluir primas en efectivo.
+    netCash += ingresoEfectivoReal;
 
     // Total ventas (Bruto)
+    // CORRECCION AUDITORIA: Sumar todo (incluso crédito)
     if (t.startsWith('venta')) {
-      tVentasDia += montoBase;
+      if (rawAmount > 0) {
+        tVentasDia += (rawAmount + txCredito);
+      } else {
+        tVentasDia += (Math.abs(rawAmount) + txCredito);
+      }
     }
+
 
     // Listas
     const esDevolucion = t === 'devolucion' || t.includes('devolucion');

@@ -116,9 +116,16 @@ const CajaModal = ({
       // 4. TOTAL VENTAS DEL DIA
       // Sumar al total global de ventas si es una venta
       if (t.startsWith('venta')) {
-        // Usamos Math.abs porque la venta contribuye al volumen bruto positivo
-        // (a menos que haya devoluciones, pero aquí hablamos de ventas brutas)
-        tVentasDia += Math.abs(rawAmount);
+        // CORRECCION: El "Total Venta del Dia" debe ser la suma de TODO (Efectivo + Tarjeta + Transf + Credito)
+        // rawAmount es (Efectivo+Tarjeta+Transf).
+        // Si es venta (positivo), le sumamos tambien la parte de credito.
+        // Si es devolucion (se maneja fuera de este if usualmente o se resta), aqui solo nos interesa VENTA bruta.
+        if (rawAmount > 0) {
+          tVentasDia += (rawAmount + txCredito);
+        } else {
+          // Si por alguna razon rawAmount es negativo en una venta (raro), usamos abs pero sumamos credito
+          tVentasDia += (Math.abs(rawAmount) + txCredito);
+        }
       }
 
       // --- Clasificación en Listas para visualización ---
