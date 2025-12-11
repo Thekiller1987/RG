@@ -490,32 +490,83 @@ const FacturasProveedores = () => {
         }
     };
 
+    // --- CÁLCULO DE ESTADO DINÁMICO ---
+    const getEffectiveStatus = useCallback((invoice) => {
+        const total = parseFloat(invoice.monto_total) || 0;
+        const abonado = parseFloat(invoice.monto_abonado) || 0;
+
+        // 1. Si está pagada (margen de error 0.1 por decimales)
+        if (total > 0 && abonado >= (total - 0.1)) return 'PAGADA';
+
+        // 2. Chequeo de fechas
+        if (!invoice.fecha_vencimiento) return 'PENDIENTE';
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Normalizar hoy
+
+        // Ajustamos la fecha de vencimiento a hora local Managua (evitar desfase)
+        // La fecha viene YYYY-MM-DD.
+        const vencParts = invoice.fecha_vencimiento.split('-'); // [YYYY, MM, DD]
+        const vencDate = new Date(vencParts[0], vencParts[1] - 1, vencParts[2]);
+        vencDate.setHours(0, 0, 0, 0);
+
+        const diffTime = vencDate - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) return 'VENCIDA'; // Ya pasó la fecha
+        if (diffDays <= 5) return 'PROXIMA'; // Faltan 5 días o menos (incluyendo hoy)
+
+        return 'PENDIENTE';
+    }, []);
+
     // --- ESTILOS DINÁMICOS Y CÁLCULOS ---
     const getStatusStyles = useCallback((status) => {
         switch (status) {
-            case 'VENCIDA': return { color: '#dc2626', bg: '#fee2e2', activeColor: '#dc2626', activeBg: '#fef2f2' };
-            case 'PAGADA': return { color: '#16a34a', bg: '#dcfce7', activeColor: '#16a34a', activeBg: '#f0fdf4' };
-            default: return { color: '#3b82f6', bg: '#dbeafe', activeColor: '#2563eb', activeBg: '#eff6ff' };
+            case 'VENCIDA': return { color: '#dc2626', bg: '#fee2e2', activeColor: '#dc2626', activeBg: '#fef2f2', label: 'Vencida' };
+            case 'PROXIMA': return { color: '#ea580c', bg: '#ffedd5', activeColor: '#c2410c', activeBg: '#fff7ed', label: 'Próxima a Vencer' }; // Naranja
+            case 'PAGADA': return { color: '#16a34a', bg: '#dcfce7', activeColor: '#16a34a', activeBg: '#f0fdf4', label: 'Pagada' };
+            default: return { color: '#3b82f6', bg: '#dbeafe', activeColor: '#2563eb', activeBg: '#eff6ff', label: 'Pendiente' };
         }
     }, []);
 
     const stats = useMemo(() => {
-        const pend = invoices.filter(i => i.estado === 'PENDIENTE').length;
-        const venc = invoices.filter(i => i.estado === 'VENCIDA').length;
-        const pag = invoices.filter(i => i.estado === 'PAGADA').length;
-        const totalDebt = invoices.reduce((acc, curr) => {
-            const deuda = (parseFloat(curr.monto_total) || 0) - (parseFloat(curr.monto_abonado) || 0);
-            return curr.estado !== 'PAGADA' ? acc + deuda : acc;
-        }, 0);
-        return { pend, venc, pag, totalDebt };
-    }, [invoices]);
+        let pend = 0, venc = 0, pag = 0, prox = 0, totalDebt = 0;
+
+        invoices.forEach(inv => {
+            const status = getEffectiveStatus(inv);
+            if (status === 'PENDIENTE') pend++;
+            if (status === 'VENCIDA') venc++;
+            if (status === 'PAGADA') pag++;
+            if (status === 'PROXIMA') prox++;
+
+            const deuda = (parseFloat(inv.monto_total) || 0) - (parseFloat(inv.monto_abonado) || 0);
+            if (status !== 'PAGADA') totalDebt += deuda;
+        });
+
+        return { pend, venc, pag, prox, totalDebt };
+    }, [invoices, getEffectiveStatus]);
 
     const filteredInvoices = useMemo(() => {
-        let data = [...invoices]; // Copia para no mutar original
+        let data = invoices.map(inv => ({ ...inv, effectiveStatus: getEffectiveStatus(inv) }));
 
         // 1. Filtro Tabs (Estado)
         if (filter !== 'TODAS') {
-            data = data.filter(i => i.estado === filter);
+            // "PENDIENTE" en el filtro tabs ahora agrupa 'PENDIENTE' y 'PROXIMA' para no esconderlas, 
+            // O podríamos hacer un tab separado. El usuario pidió ver naranjas.
+            // Vamos a mostrar las "PROXIMAS" dentro de "PENDIENTES" o hacer un filtro inteligente.
+            // UPD: El usuario pidió que se pongan en roja si vencidas, naranja si faltan 5 días.
+            // Si elijo Tab Pendientes, quiero ver las pendientes nomas.
+            // Si elijo Tab Vencidas, solo las vencidas.
+            // Voy a asumir que PROXIMA cuenta como PENDIENTE para efectos de Tabs generales, 
+            // o crear un Tab "Próximas"? Mejor las incluyo en PENDIENTES pero visualmente destacadas,
+            // O si filtro VENCIDAS solo vencidas.
+
+            if (filter === 'PENDIENTE') {
+                // Mostrar Pendientes Y Próximas
+                data = data.filter(i => i.effectiveStatus === 'PENDIENTE' || i.effectiveStatus === 'PROXIMA');
+            } else {
+                data = data.filter(i => i.effectiveStatus === filter);
+            }
         }
 
         // 2. Filtro Proveedor
@@ -542,8 +593,11 @@ const FacturasProveedores = () => {
             );
         }
 
-        // 5. ORDENAMIENTO (Nuevo)
+        // 5. ORDENAMIENTO
         data.sort((a, b) => {
+            // Prioridad forzada: Vencidas arriba si no hay orden especifico
+            // El usuario pidió: "deberia pasarse a la lista de vencidas"
+
             if (sortBy === 'vencimiento_asc') {
                 return new Date(a.fecha_vencimiento) - new Date(b.fecha_vencimiento);
             } else if (sortBy === 'emision_desc') {
@@ -555,7 +609,7 @@ const FacturasProveedores = () => {
         });
 
         return data;
-    }, [invoices, filter, searchTerm, filterProvider, filterDateFrom, filterDateTo, sortBy]);
+    }, [invoices, filter, searchTerm, filterProvider, filterDateFrom, filterDateTo, sortBy, getEffectiveStatus]);
 
     return (
         <PageWrapper>
@@ -583,11 +637,17 @@ const FacturasProveedores = () => {
                     <div className="value">{stats.venc}</div>
                     <div className="sub">Requieren atención urgente</div>
                 </StatCard>
+                <StatCard color="#ea580c" bg="#fff7ed">
+                    <div className="icon-wrapper"><FaClock /></div>
+                    <div className="label">Próximas a Vencer</div>
+                    <div className="value">{stats.prox}</div>
+                    <div className="sub">En los próx. 5 días</div>
+                </StatCard>
                 <StatCard color="#3b82f6" bg="#eff6ff">
                     <div className="icon-wrapper"><FaClock /></div>
-                    <div className="label">Por Pagar</div>
+                    <div className="label">Pendientes</div>
                     <div className="value">{stats.pend}</div>
-                    <div className="sub">Facturas pendientes</div>
+                    <div className="sub">Sin riesgo inmediato</div>
                 </StatCard>
                 <StatCard color="#f59e0b" bg="#fffbeb">
                     <div className="icon-wrapper"><FaMoneyBillWave /></div>
@@ -601,7 +661,7 @@ const FacturasProveedores = () => {
             <Toolbar>
                 <FilterTabs>
                     {[
-                        { id: 'PENDIENTE', label: 'Pendientes', icon: FaClock, color: '#3b82f6', bg: '#eff6ff', count: stats.pend },
+                        { id: 'PENDIENTE', label: 'Por Pagar (Prox)', icon: FaClock, color: '#3b82f6', bg: '#eff6ff', count: stats.pend + stats.prox },
                         { id: 'VENCIDA', label: 'Vencidas', icon: FaExclamationCircle, color: '#dc2626', bg: '#fef2f2', count: stats.venc },
                         { id: 'PAGADA', label: 'Pagadas', icon: FaCheckCircle, color: '#16a34a', bg: '#f0fdf4', count: stats.pag },
                         { id: 'TODAS', label: 'Todas', icon: FaList, color: '#64748b', bg: '#f1f5f9', count: null },
@@ -683,12 +743,13 @@ const FacturasProveedores = () => {
             ) : filteredInvoices.length > 0 ? (
                 <InvoicesGrid>
                     {filteredInvoices.map(inv => {
-                        const styles = getStatusStyles(inv.estado);
+                        const status = inv.effectiveStatus; // Usamos la calculada
+                        const styles = getStatusStyles(status);
                         const total = parseFloat(inv.monto_total) || 0;
                         const abonado = parseFloat(inv.monto_abonado) || 0;
                         const saldo = total - abonado;
                         const progress = total > 0 ? (abonado / total) * 100 : 0;
-                        const reference = inv.estado === 'PAGADA' ? inv.referencia_pago : null;
+                        const reference = status === 'PAGADA' ? inv.referencia_pago : null;
 
                         return (
                             <InvoiceCard key={inv.id} color={styles.color} balanceColor={saldo > 0 ? '#ef4444' : '#16a34a'}>
@@ -699,7 +760,7 @@ const FacturasProveedores = () => {
                                         </h3>
                                         <span className="invoice-number">#{inv.numero_factura}</span>
                                     </div>
-                                    <StatusBadge bg={styles.bg} text={styles.color}>{inv.estado}</StatusBadge>
+                                    <StatusBadge bg={styles.bg} text={styles.color}>{styles.label}</StatusBadge>
                                 </div>
 
                                 <div className="card-body">

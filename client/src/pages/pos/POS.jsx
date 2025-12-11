@@ -1015,7 +1015,8 @@ const POS = () => {
             // Trigger del Modal
             setTicketData({ transaction: txToPrint, creditStatus: null, shouldOpen: true, printMode: '80' });
 
-            showAlert({ title: "Impresión Recuperada", message: `Recuperando impresión de venta #${pendingPrintId} tras recarga.` });
+            // alert removed as requested            
+
           }
         } catch (e) {
           console.error("Error recuperando impresión automática:", e);
@@ -1205,9 +1206,7 @@ const POS = () => {
         <div style={{ fontSize: '0.8rem', color: '#555' }}><FaKeyboard /> Atajos: <strong>F1</strong> Buscar, <strong>F2</strong> Pagar, <strong>F9</strong> Caja</div>
 
         <div className="right-actions">
-          <S.Button info onClick={loadPendingOrdersFromServer}>
-            <FaClipboardList /> Cargar Pedido
-          </S.Button>
+
 
           <S.Button dark onClick={handleOpenHistoryModal}>
             <FaHistory /> Historial
