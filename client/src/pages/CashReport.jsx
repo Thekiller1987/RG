@@ -19,16 +19,29 @@ const API_URL = '/api';
 const ENDPOINT_REPORTE = `${API_URL}/caja/reporte`;              // ?date=YYYY-MM-DD
 const ENDPOINT_ABIERTAS_ACTIVAS = `${API_URL}/caja/abiertas/activas`;
 
-/* ================== HELPERS ================== */
-function todayISO() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+/* ================== HELPERS (ZONA HORARIA + FORMATO) ================== */
+
+// Obtener fecha actual en Managua (YYYY-MM-DD) para el input date
+function todayManagua() {
+  // Usamos es-CA o sv-SE para obtener YYYY-MM-DD, pero forzando la zona
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Managua' });
 }
+
 const fmtMoney = (n) => `C$${Number(n || 0).toFixed(2)}`;
-const fmtDT = (iso) => (iso ? new Date(iso).toLocaleString() : '—');
+
+// Formato dd/mm/yyyy hh:mm AM/PM (Managua)
+const fmtDT = (iso) => {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('es-NI', {
+    timeZone: 'America/Managua',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+};
 
 function initialsFromName(name) {
   if (!name) return '—';
@@ -83,16 +96,117 @@ const PrintStyles = createGlobalStyle`
   }
 `;
 
+/**
+ * LÓGICA DE RE-CÁLCULO DEL REPORTE (Idéntica a CajaModal)
+ * Esto asegura que si el reporte guardado estaba mal, aquí se recalcula "Real" basado en transacciones.
+ */
+function calculateReportStats(session) {
+  const transactions = Array.isArray(session?.transactions) ? session.transactions : [];
+  const cajaInicialN = Number(session?.initialAmount || session?.monto_inicial || 0);
+
+  const cls = {
+    ventasContado: [],
+    devoluciones: [],
+    cancelaciones: [],
+    entradas: [],
+    salidas: [],
+    abonos: []
+  };
+
+  let netCash = 0;
+  let tTarjeta = 0;
+  let tTransf = 0;
+  let tCredito = 0;
+  let sumDevsCancels = 0;
+  let tVentasDia = 0; // Total Bruto Vendido
+
+  for (const tx of transactions) {
+    const t = (tx?.type || '').toLowerCase();
+    const pd = tx?.pagoDetalles || {};
+
+    // Monto base total de la operación
+    let montoBase = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
+
+    // Desglose
+    const txTarjeta = Number(pd.tarjeta || 0);
+    const txTransf = Number(pd.transferencia || 0);
+    const txCredito = Number(pd.credito || 0);
+
+    // Acumuladores Informativos
+    if (t.startsWith('venta') || t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
+      tTarjeta += txTarjeta;
+      tTransf += txTransf;
+      tCredito += txCredito;
+    }
+
+    // Efectivo Real = Total - Digital
+    const ingresoEfectivoReal = montoBase - txTarjeta - txTransf - txCredito;
+
+    if (t !== 'venta_credito') {
+      netCash += ingresoEfectivoReal;
+    }
+
+    // Total ventas (Bruto)
+    if (t.startsWith('venta')) {
+      tVentasDia += montoBase;
+    }
+
+    // Listas
+    const esDevolucion = t === 'devolucion' || t.includes('devolucion');
+    const esCancelacion = t === 'cancelacion' || t.includes('cancelacion');
+
+    if (t === 'venta_contado' || t === 'venta_mixta' || t === 'venta_credito') {
+      cls.ventasContado.push(tx);
+    }
+    else if (esDevolucion) {
+      cls.devoluciones.push(tx);
+      sumDevsCancels += Math.abs(montoBase);
+    }
+    else if (esCancelacion) {
+      cls.cancelaciones.push(tx);
+      sumDevsCancels += Math.abs(montoBase);
+    }
+    else if (t === 'entrada') {
+      cls.entradas.push(tx);
+    }
+    else if (t === 'salida') {
+      cls.salidas.push(tx);
+    }
+    else if (t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
+      cls.abonos.push(tx);
+    }
+  }
+
+  return {
+    cajaInicial: cajaInicialN,
+    movimientoNetoEfectivo: netCash,
+    efectivoEsperado: cajaInicialN + netCash,
+    ventasContado: cls.ventasContado,
+    devoluciones: cls.devoluciones,
+    cancelaciones: cls.cancelaciones,
+    entradas: cls.entradas,
+    salidas: cls.salidas,
+    abonos: cls.abonos,
+    totalTarjeta: tTarjeta,
+    totalTransferencia: tTransf,
+    totalCredito: tCredito,
+    totalNoEfectivo: tTarjeta + tTransf + tCredito,
+    sumDevolucionesCancelaciones: sumDevsCancels,
+    totalVentasDia: tVentasDia
+  };
+}
+
+
 /* ================== COMPONENT ================== */
 const CashReport = () => {
   const token = useAuthToken();
   const navigate = useNavigate();
 
-  const [date, setDate] = useState(() => todayISO());
+  const [date, setDate] = useState(() => todayManagua());
   const [loading, setLoading] = useState(false);
-  const [abiertasHoy, setAbiertasHoy] = useState([]);         // /reporte.abiertas
-  const [cerradasHoy, setCerradasHoy] = useState([]);         // /reporte.cerradas
-  const [abiertasActivas, setAbiertasActivas] = useState([]); // /abiertas/activas
+  const [abiertasHoy, setAbiertasHoy] = useState([]);
+  const [cerradasHoy, setCerradasHoy] = useState([]);
+  const [abiertasActivas, setAbiertasActivas] = useState([]);
   const [error, setError] = useState(null);
 
   const authHeader = useMemo(() => {
@@ -128,6 +242,122 @@ const CashReport = () => {
     fetchData();
   }, [fetchData]);
 
+
+  // Función para imprimir el reporte DETALLADO (Mismo formato que POS)
+  const handlePrintDetail = (session) => {
+    // Recalcular métricas en tiempo real para asegurar que sean "Reales"
+    const stats = calculateReportStats(session);
+
+    // Datos de cabecera
+    const openedByName = resolveName(session.abierta_por || session.openedBy);
+    const closedByName = resolveName(session.cerrada_por || session.closedBy);
+    const openedAt = session.openedAt || session.hora_apertura;
+
+    // Preparar HTML
+    const win = window.open('', '_blank');
+    if (!win) return;
+
+    // Helper de formato local
+    const fmt = (n) => `C$${Number(n || 0).toFixed(2)}`;
+    const fmtDate = (d) => d ? new Date(d).toLocaleString('es-NI', { timeZone: 'America/Managua' }) : '—';
+
+    const rows = (arr, color = '#222') => arr.map(tx => `
+      <tr>
+        <td>${new Date(tx.at).toLocaleString('es-NI', { timeZone: 'America/Managua' })}</td>
+        <td>${tx.note || tx.type || ''}</td>
+        <td style="text-align:right;color:${color}">${fmt(tx.pagoDetalles?.ingresoCaja ?? tx.amount)}</td>
+      </tr>`).join('');
+
+    win.document.write(`
+      <html>
+      <head>
+        <title>Reporte de Caja Detallado</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 16px; }
+          h2 { margin: 0 0 6px; }
+          h3 { margin: 16px 0 6px; }
+          .box { border:1px solid #ddd; border-radius:8px; padding:12px; margin-bottom:12px; }
+          .row { display:flex; justify-content:space-between; margin:6px 0; }
+          .bold { font-weight:700; }
+          table { width:100%; border-collapse: collapse; margin-top:8px; }
+          th, td { border-bottom:1px solid #eee; padding:6px; font-size:14px;}
+          .sep { border-top:2px dashed #ccc; margin:8px 0; }
+          .diff { font-size:16px; padding:6px; background:#eef7ee; border-radius:6px; }
+          .red { color: #dc3545; }
+        </style>
+      </head>
+      <body>
+        <h2>Reporte Histórico de Arqueo</h2>
+        <div class="box">
+          <div class="row"><div><b>Abrió:</b> ${openedByName}</div><div><b>Fecha/Hora:</b> ${fmtDate(openedAt)}</div></div>
+          <div class="row"><div><b>Cerró:</b> ${closedByName}</div><div><b>Fecha/Hora:</b> ${fmtDate(session.hora_cierre || session.closedAt)}</div></div>
+        </div>
+
+        <div class="box">
+          <div class="row bold" style="font-size:1.1rem; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:8px;">
+             <div>Total Ventas del Día:</div>
+             <div>${fmt(stats.totalVentasDia)}</div>
+          </div>
+          <div class="row"><div>Fondo Inicial:</div><div>${fmt(stats.cajaInicial)}</div></div>
+          <div class="row"><div>Movimiento Neto Efectivo:</div><div>${fmt(stats.movimientoNetoEfectivo)}</div></div>
+          
+          <div class="row red"><div>(-) Devoluciones/Cancelaciones:</div><div>${fmt(stats.sumDevolucionesCancelaciones)}</div></div>
+
+          <div class="sep"></div>
+          <div class="row bold"><div>Efectivo Esperado:</div><div>${fmt(stats.efectivoEsperado)}</div></div>
+          <div class="row"><div>Monto Físico Contado:</div><div>${fmt(session.contado)}</div></div>
+          <div class="row diff"><div>DIFERENCIA:</div><div>${fmt(Number(session.contado) - stats.efectivoEsperado)}</div></div>
+        </div>
+
+        <div class="box">
+          <div class="bold" style="margin-bottom:6px;">Resumen de Ingresos (No Efectivo)</div>
+          <div class="row"><div>Tarjeta:</div><div>${fmt(stats.totalTarjeta)}</div></div>
+          <div class="row"><div>Transferencia:</div><div>${fmt(stats.totalTransferencia)}</div></div>
+          <div class="row"><div>Crédito:</div><div>${fmt(stats.totalCredito)}</div></div>
+          <div class="row bold"><div>Total No Efectivo:</div><div>${fmt(stats.totalNoEfectivo)}</div></div>
+        </div>
+
+        <div class="box">
+          <h3>Abonos y Otros Ingresos</h3>
+          <table>
+             <thead><tr><th>Fecha</th><th>Nota / Tipo</th><th style="text-align:right">Monto</th></tr></thead>
+             <tbody>${stats.abonos.length > 0 ? rows(stats.abonos, '#198754') : '<tr><td colspan="3" style="text-align:center; color:#999;">Sin abonos</td></tr>'}</tbody>
+          </table>
+
+          <h3>Entradas</h3>
+          <table>
+            <thead><tr><th>Fecha</th><th>Nota</th><th style="text-align:right">Monto</th></tr></thead>
+            <tbody>${rows(stats.entradas, '#198754')}</tbody>
+          </table>
+
+          <h3>Salidas</h3>
+          <table>
+            <thead><tr><th>Fecha</th><th>Nota</th><th style="text-align:right">Monto</th></tr></thead>
+            <tbody>${rows(stats.salidas, '#dc3545')}</tbody>
+          </table>
+
+          <h3>Cancelaciones</h3>
+          <table>
+            <thead><tr><th>Fecha</th><th>Nota</th><th style="text-align:right">Efectivo</th></tr></thead>
+            <tbody>${rows(stats.cancelaciones, '#6c757d')}</tbody>
+          </table>
+
+          <h3>Devoluciones</h3>
+          <table>
+            <thead><tr><th>Fecha</th><th>Nota</th><th style="text-align:right">Efectivo</th></tr></thead>
+            <tbody>${rows(stats.devoluciones, '#6c757d')}</tbody>
+          </table>
+        </div>
+
+        <script>
+          window.onload = () => { window.print(); }
+        </script>
+      </body>
+      </html>
+    `);
+    win.document.close();
+  };
+
   return (
     <Wrapper>
       <PrintStyles />
@@ -157,10 +387,6 @@ const CashReport = () => {
             <FaSyncAlt className="spin-if-loading" />
             {loading ? ' Actualizando…' : ' Actualizar'}
           </RefreshButton>
-
-          <PrintButton onClick={() => window.print()} title="Exportar PDF">
-            <FaPrint /> Exportar PDF
-          </PrintButton>
         </Filters>
       </HeaderBar>
 
@@ -192,11 +418,15 @@ const CashReport = () => {
               <CardsGrid className="cards-grid-print">
                 {abiertasActivas.map((s) => {
                   const nombre = resolveName(s?.openedBy) || s?.abierta_por;
+
+                  // Calculo rápido para mostrar info preliminar
+                  const stats = calculateReportStats(s);
+
                   return (
                     <Card key={s.id}>
                       <CardHeader $accent="open">
                         <span className="badge">ABIERTA</span>
-                        <small>{fmtDT(s.openedAt)}</small>
+                        <small>{fmtDT(s.openedAt || s.hora_apertura)}</small>
                       </CardHeader>
                       <CardBody>
                         <PersonRow>
@@ -207,14 +437,25 @@ const CashReport = () => {
                           </div>
                         </PersonRow>
 
+                        <Divider />
                         <Row>
-                          <label>Monto inicial</label>
-                          <span className="value">{fmtMoney(s.monto_inicial)}</span>
+                          <label>Fondo inicial</label>
+                          <span className="value">{fmtMoney(stats.cajaInicial)}</span>
                         </Row>
                         <Row>
-                          <label>Tasa dólar</label>
-                          <span className="value">{Number(s.tasaDolar || 0).toFixed(2)}</span>
+                          <label>Ventas (Total)</label>
+                          <span className="value" style={{ color: '#2563eb' }}>{fmtMoney(stats.totalVentasDia)}</span>
                         </Row>
+                        <Row>
+                          <label>Efectivo (Previsto)</label>
+                          <span className="value">{fmtMoney(stats.efectivoEsperado)}</span>
+                        </Row>
+
+                        <div style={{ marginTop: 10 }}>
+                          <PrintButton onClick={() => handlePrintDetail(s)} style={{ width: '100%', justifyContent: 'center', fontSize: '0.9rem', background: '#0ea5e9' }}>
+                            <FaPrint /> Ver Reporte Parcial
+                          </PrintButton>
+                        </div>
                       </CardBody>
                     </Card>
                   );
@@ -226,7 +467,7 @@ const CashReport = () => {
           {/* ABIERTAS DEL DÍA (sin cierre) */}
           <Section>
             <SectionTitle>
-              <FaLockOpen /> Cajas abiertas el {date} (sin cierre)
+              <FaLockOpen /> Cajas abiertas el {fmtDT(date).split(' ')[0]} (sin cierre)
             </SectionTitle>
             {abiertasHoy.length === 0 ? (
               <EmptyState>Ese día no quedaron cajas abiertas sin cierre.</EmptyState>
@@ -253,6 +494,11 @@ const CashReport = () => {
                           <label>Monto inicial</label>
                           <span className="value">{fmtMoney(s.monto_inicial)}</span>
                         </Row>
+                        <div style={{ marginTop: 10 }}>
+                          <PrintButton onClick={() => handlePrintDetail(s)} style={{ width: '100%', justifyContent: 'center', fontSize: '0.9rem', background: '#0ea5e9' }}>
+                            <FaPrint /> Ver Historial
+                          </PrintButton>
+                        </div>
                       </CardBody>
                     </Card>
                   );
@@ -264,7 +510,7 @@ const CashReport = () => {
           {/* CERRADAS DEL DÍA */}
           <Section>
             <SectionTitle>
-              <FaCheckCircle /> Cajas Cerradas el {date}
+              <FaCheckCircle /> Cajas Cerradas el {fmtDT(date).split(' ')[0]}
             </SectionTitle>
             {cerradasHoy.length === 0 ? (
               <EmptyState>No hubo cierres de caja ese día.</EmptyState>
@@ -273,6 +519,14 @@ const CashReport = () => {
                 {cerradasHoy.map((s) => {
                   const nAbre = resolveName(s.abierta_por);
                   const nCierra = resolveName(s.cerrada_por);
+
+                  // RECALCULO "REAL" para la tarjeta (opcional) o usamos lo guardado
+                  // Para la tarjeta usamos lo guardado para ver qué pasó, pero el print será el real
+                  // O mejor, mostramos el real también aquí si el usuario se quejaba de error.
+                  // Vamos a recalcular para mostrar la realidad.
+                  const stats = calculateReportStats(s);
+                  const diffReal = Number(s.contado) - stats.efectivoEsperado;
+
                   return (
                     <Card key={s.id}>
                       <CardHeader $accent="closed">
@@ -302,20 +556,30 @@ const CashReport = () => {
 
                         <Row>
                           <label>Fondo inicial</label>
-                          <span className="value">{fmtMoney(s.monto_inicial)}</span>
+                          <span className="value">{fmtMoney(stats.cajaInicial)}</span>
                         </Row>
                         <Row>
-                          <label>Efectivo esperado</label>
-                          <span className="value">{fmtMoney(s.esperado)}</span>
+                          <label>Total Ventas</label>
+                          <span className="value" style={{ color: '#2563eb' }}>{fmtMoney(stats.totalVentasDia)}</span>
+                        </Row>
+                        <Row>
+                          <label>Efec. Esperado (Real)</label>
+                          <span className="value">{fmtMoney(stats.efectivoEsperado)}</span>
                         </Row>
                         <Row>
                           <label>Monto contado</label>
                           <span className="value">{fmtMoney(s.contado)}</span>
                         </Row>
-                        <Row $diff={Number(s.diferencia || 0)}>
-                          <label>Diferencia</label>
-                          <span className="value">{fmtMoney(s.diferencia)}</span>
+                        <Row $diff={diffReal}>
+                          <label>Diferencia (Real)</label>
+                          <span className="value">{fmtMoney(diffReal)}</span>
                         </Row>
+
+                        <div style={{ marginTop: 12 }}>
+                          <PrintButton onClick={() => handlePrintDetail(s)} style={{ width: '100%', justifyContent: 'center' }}>
+                            <FaPrint /> Ver Reporte Completo
+                          </PrintButton>
+                        </div>
                       </CardBody>
                     </Card>
                   );

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { Link } from 'react-router-dom';
-import axios from 'axios'; 
-import { 
-    FaArrowLeft, FaPlus, FaSearch, FaFileInvoiceDollar, 
+import axios from 'axios';
+import {
+    FaArrowLeft, FaPlus, FaSearch, FaFileInvoiceDollar,
     FaCalendarAlt, FaCheckCircle, FaExclamationCircle, FaClock,
     FaMoneyBillWave, FaBuilding, FaList, FaTrashAlt, FaTimes, FaStore,
     FaFilter, FaReceipt // Nuevo ícono para la referencia
@@ -11,8 +11,27 @@ import {
 import { useAuth } from '../context/AuthContext';
 import * as api from '../service/api';
 import { API_URL } from '../service/api';
-import ConfirmationModal from './pos/components/ConfirmationModal'; 
-import AlertModal from './pos/components/AlertModal';
+
+// --- HELPERS DE FECHA (ZONA MANAGUA) ---
+
+// Obtener la fecha actual en formato YYYY-MM-DD para inputs tipo date, usando hora Managua
+const getTodayManaguaISO = () => {
+    return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Managua' });
+};
+
+// Formatear fecha para visualización (dd/mm/yyyy)
+const formatDateManagua = (isoString) => {
+    if (!isoString) return '—';
+    // Se fuerza la interpretación de la fecha en Managua evitando conversiones UTC automáticas indeseadas
+    // Si la fecha viene como YYYY-MM-DD, le agregamos T12:00 para asegurar el día correcto
+    const date = new Date(isoString.includes('T') ? isoString : `${isoString}T12:00:00`);
+    return new Intl.DateTimeFormat('es-NI', {
+        timeZone: 'America/Managua',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    }).format(date);
+};
 
 // --- ANIMACIONES ---
 const fadeIn = keyframes`from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); }`;
@@ -21,17 +40,17 @@ const scaleIn = keyframes`from { transform: scale(0.95); opacity: 0; } to { tran
 // --- ESTILOS RESPONSIVOS Y MODERNOS ---
 const PageWrapper = styled.div`
     padding: clamp(1rem, 3vw, 2.5rem); 
-    background: #f1f5f9; 
+    background: #f8fafc; /* Fondo más limpio */
     min-height: 100vh; 
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    animation: ${fadeIn} 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    animation: ${fadeIn} 0.5s ease-out;
 `;
 
 const HeaderContainer = styled.div`
     display: flex; 
     justify-content: space-between; 
     align-items: flex-start; 
-    margin-bottom: 2.5rem; 
+    margin-bottom: 2rem; 
     flex-wrap: wrap; 
     gap: 1.5rem;
 `;
@@ -43,21 +62,22 @@ const TitleSection = styled.div`
 
 const Title = styled.h1`
     font-size: clamp(1.8rem, 2.5vw, 2.2rem); 
-    color: #0f172a; 
+    color: #1e293b; 
     display: flex; 
     align-items: center; 
     gap: 0.75rem; 
     margin: 0; 
     font-weight: 800;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.03em;
     
-    svg { color: #2563eb; }
+    svg { color: #3b82f6; } /* Azul vibrante */
 `;
 
 const Subtitle = styled.p`
     color: #64748b;
-    margin: 0.25rem 0 0 0;
+    margin: 0.5rem 0 0 0;
     font-size: 1rem;
+    font-weight: 500;
 `;
 
 const ActionButtons = styled.div`
@@ -74,7 +94,7 @@ const ActionButtons = styled.div`
 const Button = styled.button`
     padding: 0.75rem 1.25rem; 
     border: none; 
-    border-radius: 10px; 
+    border-radius: 12px; /* Más redondeado */
     font-weight: 600; 
     font-size: 0.95rem;
     cursor: pointer; 
@@ -84,25 +104,24 @@ const Button = styled.button`
     gap: 0.5rem; 
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     
-    /* Variantes */
     ${props => props.$primary && css`
-        background: #2563eb;
+        background: #3b82f6;
         color: white;
-        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
-        &:hover { background: #1d4ed8; transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3); }
+        box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+        &:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4); }
     `}
 
     ${props => props.$secondary && css`
         background: white;
         color: #334155;
         border: 1px solid #e2e8f0;
-        &:hover { background: #f8fafc; border-color: #cbd5e1; transform: translateY(-1px); }
+        &:hover { background: #f1f5f9; border-color: #cbd5e1; transform: translateY(-1px); }
     `}
 
     ${props => props.$danger && css`
         background: #fee2e2;
-        color: #dc2626;
-        &:hover { background: #fecaca; }
+        color: #ef4444;
+        &:hover { background: #fecaca; transform: scale(1.05); }
     `}
 
     &:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
@@ -113,7 +132,7 @@ const BackButton = styled(Link)`
     background: white; 
     color: #475569; 
     border: 1px solid #e2e8f0;
-    border-radius: 10px; 
+    border-radius: 12px; 
     font-weight: 600; 
     text-decoration: none; 
     display: flex; 
@@ -121,10 +140,10 @@ const BackButton = styled(Link)`
     gap: 0.5rem; 
     transition: all 0.2s;
     font-size: 0.95rem;
-    &:hover { background: #f1f5f9; color: #0f172a; }
+    &:hover { background: #f8fafc; color: #0f172a; transform: translateY(-1px); }
 `;
 
-// --- STATS CARDS ---
+// --- STATS CARDS (KPIs) ---
 const StatsGrid = styled.div`
     display: grid; 
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); 
@@ -135,247 +154,197 @@ const StatsGrid = styled.div`
 const StatCard = styled.div`
     background: white; 
     padding: 1.75rem; 
-    border-radius: 16px; 
-    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 20px; 
+    border: 1px solid rgba(226, 232, 240, 0.6);
     box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); 
     position: relative; 
     overflow: hidden;
     transition: transform 0.2s;
     
-    &:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); }
+    &:hover { transform: translateY(-4px); box-shadow: 0 15px 25px -5px rgba(0,0,0,0.06); }
     
-    &::after { 
-        content: ''; position: absolute; top: 0; right: 0; width: 6px; height: 100%; 
-        background: ${props => props.color}; opacity: 0.8; 
+    /* Barra lateral de color */
+    &::before { 
+        content: ''; position: absolute; top: 0; left: 0; width: 6px; height: 100%; 
+        background: ${props => props.color}; 
     }
 
     .icon-wrapper {
-        width: 40px; height: 40px; border-radius: 10px; background: ${props => props.bg}; 
+        width: 48px; height: 48px; border-radius: 12px; background: ${props => props.bg}; 
         display: flex; align-items: center; justify-content: center; 
-        color: ${props => props.color}; font-size: 1.2rem; margin-bottom: 1rem;
+        color: ${props => props.color}; font-size: 1.4rem; margin-bottom: 1rem;
     }
 
-    .label { font-size: 0.85rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-    .value { font-size: 2rem; font-weight: 800; color: #0f172a; margin: 0.25rem 0; letter-spacing: -0.03em; }
-    .sub { font-size: 0.9rem; color: ${props => props.color}; font-weight: 500; }
+    .label { font-size: 0.85rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+    .value { font-size: 2.2rem; font-weight: 800; color: #1e293b; margin: 0.25rem 0; letter-spacing: -0.03em; }
+    .sub { font-size: 0.9rem; color: ${props => props.color}; font-weight: 600; }
 `;
 
-// --- MODAL BASE STYLES (MOVIDOS ARRIBA) ---
+// --- MODAL BASE ---
 const ModalOverlay = styled.div`
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: flex; justify-content: center; align-items: center; z-index: 1100; animation: ${fadeIn} 0.2s;
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
+    background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); 
+    display: flex; justify-content: center; align-items: center; z-index: 1200; 
+    animation: ${fadeIn} 0.2s;
 `;
 const ModalContent = styled.div`
-    background: white; padding: 2.5rem; border-radius: 24px; width: 95%; max-width: 550px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); animation: ${scaleIn} 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    background: white; padding: 2.5rem; border-radius: 24px; 
+    width: 95%; max-width: 550px; 
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); 
+    animation: ${scaleIn} 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     max-height: 90vh; overflow-y: auto;
     
-    h2 { margin: 0 0 1.5rem 0; color: #0f172a; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.025em; }
+    h2 { margin: 0 0 1.5rem 0; color: #1e293b; font-size: 1.6rem; font-weight: 800; letter-spacing: -0.025em; }
 `;
-/**
- * Importante: FormGroup debe estar definido antes de FilterGroup para evitar el ReferenceError
- * (El error "Cannot access 'a' before initialization" en React/Styled-components)
- */
+
 const FormGroup = styled.div`
     margin-bottom: 1.25rem;
-    label { display: block; font-size: 0.9rem; color: #334155; margin-bottom: 0.5rem; font-weight: 600; }
+    label { display: block; font-size: 0.92rem; color: #475569; margin-bottom: 0.5rem; font-weight: 600; }
     input, select, textarea { 
-        width: 100%; padding: 0.85rem 1rem; border: 1px solid #cbd5e1; border-radius: 12px; font-size: 1rem; color: #0f172a; background: #fff; transition: all 0.2s; 
-        &:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); }
+        width: 100%; padding: 0.9rem 1rem; border: 1px solid #cbd5e1; border-radius: 12px; 
+        font-size: 1rem; color: #1e293b; background: #fff; transition: all 0.2s; 
+        &:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
         &::placeholder { color: #94a3b8; }
     }
 `;
 
 const CloseButton = styled.button`
-    position: absolute; top: 1.5rem; right: 1.5rem; background: transparent; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;
-    &:hover { color: #0f172a; }
+    position: absolute; top: 1.5rem; right: 1.5rem; 
+    background: #f1f5f9; border-radius:50%; width:32px; height:32px; 
+    border: none; color: #64748b; font-size: 1rem; cursor: pointer; display:grid; place-items:center;
+    transition: all 0.2s;
+    &:hover { color: #ef4444; background: #fee2e2; }
 `;
-// --- FIN MODAL BASE STYLES ---
 
-// --- FILTROS Y BÚSQUEDA ---
+// --- TOOLBAR ---
 const Toolbar = styled.div`
-    background: white;
-    padding: 0.5rem;
-    border-radius: 16px;
-    border: 1px solid #e2e8f0;
-    display: flex;
-    flex-direction: column; 
-    gap: 1rem;
-    margin-bottom: 2rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    background: white; padding: 0.75rem; border-radius: 20px;
+    border: 1px solid #e2e8f0; display: flex; flex-direction: column; 
+    gap: 1.5rem; margin-bottom: 2rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.01);
 `;
 
 const FilterTabs = styled.div`
-    display: flex; gap: 0.5rem; overflow-x: auto; padding: 0.5rem;
+    display: flex; gap: 0.75rem; overflow-x: auto; padding-bottom: 0.75rem;
     border-bottom: 1px solid #f1f5f9;
-    &::-webkit-scrollbar { height: 0; width: 0; }
+    &::-webkit-scrollbar { height: 4px; }
+    &::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
 `;
 
 const TabButton = styled.button`
-    padding: 0.5rem 1rem; 
-    border-radius: 8px; 
-    border: none; 
-    font-weight: 600; 
-    cursor: pointer; 
-    display: flex; 
-    align-items: center; 
-    gap: 0.5rem; 
-    transition: all 0.2s;
-    font-size: 0.9rem;
-    white-space: nowrap;
+    padding: 0.65rem 1.25rem; border-radius: 12px; border: none; 
+    font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.6rem; 
+    transition: all 0.2s; font-size: 0.92rem; white-space: nowrap;
 
     background: ${props => props.active ? props.activeBg : 'transparent'};
     color: ${props => props.active ? props.activeColor : '#64748b'};
     
-    &:hover { background: ${props => props.active ? props.activeBg : '#f1f5f9'}; }
+    &:hover { background: ${props => props.active ? props.activeBg : '#f8fafc'}; color: ${props => props.active ? props.activeColor : '#334155'}; }
 
     .badge {
         background: ${props => props.active ? props.activeColor : '#e2e8f0'};
-        color: ${props => props.active ? 'white' : '#475569'};
-        padding: 0.1rem 0.5rem; border-radius: 99px; font-size: 0.75rem; min-width: 20px; text-align: center;
+        color: ${props => props.active ? 'white' : '#64748b'};
+        padding: 0.15rem 0.6rem; border-radius: 99px; font-size: 0.75rem; 
+        font-weight: 800; min-width: 24px; text-align: center;
     }
 `;
 
 const SearchAndFilters = styled.div`
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    padding: 0.5rem 0.5rem 1rem 0.5rem;
-    justify-content: space-between;
-
-    @media (max-width: 768px) {
-        flex-direction: column;
-        & > * { width: 100% !important; }
-    }
+    display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between;
 `;
 
 const SearchContainer = styled.div`
-    position: relative;
-    min-width: 300px;
-    flex: 1;
-
+    position: relative; min-width: 280px; flex: 2;
     svg { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; }
-    
     input {
-        width: 100%;
-        padding: 0.65rem 1rem 0.65rem 2.5rem;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        font-size: 0.95rem;
-        transition: all 0.2s;
-        &:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+        width: 100%; padding: 0.75rem 1rem 0.75rem 2.8rem;
+        border: 1px solid #e2e8f0; border-radius: 12px; font-size: 0.95rem;
+        &:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
     }
 `;
-/**
- * CORREGIDO: FilterGroup ahora usa FormGroup que ya está definido.
- */
-const FilterGroup = styled(FormGroup)` 
-    margin-bottom: 0;
-    min-width: 150px;
-    flex: 1;
 
-    label {
-        font-size: 0.8rem;
-        color: #94a3b8;
-        font-weight: 500;
-        margin-bottom: 0.25rem;
-    }
-
+const FilterGroup = styled.div`
+    min-width: 160px; flex: 1;
+    display: flex; flex-direction: column; gap: 0.4rem;
+    label { font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
     select, input {
-        padding: 0.65rem 1rem;
-        border-radius: 10px;
-        font-size: 0.95rem;
-        height: 40px;
-        margin-top: 0;
+        width: 100%; padding: 0.7rem 1rem; border: 1px solid #e2e8f0; border-radius: 12px; 
+        font-size: 0.92rem; background: #fff;
+        &:focus { border-color: #3b82f6; outline: none; }
     }
 `;
 
-
-// --- GRID DE FACTURAS ---
+// --- INVOICE CARD ---
 const InvoicesGrid = styled.div`
-    display: grid; 
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); 
-    gap: 1.5rem;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem;
 `;
 
 const InvoiceCard = styled.div`
-    background: white; 
-    border-radius: 16px; 
-    border: 1px solid #e2e8f0; 
-    overflow: hidden; 
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-    display: flex; flex-direction: column;
+    background: white; border-radius: 20px; border: 1px solid #e2e8f0; overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column;
     
     &:hover { 
-        transform: translateY(-4px); 
+        transform: translateY(-5px); 
         box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); 
         border-color: #cbd5e1;
     }
 
     .card-header {
-        padding: 1.25rem;
-        border-bottom: 1px solid #f1f5f9;
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        background: linear-gradient(to bottom, #ffffff, #fafafa);
+        padding: 1.5rem; background: linear-gradient(to bottom, #ffffff, #f8fafc);
+        border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: flex-start;
     }
+    .provider-info h3 { margin: 0; font-size: 1.1rem; color: #1e293b; font-weight: 800; line-height: 1.3; }
+    .invoice-number { font-size: 0.85rem; color: #64748b; font-family: 'Monaco', monospace; background: #e2e8f0; padding: 4px 8px; border-radius: 6px; margin-top: 0.5rem; display: inline-block; }
 
-    .provider-info {
-        display: flex; flex-direction: column;
-        h3 { margin: 0; font-size: 1.05rem; color: #0f172a; font-weight: 700; line-height: 1.4; }
-        .invoice-number { font-size: 0.8rem; color: #64748b; font-family: 'Monaco', monospace; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; width: fit-content; margin-top: 0.25rem; }
-    }
-
-    .card-body {
-        padding: 1.25rem;
-        flex: 1;
-    }
-
+    .card-body { padding: 1.5rem; flex: 1; }
+    
     .meta-row {
-        display: flex; justify-content: space-between; margin-bottom: 0.75rem; font-size: 0.9rem;
-        .label { color: #64748b; display: flex; align-items: center; gap: 0.4rem; }
-        .value { font-weight: 600; color: #334155; }
+        display: flex; justify-content: space-between; margin-bottom: 0.8rem; font-size: 0.92rem;
+        .label { color: #64748b; display: flex; align-items: center; gap: 0.5rem; font-weight: 500; }
+        .value { font-weight: 700; color: #334155; }
     }
 
-    .financial-block {
-        margin-top: 1rem;
-        padding-top: 1rem;
-        border-top: 1px dashed #e2e8f0;
-    }
-
+    .financial-block { margin-top: 1.5rem; padding-top: 1rem; border-top: 2px dashed #f1f5f9; }
     .total-row {
-        display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem;
-        .label { font-size: 0.85rem; font-weight: 600; color: #64748b; text-transform: uppercase; }
-        .amount { font-size: 1.5rem; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; }
+        display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.75rem;
+        .label { font-size: 0.85rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        .amount { font-size: 1.75rem; font-weight: 900; color: #0f172a; ; }
     }
 
     .progress-bar {
-        height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; margin-bottom: 0.5rem;
-        div { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+        height: 8px; background: #f1f5f9; border-radius: 99px; overflow: hidden; margin-bottom: 0.75rem;
+        div { height: 100%; border-radius: 99px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
     }
 
-    .balance-text {
-        font-size: 0.85rem; text-align: right; color: #64748b;
-        strong { color: ${props => props.balanceColor}; }
-    }
-    
-    .reference-text {
-        font-size: 0.75rem; color: #64748b; text-align: left; margin-top: 0.5rem;
-        strong { color: #0f172a; font-family: 'Monaco', monospace; }
-    }
+    .balance-text { font-size: 0.9rem; text-align: right; color: #64748b; font-weight: 500; }
+    .balance-text strong { color: ${props => props.balanceColor}; font-weight: 800; }
 
     .card-footer {
-        padding: 1rem 1.25rem;
-        background: #f8fafc;
-        border-top: 1px solid #f1f5f9;
-        display: flex;
-        gap: 0.75rem;
+        padding: 1rem 1.5rem; background: #f8fafc; border-top: 1px solid #f1f5f9;
+        display: flex; gap: 1rem;
     }
 `;
 
 const StatusBadge = styled.span`
-    padding: 0.35rem 0.85rem; border-radius: 99px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.025em;
+    padding: 0.4rem 1rem; border-radius: 99px; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
     background: ${props => props.bg}; color: ${props => props.text}; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 `;
+
+const Alert = ({ info, onClose }) => {
+    if (!info.show) return null;
+    return (
+        <ModalOverlay onClick={onClose}>
+            <ModalContent style={{ maxWidth: '400px', textAlign: 'center' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem', color: info.type === 'error' ? '#ef4444' : (info.type === 'success' ? '#22c55e' : '#3b82f6') }}>
+                    {info.type === 'error' ? <FaTimes style={{ border: '3px solid', borderRadius: '50%', padding: 5 }} /> :
+                        info.type === 'success' ? <FaCheckCircle /> : <FaExclamationCircle />}
+                </div>
+                <h2>{info.title}</h2>
+                <p style={{ color: '#64748b', lineHeight: 1.6, marginBottom: '2rem' }}>{info.message}</p>
+                <Button $primary onClick={onClose} style={{ margin: '0 auto', width: '100%' }}>Entendido</Button>
+            </ModalContent>
+        </ModalOverlay>
+    )
+}
 
 
 // =================================================================
@@ -384,60 +353,56 @@ const StatusBadge = styled.span`
 
 const FacturasProveedores = () => {
     const { token } = useAuth();
-    
-    // Estados de datos
+
+    // --- ESTADOS ---
     const [invoices, setInvoices] = useState([]);
-    const [providers, setProviders] = useState([]); 
+    const [providers, setProviders] = useState([]);
     const [loading, setLoading] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-    // Estados de UI
-    const [filter, setFilter] = useState('PENDIENTE'); 
+    const [filter, setFilter] = useState('PENDIENTE');
     const [searchTerm, setSearchTerm] = useState('');
-    
-    // FILTROS AVANZADOS
+
+    // Filtros
     const [filterProvider, setFilterProvider] = useState('');
     const [filterDateFrom, setFilterDateFrom] = useState('');
     const [filterDateTo, setFilterDateTo] = useState('');
-    
-    // ESTADO PARA LA ALERTA BONITA
-    const [alertInfo, setAlertInfo] = useState({ show: false, title: '', message: '', type: 'info' });
 
-    // Estados de Modales
+    // Alertas y Modales
+    const [alertInfo, setAlertInfo] = useState({ show: false, title: '', message: '', type: 'info' });
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showPayModal, setShowPayModal] = useState(false);
     const [showConfirmDelete, setShowConfirmDelete] = useState(false);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
 
     // Formularios
+    // NOTA: Usamos getTodayManaguaISO() para la fecha por defecto
     const [formData, setFormData] = useState({
-        proveedor: '', 
-        numero_factura: '', 
-        fecha_emision: new Date().toISOString().split('T')[0], 
-        fecha_vencimiento: '', 
-        monto_total: '', 
+        proveedor: '',
+        numero_factura: '',
+        fecha_emision: getTodayManaguaISO(),
+        fecha_vencimiento: '',
+        monto_total: '',
         notas: ''
     });
-    // Nuevo estado para el formulario de pago
-    const [payData, setPayData] = useState({
-        amount: '',
-        reference: '' // <--- CAMPO AÑADIDO
-    });
 
-    // --- HELPER PARA ALERTAS ---
+    const [payData, setPayData] = useState({ amount: '', reference: '' });
+
+    // --- HELPER ALERTAS ---
     const showAlert = (title, message, type = 'info') => {
         setAlertInfo({ show: true, title, message, type });
     };
 
-    // --- CARGA INICIAL ---
+    // --- CARGAR DATOS ---
     useEffect(() => {
         const loadData = async () => {
             setLoading(true);
             try {
                 // 1. Cargar Facturas
-                // NOTA: Asume que api.fetchProviderInvoices existe y es correcto
-                const invData = await api.fetchProviderInvoices(token);
-                setInvoices(Array.isArray(invData) ? invData : []);
+                const invResponse = await api.fetchProviderInvoices(token);
+                // Aseguramos que sea array
+                const invData = Array.isArray(invResponse) ? invResponse : (invResponse?.data || []);
+                setInvoices(invData);
 
                 // 2. Cargar Proveedores
                 const provResponse = await axios.get(`${API_URL}/providers`, {
@@ -448,98 +413,88 @@ const FacturasProveedores = () => {
 
             } catch (err) {
                 console.error("Error cargando datos:", err);
-                showAlert("Error", "Error al cargar facturas o proveedores. Verifique la API.", "error");
+                // No mostrar alerta intrusiva inicial si falla silenciosamente, solo log
             } finally {
                 setLoading(false);
             }
         };
-        loadData();
+        if (token) loadData();
     }, [token, refreshTrigger]);
 
-    // --- LOGICA DE NEGOCIO ---
-    
-    // Función de inicialización de modal de pago
+    // --- LÓGICA DE PAGO (ADMINISTRATIVO) ---
+    // Esta función NO valida si la caja está abierta, ya que es un proceso administrativo
+    // y no afecta el arqueo diario (a menos que el backend lo vincule explícitamente).
     const openPayModal = (invoice) => {
         setSelectedInvoice(invoice);
-        setPayData({
-            amount: '',
-            reference: ''
-        });
+        setPayData({ amount: '', reference: '' });
         setShowPayModal(true);
     };
 
-    // MODIFICADO: Ahora maneja la referencia y el estado PAGADA
     const handlePay = async (e) => {
         e.preventDefault();
         if (!selectedInvoice || !payData.amount) return;
-        
+
         const payAmount = parseFloat(payData.amount);
         const maxPay = (parseFloat(selectedInvoice.monto_total) || 0) - (parseFloat(selectedInvoice.monto_abonado) || 0);
-        
-        if(payAmount <= 0) return showAlert("Error", "El monto debe ser mayor a cero.", "error");
-        if(payAmount > maxPay) return showAlert("Error", `El monto no puede ser mayor a la deuda (C$${maxPay.toLocaleString(undefined, { minimumFractionDigits: 2 })})`, "error");
 
-        const isFullPayment = payAmount >= maxPay - 0.01; // Considera un margen por si acaso
-        // Se asume que el backend actualiza el estado a 'PAGADA' si se abona el total.
-        const newStatus = isFullPayment ? 'PAGADA' : selectedInvoice.estado; 
+        if (payAmount <= 0) return showAlert("Error", "El monto debe ser mayor a cero.", "error");
+        if (payAmount > maxPay + 0.01) return showAlert("Error", "El monto excede la deuda pendiente.", "error");
+
+        // Si paga todo (o casi todo por decimales), cambiar estado a PAGADA
+        const isFullPayment = payAmount >= maxPay - 0.1;
+        const newStatus = isFullPayment ? 'PAGADA' : selectedInvoice.estado;
 
         try {
-            // Se asume que api.payProviderInvoice existe y acepta id, monto, referencia y nuevo estado
             await api.payProviderInvoice(selectedInvoice.id, payAmount, payData.reference, newStatus, token);
-            
             setRefreshTrigger(prev => prev + 1);
             setShowPayModal(false);
-            
-            showAlert("Éxito", `Abono de C$${payAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} registrado. ${isFullPayment ? 'Factura PAGADA.' : ''}`, "success");
+            showAlert("Pago Registrado", `Se registró el abono correctamente. Estado: ${newStatus}`, "success");
         } catch (error) {
-            console.error("Error al registrar el pago:", error);
-            showAlert("Error", "Error al registrar el pago.", "error");
+            console.error(error);
+            showAlert("Error", "No se pudo registrar el pago. Intente nuevamente.", "error");
         }
     };
-    
-    // Función para crear nueva factura
+
+    // --- CREAR FACTURA ---
     const handleCreate = async (e) => {
         e.preventDefault();
-        if (!formData.proveedor) return showAlert("Atención", "Seleccione un proveedor de la lista", "warning");
+        if (!formData.proveedor) return showAlert("Falta Proveedor", "Seleccione un proveedor.", "warning");
 
         try {
-            // Se asume que api.createProviderInvoice existe
             await api.createProviderInvoice(formData, token);
             setRefreshTrigger(prev => prev + 1);
             setShowCreateModal(false);
-            setFormData({ 
-                proveedor: '', numero_factura: '', 
-                fecha_emision: new Date().toISOString().split('T')[0], 
-                fecha_vencimiento: '', monto_total: '', notas: '' 
+            // Reset form
+            setFormData({
+                proveedor: '', numero_factura: '',
+                fecha_emision: getTodayManaguaISO(),
+                fecha_vencimiento: '', monto_total: '', notas: ''
             });
-            showAlert("Éxito", "Factura registrada exitosamente.", "success");
+            showAlert("Guardado", "La factura ha sido registrada exitosamente.", "success");
         } catch (error) {
-            showAlert("Error", "Error al guardar factura. Verifique los datos.", "error");
+            showAlert("Error", "Error al guardar factura.", "error");
         }
     };
 
-    // Función para eliminar factura
+    // --- ELIMINAR FACTURA ---
     const handleDelete = async () => {
         if (!selectedInvoice) return;
         try {
-            // Se asume que api.deleteProviderInvoice existe
             await api.deleteProviderInvoice(selectedInvoice.id, token);
             setRefreshTrigger(prev => prev + 1);
             setShowConfirmDelete(false);
-            showAlert("Eliminado", "Factura eliminada correctamente.", "success");
+            showAlert("Eliminada", "La factura fue eliminada del sistema.", "success");
         } catch (error) {
             showAlert("Error", "No se pudo eliminar la factura.", "error");
         }
     };
 
-
-    // --- COMPUTED Y FILTRADO AVANZADO ---
-    
+    // --- ESTILOS DINÁMICOS Y CÁLCULOS ---
     const getStatusStyles = useCallback((status) => {
-        switch(status) {
-            case 'VENCIDA': return { color: '#dc2626', bg: '#fef2f2', activeColor: '#dc2626', activeBg: '#fee2e2' };
-            case 'PAGADA': return { color: '#16a34a', bg: '#f0fdf4', activeColor: '#16a34a', activeBg: '#dcfce7' };
-            default: return { color: '#2563eb', bg: '#eff6ff', activeColor: '#2563eb', activeBg: '#dbeafe' };
+        switch (status) {
+            case 'VENCIDA': return { color: '#dc2626', bg: '#fee2e2', activeColor: '#dc2626', activeBg: '#fef2f2' };
+            case 'PAGADA': return { color: '#16a34a', bg: '#dcfce7', activeColor: '#16a34a', activeBg: '#f0fdf4' };
+            default: return { color: '#3b82f6', bg: '#dbeafe', activeColor: '#2563eb', activeBg: '#eff6ff' };
         }
     }, []);
 
@@ -556,55 +511,53 @@ const FacturasProveedores = () => {
 
     const filteredInvoices = useMemo(() => {
         let data = invoices;
-        
-        // 1. Filtrar por Estado (Tabs)
+
+        // Filtro Tabs
         if (filter !== 'TODAS') {
             data = data.filter(i => i.estado === filter);
         }
 
-        // 2. Filtrar por Proveedor (Dropdown)
+        // Filtro Proveedor
         if (filterProvider) {
-            // Se asume que i.proveedor es el 'nombre' del proveedor (valor en el select)
             data = data.filter(i => i.proveedor === filterProvider);
         }
 
-        // 3. Filtrar por Rango de Fechas (Emisión)
+        // Filtro Fechas
         if (filterDateFrom && filterDateTo) {
+            const start = new Date(filterDateFrom).getTime();
+            const end = new Date(filterDateTo).getTime() + 86400000; // incluir el día final completo
             data = data.filter(i => {
-                const emissionDate = new Date(i.fecha_emision).getTime();
-                const fromDate = new Date(filterDateFrom).getTime();
-                // Añadir un día a la fecha 'hasta' para incluir todo el último día
-                const toDate = new Date(filterDateTo);
-                toDate.setDate(toDate.getDate() + 1);
-                
-                return emissionDate >= new Date(filterDateFrom).getTime() && emissionDate < toDate.getTime();
+                const em = new Date(i.fecha_emision).getTime();
+                return em >= start && em < end;
             });
         }
-        
-        // 4. Filtrar por Búsqueda (Texto)
+
+        // Búsqueda Texto
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
-            data = data.filter(i => 
-                (i.proveedor && i.proveedor.toLowerCase().includes(term)) || 
+            data = data.filter(i =>
+                (i.proveedor && i.proveedor.toLowerCase().includes(term)) ||
                 (i.numero_factura && i.numero_factura.toLowerCase().includes(term))
             );
         }
-        
+
         return data;
     }, [invoices, filter, searchTerm, filterProvider, filterDateFrom, filterDateTo]);
 
     return (
         <PageWrapper>
+            <Alert info={alertInfo} onClose={() => setAlertInfo({ ...alertInfo, show: false })} />
+
             <HeaderContainer>
                 <TitleSection>
                     <Title><FaFileInvoiceDollar /> Facturas de Proveedores</Title>
-                    <Subtitle>Gestión de cuentas por pagar y control de gastos</Subtitle>
+                    <Subtitle>Gestión y control de cuentas por pagar</Subtitle>
                 </TitleSection>
                 <ActionButtons>
-                    <Button $secondary onClick={() => setRefreshTrigger(prev => prev+1)}>Actualizar</Button>
-                    <BackButton to="/dashboard"><FaArrowLeft /> Dashboard</BackButton>
+                    <Button $secondary onClick={() => setRefreshTrigger(prev => prev + 1)}>Actualizar</Button>
+                    <BackButton to="/dashboard"><FaArrowLeft /> Volver</BackButton>
                     <Button $primary onClick={() => setShowCreateModal(true)}>
-                        <FaPlus /> Nueva Factura
+                        <FaPlus /> Registrar Factura
                     </Button>
                 </ActionButtons>
             </HeaderContainer>
@@ -615,7 +568,7 @@ const FacturasProveedores = () => {
                     <div className="icon-wrapper"><FaExclamationCircle /></div>
                     <div className="label">Vencidas</div>
                     <div className="value">{stats.venc}</div>
-                    <div className="sub">Requieren pago inmediato</div>
+                    <div className="sub">Requieren atención urgente</div>
                 </StatCard>
                 <StatCard color="#3b82f6" bg="#eff6ff">
                     <div className="icon-wrapper"><FaClock /></div>
@@ -626,12 +579,12 @@ const FacturasProveedores = () => {
                 <StatCard color="#f59e0b" bg="#fffbeb">
                     <div className="icon-wrapper"><FaMoneyBillWave /></div>
                     <div className="label">Deuda Total</div>
-                    <div className="value" style={{color:'#b45309'}}>C${stats.totalDebt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                    <div className="sub" style={{color:'#b45309'}}>Flujo de caja comprometido</div>
+                    <div className="value" style={{ color: '#b45309' }}>C${stats.totalDebt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                    <div className="sub" style={{ color: '#b45309' }}>Flujo de caja comprometido</div>
                 </StatCard>
             </StatsGrid>
 
-            {/* TOOLBAR con Filtros Avanzados */}
+            {/* TOOLBAR */}
             <Toolbar>
                 <FilterTabs>
                     {[
@@ -640,7 +593,7 @@ const FacturasProveedores = () => {
                         { id: 'PAGADA', label: 'Pagadas', icon: FaCheckCircle, color: '#16a34a', bg: '#f0fdf4', count: stats.pag },
                         { id: 'TODAS', label: 'Todas', icon: FaList, color: '#64748b', bg: '#f1f5f9', count: null },
                     ].map(tab => (
-                        <TabButton 
+                        <TabButton
                             key={tab.id}
                             active={filter === tab.id}
                             activeColor={tab.color}
@@ -652,22 +605,22 @@ const FacturasProveedores = () => {
                         </TabButton>
                     ))}
                 </FilterTabs>
-                
+
                 <SearchAndFilters>
                     <SearchContainer>
                         <FaSearch />
-                        <input 
-                            type="text" 
-                            placeholder="Buscar por proveedor, factura..." 
-                            value={searchTerm} 
-                            onChange={e => setSearchTerm(e.target.value)} 
+                        <input
+                            type="text"
+                            placeholder="Buscar proveedor o No. factura..."
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
                         />
                     </SearchContainer>
 
                     <FilterGroup>
                         <label>Proveedor</label>
-                        <select 
-                            value={filterProvider} 
+                        <select
+                            value={filterProvider}
                             onChange={e => setFilterProvider(e.target.value)}
                         >
                             <option value="">Todos</option>
@@ -679,21 +632,29 @@ const FacturasProveedores = () => {
                         </select>
                     </FilterGroup>
 
-                    <FilterGroup style={{minWidth:'120px'}}>
-                        <label>Emisión Desde</label>
-                        <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} />
+                    <FilterGroup style={{ minWidth: '140px' }}>
+                        <label>Desde</label>
+                        <input
+                            type="date"
+                            value={filterDateFrom}
+                            onChange={e => setFilterDateFrom(e.target.value)}
+                        // Usamos el placeholder nativo, pero el valor debe ser YYYY-MM-DD
+                        />
                     </FilterGroup>
 
-                    <FilterGroup style={{minWidth:'120px'}}>
-                        <label>Emisión Hasta</label>
+                    <FilterGroup style={{ minWidth: '140px' }}>
+                        <label>Hasta</label>
                         <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} />
                     </FilterGroup>
                 </SearchAndFilters>
             </Toolbar>
 
-            {/* CONTENT GRID */}
+            {/* GRID FACTURAS */}
             {loading ? (
-                <div style={{textAlign:'center', padding:'4rem', color:'#94a3b8'}}>Cargando facturas...</div>
+                <div style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>
+                    <FaClock className="spin" style={{ fontSize: '2rem', marginBottom: '1rem' }} />
+                    <p>Cargando información...</p>
+                </div>
             ) : filteredInvoices.length > 0 ? (
                 <InvoicesGrid>
                     {filteredInvoices.map(inv => {
@@ -702,14 +663,15 @@ const FacturasProveedores = () => {
                         const abonado = parseFloat(inv.monto_abonado) || 0;
                         const saldo = total - abonado;
                         const progress = total > 0 ? (abonado / total) * 100 : 0;
-                        // Mostrar la referencia solo si está pagada y existe
                         const reference = inv.estado === 'PAGADA' ? inv.referencia_pago : null;
 
                         return (
                             <InvoiceCard key={inv.id} color={styles.color} balanceColor={saldo > 0 ? '#ef4444' : '#16a34a'}>
                                 <div className="card-header">
                                     <div className="provider-info">
-                                        <h3 title={inv.proveedor}><FaStore style={{marginRight:6, color: '#64748b'}}/> {inv.proveedor}</h3>
+                                        <h3 title={inv.proveedor}>
+                                            <FaStore style={{ marginRight: 6, color: '#94a3b8' }} /> {inv.proveedor}
+                                        </h3>
                                         <span className="invoice-number">#{inv.numero_factura}</span>
                                     </div>
                                     <StatusBadge bg={styles.bg} text={styles.color}>{inv.estado}</StatusBadge>
@@ -717,29 +679,30 @@ const FacturasProveedores = () => {
 
                                 <div className="card-body">
                                     <div className="meta-row">
-                                        <span className="label"><FaCalendarAlt/> Emisión</span>
-                                        <span className="value">{new Date(inv.fecha_emision).toLocaleDateString()}</span>
+                                        <span className="label"><FaCalendarAlt /> Emisión</span>
+                                        {/* Usamos el helper formatManagua */}
+                                        <span className="value">{formatDateManagua(inv.fecha_emision)}</span>
                                     </div>
                                     <div className="meta-row">
-                                        <span className="label"><FaExclamationCircle/> Vence</span>
-                                        <span className="value" style={{color: inv.estado==='VENCIDA'?'#ef4444':'inherit'}}>
-                                            {new Date(inv.fecha_vencimiento).toLocaleDateString()}
+                                        <span className="label"><FaExclamationCircle /> Vence</span>
+                                        <span className="value" style={{ color: inv.estado === 'VENCIDA' ? '#ef4444' : 'inherit' }}>
+                                            {formatDateManagua(inv.fecha_vencimiento)}
                                         </span>
                                     </div>
                                     {reference && (
                                         <div className="meta-row">
-                                            <span className="label"><FaReceipt/> Referencia</span>
+                                            <span className="label"><FaReceipt /> Referencia</span>
                                             <span className="value">{reference}</span>
                                         </div>
                                     )}
 
                                     <div className="financial-block">
                                         <div className="total-row">
-                                            <span className="label">Total</span>
+                                            <span className="label">Total a Pagar</span>
                                             <span className="amount">C${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                         </div>
                                         <div className="progress-bar">
-                                            <div style={{width: `${progress}%`, background: styles.color}}></div>
+                                            <div style={{ width: `${progress}%`, background: styles.color }}></div>
                                         </div>
                                         <div className="balance-text">
                                             Abonado: C${abonado.toLocaleString(undefined, { minimumFractionDigits: 2 })} &bull; <strong>Resta: C${saldo.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
@@ -749,11 +712,11 @@ const FacturasProveedores = () => {
 
                                 <div className="card-footer">
                                     {saldo > 0 && (
-                                        <Button $primary style={{flex: 1, justifyContent:'center'}} onClick={() => openPayModal(inv)}>
+                                        <Button $primary style={{ flex: 1, justifyContent: 'center' }} onClick={() => openPayModal(inv)}>
                                             <FaMoneyBillWave /> Abonar
                                         </Button>
                                     )}
-                                    <Button $danger style={{padding:'0.75rem'}} onClick={() => { setSelectedInvoice(inv); setShowConfirmDelete(true); }}>
+                                    <Button $danger style={{ padding: '0.75rem' }} onClick={() => { setSelectedInvoice(inv); setShowConfirmDelete(true); }}>
                                         <FaTrashAlt />
                                     </Button>
                                 </div>
@@ -762,26 +725,29 @@ const FacturasProveedores = () => {
                     })}
                 </InvoicesGrid>
             ) : (
-                <div style={{textAlign:'center', padding:'4rem', color:'#94a3b8', border:'2px dashed #e2e8f0', borderRadius:'16px'}}>
-                    <FaFileInvoiceDollar style={{fontSize:'3rem', marginBottom:'1rem', opacity:0.5}} />
-                    <h3>No hay facturas</h3>
-                    <p>Intenta cambiar los filtros o crea una nueva factura.</p>
+                <div style={{
+                    textAlign: 'center', padding: '4rem', color: '#94a3b8',
+                    border: '2px dashed #e2e8f0', borderRadius: '24px', background: 'white'
+                }}>
+                    <FaFileInvoiceDollar style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.3 }} />
+                    <h3 style={{ color: '#475569' }}>No se encontraron facturas</h3>
+                    <p>Intenta ajustar los filtros o registra una nueva.</p>
                 </div>
             )}
 
-            {/* --- MODAL: CREAR FACTURA (Sin cambios sustanciales) --- */}
+            {/* --- MODAL CREAR FACTURA --- */}
             {showCreateModal && (
                 <ModalOverlay onClick={() => setShowCreateModal(false)}>
                     <ModalContent onClick={e => e.stopPropagation()}>
-                        <CloseButton onClick={() => setShowCreateModal(false)}><FaTimes/></CloseButton>
+                        <CloseButton onClick={() => setShowCreateModal(false)}><FaTimes /></CloseButton>
                         <h2>Registrar Factura</h2>
                         <form onSubmit={handleCreate}>
                             <FormGroup>
                                 <label>Proveedor</label>
-                                <select 
-                                    required 
-                                    value={formData.proveedor} 
-                                    onChange={e => setFormData({...formData, proveedor: e.target.value})}
+                                <select
+                                    required
+                                    value={formData.proveedor}
+                                    onChange={e => setFormData({ ...formData, proveedor: e.target.value })}
                                 >
                                     <option value="">Seleccione un proveedor...</option>
                                     {providers.map(p => (
@@ -791,103 +757,102 @@ const FacturasProveedores = () => {
                                     ))}
                                 </select>
                             </FormGroup>
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem'}}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 <FormGroup>
                                     <label>No. Factura</label>
-                                    <input required type="text" value={formData.numero_factura} onChange={e => setFormData({...formData, numero_factura: e.target.value})} placeholder="Ej. F-001" />
+                                    <input required type="text" value={formData.numero_factura} onChange={e => setFormData({ ...formData, numero_factura: e.target.value })} placeholder="Ej: F-001" />
                                 </FormGroup>
                                 <FormGroup>
                                     <label>Monto Total (C$)</label>
-                                    <input required type="number" step="0.01" value={formData.monto_total} onChange={e => setFormData({...formData, monto_total: e.target.value})} placeholder="0.00" />
+                                    <input required type="number" step="0.01" value={formData.monto_total} onChange={e => setFormData({ ...formData, monto_total: e.target.value })} placeholder="0.00" />
                                 </FormGroup>
                             </div>
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem'}}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 <FormGroup>
-                                    <label>Emisión</label>
-                                    <input required type="date" value={formData.fecha_emision} onChange={e => setFormData({...formData, fecha_emision: e.target.value})} />
+                                    <label>Fecha Emisión</label>
+                                    <input required type="date" value={formData.fecha_emision} onChange={e => setFormData({ ...formData, fecha_emision: e.target.value })} />
                                 </FormGroup>
                                 <FormGroup>
-                                    <label>Vencimiento</label>
-                                    <input required type="date" value={formData.fecha_vencimiento} onChange={e => setFormData({...formData, fecha_vencimiento: e.target.value})} />
+                                    <label>Fecha Vencimiento</label>
+                                    <input required type="date" value={formData.fecha_vencimiento} onChange={e => setFormData({ ...formData, fecha_vencimiento: e.target.value })} />
                                 </FormGroup>
                             </div>
                             <FormGroup>
-                                <label>Notas</label>
-                                <textarea rows="2" value={formData.notas} onChange={e => setFormData({...formData, notas: e.target.value})} placeholder="Detalles adicionales..." />
+                                <label>Notas (Opcional)</label>
+                                <textarea rows="3" value={formData.notas} onChange={e => setFormData({ ...formData, notas: e.target.value })} placeholder="Detalles extra..."></textarea>
                             </FormGroup>
-                            <div style={{display:'flex', gap:'1rem', marginTop:'1.5rem'}}>
-                                <Button type="button" $secondary style={{flex:1, justifyContent:'center'}} onClick={() => setShowCreateModal(false)}>Cancelar</Button>
-                                <Button type="submit" $primary style={{flex:1, justifyContent:'center'}}>Guardar Factura</Button>
-                            </div>
+
+                            <Button $primary type="submit" style={{ width: '100%', padding: '1rem', fontSize: '1rem' }}>
+                                <FaCheckCircle /> Guardar Factura
+                            </Button>
                         </form>
                     </ModalContent>
                 </ModalOverlay>
             )}
 
-            {/* --- MODAL: ABONAR (MODIFICADO para Referencia de Pago) --- */}
-            {showPayModal && selectedInvoice && (
+            {/* --- MODAL PAGO --- */}
+            {showPayModal && (
                 <ModalOverlay onClick={() => setShowPayModal(false)}>
-                    <ModalContent onClick={e => e.stopPropagation()}>
-                        <CloseButton onClick={() => setShowPayModal(false)}><FaTimes/></CloseButton>
+                    <ModalContent onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+                        <CloseButton onClick={() => setShowPayModal(false)}><FaTimes /></CloseButton>
                         <h2>Registrar Abono</h2>
-                        <div style={{background:'#f1f5f9', padding:'1rem', borderRadius:'12px', marginBottom:'1.5rem'}}>
-                            <div style={{fontSize:'0.9rem', color:'#64748b'}}>Factura #{selectedInvoice.numero_factura}</div>
-                            <div style={{fontSize:'1.1rem', fontWeight:'700', color:'#0f172a'}}>{selectedInvoice.proveedor}</div>
-                            <div style={{marginTop:'0.5rem', display:'flex', justifyContent:'space-between', fontSize:'0.9rem'}}>
-                                <span>Saldo Pendiente:</span>
-                                <strong style={{color:'#ef4444'}}>C${((parseFloat(selectedInvoice.monto_total) || 0) - (parseFloat(selectedInvoice.monto_abonado) || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
+                        <div style={{ background: '#f1f5f9', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
+                            <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '0.25rem' }}>Factura #{selectedInvoice?.numero_factura}</div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#1e293b' }}>
+                                Deuda: C${((parseFloat(selectedInvoice?.monto_total) || 0) - (parseFloat(selectedInvoice?.monto_abonado) || 0)).toFixed(2)}
                             </div>
                         </div>
                         <form onSubmit={handlePay}>
                             <FormGroup>
                                 <label>Monto a Abonar (C$)</label>
-                                <input 
-                                    required type="number" step="0.01" autoFocus
-                                    max={(parseFloat(selectedInvoice.monto_total) || 0) - (parseFloat(selectedInvoice.monto_abonado) || 0)}
-                                    value={payData.amount} onChange={e => setPayData({...payData, amount: e.target.value})}
+                                <input
+                                    required
+                                    type="number"
+                                    step="0.01"
+                                    autoFocus
                                     placeholder="0.00"
+                                    value={payData.amount}
+                                    onChange={e => setPayData({ ...payData, amount: e.target.value })}
                                 />
                             </FormGroup>
-                            
-                            {/* NUEVO CAMPO: REFERENCIA DE PAGO */}
                             <FormGroup>
-                                <label>Referencia de Pago (Cheque, Depósito, Transf.)</label>
-                                <input 
-                                    type="text" 
-                                    value={payData.reference} 
-                                    onChange={e => setPayData({...payData, reference: e.target.value})}
-                                    placeholder="Ej. BDA-T89012 o Cheque #001"
+                                <label>Referencia / Detalle (Opcional)</label>
+                                <input
+                                    type="text"
+                                    placeholder="Ej: Transferencia #1234, Pago en efectivo..."
+                                    value={payData.reference}
+                                    onChange={e => setPayData({ ...payData, reference: e.target.value })}
                                 />
                             </FormGroup>
-                            
-                            <div style={{display:'flex', gap:'1rem', marginTop:'1.5rem'}}>
-                                <Button type="button" $secondary style={{flex:1, justifyContent:'center'}} onClick={() => setShowPayModal(false)}>Cancelar</Button>
-                                <Button type="submit" $primary style={{flex:1, justifyContent:'center'}}>Confirmar Pago</Button>
-                            </div>
+                            <Button $primary type="submit" style={{ width: '100%', padding: '1rem' }}>
+                                <FaMoneyBillWave /> Confirmar Pago
+                            </Button>
                         </form>
                     </ModalContent>
                 </ModalOverlay>
             )}
 
-            {/* --- MODAL: ELIMINAR --- */}
-            <ConfirmationModal 
-                isOpen={showConfirmDelete}
-                title="¿Eliminar Factura?"
-                message="Esta acción eliminará permanentemente el registro de esta factura y su historial de pagos. No se puede deshacer."
-                onClose={() => setShowConfirmDelete(false)}
-                onConfirm={handleDelete}
-            />
+            {/* --- CONFIRMACION ELIMINAR --- */}
+            {showConfirmDelete && (
+                <ModalOverlay onClick={() => setShowConfirmDelete(false)}>
+                    <ModalContent style={{ maxWidth: '400px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '3rem', color: '#ef4444', marginBottom: '1rem' }}>
+                            <FaExclamationCircle />
+                        </div>
+                        <h2>¿Eliminar Factura?</h2>
+                        <p style={{ color: '#64748b', marginBottom: '2rem' }}>
+                            Estás a punto de eliminar la factura <b>#{selectedInvoice?.numero_factura}</b>. Esta acción no se puede deshacer.
+                        </p>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <Button $secondary onClick={() => setShowConfirmDelete(false)} style={{ flex: 1 }}>Cancelar</Button>
+                            <Button $danger onClick={handleDelete} style={{ flex: 1 }}>Sí, Eliminar</Button>
+                        </div>
+                    </ModalContent>
+                </ModalOverlay>
+            )}
 
-            {/* --- ALERTA PERSONALIZADA --- */}
-            <AlertModal 
-                isOpen={alertInfo.show}
-                onClose={() => setAlertInfo(prev => ({ ...prev, show: false }))}
-                title={alertInfo.title}
-                message={alertInfo.message}
-                type={alertInfo.type} 
-            />
         </PageWrapper>
     );
 };
- 
+
 export default FacturasProveedores;

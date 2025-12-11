@@ -35,6 +35,7 @@ const CajaModal = ({
   );
 
   // --------- Clasificación y totales ----------
+  // --------- Clasificación y totales (Lógica Corregida) ----------
   const {
     cajaInicial,
     movimientoNetoEfectivo,
@@ -44,12 +45,13 @@ const CajaModal = ({
     cancelaciones,
     entradas,
     salidas,
-    abonos, 
+    abonos,
     totalTarjeta,
     totalTransferencia,
     totalCredito,
-    totalNoEfectivo,
-    sumDevolucionesCancelaciones
+    totalNoEfectivo, // Suma de Tarjeta + Transferencia + Crédito
+    sumDevolucionesCancelaciones,
+    totalVentasDia // Nueva métrica: Total vendido (sin importar método de pago)
   } = useMemo(() => {
     const cajaInicialN = Number(session?.initialAmount || 0);
 
@@ -59,62 +61,75 @@ const CajaModal = ({
       cancelaciones: [],
       entradas: [],
       salidas: [],
-      abonos: [] 
+      abonos: []
     };
 
-    let netCash = 0;
-    let tTarjeta = 0;
-    let tTransf = 0;
-    let tCredito = 0;
-    
+    let netCash = 0;      // Acumulador de efectivo físico real
+    let tTarjeta = 0;     // Total cobrado con tarjeta
+    let tTransf = 0;      // Total cobrado con transferencia
+    let tCredito = 0;     // Total fiado / crédito
+    let tVentasDia = 0;   // Suma total de todas las ventas del día (bruto)
+
     let sumDevsCancels = 0;
 
     for (const tx of transactions) {
       const t = (tx?.type || '').toLowerCase();
-      const txId = String(tx?.id || '').toLowerCase(); 
+      // const txId = String(tx?.id || '').toLowerCase(); 
       const pd = tx?.pagoDetalles || {};
-      
-      // 1. Obtener el monto TOTAL que afectó la caja (Ventas, Abonos, Devoluciones, etc.)
-      // Este valor incluye Efectivo + Tarjeta + Transferencia
-      const ingresoTotal = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
 
-      // 2. Extraer los montos NO EFECTIVO
+      // MONTO TOTAL DE LA OPERACIÓN
+      // pd.ingresoCaja suele tener el total (ej: 100). 
+      // Si es venta, es positivo. Si es gasto/devolución, a veces viene negativo o se maneja por tipo.
+      // Asumiremos que el valor base es el monto total de la transacción.
+      let montoBase = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
+
+      // 1. DESGLOSE DE PAGOS NO EFECTIVO
+      // Estos montos son parte del montoBase pero NO son dinero físico en caja.
       const txTarjeta = Number(pd.tarjeta || 0);
       const txTransf = Number(pd.transferencia || 0);
       const txCredito = Number(pd.credito || 0);
 
-      // 3. CALCULAR EFECTIVO REAL (LA CORRECCIÓN CLAVE)
-      // Al total le restamos lo que fue digital para saber cuánto dinero físico se movió.
-      // Funciona tanto para ventas (positivos) como para devoluciones (negativos) si se registran correctamente.
-      const ingresoEfectivoReal = ingresoTotal - txTarjeta - txTransf;
-
-      // Sumamos al neto de efectivo (solo si no es venta a crédito pura, que no mueve caja)
-      if (t !== 'venta_credito') {
-        netCash += ingresoEfectivoReal;
-      }
-
-      // --- Acumuladores Globales (Solo informativos) ---
+      // Acumuladores globales de "No Efectivo"
+      // Se suman solo si es una operación de ingreso (venta, abono, etc) para no restar si es devolucion (aunque raramente se devuelve a tarjeta directo aquí)
       if (t.startsWith('venta') || t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
         tTarjeta += txTarjeta;
         tTransf += txTransf;
         tCredito += txCredito;
       }
 
-      // --- Clasificación en Listas ---
-      const esDevolucion = t === 'devolucion' || txId.includes('devolucion');
-      const esCancelacion = t === 'cancelacion' || txId.includes('cancelacion');
+      // 2. CALCULAR EL EFECTIVO REAL DE ESTA TRANSACCIÓN
+      // Fórmula: Efectivo = Total - (Tarjeta + Transferencia + Crédito)
+      // Ejemplo: Venta de 100. Paga 20 efectivos, 80 tarjeta. 
+      // montoBase=100. txTarjeta=80. dif = 20. Correcto.
+      const ingresoEfectivoReal = montoBase - txTarjeta - txTransf - txCredito;
 
-      if (t === 'venta_contado' || t === 'venta_mixta') {
+      // 3. ACTUALIZAR CAJA (Solo Efectivo)
+      // Si es una venta a crédito pura, ingresoEfectivoReal debería ser 0.
+      if (t !== 'venta_credito') {
+        netCash += ingresoEfectivoReal;
+      }
+
+      // 4. TOTAL VENTAS DEL DIA
+      // Sumar al total global de ventas si es una venta
+      if (t.startsWith('venta')) {
+        tVentasDia += montoBase;
+      }
+
+      // --- Clasificación en Listas para visualización ---
+      const esDevolucion = t === 'devolucion' || t.includes('devolucion');
+      const esCancelacion = t === 'cancelacion' || t.includes('cancelacion');
+
+      if (t === 'venta_contado' || t === 'venta_mixta' || t === 'venta_credito') {
+        // Incluimos venta_credito en la lista si queremos verla, pero su efectivo fue 0 arriba si fue total
         cls.ventasContado.push(tx);
       }
       else if (esDevolucion) {
         cls.devoluciones.push(tx);
-        // Para el reporte visual, sumamos el valor absoluto del total de la operación
-        sumDevsCancels += Math.abs(ingresoTotal); 
+        sumDevsCancels += Math.abs(montoBase);
       }
       else if (esCancelacion) {
         cls.cancelaciones.push(tx);
-        sumDevsCancels += Math.abs(ingresoTotal);
+        sumDevsCancels += Math.abs(montoBase);
       }
       else if (t === 'entrada') {
         cls.entradas.push(tx);
@@ -123,13 +138,13 @@ const CajaModal = ({
         cls.salidas.push(tx);
       }
       else if (t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
-         cls.abonos.push(tx);
+        cls.abonos.push(tx);
       }
     }
 
     return {
       cajaInicial: cajaInicialN,
-      movimientoNetoEfectivo: netCash, // Ahora sí es SOLO efectivo
+      movimientoNetoEfectivo: netCash,
       efectivoEsperado: cajaInicialN + netCash,
       ventasContado: cls.ventasContado,
       devoluciones: cls.devoluciones,
@@ -141,7 +156,8 @@ const CajaModal = ({
       totalTransferencia: tTransf,
       totalCredito: tCredito,
       totalNoEfectivo: tTarjeta + tTransf + tCredito,
-      sumDevolucionesCancelaciones: sumDevsCancels
+      sumDevolucionesCancelaciones: sumDevsCancels,
+      totalVentasDia: tVentasDia
     };
   }, [transactions, session]);
 
@@ -222,6 +238,10 @@ const CajaModal = ({
         </div>
 
         <div class="box">
+          <div class="row bold" style="font-size:1.1rem; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:8px;">
+             <div>Total Ventas del Día:</div>
+             <div>${fmt(totalVentasDia)}</div>
+          </div>
           <div class="row"><div>Fondo Inicial:</div><div>${fmt(cajaInicial)}</div></div>
           <div class="row"><div>Movimiento Neto Efectivo:</div><div>${fmt(movimientoNetoEfectivo)}</div></div>
           
@@ -297,7 +317,7 @@ const CajaModal = ({
               <FaLockOpen /> Abrir Caja
             </h3>
 
-            <div style={{ display:'grid', gap:12 }}>
+            <div style={{ display: 'grid', gap: 12 }}>
               <div>
                 <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Monto Inicial (C$)</label>
                 <SearchInput type="number" step="0.01" placeholder="Ej: 100.00" value={montoApertura} onChange={e => setMontoApertura(e.target.value)} autoFocus />
@@ -310,14 +330,14 @@ const CajaModal = ({
 
             <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
               <Button primary onClick={handleOpen} style={{ flex: 1, padding: '10px' }}>Abrir Caja</Button>
-            <Button onClick={() => navigate('/dashboard')} style={{ flex: 0.7, padding: '10px', fontWeight: 700 }}>
+              <Button onClick={() => navigate('/dashboard')} style={{ flex: 0.7, padding: '10px', fontWeight: 700 }}>
                 ← Ir al Dashboard
               </Button>
             </div>
           </>
         ) : viewingReport ? (
           <>
-            <h3 style={{ color: '#007bff', borderBottom: '2px solid #007bff', paddingBottom: '10px', display:'flex', alignItems:'center', gap:8 }}>
+            <h3 style={{ color: '#007bff', borderBottom: '2px solid #007bff', paddingBottom: '10px', display: 'flex', alignItems: 'center', gap: 8 }}>
               <FaFileInvoiceDollar /> Reporte de Arqueo
             </h3>
 
@@ -333,6 +353,10 @@ const CajaModal = ({
             </div>
 
             <div style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem', backgroundColor: '#f9f9f9' }}>
+              <TotalsRow $bold style={{ fontSize: '1.1rem', borderBottom: '1px solid #e0e0e0', paddingBottom: '0.5rem', marginBottom: '0.5rem' }}>
+                <span>Total Ventas del Día:</span>
+                <span>C${totalVentasDia.toFixed(2)}</span>
+              </TotalsRow>
               <TotalsRow>
                 <span><FaMoneyBillWave /> Fondo Inicial:</span>
                 <span>C${cajaInicial.toFixed(2)}</span>
@@ -347,7 +371,7 @@ const CajaModal = ({
                 <span>C${sumDevolucionesCancelaciones.toFixed(2)}</span>
               </TotalsRow>
 
-              <hr style={{margin: '6px 0', border: 'none', borderTop: '2px dashed #ccc'}}/>
+              <hr style={{ margin: '6px 0', border: 'none', borderTop: '2px dashed #ccc' }} />
 
               <TotalsRow $bold>
                 <span>Efectivo Esperado:</span>
@@ -362,9 +386,9 @@ const CajaModal = ({
                 <span>C${diferencia.toFixed(2)}</span>
               </TotalsRow>
 
-              <hr style={{margin: '6px 0', border: 'none', borderTop: '1px solid #eee'}}/>
+              <hr style={{ margin: '6px 0', border: 'none', borderTop: '1px solid #eee' }} />
 
-              <p style={{fontWeight: 'bold', color: '#6c757d', margin: '6px 0 0'}}>Resumen de Ingresos (No Efectivo):</p>
+              <p style={{ fontWeight: 'bold', color: '#6c757d', margin: '6px 0 0' }}>Resumen de Ingresos (No Efectivo):</p>
               <TotalsRow>
                 <span><FaRegCreditCard /> Total Tarjeta:</span>
                 <span>C${totalTarjeta.toFixed(2)}</span>
@@ -389,16 +413,16 @@ const CajaModal = ({
             {cancelaciones?.length > 0 && <SectionList title="Cancelaciones" items={cancelaciones} neutral />}
             {devoluciones?.length > 0 && <SectionList title="Devoluciones" items={devoluciones} neutral />}
 
-            <div style={{ display: 'flex', gap: 8, marginTop: 16, alignItems:'center' }}>
-              <Button primary onClick={handleConfirmClose} style={{flex: 1}} disabled={!isAdmin}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 16, alignItems: 'center' }}>
+              <Button primary onClick={handleConfirmClose} style={{ flex: 1 }} disabled={!isAdmin}>
                 Confirmar y Cerrar Caja
               </Button>
-              <Button onClick={() => setViewingReport(false)} style={{flex: 0.6}}>Volver</Button>
-              <Button onClick={printReport} style={{flex: 0.6, display:'inline-flex', alignItems:'center', gap:8}}>
+              <Button onClick={() => setViewingReport(false)} style={{ flex: 0.6 }}>Volver</Button>
+              <Button onClick={printReport} style={{ flex: 0.6, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <FaPrint /> Imprimir
               </Button>
             </div>
-            {!isAdmin && <p style={{color: '#dc3545', marginTop: 8, textAlign: 'center', fontSize: '0.9rem'}}>Solo un Administrador puede cerrar la caja.</p>}
+            {!isAdmin && <p style={{ color: '#dc3545', marginTop: 8, textAlign: 'center', fontSize: '0.9rem' }}>Solo un Administrador puede cerrar la caja.</p>}
           </>
         ) : (
           <>
@@ -427,17 +451,17 @@ const CajaModal = ({
               onChange={e => setMontoContado(e.target.value)}
             />
             {montoContado && (
-              <TotalsRow $bold style={{color: diferencia !== 0 ? '#dc3545' : '#28a745', fontSize: '1.05rem'}}>
+              <TotalsRow $bold style={{ color: diferencia !== 0 ? '#dc3545' : '#28a745', fontSize: '1.05rem' }}>
                 <span>Diferencia:</span>
                 <span>C${diferencia.toFixed(2)}</span>
               </TotalsRow>
             )}
 
             <div style={{ display: 'flex', gap: 8, marginTop: '1rem' }}>
-              <Button primary onClick={handlePrepareClose} disabled={!isAdmin} style={{flex: 1, padding: '12px'}}>
+              <Button primary onClick={handlePrepareClose} disabled={!isAdmin} style={{ flex: 1, padding: '12px' }}>
                 Generar Reporte y Cerrar
               </Button>
-              <Button onClick={onClose} style={{flex: 0.6}}>Cancelar</Button>
+              <Button onClick={onClose} style={{ flex: 0.6 }}>Cancelar</Button>
             </div>
           </>
         )}
