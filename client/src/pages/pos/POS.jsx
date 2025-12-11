@@ -951,14 +951,17 @@ const POS = () => {
         subtotal: response?.saleData?.subtotal ?? subtotalCalc,
         descuento: response?.saleData?.descuento ?? discountAmountCalc,
         total_venta: response?.saleData?.total_venta ?? totalCalc,
-        totalVenta: response?.saleData?.totalVenta ?? totalCalc,
+        totalVenta: response?.saleData?.totalVenta ?? totalCalc, // Ensure both keys exist
         userId: currentUser?.id_usuario || currentUser?.id,
         usuarioNombre: currentUser?.nombre_usuario || currentUser?.name,
       };
 
+      await refreshData(); // Esperamos refrescar para asegurar que la venta esté en el estado local si fuera necesario
+
       showAlert({ title: "Éxito", message: "Venta realizada y dinero ingresado a caja." });
 
       if (pagoDetalles.shouldPrintNow === true) {
+        // Imprimir Directamente usando el objeto construido (similar al del historial)
         setTicketData({ transaction: txToPrint, creditStatus: null, shouldOpen: true, printMode: '80' });
       } else if (pagoDetalles.shouldPrintNow === false) {
         // Silencio (Solo guardar)
@@ -966,8 +969,7 @@ const POS = () => {
         // Fallback legacy behavior
         setTimeout(() => askForPrint(txToPrint), 0);
       }
-
-      await refreshData();
+      return true;
       return true;
     } catch (error) {
       showAlert({ title: "Error", message: `La venta no se pudo guardar. ${error.message}` });
