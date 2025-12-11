@@ -35,7 +35,7 @@ const CajaModal = ({
   );
 
   // --------- Clasificación y totales ----------
-  // --------- Clasificación y totales (Lógica Corregida) ----------
+  // --------- Clasificación y totales (Cálculo corregido) ----------
   const {
     cajaInicial,
     movimientoNetoEfectivo,
@@ -74,14 +74,19 @@ const CajaModal = ({
 
     for (const tx of transactions) {
       const t = (tx?.type || '').toLowerCase();
-      // const txId = String(tx?.id || '').toLowerCase(); 
       const pd = tx?.pagoDetalles || {};
 
-      // MONTO TOTAL DE LA OPERACIÓN
-      // pd.ingresoCaja suele tener el total (ej: 100). 
-      // Si es venta, es positivo. Si es gasto/devolución, a veces viene negativo o se maneja por tipo.
-      // Asumiremos que el valor base es el monto total de la transacción.
-      let montoBase = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
+      // 1. Obtener el monto TOTAL que afectó la caja (Ventas, Abonos, Devoluciones, etc.)
+      // Este valor incluye Efectivo + Tarjeta + Transferencia
+      // CORRECCION CRÍTICA: Asegurar signo correcto para salidas y devoluciones
+      let rawAmount = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
+
+      if (t === 'salida' || t.includes('devolucion')) {
+        // Si es una salida, forzamos negativo para que reste matemáticamente
+        rawAmount = -Math.abs(rawAmount);
+      }
+
+      const montoBase = rawAmount;
 
       // 1. DESGLOSE DE PAGOS NO EFECTIVO
       // Estos montos son parte del montoBase pero NO son dinero físico en caja.
@@ -104,15 +109,16 @@ const CajaModal = ({
       const ingresoEfectivoReal = montoBase - txTarjeta - txTransf - txCredito;
 
       // 3. ACTUALIZAR CAJA (Solo Efectivo)
-      // Si es una venta a crédito pura, ingresoEfectivoReal debería ser 0.
-      if (t !== 'venta_credito') {
-        netCash += ingresoEfectivoReal;
-      }
+      // Se acumula siempre, porque si es venta a crédito, ingresoEfectivoReal tendrá solo la prima (o 0 si es full crédito).
+      // Si es salida (montoBase negativo), ingresoEfectivoReal será negativo y restará a la caja.
+      netCash += ingresoEfectivoReal;
 
       // 4. TOTAL VENTAS DEL DIA
       // Sumar al total global de ventas si es una venta
       if (t.startsWith('venta')) {
-        tVentasDia += montoBase;
+        // Usamos Math.abs porque la venta contribuye al volumen bruto positivo
+        // (a menos que haya devoluciones, pero aquí hablamos de ventas brutas)
+        tVentasDia += Math.abs(rawAmount);
       }
 
       // --- Clasificación en Listas para visualización ---
