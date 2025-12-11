@@ -961,13 +961,18 @@ const POS = () => {
 
       showAlert({ title: "Éxito", message: "Venta realizada y dinero ingresado a caja." });
 
+      // Guardamos la intención de imprimir en LocalStorage por si la página se recarga
       if (pagoDetalles.shouldPrintNow) {
-        // Use setTimeout to ensure this runs after modal close and state updates
+        localStorage.setItem('POS_PRINT_PENDING_ID', String(response?.saleId || response?.result?.id || ''));
+      }
+
+      if (pagoDetalles.shouldPrintNow) {
         setTimeout(() => {
+          // Intentamos imprimir inmediatamente
           setTicketData({ transaction: txToPrint, creditStatus: null, shouldOpen: true, printMode: '80' });
+          // Si llegamos aquí sin recarga, podemos limpiar la bandera (opcional, o dejar que el useEffect lo maneje si no encuentra nada nuevo)
+          // Pero mejor dejémoslo, el useEffect de "mount" solo corre al inicio.
         }, 100);
-      } else {
-        // Silent save (unless logic changes)
       }
 
       return true;
@@ -976,6 +981,51 @@ const POS = () => {
       return false;
     }
   };
+
+  /* -----------------------------------------------------------------
+   * EFECTO DE RECUPERACIÓN DE IMPRESIÓN (POST-RELOAD)
+   * ----------------------------------------------------------------- */
+  useEffect(() => {
+    const pendingPrintId = localStorage.getItem('POS_PRINT_PENDING_ID');
+    if (pendingPrintId && pendingPrintId !== 'null' && pendingPrintId !== '') {
+      // Limpiamos inmediatamente para que no lo intente eternamente si falla
+      localStorage.removeItem('POS_PRINT_PENDING_ID');
+
+      // Intentamos cargar esa venta para imprimirla
+      const recoverAndPrint = async () => {
+        try {
+          // Opción A: Buscar en las ventas del día cargadas (si está en el rango)
+          // Opción B: Forzar fetch de esa venta específica. 
+          // Dado que fetchSales(date) trae todas, podríamos intentar cargar las de hoy.
+          const today = new Date().toISOString().split('T')[0];
+          const sales = await api.fetchSales(token, today);
+
+          // Buscar la venta
+          const targetSale = sales.find(s => String(s.id) === String(pendingPrintId));
+
+          if (targetSale) {
+            // Construir objeto de impresión saneado (igual que handleFinishSale)
+            const txToPrint = {
+              ...targetSale,
+              userId: currentUser?.id_usuario || currentUser?.id,
+              usuarioNombre: currentUser?.nombre_usuario || currentUser?.name,
+              shouldPrintNow: true
+            };
+
+            // Trigger del Modal
+            setTicketData({ transaction: txToPrint, creditStatus: null, shouldOpen: true, printMode: '80' });
+
+            showAlert({ title: "Impresión Recuperada", message: `Recuperando impresión de venta #${pendingPrintId} tras recarga.` });
+          }
+        } catch (e) {
+          console.error("Error recuperando impresión automática:", e);
+        }
+      };
+
+      // Pequeño delay para asegurar que el DOM y modales estén listos
+      setTimeout(recoverAndPrint, 1000);
+    }
+  }, [token, currentUser, api]);
 
   const handleCancelSale = async (saleId) => {
     if (!token) return;
