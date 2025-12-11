@@ -951,25 +951,25 @@ const POS = () => {
         subtotal: response?.saleData?.subtotal ?? subtotalCalc,
         descuento: response?.saleData?.descuento ?? discountAmountCalc,
         total_venta: response?.saleData?.total_venta ?? totalCalc,
-        totalVenta: response?.saleData?.totalVenta ?? totalCalc, // Ensure both keys exist
+        totalVenta: response?.saleData?.totalVenta ?? totalCalc,
         userId: currentUser?.id_usuario || currentUser?.id,
         usuarioNombre: currentUser?.nombre_usuario || currentUser?.name,
+        shouldPrintNow: !!pagoDetalles.shouldPrintNow // Ensure this prop exists for TicketModal
       };
 
-      await refreshData(); // Esperamos refrescar para asegurar que la venta esté en el estado local si fuera necesario
+      await refreshData();
 
       showAlert({ title: "Éxito", message: "Venta realizada y dinero ingresado a caja." });
 
-      if (pagoDetalles.shouldPrintNow === true) {
-        // Imprimir Directamente usando el objeto construido (similar al del historial)
-        setTicketData({ transaction: txToPrint, creditStatus: null, shouldOpen: true, printMode: '80' });
-      } else if (pagoDetalles.shouldPrintNow === false) {
-        // Silencio (Solo guardar)
+      if (pagoDetalles.shouldPrintNow) {
+        // Use setTimeout to ensure this runs after modal close and state updates
+        setTimeout(() => {
+          setTicketData({ transaction: txToPrint, creditStatus: null, shouldOpen: true, printMode: '80' });
+        }, 100);
       } else {
-        // Fallback legacy behavior
-        setTimeout(() => askForPrint(txToPrint), 0);
+        // Silent save (unless logic changes)
       }
-      return true;
+
       return true;
     } catch (error) {
       showAlert({ title: "Error", message: `La venta no se pudo guardar. ${error.message}` });
