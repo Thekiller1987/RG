@@ -506,8 +506,27 @@ const FacturasProveedores = () => {
 
         // Ajustamos la fecha de vencimiento a hora local Managua (evitar desfase)
         // La fecha viene YYYY-MM-DD.
-        const vencParts = invoice.fecha_vencimiento.split('-'); // [YYYY, MM, DD]
-        const vencDate = new Date(vencParts[0], vencParts[1] - 1, vencParts[2]);
+        let fVenc = invoice.fecha_vencimiento;
+        if (fVenc && fVenc.includes('T')) fVenc = fVenc.split('T')[0];
+
+        // Normalizamos separadores (acepta - o /)
+        const parts = fVenc.split(/[-/]/);
+
+        let yyyy, mm, dd;
+
+        // Detectar formato: Si el primer elemento es 4 dígitos -> YYYY-MM-DD
+        if (parts[0].length === 4) {
+            yyyy = parseInt(parts[0], 10);
+            mm = parseInt(parts[1], 10) - 1;
+            dd = parseInt(parts[2], 10);
+        } else {
+            // Asumimos DD-MM-YYYY (formato local común si no es ISO)
+            dd = parseInt(parts[0], 10);
+            mm = parseInt(parts[1], 10) - 1;
+            yyyy = parseInt(parts[2], 10);
+        }
+
+        const vencDate = new Date(yyyy, mm, dd);
         vencDate.setHours(0, 0, 0, 0);
 
         const diffTime = vencDate - today;
