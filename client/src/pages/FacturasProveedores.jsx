@@ -359,11 +359,12 @@ const FacturasProveedores = () => {
     const [providers, setProviders] = useState([]);
     const [loading, setLoading] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
-
+    // Estados de UI
     const [filter, setFilter] = useState('PENDIENTE');
+    const [sortBy, setSortBy] = useState('vencimiento_asc'); // 'vencimiento_asc', 'emision_desc', 'emision_asc'
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Filtros
+    // FILTROS INDIVIDUALES
     const [filterProvider, setFilterProvider] = useState('');
     const [filterDateFrom, setFilterDateFrom] = useState('');
     const [filterDateTo, setFilterDateTo] = useState('');
@@ -510,29 +511,29 @@ const FacturasProveedores = () => {
     }, [invoices]);
 
     const filteredInvoices = useMemo(() => {
-        let data = invoices;
+        let data = [...invoices]; // Copia para no mutar original
 
-        // Filtro Tabs
+        // 1. Filtro Tabs (Estado)
         if (filter !== 'TODAS') {
             data = data.filter(i => i.estado === filter);
         }
 
-        // Filtro Proveedor
+        // 2. Filtro Proveedor
         if (filterProvider) {
             data = data.filter(i => i.proveedor === filterProvider);
         }
 
-        // Filtro Fechas
+        // 3. Filtro Fechas
         if (filterDateFrom && filterDateTo) {
             const start = new Date(filterDateFrom).getTime();
-            const end = new Date(filterDateTo).getTime() + 86400000; // incluir el día final completo
+            const end = new Date(filterDateTo).getTime() + 86400000;
             data = data.filter(i => {
                 const em = new Date(i.fecha_emision).getTime();
                 return em >= start && em < end;
             });
         }
 
-        // Búsqueda Texto
+        // 4. Búsqueda Texto
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
             data = data.filter(i =>
@@ -541,8 +542,20 @@ const FacturasProveedores = () => {
             );
         }
 
+        // 5. ORDENAMIENTO (Nuevo)
+        data.sort((a, b) => {
+            if (sortBy === 'vencimiento_asc') {
+                return new Date(a.fecha_vencimiento) - new Date(b.fecha_vencimiento);
+            } else if (sortBy === 'emision_desc') {
+                return new Date(b.fecha_emision) - new Date(a.fecha_emision);
+            } else if (sortBy === 'emision_asc') {
+                return new Date(a.fecha_emision) - new Date(b.fecha_emision);
+            }
+            return 0;
+        });
+
         return data;
-    }, [invoices, filter, searchTerm, filterProvider, filterDateFrom, filterDateTo]);
+    }, [invoices, filter, searchTerm, filterProvider, filterDateFrom, filterDateTo, sortBy]);
 
     return (
         <PageWrapper>
@@ -580,7 +593,7 @@ const FacturasProveedores = () => {
                     <div className="icon-wrapper"><FaMoneyBillWave /></div>
                     <div className="label">Deuda Total</div>
                     <div className="value" style={{ color: '#b45309' }}>C${stats.totalDebt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                    <div className="sub" style={{ color: '#b45309' }}>Flujo de caja comprometido</div>
+                    <div className="sub" style={{ color: '#b45309' }}>Saldo Pendiente Global</div>
                 </StatCard>
             </StatsGrid>
 
@@ -616,6 +629,18 @@ const FacturasProveedores = () => {
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </SearchContainer>
+
+                    <FilterGroup style={{ minWidth: '180px' }}>
+                        <label>Ordenar Por</label>
+                        <select
+                            value={sortBy}
+                            onChange={e => setSortBy(e.target.value)}
+                        >
+                            <option value="vencimiento_asc">Vencen Primero (Próximas)</option>
+                            <option value="emision_desc">Emitidas Reciente (Nuevas)</option>
+                            <option value="emision_asc">Emitidas Antiguas (Viejas)</option>
+                        </select>
+                    </FilterGroup>
 
                     <FilterGroup>
                         <label>Proveedor</label>

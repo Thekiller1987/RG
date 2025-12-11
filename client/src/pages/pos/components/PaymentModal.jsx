@@ -205,6 +205,16 @@ const PaymentModal = ({
 
   /* ---- Finalizar Venta (sin imprimir aquí) ---- */
   const handleFinish = async (shouldPrintNow) => {
+    // 1. Validación Estricta de Cliente (Solicitud Usuario)
+    if (!isClientValid || finalClienteId === 0) {
+      showAlert?.({
+        title: 'Cliente Requerido',
+        message: 'No puedes vender sin seleccionar un cliente. Por favor selecciona uno.',
+        type: 'error'
+      });
+      return;
+    }
+
     if ((tipoVentaFinal === 'credito_total' || tipoVentaFinal === 'mixto') && finalClienteId === 0) {
       showAlert?.({ title: 'Cliente Requerido', message: 'Debe seleccionar un cliente para ventas a crédito o mixtas.', type: 'error' });
       return;
@@ -223,27 +233,26 @@ const PaymentModal = ({
     const ingresoRealEnCaja = Math.max(0, numEfectivo + dolaresEnMonedaLocal - cambio);
 
     const pagoDetalles = {
-  totalVenta: Number(total),
-  efectivo: numEfectivo,
-  tarjeta: numTarjeta,
-  transferencia: numTransferencia,
-  dolares: numDolares,
-  tasaDolarAlMomento: Number(tasaDolar),
-  referenciaTarjeta: numTarjeta > 0.01 ? referenciaTarjeta.trim() : null,
-  credito,                           // shorthand
-  clienteId: finalClienteId,
-  tipoVenta: computeTipoVenta({
-    efectivo: numEfectivo,
-    tarjeta: numTarjeta,
-    transferencia: numTransferencia,
-    dolaresLocal: dolaresEnMonedaLocal,
-    credito: tipoPagoPrincipal === 'credito',
-  }),
-  cambio: Number(cambio),
-  ingresoCaja: Number(ingresoRealEnCaja),
-  shouldPrintNow: shouldPrintNow,    // <- aquí, fuera de computeTipoVenta
-};
-
+      totalVenta: Number(total),
+      efectivo: numEfectivo,
+      tarjeta: numTarjeta,
+      transferencia: numTransferencia,
+      dolares: numDolares,
+      tasaDolarAlMomento: Number(tasaDolar),
+      referenciaTarjeta: numTarjeta > 0.01 ? referenciaTarjeta.trim() : null,
+      credito,                           // shorthand
+      clienteId: finalClienteId,
+      tipoVenta: computeTipoVenta({
+        efectivo: numEfectivo,
+        tarjeta: numTarjeta,
+        transferencia: numTransferencia,
+        dolaresLocal: dolaresEnMonedaLocal,
+        credito: tipoPagoPrincipal === 'credito',
+      }),
+      cambio: Number(cambio),
+      ingresoCaja: Number(ingresoRealEnCaja),
+      shouldPrintNow: shouldPrintNow,    // <- IMPORTANTE: Bandera para imprimir
+    };
 
     try {
       if (typeof onFinishSale === 'function') {
@@ -258,17 +267,16 @@ const PaymentModal = ({
   };
 
   const alertColor =
-    saldoPendienteDePago > 0.01 || !isClientValid ? '#dc3545' : (cambio > 0.01 ? '#28a745' : '#17a2b8');
+    !isClientValid ? '#dc3545' : (saldoPendienteDePago > 0.01 ? '#dc3545' : ((cambio > 0.01 ? '#28a745' : '#17a2b8')));
 
   const alertMessage =
-    !isClientValid && (tipoPagoPrincipal === 'credito' || tipoVentaFinal === 'mixto' || tipoVentaFinal === 'credito_total')
-      ? 'CLIENTE NO SELECCIONADO'
+    !isClientValid
+      ? '¡SELECCIONA UN CLIENTE!'
       : (saldoPendienteDePago > 0.01
         ? `¡FALTA CUBRIR! C$${saldoPendienteDePago.toFixed(2)}`
         : (cambio > 0.01 ? `CAMBIO A ENTREGAR: C$${cambio.toFixed(2)}` : 'BALANCE PERFECTO'));
 
-  const buttonBgColor = isHovering ? '#28a745' : '#6c757d';
-  const buttonBorderColor = isHovering ? '#28a745' : '#6c757d';
+  const buttonBgColor = isHovering ? '#218838' : '#28a745';
 
   const handleMouseEnter = () => !isButtonDisabled && setIsHovering(true);
   const handleMouseLeave = () => setIsHovering(false);
@@ -282,165 +290,160 @@ const PaymentModal = ({
           width: '96%',
           maxHeight: '90vh',
           overflow: 'hidden',
-          borderRadius: 12,
-          backgroundColor: '#f8f9fa'
+          borderRadius: 16,
+          backgroundColor: '#f8f9fa',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
         }}
       >
         {/* Header */}
         <div
           style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            borderBottom: '2px solid #007bff', paddingBottom: 10, marginBottom: 15
+            borderBottom: '2px solid #e9ecef', paddingBottom: 15, marginBottom: 20
           }}
         >
-          <h2 style={{ margin: 0, color: '#333', fontSize: '1.3rem' }}>
-            <FaCreditCardIcon /> PROCESAR PAGO
+          <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.5rem', fontWeight: 800 }}>
+            <FaCreditCardIcon style={{ marginRight: '0.5rem', color: '#007bff' }} /> PROCESAR PAGO
           </h2>
           <Button
             $cancel onClick={onClose}
-            style={{ borderRadius: '50%', width: 36, height: 36, padding: 0, fontSize: '1.05rem', backgroundColor: '#dc3545', borderColor: '#dc3545' }}
+            style={{ borderRadius: '50%', width: 40, height: 40, padding: 0, fontSize: '1.2rem', backgroundColor: '#fee2e2', color: '#ef4444', borderColor: 'transparent' }}
           >
             <FaWindowClose />
           </Button>
         </div>
 
         {/* Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '5fr 4fr', gap: '1.5rem', height: 'calc(90vh - 120px)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '5fr 4fr', gap: '2rem', height: 'calc(90vh - 140px)' }}>
           {/* Left */}
-          <div style={{ paddingRight: 10, borderRight: '1px solid #dee2e6', overflowY: 'auto', paddingBottom: 10 }}>
+          <div style={{ paddingRight: 10, borderRight: '1px solid #e2e8f0', overflowY: 'auto', paddingBottom: 10 }}>
             {/* Opciones */}
-            <div style={{ padding: 15, border: '1px solid #ddd', borderRadius: 8, backgroundColor: '#fff', marginBottom: 15 }}>
-              <h4 style={{ marginTop: 0, color: '#007bff', fontSize: '1.05rem' }}>
-                <FaCashRegister /> Opciones de Venta
+            <div style={{ padding: 20, border: '1px solid #e2e8f0', borderRadius: 12, backgroundColor: '#fff', marginBottom: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <h4 style={{ marginTop: 0, color: '#334155', fontSize: '1rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: 15 }}>
+                <FaCashRegister style={{ marginRight: 6 }} /> Tipo de Venta
               </h4>
 
-              <div style={{ display: 'flex', gap: 10, marginBottom: 15 }}>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
                 <Button
                   onClick={handleSetTipoContado}
                   style={{
-                    flex: 1, padding: '8px 0',
-                    backgroundColor: tipoPagoPrincipal === 'contado' ? '#17a2b8' : '#f0f0f0',
-                    color: tipoPagoPrincipal === 'contado' ? '#fff' : '#333',
-                    border: `1px solid ${tipoPagoPrincipal === 'contado' ? '#007bff' : '#ccc'}`,
-                    fontWeight: '700'
+                    flex: 1, padding: '10px 0',
+                    backgroundColor: tipoPagoPrincipal === 'contado' ? '#0ea5e9' : '#f1f5f9',
+                    color: tipoPagoPrincipal === 'contado' ? '#fff' : '#475569',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontWeight: '700',
+                    boxShadow: tipoPagoPrincipal === 'contado' ? '0 4px 6px -1px rgba(14, 165, 233, 0.4)' : 'none'
                   }}
                 >
-                  <FaCashRegister /> CONTADO
+                  CONTADO
                 </Button>
                 <Button
                   onClick={handleSetTipoCredito}
                   disabled={!isClientValid}
                   style={{
-                    flex: 1, padding: '8px 0',
-                    backgroundColor: tipoPagoPrincipal === 'credito' ? '#ffc107' : '#f0f0f0',
-                    border: `1px solid ${tipoPagoPrincipal === 'credito' ? '#e65100' : '#ccc'}`,
-                    opacity: !isClientValid ? 0.6 : 1
+                    flex: 1, padding: '10px 0',
+                    backgroundColor: tipoPagoPrincipal === 'credito' ? '#f59e0b' : '#f1f5f9',
+                    color: tipoPagoPrincipal === 'credito' ? '#fff' : '#475569',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontWeight: '700',
+                    boxShadow: tipoPagoPrincipal === 'credito' ? '0 4px 6px -1px rgba(245, 158, 11, 0.4)' : 'none',
+                    opacity: !isClientValid ? 0.5 : 1
                   }}
                 >
-                  <FaHandshake /> CRÉDITO
+                  CRÉDITO
                 </Button>
               </div>
 
               {/* Cliente */}
-              <label style={{ display: 'block', fontWeight: '700', marginBottom: 6, color: '#007bff' }}>
-                <FaUserTag /> Seleccionar Cliente
+              <label style={{ display: 'block', fontWeight: '700', marginBottom: 8, color: '#475569', fontSize: '0.9rem' }}>
+                <FaUserTag /> Seleccionar Cliente <span style={{ color: '#ef4444' }}>* (Obligatorio)</span>
               </label>
               <SearchInput
                 as="select"
                 value={clienteSeleccionado}
                 onChange={handleClientChange}
                 style={{
-                  height: 36, padding: '0 8px', width: '100%', fontSize: '0.95rem',
-                  border: isClientValid ? '2px solid #28a745' : '2px solid #dc3545',
-                  backgroundColor: isClientValid ? '#f6fff6' : '#fff0f0'
+                  height: 42, padding: '0 12px', width: '100%', fontSize: '1rem',
+                  border: isClientValid ? '2px solid #22c55e' : '2px solid #ef4444',
+                  backgroundColor: isClientValid ? '#f0fdf4' : '#fef2f2',
+                  borderRadius: 8
                 }}
               >
-                <option value="0" disabled>-- Seleccionar Cliente --</option>
+                <option value="0">-- Seleccionar Cliente --</option>
                 {(clientes || []).map(c => (
                   <option key={(c.id_cliente ?? c.id)} value={(c.id_cliente ?? c.id)}>
-                    {c.nombre}{Number(c.saldo_pendiente || 0) > 0 ? ` (C$${Number(c.saldo_pendiente).toFixed(2)})` : ''}
+                    {c.nombre}{Number(c.saldo_pendiente || 0) > 0 ? ` (Deuda: C$${Number(c.saldo_pendiente).toFixed(2)})` : ''}
                   </option>
                 ))}
               </SearchInput>
 
-              {!isClientValid && (tipoPagoPrincipal === 'credito' || tipoVentaFinal === 'mixto' || tipoVentaFinal === 'credito_total') && (
-                <p style={{ color: '#dc3545', margin: '8px 0 0', fontSize: '0.85rem', fontWeight: '700' }}>
-                  ¡Atención! Debe seleccionar un cliente para crédito/mixto.
+              {!isClientValid && (
+                <p style={{ color: '#ef4444', margin: '8px 0 0', fontSize: '0.85rem', fontWeight: '600' }}>
+                  <FaWindowClose style={{ marginRight: 4 }} /> No puedes vender sin seleccionar un cliente.
                 </p>
               )}
             </div>
 
             {/* Medios de pago */}
-            <div style={{ padding: 15, border: '1px solid #ddd', borderRadius: 8, backgroundColor: '#fff' }}>
-              <h4 style={{ marginTop: 0, color: '#333', fontSize: '1.05rem', borderBottom: '1px solid #eee', paddingBottom: 6 }}>
-                Medios de Pago (C$)
+            <div style={{ padding: 20, border: '1px solid #e2e8f0', borderRadius: 12, backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <h4 style={{ marginTop: 0, color: '#334155', fontSize: '1rem', fontWeight: 700, textTransform: 'uppercase', borderBottom: '1px solid #f1f5f9', paddingBottom: 10, marginBottom: 15 }}>
+                Desglose de Pago (C$)
               </h4>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 15px', marginTop: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                 <div>
-                  <label style={{ display: 'block', fontWeight: '700', fontSize: '0.85rem', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: 6, color: '#64748b' }}>
                     <FaMoneyBillWave /> Efectivo
                   </label>
-                  <SearchInput type="number" step="0.01" value={efectivo} onChange={e => setEfectivo(e.target.value)} style={{ height: 34, fontSize: '0.95rem' }} disabled={disableInputs} />
+                  <SearchInput type="number" step="0.01" value={efectivo} onChange={e => setEfectivo(e.target.value)} style={{ width: '100%', height: 38, fontSize: '1rem', borderRadius: 8, border: '1px solid #cbd5e1' }} disabled={disableInputs} />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontWeight: '700', fontSize: '0.85rem', marginBottom: 4 }}>
-                    <FaDollarSign /> Dólares (USD)
+                  <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: 6, color: '#64748b' }}>
+                    <FaDollarSign /> Dólares
                   </label>
-                  <SearchInput type="number" step="0.01" value={dolares} onChange={e => setDolares(e.target.value)} style={{ height: 34, fontSize: '0.95rem' }} disabled={disableInputs} />
+                  <SearchInput type="number" step="0.01" value={dolares} onChange={e => setDolares(e.target.value)} style={{ width: '100%', height: 38, fontSize: '1rem', borderRadius: 8, border: '1px solid #cbd5e1' }} disabled={disableInputs} />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontWeight: '700', fontSize: '0.85rem', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: 6, color: '#64748b' }}>
                     <FaCreditCardIcon /> Tarjeta
                   </label>
-                  <SearchInput type="number" step="0.01" value={tarjeta} onChange={e => setTarjeta(e.target.value)} style={{ height: 34, fontSize: '0.95rem' }} disabled={disableInputs} />
+                  <SearchInput type="number" step="0.01" value={tarjeta} onChange={e => setTarjeta(e.target.value)} style={{ width: '100%', height: 38, fontSize: '1rem', borderRadius: 8, border: '1px solid #cbd5e1' }} disabled={disableInputs} />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontWeight: '700', fontSize: '0.85rem', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: 6, color: '#64748b' }}>
                     <FaExchangeAlt /> Transferencia
                   </label>
-                  <SearchInput type="number" step="0.01" value={transferencia} onChange={e => setTransferencia(e.target.value)} style={{ height: 34, fontSize: '0.95rem' }} disabled={disableInputs} />
+                  <SearchInput type="number" step="0.01" value={transferencia} onChange={e => setTransferencia(e.target.value)} style={{ width: '100%', height: 38, fontSize: '1rem', borderRadius: 8, border: '1px solid #cbd5e1' }} disabled={disableInputs} />
                 </div>
               </div>
 
               {tipoPagoPrincipal === 'credito' && (
-                <div style={{ marginTop: 12 }}>
-                  <label style={{ display: 'block', fontWeight: '700', fontSize: '0.85rem', marginBottom: 4, color: '#e65100' }}>
-                    <FaMinusCircle /> MONTO A CRÉDITO (Calculado)
+                <div style={{ marginTop: 15, padding: 12, backgroundColor: '#fff7ed', borderRadius: 8, border: '1px dashed #f97316' }}>
+                  <label style={{ display: 'block', fontWeight: '700', fontSize: '0.85rem', marginBottom: 4, color: '#c2410c' }}>
+                    <FaMinusCircle /> CRÉDITO GENERADO
                   </label>
-                  <SearchInput type="text" value={`C$${credito.toFixed(2)}`} readOnly style={{ height: 34, fontSize: '0.95rem', backgroundColor: '#fff3e0', color: '#e65100', fontWeight: '700' }} />
-                  <p style={{ margin: '6px 0 0', fontSize: '0.8rem', textAlign: 'center' }}>
-                    Abono: C${pagosContadoTotal.toFixed(2)}. Falta (Crédito): C${credito.toFixed(2)}
-                  </p>
+                  <div style={{ fontSize: '1.2rem', color: '#ea580c', fontWeight: 800 }}>C$ {credito.toFixed(2)}</div>
                 </div>
               )}
 
               {needsReference && (
-                <div style={{ marginTop: 12, padding: 10, border: '1px dashed #ffc107', borderRadius: 6, backgroundColor: '#fffbe6' }}>
-                  <label style={{ display: 'block', fontWeight: '700', fontSize: '0.85rem', color: '#856404' }}>
-                    <FaHashtag /> Nº de Referencia (Obligatorio)
+                <div style={{ marginTop: 15, padding: 12, border: '1px solid #fcd34d', borderRadius: 8, backgroundColor: '#fffbeb' }}>
+                  <label style={{ display: 'block', fontWeight: '700', fontSize: '0.85rem', color: '#b45309', marginBottom: 6 }}>
+                    <FaHashtag /> Nº Referencia Tarjeta
                   </label>
-                  <SearchInput type="text" placeholder="Referencia de pago" value={referenciaTarjeta} onChange={e => setReferenciaTarjeta(e.target.value)} style={{ height: 32, fontSize: '0.9rem' }} />
+                  <SearchInput type="text" placeholder="Ej: 1234" value={referenciaTarjeta} onChange={e => setReferenciaTarjeta(e.target.value)} style={{ width: '100%', height: 36, fontSize: '0.95rem' }} />
                 </div>
               )}
 
-              {tipoPagoPrincipal === 'contado' ? (
-                <Button info onClick={handlePayFullCash} style={{ width: '100%', padding: '10px 0', marginTop: 14, backgroundColor: '#17a2b8', fontSize: '1rem' }}>
-                  <FaCoins /> VENTA DE CONTADO RÁPIDA (C$ {Number(total).toFixed(2)})
+              {tipoPagoPrincipal === 'contado' && (
+                <Button info onClick={handlePayFullCash} style={{ width: '100%', padding: '12px 0', marginTop: 20, backgroundColor: '#e0f2fe', color: '#0284c7', border: '1px dashed #0ea5e9', fontSize: '0.95rem', fontWeight: 600 }}>
+                  <FaCoins /> Rellenar con Efectivo (Total: C$ {Number(total).toFixed(2)})
                 </Button>
-              ) : (
-                <div style={{ marginTop: 14, padding: 10, textAlign: 'center', border: '1px solid #ddd', borderRadius: 6, backgroundColor: '#f9f9f9' }}>
-                  <small style={{ fontWeight: '700' }}>
-                    {credito > 0.01
-                      ? `Crédito de C$${credito.toFixed(2)} aplicado.`
-                      : (pagosContadoTotal >= Number(total)
-                        ? '¡VENTA PAGADA TOTALMENTE!'
-                        : 'Deje en cero para Crédito Total o ingrese abono para Venta Mixta.')}
-                  </small>
-                </div>
               )}
             </div>
           </div>
@@ -448,26 +451,26 @@ const PaymentModal = ({
           {/* Right */}
           <div style={{ paddingLeft: 10, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', paddingBottom: 10 }}>
             <div>
-              <InfoBox style={{ marginBottom: 10, padding: 15, backgroundColor: '#e9f7ff', border: '2px solid #007bff', borderRadius: 8 }}>
-                <TotalsRow $bold style={{ fontSize: '1.4rem', color: '#007bff' }}>
-                  <span>TOTAL VENTA:</span>
+              <InfoBox style={{ marginBottom: 15, padding: 20, backgroundColor: '#f0f9ff', border: 'none', borderRadius: 12, boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)' }}>
+                <TotalsRow $bold style={{ fontSize: '1.8rem', color: '#0f172a', marginBottom: 5 }}>
+                  <span style={{ fontSize: '1rem', color: '#64748b', fontWeight: 600 }}>TOTAL A PAGAR</span>
                   <span>C$ {Number(total).toFixed(2)}</span>
                 </TotalsRow>
-                <TotalsRow style={{ borderTop: '1px dashed #b3d9ff', paddingTop: 6, fontSize: '0.85rem' }}>
-                  <span><FaDollarSign /> Tasa USD:</span>
-                  <span>C$ {Number(tasaDolar).toFixed(2)}</span>
+                <TotalsRow style={{ borderTop: '1px solid #cbd5e0', paddingTop: 10, fontSize: '0.9rem', color: '#64748b' }}>
+                  <span>Tasa USD: C$ {Number(tasaDolar).toFixed(2)}</span>
+                  <span style={{ color: '#0f172a', fontWeight: 700 }}>${(Number(total) / Number(tasaDolar || 1)).toFixed(2)} USD</span>
                 </TotalsRow>
               </InfoBox>
 
-              <div style={{ padding: 10, border: '1px solid #ddd', borderRadius: 6, marginBottom: 10, backgroundColor: '#fff' }}>
-                <TotalsRow style={{ color: '#333', borderBottom: '1px solid #eee', paddingBottom: 6, fontSize: '0.95rem' }}>
-                  <span>TOTAL PAGADO (Contado):</span>
-                  <span style={{ fontWeight: '700' }}>C$ {pagosContadoTotal.toFixed(2)}</span>
+              <div style={{ padding: 15, border: '1px solid #e2e8f0', borderRadius: 12, marginBottom: 15, backgroundColor: '#fff' }}>
+                <TotalsRow style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: 8 }}>
+                  <span>Pagado (Contado)</span>
+                  <span style={{ fontWeight: '700', color: '#1e293b' }}>C$ {pagosContadoTotal.toFixed(2)}</span>
                 </TotalsRow>
 
-                <TotalsRow style={{ marginTop: 8, fontSize: '0.95rem' }}>
-                  <span>Clasificación Final:</span>
-                  <span style={{ fontWeight: '700', color: credito > 0.01 ? '#e65100' : (isClientValid ? '#2e7d32' : '#dc3545') }}>
+                <TotalsRow style={{ fontSize: '0.95rem' }}>
+                  <span>Estado</span>
+                  <span style={{ fontWeight: '700', color: credito > 0.01 ? '#f59e0b' : (isClientValid ? '#22c55e' : '#ef4444') }}>
                     {displayTipoVenta}
                   </span>
                 </TotalsRow>
@@ -475,36 +478,59 @@ const PaymentModal = ({
 
               <InfoBox
                 style={{
-                  marginBottom: 10, padding: 12,
-                  backgroundColor: alertColor === '#dc3545' ? '#f8d7da' : (alertColor === '#28a745' ? '#d4edda' : '#cce5ff'),
-                  color: alertColor, fontWeight: '700', fontSize: '1.05rem',
-                  textAlign: 'center', borderRadius: 8, border: `2px solid ${alertColor}`
+                  marginBottom: 10, padding: 15,
+                  backgroundColor: alertColor === '#dc3545' ? '#fef2f2' : (alertColor === '#28a745' ? '#ecfccb' : '#e0f2fe'),
+                  color: alertColor === '#dc3545' ? '#ef4444' : (alertColor === '#28a745' ? '#4d7c0f' : '#0369a1'),
+                  fontWeight: '800', fontSize: '1.1rem',
+                  textAlign: 'center', borderRadius: 12, border: 'none', boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
                 }}
               >
                 <FaBalanceScale style={{ marginRight: 8 }} /> {alertMessage}
               </InfoBox>
             </div>
 
-            {/* Acciones */}
-            <div style={{ marginTop: 'auto', display: 'flex', gap: '10px' }}>
-             <Button
-  onClick={() => handleFinish(true)}    // shouldPrintNow = true
-  disabled={isButtonDisabled}
-  onMouseEnter={handleMouseEnter}
-  onMouseLeave={handleMouseLeave}
-  style={{
-    flex: 1,
-    padding: '12px 0',
-    fontSize: '1.1rem',
-    fontWeight: 800,
-    backgroundColor: isButtonDisabled ? '#adb5bd' : buttonBgColor,
-    color: 'white',
-    transition: 'background-color 0.15s ease-in-out',
-    borderColor: buttonBorderColor
-  }}
->
-  <FaCheckCircle /> Pagar
-</Button>
+            {/* ACCIONES FINALES (BOTONES) */}
+            <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+              {/* BOTÓN 1: PAGAR E IMPRIMIR (PRINCIPAL) */}
+              <Button
+                onClick={() => handleFinish(true)}
+                disabled={isButtonDisabled || !isClientValid}
+                style={{
+                  width: '100%',
+                  padding: '16px 0',
+                  fontSize: '1.2rem',
+                  fontWeight: 800,
+                  backgroundColor: (isButtonDisabled || !isClientValid) ? '#cbd5e1' : '#2563eb', // Azul fuerte
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 10,
+                  boxShadow: (isButtonDisabled || !isClientValid) ? 'none' : '0 4px 6px -1px rgba(37, 99, 235, 0.4)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <FaPrint style={{ marginRight: 8 }} /> PAGAR E IMPRIMIR
+              </Button>
+
+              {/* BOTÓN 2: SOLO PAGAR/GUARDAR (SECUNDARIO) */}
+              <Button
+                onClick={() => handleFinish(false)}
+                disabled={isButtonDisabled || !isClientValid}
+                style={{
+                  width: '100%',
+                  padding: '12px 0',
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  backgroundColor: 'white',
+                  color: (isButtonDisabled || !isClientValid) ? '#cbd5e1' : '#475569',
+                  border: (isButtonDisabled || !isClientValid) ? '1px solid #e2e8f0' : '2px solid #cbd5e1',
+                  borderRadius: 10,
+                  transition: 'all 0.2s'
+                }}
+              >
+                <FaCheckCircle style={{ marginRight: 8 }} /> Solo Guardar (Sin Ticket)
+              </Button>
+
             </div>
           </div>
         </div>
@@ -512,5 +538,6 @@ const PaymentModal = ({
     </ModalOverlay>
   );
 };
+
 
 export default PaymentModal;
