@@ -494,6 +494,7 @@ const PaymentModal = ({
 
               {/* BOTÓN 1: PAGAR E IMPRIMIR (PRINCIPAL) */}
               <Button
+                type="button"
                 onClick={() => handleFinish(true)}
                 disabled={isButtonDisabled || !isClientValid}
                 style={{
@@ -514,6 +515,7 @@ const PaymentModal = ({
 
               {/* BOTÓN 2: SOLO PAGAR/GUARDAR (SECUNDARIO) */}
               <Button
+                type="button"
                 onClick={() => handleFinish(false)}
                 disabled={isButtonDisabled || !isClientValid}
                 style={{
