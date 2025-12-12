@@ -521,13 +521,41 @@ const POS = () => {
     const current = cajaSessionCtx;
     if (!current || !userId) return;
     const movimientoNetoEfectivo = (current.transactions || []).reduce((total, tx) => {
-      if (tx.type === 'venta_credito') return total;
-      const ingreso = Number(tx.pagoDetalles?.ingresoCaja || tx.amount || 0);
-      if (tx.type === 'entrada') return total + Math.abs(ingreso);
-      if (tx.type === 'salida') return total - Math.abs(ingreso);
-      return total + ingreso;
+      // --- Lógica de Suma Positiva para Validación Final (Igual que CajaModal) ---
+      let pd = tx.pagoDetalles || {};
+      if (typeof pd === 'string') { try { pd = JSON.parse(pd); } catch (e) { pd = {}; } }
+
+      const type = (tx.type || '').toLowerCase();
+      let realCash = 0;
+
+      if (type.startsWith('venta')) {
+        // Si hay desglose positivo (efectivo ingresado), lo usamos.
+        if (pd.efectivo !== undefined) {
+          const cashIn = Number(pd.efectivo || 0);
+          const cashOut = Number(pd.cambio || 0);
+          const dolaresEnLocal = Number(pd.dolares || 0) * Number(pd.tasa || tx.tasaDolarAlMomento || 1);
+          realCash = (cashIn + dolaresEnLocal) - cashOut;
+        } else {
+          // Fallback Legacy
+          const rawBase = Number(tx.amount || 0);
+          const digital = Number(pd.tarjeta || 0) + Number(pd.transferencia || 0) + Number(pd.credito || 0);
+          realCash = rawBase - digital;
+        }
+      } else if (type.includes('abono')) {
+        realCash = Number(pd.ingresoCaja || 0);
+      } else {
+        // Entradas/Salidas
+        realCash = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
+        if (type === 'salida' || type.includes('devolucion')) {
+          if (realCash > 0) realCash = -realCash; // Forzar negativo
+        }
+      }
+      return total + realCash;
     }, 0);
+
     const efectivoEsperado = Number(current.initialAmount) + movimientoNetoEfectivo;
+
+    // Preparar objeto final
     const finalSession = {
       ...current,
       closedAt: new Date().toISOString(),
@@ -535,6 +563,8 @@ const POS = () => {
       countedAmount: Number(countedAmount),
       difference: Number(countedAmount) - efectivoEsperado,
     };
+
+    // Guardar y cerrar
     saveCajaSession(userId, finalSession);
     setCajaSession(finalSession);
     setIsCajaOpen(false);
@@ -545,6 +575,10 @@ const POS = () => {
         countedAmount: Number(countedAmount),
         closedAt: finalSession.closedAt,
         closedBy: finalSession.closedBy,
+        // Enviamos explicitamente la diferencia calculada aqui para que el backend la respete si es posible,
+        // aunque idealmente el backend deberia recalcular.
+        difference: finalSession.difference,
+        expectedAmount: efectivoEsperado
       }, token);
     } catch (e) { }
     showAlert({
