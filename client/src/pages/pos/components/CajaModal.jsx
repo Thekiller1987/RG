@@ -271,40 +271,45 @@ const CajaModal = ({
     const fmtDate = (d) => d ? d.toLocaleString('es-NI', { timeZone: 'America/Managua' }) : '—';
 
     // Usamos tx.displayAmount si existe (calculado arriba), o fallback al viejo
-    const rows = (arr, color = '#222') => arr.map(tx => `
+    // Estilos amigables (tipo ticket pero ancho)
+    const css = `
+      body { font-family: 'Courier New', Courier, monospace; padding: 20px; max-width: 800px; margin: 0 auto; color: #333; }
+      h2, h3 { text-align: center; margin: 5px 0; text-transform: uppercase; }
+      .header { text-align: center; border-bottom: 2px dashed #333; padding-bottom: 10px; margin-bottom: 20px; }
+      .box { border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+      .row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; }
+      .row.bold { font-weight: bold; font-size: 16px; margin-top: 5px; border-top: 1px solid #eee; padding-top: 5px; }
+      .big-total { font-size: 24px; font-weight: bold; text-align: center; margin: 10px 0; background: #eee; padding: 10px; border-radius: 5px; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+      th { border-bottom: 1px solid #333; text-align: left; padding: 5px; }
+      td { border-bottom: 1px solid #eee; padding: 5px; }
+      .text-right { text-align: right; }
+      .section-title { font-weight: bold; font-size: 16px; margin-top: 20px; border-bottom: 1px solid #ccc; padding-bottom: 2px; }
+      .diff-negative { color: red; font-weight: bold; }
+      .diff-positive { color: green; font-weight: bold; }
+    `;
+
+    // Calculamos totales detallados para el desglose visual
+    // Filtramos SOLO lo que fue efectivo real para mostrarlo claro
+    const ventasEfectivoTotal = cls.ventasContado.reduce((sum, tx) => sum + (Number(tx.pagoDetalles?.efectivo || 0) - Number(tx.pagoDetalles?.cambio || 0) + (Number(tx.pagoDetalles?.dolares || 0) * Number(tx.pagoDetalles?.tasa || 1))), 0);
+    const abonosEfectivoTotal = cls.abonos.reduce((sum, tx) => sum + (Number(tx.pagoDetalles?.ingresoCaja || 0)), 0);
+    const salidasTotal = Math.abs(cls.salidas.reduce((sum, tx) => sum + Number(tx.displayAmount || tx.amount || 0), 0));
+
+    // Generar filas de tabla
+    const rowsHTML = (arr, color = '#333') => arr.map(tx => `
       <tr>
-        <td>${new Date(tx.at).toLocaleString('es-NI', { timeZone: 'America/Managua' })}</td>
+        <td>${tx.at ? new Date(tx.at).toLocaleTimeString() : ''}</td>
         <td>${tx.note || tx.type || ''}</td>
-        <td style="text-align:right;color:${color}">${fmt(tx.displayAmount !== undefined ? tx.displayAmount : (tx.pagoDetalles?.ingresoCaja ?? tx.amount))}</td>
+        <td class="text-right" style="color:${color}">${fmt(tx.displayAmount)}</td>
       </tr>`).join('');
 
     win.document.write(`
       <html>
       <head>
-        <title>Reporte de Caja</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 16px; }
-          h2 { margin: 0 0 6px; }
-          h3 { margin: 16px 0 6px; }
-          .box { border:1px solid #ddd; border-radius:8px; padding:12px; margin-bottom:12px; }
-          .row { display:flex; justify-content:space-between; margin:6px 0; }
-          .bold { font-weight:700; }
-          table { width:100%; border-collapse: collapse; margin-top:8px; }
-          th, td { border-bottom:1px solid #eee; padding:6px; font-size:14px;}
-          .sep { border-top:2px dashed #ccc; margin:8px 0; }
-          .diff { font-size:16px; padding:6px; background:#eef7ee; border-radius:6px; }
-          .red { color: #dc3545; }
-        </style>
+        <title>Arqueo de Caja - ${new Date().toLocaleDateString()}</title>
+        <style>${css}</style>
       </head>
       <body>
-        <h2>Reporte de Arqueo</h2>
-        <div class="box">
-          <div class="row"><div><b>Abrió:</b> ${openedByName}</div><div><b>Fecha/Hora:</b> ${fmtDate(openedAt)}</div></div>
-          <div class="row"><div><b>Cerró:</b> ${closedByName || currentUser?.nombre_usuario || '—'}</div><div><b>Fecha/Hora:</b> ${fmtDate(new Date())}</div></div>
-        </div>
-
-        <div class="box">
-          <div class="row bold" style="font-size:1.1rem; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:8px;">
              <div>Total Ventas del Día:</div>
              <div>${fmt(totalVentasDia)}</div>
           </div>
