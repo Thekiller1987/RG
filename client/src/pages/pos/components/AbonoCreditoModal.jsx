@@ -128,22 +128,32 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
       }, token);
 
       // 2. Registrar la transacción en la caja local (si es un ingreso)
-      const esIngresoEnCaja = metodoPago === 'Efectivo'; // Solo el efectivo impacta la caja
-      addCajaTransaction({
-        tipo: 'Abono Crédito',
-        monto: montoNum,
-        cliente: client?.nombre || 'N/A',
-        idCliente: client?.id_cliente,
-        usuario: user?.nombre_usuario || 'N/A',
-        referencia: `Abono Cliente #${client.id_cliente} (${metodoPago})`,
+      const esIngresoEnCaja = metodoPago === 'Efectivo';
+      const txCaja = {
+        id: `abono-${Date.now()}`,
+        type: 'abono',
+        amount: montoNum,
+        note: `Abono Cliente #${client.id_cliente} (${metodoPago})`,
+        at: new Date().toISOString(),
         pagoDetalles: {
-          // Esta propiedad es clave para que el arqueo de caja lo sume correctamente.
           ingresoCaja: esIngresoEnCaja ? montoNum : 0,
           tarjeta: metodoPago === 'Tarjeta' ? montoNum : 0,
           transferencia: metodoPago === 'Transferencia' ? montoNum : 0,
-          credito: 0 // Un abono no genera nuevo credito, reduce deuda. 
+          credito: 0
         }
-      });
+      };
+
+      addCajaTransaction(txCaja);
+
+      // PERSISTIR EN SERVIDOR (Crucial)
+      if (token) {
+        try {
+          await api.addCajaTx({ userId: user?.id_usuario || user?.id, tx: txCaja }, token);
+        } catch (e) { console.error("Error persistiendo caja", e); }
+      }
+
+      onAbonoSuccess?.(txCaja);
+      onClose?.();
 
       onAbonoSuccess?.();
       onClose?.();
