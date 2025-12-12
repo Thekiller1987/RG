@@ -74,7 +74,21 @@ const CajaModal = ({
 
     for (const tx of transactions) {
       const t = (tx?.type || '').toLowerCase();
-      const pd = tx?.pagoDetalles || {};
+      // const txId = String(tx?.id || '').toLowerCase(); 
+
+      // --- PARSEO ROBUSTO DE PAGO DETALLES ---
+      // Si el backend devuelve un string JSON (común en ciertos DB adapters), lo parseamos.
+      let pd = tx?.pagoDetalles || {};
+      if (typeof pd === 'string') {
+        try {
+          pd = JSON.parse(pd);
+        } catch (e) {
+          console.error("Error parseando pagoDetalles en transacción:", tx, e);
+          pd = {};
+        }
+      }
+      // Aseguramos que sea objeto
+      if (!pd || typeof pd !== 'object') pd = {};
 
       // 1. Obtener el monto TOTAL que afectó la caja (Ventas, Abonos, Devoluciones, etc.)
       // Este valor incluye Efectivo + Tarjeta + Transferencia
@@ -87,6 +101,11 @@ const CajaModal = ({
       }
 
       const montoBase = rawAmount;
+
+      // CREAR VERSIÓN NORMALIZADA PARA VISUALIZACIÓN
+      // Esto asegura que al imprimir el reporte, se use el 'pd' ya parseado y no el string original.
+      // Ademas, agregamos displayAmount para que el reporte impreso coincida con el signo (negativo) forzado si aplica.
+      const normalizedTx = { ...tx, pagoDetalles: pd, displayAmount: rawAmount };
 
       // 1. DESGLOSE DE PAGOS NO EFECTIVO
       // Estos montos son parte del montoBase pero NO son dinero físico en caja.
@@ -134,24 +153,24 @@ const CajaModal = ({
 
       if (t === 'venta_contado' || t === 'venta_mixta' || t === 'venta_credito') {
         // Incluimos venta_credito en la lista si queremos verla, pero su efectivo fue 0 arriba si fue total
-        cls.ventasContado.push(tx);
+        cls.ventasContado.push(normalizedTx);
       }
       else if (esDevolucion) {
-        cls.devoluciones.push(tx);
+        cls.devoluciones.push(normalizedTx);
         sumDevsCancels += Math.abs(montoBase);
       }
       else if (esCancelacion) {
-        cls.cancelaciones.push(tx);
+        cls.cancelaciones.push(normalizedTx);
         sumDevsCancels += Math.abs(montoBase);
       }
       else if (t === 'entrada') {
-        cls.entradas.push(tx);
+        cls.entradas.push(normalizedTx);
       }
       else if (t === 'salida') {
-        cls.salidas.push(tx);
+        cls.salidas.push(normalizedTx);
       }
       else if (t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
-        cls.abonos.push(tx);
+        cls.abonos.push(normalizedTx);
       }
     }
 
@@ -218,11 +237,12 @@ const CajaModal = ({
     const fmt = (n) => `C$${Number(n || 0).toFixed(2)}`;
     const fmtDate = (d) => d ? d.toLocaleString('es-NI', { timeZone: 'America/Managua' }) : '—';
 
+    // Usamos tx.displayAmount si existe (calculado arriba), o fallback al viejo
     const rows = (arr, color = '#222') => arr.map(tx => `
       <tr>
         <td>${new Date(tx.at).toLocaleString('es-NI', { timeZone: 'America/Managua' })}</td>
         <td>${tx.note || tx.type || ''}</td>
-        <td style="text-align:right;color:${color}">${fmt(tx.pagoDetalles?.ingresoCaja ?? tx.amount)}</td>
+        <td style="text-align:right;color:${color}">${fmt(tx.displayAmount !== undefined ? tx.displayAmount : (tx.pagoDetalles?.ingresoCaja ?? tx.amount))}</td>
       </tr>`).join('');
 
     win.document.write(`

@@ -91,7 +91,7 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
 
   // Usamos useMemo para evitar recalcular esto en cada render si el cliente no cambia.
   const saldoPendiente = useMemo(() => Number(client?.saldo_pendiente) || 0, [client]);
-  
+
   // useEffect para la validación del monto
   useEffect(() => {
     if (!monto) {
@@ -138,11 +138,14 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
         referencia: `Abono Cliente #${client.id_cliente} (${metodoPago})`,
         pagoDetalles: {
           // Esta propiedad es clave para que el arqueo de caja lo sume correctamente.
-          ingresoCaja: esIngresoEnCaja ? montoNum : 0 
+          ingresoCaja: esIngresoEnCaja ? montoNum : 0,
+          tarjeta: metodoPago === 'Tarjeta' ? montoNum : 0,
+          transferencia: metodoPago === 'Transferencia' ? montoNum : 0,
+          credito: 0 // Un abono no genera nuevo credito, reduce deuda. 
         }
       });
-      
-      onAbonoSuccess?.(); 
+
+      onAbonoSuccess?.();
       onClose?.();
 
     } catch (err) {
@@ -185,13 +188,13 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
               disabled={isLoading || saldoPendiente <= 0}
             />
           </InputGroup>
-          
+
           <InputGroup>
             <Label htmlFor="metodoPago">Método de Pago</Label>
-            <Select 
+            <Select
               id="metodoPago"
-              value={metodoPago} 
-              onChange={e => setMetodoPago(e.target.value)} 
+              value={metodoPago}
+              onChange={e => setMetodoPago(e.target.value)}
               disabled={isLoading}
             >
               <option value="Efectivo">Efectivo</option>
@@ -199,9 +202,9 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
               <option value="Transferencia">Transferencia</option>
             </Select>
           </InputGroup>
-          
+
           {errorMonto && <ErrorText>{errorMonto}</ErrorText>}
-          
+
           <Button type="submit" disabled={isSubmitDisabled}>
             {isLoading ? <><SpinAnimation /> Procesando...</> : <><FaSave /> Registrar Abono</>}
           </Button>

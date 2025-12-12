@@ -122,7 +122,18 @@ function calculateReportStats(session) {
 
   for (const tx of transactions) {
     const t = (tx?.type || '').toLowerCase();
-    const pd = tx?.pagoDetalles || {};
+
+    // --- PARSEO ROBUSTO AUDITORIA ---
+    let pd = tx?.pagoDetalles || {};
+    if (typeof pd === 'string') {
+      try {
+        pd = JSON.parse(pd);
+      } catch (e) {
+        console.error("Error parseando pagoDetalles en reporte:", tx, e);
+        pd = {};
+      }
+    }
+    if (!pd || typeof pd !== 'object') pd = {};
 
     // Monto base total de la operación
     // CORRECCION AUDITORIA: Forzar signo negativo si es salida o devolución
@@ -131,6 +142,11 @@ function calculateReportStats(session) {
       rawAmount = -Math.abs(rawAmount);
     }
     const montoBase = rawAmount;
+
+    // CREAR VERSIÓN NORMALIZADA REPORTES
+    // Para que las listas (cls.ventasContado, etc.) tengan el objeto parseado y no el string.
+    // Agregamos displayAmount para consistencia visual absoluta.
+    const normalizedTx = { ...tx, pagoDetalles: pd, displayAmount: rawAmount };
 
     // Desglose
     const txTarjeta = Number(pd.tarjeta || 0);
@@ -165,27 +181,27 @@ function calculateReportStats(session) {
 
     // Listas
     const esDevolucion = t === 'devolucion' || t.includes('devolucion');
-    const esCancelacion = t === 'cancelacion' || t.includes('cancelacion');
+    const esCancelacion = t === 'cancelacion' || t === 'anulacion'; // Added 'anulacion' for robustness
 
     if (t === 'venta_contado' || t === 'venta_mixta' || t === 'venta_credito') {
-      cls.ventasContado.push(tx);
+      cls.ventasContado.push(normalizedTx);
     }
     else if (esDevolucion) {
-      cls.devoluciones.push(tx);
+      cls.devoluciones.push(normalizedTx);
       sumDevsCancels += Math.abs(montoBase);
     }
     else if (esCancelacion) {
-      cls.cancelaciones.push(tx);
+      cls.cancelaciones.push(normalizedTx);
       sumDevsCancels += Math.abs(montoBase);
     }
     else if (t === 'entrada') {
-      cls.entradas.push(tx);
+      cls.entradas.push(normalizedTx);
     }
     else if (t === 'salida') {
-      cls.salidas.push(tx);
+      cls.salidas.push(normalizedTx);
     }
     else if (t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
-      cls.abonos.push(tx);
+      cls.abonos.push(normalizedTx);
     }
   }
 
@@ -277,7 +293,7 @@ const CashReport = () => {
       <tr>
         <td>${new Date(tx.at).toLocaleString('es-NI', { timeZone: 'America/Managua' })}</td>
         <td>${tx.note || tx.type || ''}</td>
-        <td style="text-align:right;color:${color}">${fmt(tx.pagoDetalles?.ingresoCaja ?? tx.amount)}</td>
+        <td style="text-align:right;color:${color}">${fmt(tx.displayAmount !== undefined ? tx.displayAmount : (tx.pagoDetalles?.ingresoCaja ?? tx.amount))}</td>
       </tr>`).join('');
 
     win.document.write(`

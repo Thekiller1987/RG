@@ -22,14 +22,20 @@ export function calculateClientCreditStatus(clientId, allTransactions) {
 
   // 4. Recorremos cada transacción en orden para construir el saldo.
   for (const tx of clientTransactions) {
-    
+    // --- PARSEO ROBUSTO (BANK LEVEL) ---
+    let pd = tx.pagoDetalles || {};
+    if (typeof pd === 'string') {
+      try { pd = JSON.parse(pd); } catch (e) { pd = {}; }
+    }
+
     // --- REGLA #1: VENTA A CRÉDITO (AUMENTA LA DEUDA) ---
     // Si la transacción es una venta COMPLETADA y tiene un monto a crédito,
     // ese monto se SUMA al saldo del cliente.
-    if (tx.estado === 'COMPLETADA' && tx.pagoDetalles?.credito > 0) {
-      saldoActual += Number(tx.pagoDetalles.credito);
-    } 
-    
+    // Usamos 'pd' que ya está parseado y validado.
+    if (tx.estado === 'COMPLETADA' && pd.credito > 0) {
+      saldoActual += Number(pd.credito);
+    }
+
     // --- REGLA #2: PAGO O DEVOLUCIÓN (DISMINUYE LA DEUDA) ---
     // Si la transacción es un ABONO (pago) o una DEVOLUCIÓN,
     // el total de esa transacción se RESTA del saldo del cliente.

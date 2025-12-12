@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import styled from "styled-components";
 import { FaTimes, FaMoneyBillWave, FaCreditCard, FaSpinner, FaFileInvoiceDollar, FaArrowLeft, FaPrint } from "react-icons/fa";
 import * as api from "../../../service/api";
-import TicketModal from "./TicketModal"; 
+import TicketModal from "./TicketModal";
 import { useAuth } from "../../../context/AuthContext";
 
 const ModalOverlay = styled.div` position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: 1rem;`;
@@ -38,13 +38,13 @@ const AbonoDetailView = ({ item, client, onBack, onPrint }) => {
     return (
         <DetailContainer>
             <DetailHeader>
-                <h3 style={{margin: 0}}>Detalle del Abono</h3>
+                <h3 style={{ margin: 0 }}>Detalle del Abono</h3>
                 <Button onClick={onBack}><FaArrowLeft /> Volver al Historial</Button>
             </DetailHeader>
             <SummaryRow><span>Saldo Anterior:</span><span>C${saldoAnterior.toFixed(2)}</span></SummaryRow>
             <SummaryRow style={{ color: '#28a745' }}><span>Monto Abonado:</span><span>C${montoAbonado.toFixed(2)}</span></SummaryRow>
             <SummaryRow style={{ fontSize: '1.4rem' }}><span>Nuevo Saldo:</span><span>C${nuevoSaldo.toFixed(2)}</span></SummaryRow>
-            <div style={{marginTop: '1.5rem', textAlign: 'right'}}>
+            <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>
                 <Button primary onClick={onPrint}><FaPrint /> Imprimir Recibo</Button>
             </div>
         </DetailContainer>
@@ -55,7 +55,7 @@ export default function HistorialCreditoModal({ client, onClose, token }) {
     const [loading, setLoading] = useState(true);
     const [historial, setHistorial] = useState([]);
     const [error, setError] = useState(null);
-    const { allUsers } = useAuth(); 
+    const { allUsers } = useAuth();
     const [selectedItem, setSelectedItem] = useState(null);
     const [showTicket, setShowTicket] = useState(false);
 
@@ -64,11 +64,26 @@ export default function HistorialCreditoModal({ client, onClose, token }) {
         setLoading(true); setError(null);
         try {
             const [creditos, abonos] = await Promise.all([api.getCreditosByClient(client.id_cliente, token), api.getAbonosByClient(client.id_cliente, token)]);
-            const creditosFormateados = (creditos || []).map(c => ({ id: `c-${c.id_venta}`, fecha: new Date(c.fecha), tipo: 'credito', descripcion: `Compra a crédito (Venta #${c.id_venta})`, monto: Number(c.total), userId: c.id_usuario }));
+            const creditosFormateados = (creditos || []).map(c => {
+                // Parseo robusto de pagoDetalles para obtener el valor REAL del crédito (sin prima)
+                let pd = c.pagoDetalles || {};
+                if (typeof pd === 'string') { try { pd = JSON.parse(pd); } catch (e) { pd = {}; } }
+
+                const montoCredito = pd.credito ? Number(pd.credito) : Number(c.total);
+
+                return {
+                    id: `c-${c.id_venta}`,
+                    fecha: new Date(c.fecha),
+                    tipo: 'credito',
+                    descripcion: `Compra a crédito (Venta #${c.id_venta})`,
+                    monto: montoCredito,
+                    userId: c.id_usuario
+                };
+            });
             const abonosFormateados = (abonos || []).map(a => ({ id: `a-${a.id_abono}`, fecha: new Date(a.fecha), tipo: 'abono', descripcion: `Abono registrado`, monto: Number(a.monto), userId: a.id_usuario }));
             const historialCompleto = [...creditosFormateados, ...abonosFormateados].sort((a, b) => b.fecha - a.fecha);
             setHistorial(historialCompleto);
-        } catch (err) { console.error("Error cargando historial:", err); setError("No se pudo cargar el historial del cliente."); } 
+        } catch (err) { console.error("Error cargando historial:", err); setError("No se pudo cargar el historial del cliente."); }
         finally { setLoading(false); }
     }, [client, token]);
 
@@ -94,7 +109,7 @@ export default function HistorialCreditoModal({ client, onClose, token }) {
                 </Header>
                 <Body>
                     {loading && <CenteredMessage><SpinAnimation size={30} /> <p>Cargando...</p></CenteredMessage>}
-                    {error && <CenteredMessage style={{color:'red'}}>{error}</CenteredMessage>}
+                    {error && <CenteredMessage style={{ color: 'red' }}>{error}</CenteredMessage>}
                     {!loading && !error && (
                         <>
                             {selectedItem ? (
@@ -124,7 +139,7 @@ export default function HistorialCreditoModal({ client, onClose, token }) {
                                                     </TimelineItem>
                                                 )
                                             })
-                                        ) : ( <CenteredMessage><FaFileInvoiceDollar size={40} /><p>No hay movimientos para mostrar.</p></CenteredMessage> )}
+                                        ) : (<CenteredMessage><FaFileInvoiceDollar size={40} /><p>No hay movimientos para mostrar.</p></CenteredMessage>)}
                                     </Timeline>
                                 </>
                             )}
@@ -134,7 +149,7 @@ export default function HistorialCreditoModal({ client, onClose, token }) {
             </ModalContent>
 
             {showTicket && selectedItem && (
-                <TicketModal 
+                <TicketModal
                     transaction={{ estado: 'ABONO_CREDITO', totalVenta: selectedItem.monto, fecha: selectedItem.fecha, id: selectedItem.id.split('-')[1], clientId: client.id_cliente, userId: selectedItem.userId }}
                     creditStatus={{ remainingBalance: Number(client.saldo_pendiente || 0) }}
                     clients={[client]}
