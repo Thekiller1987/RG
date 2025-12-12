@@ -160,12 +160,37 @@ function calculateReportStats(session) {
       tCredito += txCredito;
     }
 
-    // Efectivo Real = Total - Digital
-    // Nota: Si es salida (montoBase negativo), esto restará al efectivo al final.
-    const ingresoEfectivoReal = montoBase - txTarjeta - txTransf - txCredito;
+    // 2. CALCULAR EL EFECTIVO REAL DE ESTA TRANSACCIÓN (POSITIVE SUMMATION LOGIC)
+    let ingresoEfectivoReal = 0;
+
+    if (t.startsWith('venta')) {
+      // Lógica positiva: Efectivo Recibido - Cambio Entregado
+      if (pd.efectivo !== undefined) {
+        const cashIn = Number(pd.efectivo || 0);
+        const cashOut = Number(pd.cambio || 0);
+        const dolaresEnLocal = Number(pd.dolares || 0) * Number(pd.tasa || tx.tasaDolarAlMomento || 1);
+        ingresoEfectivoReal = (cashIn + dolaresEnLocal) - cashOut;
+      } else {
+        // Legacy Fallback
+        ingresoEfectivoReal = montoBase - txTarjeta - txTransf - txCredito;
+      }
+    }
+    else if (t.includes('abono')) {
+      ingresoEfectivoReal = Number(pd.ingresoCaja || 0);
+    }
+    else {
+      // Entradas, Salidas, Devoluciones genéricas
+      ingresoEfectivoReal = montoBase - txTarjeta - txTransf;
+    }
+
+    // Corrección de signo final por seguridad
+    if (t === 'salida' || t.includes('devolucion')) {
+      ingresoEfectivoReal = montoBase;
+    }
 
     // Actualizar Caja (Solo Efectivo)
     // CORRECCION AUDITORIA: Se eliminó check 'venta_credito' para incluir primas en efectivo.
+    // Ahora ingresoEfectivoReal es puramente el movimiento físico.
     netCash += ingresoEfectivoReal;
 
     // Total ventas (Bruto)

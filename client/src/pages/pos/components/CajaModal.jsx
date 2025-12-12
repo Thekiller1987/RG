@@ -121,28 +121,61 @@ const CajaModal = ({
         tCredito += txCredito;
       }
 
-      // 2. CALCULAR EL EFECTIVO REAL DE ESTA TRANSACCIÓN
-      // Fórmula: Efectivo = Total - (Tarjeta + Transferencia + Crédito)
-      // Ejemplo: Venta de 100. Paga 20 efectivos, 80 tarjeta. 
-      // montoBase=100. txTarjeta=80. dif = 20. Correcto.
-      const ingresoEfectivoReal = montoBase - txTarjeta - txTransf - txCredito;
+      // 2. CALCULAR EL EFECTIVO REAL DE ESTA TRANSACCIÓN (POSITIVE SUMMATION LOGIC)
+      // En lugar de (Total - Tarjeta), sumamos directamente lo que entró en efectivo.
+      // Esto desacopla el reporte de "Ventas Totales" del "Arqueo de Efectivo".
+
+      let ingresoEfectivoReal = 0;
+
+      if (t.startsWith('venta')) {
+        // Lógica positiva: Efectivo Recibido - Cambio Entregado
+        // Fallback seguro: Si por alguna razón es una venta legacy sin detalles, usamos la lógica anterior (Total - Digital)
+        if (pd.efectivo !== undefined) {
+          const cashIn = Number(pd.efectivo || 0);
+          const cashOut = Number(pd.cambio || 0);
+          const dolaresEnLocal = Number(pd.dolares || 0) * Number(pd.tasa || tx.tasaDolarAlMomento || 1); // Si aceptan dólares
+          // ingresoEfectivoReal = (cashIn + dolaresEnLocal) - cashOut; 
+          // Simplificación: Asumimos efectivo neto ya calculado o raw inputs. 
+          // En POS.jsx 'efectivo' es lo recibido. 'cambio' es lo devuelto.
+          ingresoEfectivoReal = (cashIn + dolaresEnLocal) - cashOut;
+        } else {
+          // Legacy Fallback (si no hay desglose de pago)
+          ingresoEfectivoReal = montoBase - txTarjeta - txTransf - txCredito;
+        }
+      }
+      else if (t.includes('abono')) {
+        // Para abonos, ya corregimos AbonoModal para que 'ingresoCaja' sea solo la parte efectiva.
+        // Si es tarjeta, ingresoCaja es 0.
+        ingresoEfectivoReal = Number(pd.ingresoCaja || 0);
+      }
+      else {
+        // Entradas, Salidas, Devoluciones genéricas:
+        // Usamos el montoBase (que ya tiene el signo negativo si es salida).
+        // Asumimos que estas operaciones son CAJA por defecto salvo que se diga lo contrario.
+        ingresoEfectivoReal = montoBase - txTarjeta - txTransf;
+      }
+
+      // Corrección de signo final por seguridad (ej: salidas)
+      // Si es salida, montoBase era negativo. ingresoEfectivoReal debe ser negativo.
+      // (cashIn - cashOut) usualmente es positivo. 
+      // Si es devolucion y usabamos lógica POS, pd.efectivo suele ser 0.
+      if (t === 'salida' || t.includes('devolucion')) {
+        // En devoluciones, rawAmount es negativo.
+        // Si usamos lógica positiva en venta (devolucion de venta?), pd.efectivo quizas no exista.
+        // fallback a montoBase para devoluciones.
+        ingresoEfectivoReal = montoBase;
+      }
 
       // 3. ACTUALIZAR CAJA (Solo Efectivo)
-      // Se acumula siempre, porque si es venta a crédito, ingresoEfectivoReal tendrá solo la prima (o 0 si es full crédito).
-      // Si es salida (montoBase negativo), ingresoEfectivoReal será negativo y restará a la caja.
+      // Ahora ingresoEfectivoReal es puramente el movimiento físico de dinero.
       netCash += ingresoEfectivoReal;
 
       // 4. TOTAL VENTAS DEL DIA
-      // Sumar al total global de ventas si es una venta
+      // Este se mantiene igual: Suma del valor de la transacción (bruto).
       if (t.startsWith('venta')) {
-        // CORRECCION: El "Total Venta del Dia" debe ser la suma de TODO (Efectivo + Tarjeta + Transf + Credito)
-        // rawAmount es (Efectivo+Tarjeta+Transf).
-        // Si es venta (positivo), le sumamos tambien la parte de credito.
-        // Si es devolucion (se maneja fuera de este if usualmente o se resta), aqui solo nos interesa VENTA bruta.
         if (rawAmount > 0) {
           tVentasDia += (rawAmount + txCredito);
         } else {
-          // Si por alguna razon rawAmount es negativo en una venta (raro), usamos abs pero sumamos credito
           tVentasDia += (Math.abs(rawAmount) + txCredito);
         }
       }
