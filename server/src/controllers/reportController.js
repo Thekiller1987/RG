@@ -18,7 +18,7 @@ const getSalesSummaryReport = async (req, res) => {
             JOIN productos AS p ON dv.id_producto = p.id_producto
             WHERE 
                 v.estado = 'COMPLETADA' 
-                AND DATE(CONVERT_TZ(v.fecha, 'UTC', 'America/Managua')) BETWEEN ? AND ?;
+                AND DATE(DATE_SUB(v.fecha, INTERVAL 6 HOUR)) BETWEEN ? AND ?;
         `;
         // Los parámetros son las fechas YYYY-MM-DD, y el backend las compara contra la fecha LOCAL
         const [results] = await db.query(sql, [startDate, endDate]);
@@ -59,7 +59,7 @@ const getSalesByUserReport = async (req, res) => {
             JOIN usuarios AS u ON v.id_usuario = u.id_usuario
             WHERE 
                 v.estado = 'COMPLETADA' 
-                AND DATE(CONVERT_TZ(v.fecha, 'UTC', 'America/Managua')) BETWEEN ? AND ?
+                AND DATE(DATE_SUB(v.fecha, INTERVAL 6 HOUR)) BETWEEN ? AND ?
             GROUP BY u.nombre_usuario 
             ORDER BY total_vendido DESC;
         `;
@@ -83,7 +83,7 @@ const getTopProductsReport = async (req, res) => {
             JOIN ventas AS v ON dv.id_venta = v.id_venta
             WHERE 
                 v.estado = 'COMPLETADA' 
-                AND DATE(CONVERT_TZ(v.fecha, 'UTC', 'America/Managua')) BETWEEN ? AND ?
+                AND DATE(DATE_SUB(v.fecha, INTERVAL 6 HOUR)) BETWEEN ? AND ?
             GROUP BY p.nombre 
             ORDER BY total_unidades_vendidas DESC 
             LIMIT 10;
@@ -103,12 +103,12 @@ const getSalesChartReport = async (req, res) => {
     try {
         const sql = `
             SELECT 
-                DATE(CONVERT_TZ(fecha, 'UTC', 'America/Managua')) AS dia, 
+                DATE(DATE_SUB(fecha, INTERVAL 6 HOUR)) AS dia, 
                 SUM(total_venta) AS total_diario
             FROM ventas
             WHERE 
                 estado = 'COMPLETADA' 
-                AND DATE(CONVERT_TZ(fecha, 'UTC', 'America/Managua')) BETWEEN ? AND ?
+                AND DATE(DATE_SUB(fecha, INTERVAL 6 HOUR)) BETWEEN ? AND ?
             GROUP BY dia 
             ORDER BY dia ASC;
         `;

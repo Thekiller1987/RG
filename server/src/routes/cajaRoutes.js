@@ -288,14 +288,22 @@ router.get('/reporte', async (req, res) => {
     // Por simplicidad, buscaremos por fecha de APERTURA que coincida con el día, 
     // O fecha de cierre que coincida.
     // Vamos a buscar por fecha de APERTURA que inicie en ese día (00:00 a 23:59)
-    const startDay = `${dateStr} 00:00:00`;
-    const endDay = `${dateStr} 23:59:59`;
+    // CORRECCIÓN ZONA HORARIA (MANAGUA UTC-6)
+    // Las fechas en BD están en UTC (o hora servidor).
+    // Si el usuario pide el dia '2023-10-12', quiere todo lo que ocurrió en ese dia LOCAL.
+    // Una venta a las 10pm del 12 (Managua) es las 4am del 13 (UTC).
+    // Solución: Restamos 6 horas a la fecha de la base de datos antes de comparar.
+
+    // Opción A (Index Friendly): Calcular rangos en JS.
+    // Start: YYYY-MM-DD 06:00:00 UTC
+    // End:   YYYY-MM-DD+1 05:59:59 UTC
+    // Pero MySQL DATE_SUB es más legible y el volumen de datos no es masivo.
 
     const [rows] = await pool.query(`
       SELECT * FROM cierres_caja 
-      WHERE fecha_apertura BETWEEN ? AND ?
+      WHERE DATE(DATE_SUB(fecha_apertura, INTERVAL 6 HOUR)) = ?
       ORDER BY fecha_cierre DESC
-    `, [startDay, endDay]);
+    `, [dateStr]);
 
     const cerradas = rows.map(r => ({
       id: r.id,

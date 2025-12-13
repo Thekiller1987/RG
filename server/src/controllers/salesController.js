@@ -10,7 +10,7 @@ function safeParseJSON(v) {
 const createSale = async (req, res) => {
   const connection = await pool.getConnection();
   const { totalVenta, items, pagoDetalles, userId, clientId } = req.body;
-  
+
   try {
     await connection.beginTransaction();
 
@@ -109,7 +109,7 @@ const createReturn = async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    
+
     const { originalSaleId, item, quantity, userId } = req.body;
     const qtyToReturn = Number(quantity);
 
@@ -130,7 +130,7 @@ const createReturn = async (req, res) => {
 
     // 3. Buscar el item en detalle_ventas para modificarlo
     const [detalleRows] = await connection.query('SELECT * FROM detalle_ventas WHERE id_venta = ? AND id_producto = ?', [originalSaleId, productId]);
-    
+
     if (detalleRows.length === 0) throw new Error('El producto no existe en esta venta.');
     const currentItem = detalleRows[0];
 
@@ -138,26 +138,26 @@ const createReturn = async (req, res) => {
 
     // 4. Actualizar o Borrar la línea del producto en el ticket
     if (currentItem.cantidad === qtyToReturn) {
-        // Se devuelve TODO: borrar la línea
-        await connection.query('DELETE FROM detalle_ventas WHERE id_venta = ? AND id_producto = ?', [originalSaleId, productId]);
+      // Se devuelve TODO: borrar la línea
+      await connection.query('DELETE FROM detalle_ventas WHERE id_venta = ? AND id_producto = ?', [originalSaleId, productId]);
     } else {
-        // Se devuelve PARTE: restar cantidad
-        await connection.query('UPDATE detalle_ventas SET cantidad = cantidad - ? WHERE id_venta = ? AND id_producto = ?', [qtyToReturn, originalSaleId, productId]);
+      // Se devuelve PARTE: restar cantidad
+      await connection.query('UPDATE detalle_ventas SET cantidad = cantidad - ? WHERE id_venta = ? AND id_producto = ?', [qtyToReturn, originalSaleId, productId]);
     }
 
     // 5. Recalcular el Ticket Original (Sumar lo que quedó)
     const [remainingItems] = await connection.query('SELECT * FROM detalle_ventas WHERE id_venta = ?', [originalSaleId]);
-    
+
     let newSubtotal = 0;
     remainingItems.forEach(i => {
-        newSubtotal += (Number(i.cantidad) * Number(i.precio_unitario));
+      newSubtotal += (Number(i.cantidad) * Number(i.precio_unitario));
     });
 
     // Calcular descuento proporcional si existía
     let newDiscount = 0;
     if (originalSale.subtotal > 0 && originalSale.descuento > 0) {
-        const discountRate = originalSale.descuento / originalSale.subtotal;
-        newDiscount = newSubtotal * discountRate;
+      const discountRate = originalSale.descuento / originalSale.subtotal;
+      newDiscount = newSubtotal * discountRate;
     }
     const newTotal = newSubtotal - newDiscount;
 
@@ -167,44 +167,44 @@ const createReturn = async (req, res) => {
     // 6. Actualizar Cabecera de Venta (Total, Subtotal)
     // También ajustamos pago_detalles para que cuadre con el nuevo total
     let pagoDetalles = safeParseJSON(originalSale.pago_detalles);
-    
+
     // Si era crédito, ajustamos crédito. Si era contado, ajustamos efectivo/ingresoCaja.
     if ((pagoDetalles.credito || 0) > 0) {
-        const creditoRevertir = Math.min(pagoDetalles.credito, refundAmount);
-        pagoDetalles.credito -= creditoRevertir;
-        // También actualizar saldo del cliente en tabla clientes
-        if (originalSale.id_cliente) {
-             await connection.query('UPDATE clientes SET saldo_pendiente = GREATEST(0, saldo_pendiente - ?) WHERE id_cliente = ?', [creditoRevertir, originalSale.id_cliente]);
-        }
+      const creditoRevertir = Math.min(pagoDetalles.credito, refundAmount);
+      pagoDetalles.credito -= creditoRevertir;
+      // También actualizar saldo del cliente en tabla clientes
+      if (originalSale.id_cliente) {
+        await connection.query('UPDATE clientes SET saldo_pendiente = GREATEST(0, saldo_pendiente - ?) WHERE id_cliente = ?', [creditoRevertir, originalSale.id_cliente]);
+      }
     } else {
-        // Asumimos que se devuelve efectivo y el ingreso de caja baja
-        pagoDetalles.ingresoCaja = (pagoDetalles.ingresoCaja || originalSale.total_venta) - refundAmount;
-        pagoDetalles.efectivo = (pagoDetalles.efectivo || originalSale.total_venta) - refundAmount;
+      // Asumimos que se devuelve efectivo y el ingreso de caja baja
+      pagoDetalles.ingresoCaja = (pagoDetalles.ingresoCaja || originalSale.total_venta) - refundAmount;
+      pagoDetalles.efectivo = (pagoDetalles.efectivo || originalSale.total_venta) - refundAmount;
     }
 
     // Si no quedan items, marcar como CANCELADA, sino mantener COMPLETADA con nuevos montos
     const nuevoEstado = remainingItems.length === 0 ? 'CANCELADA' : 'COMPLETADA';
 
     await connection.query(
-        'UPDATE ventas SET total_venta = ?, subtotal = ?, descuento = ?, pago_detalles = ?, estado = ? WHERE id_venta = ?', 
-        [newTotal, newSubtotal, newDiscount, JSON.stringify(pagoDetalles), nuevoEstado, originalSaleId]
+      'UPDATE ventas SET total_venta = ?, subtotal = ?, descuento = ?, pago_detalles = ?, estado = ? WHERE id_venta = ?',
+      [newTotal, newSubtotal, newDiscount, JSON.stringify(pagoDetalles), nuevoEstado, originalSaleId]
     );
 
     // 7. Insertar registro de auditoría (opcional, para saber que hubo devolución)
     // Creamos un registro tipo "DEVOLUCION" con monto negativo para el historial, pero no afecta al ticket original ya modificado
     const logPagoDetalles = { efectivo: refundAmount, ingresoCaja: -refundAmount, nota: `Devolución s/Ticket #${originalSaleId}` };
     await connection.query(
-        "INSERT INTO ventas (fecha, total_venta, estado, id_usuario, pago_detalles, tipo_venta) VALUES (NOW(), ?, 'DEVOLUCION', ?, ?, 'DEVOLUCION')",
-        [-refundAmount, userId, JSON.stringify(logPagoDetalles)]
+      "INSERT INTO ventas (fecha, total_venta, estado, id_usuario, pago_detalles, tipo_venta) VALUES (NOW(), ?, 'DEVOLUCION', ?, ?, 'DEVOLUCION')",
+      [-refundAmount, userId, JSON.stringify(logPagoDetalles)]
     );
 
     await connection.commit();
 
     // Enviamos refundAmount para que el Frontend reste de la caja (POS.jsx lo maneja)
-    res.status(201).json({ 
-      message: 'Devolución procesada. Ticket original actualizado.', 
-      originalSaleId, 
-      refundAmount 
+    res.status(201).json({
+      message: 'Devolución procesada. Ticket original actualizado.',
+      originalSaleId,
+      refundAmount
     });
 
   } catch (error) {
@@ -224,9 +224,9 @@ const getSales = async (req, res) => {
     const params = [];
 
     if (date) {
-      where += ` AND DATE(CONVERT_TZ(v.fecha, 'UTC', 'America/Managua')) = ?`;
+      where += ` AND DATE(DATE_SUB(v.fecha, INTERVAL 6 HOUR)) = ?`;
       params.push(date);
-    } 
+    }
 
     const [sales] = await pool.query(
       `SELECT v.id_venta AS id, v.fecha, v.total_venta AS totalVenta, v.subtotal, v.descuento, v.estado, v.pago_detalles AS pagoDetalles, v.id_usuario AS userId, v.id_cliente AS clientId, c.nombre AS clienteNombre, v.tipo_venta, v.referencia_pedido FROM ventas v LEFT JOIN clientes c ON v.id_cliente = c.id_cliente WHERE ${where} ORDER BY v.fecha DESC`,
