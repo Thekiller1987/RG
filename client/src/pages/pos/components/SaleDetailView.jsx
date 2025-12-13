@@ -155,15 +155,24 @@ const SaleDetailView = ({
           <DetailSection>
             <h4>Resumen Financiero de esta Venta</h4>
             {sale.subtotal !== undefined && <TotalsRow><span>Subtotal:</span><span>C${money(sale.subtotal)}</span></TotalsRow>}
-            {sale.descuento > 0 && <TotalsRow><span>Descuento:</span><span style={{color: '#dc3545'}}>- C${money(sale.descuento)}</span></TotalsRow>}
+            {sale.descuento > 0 && <TotalsRow><span>Descuento:</span><span style={{ color: '#dc3545' }}>- C${money(sale.descuento)}</span></TotalsRow>}
             <TotalsRow $bold $bordered><span>Total Transacción:</span><span>C${money(Math.abs(sale.totalVenta))}</span></TotalsRow>
 
             {sale.pagoDetalles && (
-              <div style={{marginTop: '1rem'}}>
-                <h5 style={{marginBottom: '0.5rem', fontSize: '1rem'}}>Detalle del Pago:</h5>
+              <div style={{ marginTop: '1rem' }}>
+                <h5 style={{ marginBottom: '0.5rem', fontSize: '1rem' }}>Detalle del Pago:</h5>
                 {sale.pagoDetalles.efectivo > 0 && <TotalsRow><span><FaDollarSign /> Efectivo Recibido:</span><span>C${money(sale.pagoDetalles.efectivo)}</span></TotalsRow>}
-                {sale.pagoDetalles.tarjeta > 0 && <TotalsRow><span><FaCreditCard /> Tarjeta:</span><span>C${money(sale.pagoDetalles.tarjeta)}</span></TotalsRow>}
-                {sale.pagoDetalles.credito > 0 && <TotalsRow><span><FaUser /> Crédito Otorgado:</span><span style={{color: '#dc3545'}}>C${money(sale.pagoDetalles.credito)}</span></TotalsRow>}
+                {sale.pagoDetalles.tarjeta > 0 && (
+                  <>
+                    <TotalsRow><span><FaCreditCard /> Tarjeta:</span><span>C${money(sale.pagoDetalles.tarjeta)}</span></TotalsRow>
+                    {sale.pagoDetalles.referenciaTarjeta && (
+                      <TotalsRow style={{ fontSize: '0.85rem', color: '#666', paddingLeft: '1.5rem' }}>
+                        <span>↳ Ref:</span><span>{sale.pagoDetalles.referenciaTarjeta}</span>
+                      </TotalsRow>
+                    )}
+                  </>
+                )}
+                {sale.pagoDetalles.credito > 0 && <TotalsRow><span><FaUser /> Crédito Otorgado:</span><span style={{ color: '#dc3545' }}>C${money(sale.pagoDetalles.credito)}</span></TotalsRow>}
                 {sale.pagoDetalles.vuelto > 0 && <TotalsRow><span>Vuelto Entregado:</span><span>- C${money(sale.pagoDetalles.vuelto)}</span></TotalsRow>}
               </div>
             )}

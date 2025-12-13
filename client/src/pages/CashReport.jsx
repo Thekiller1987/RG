@@ -11,6 +11,7 @@ import {
   FaCheckCircle,
   FaChevronLeft,
   FaPrint,
+  FaArrowLeft,
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
@@ -22,9 +23,19 @@ const ENDPOINT_ABIERTAS_ACTIVAS = `${API_URL}/caja/abiertas/activas`;
 /* ================== HELPERS (ZONA HORARIA + FORMATO) ================== */
 
 // Obtener fecha actual en Managua (YYYY-MM-DD) para el input date
+// Obtener fecha actual en Managua (YYYY-MM-DD) Manualmente para evitar errores de locale
 function todayManagua() {
-  // Usamos es-CA o sv-SE para obtener YYYY-MM-DD, pero forzando la zona
-  return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Managua' });
+  const d = new Date();
+  // Ajustar a UTC-6 (Managua) manualmente si es necesario, o confiar en que el sistema tiene hora correcta.
+  // Mejor opción: Crear fecha local y formatear ISO
+  const offset = d.getTimezoneOffset() * 60000;
+  const local = new Date(d.getTime() - offset);
+  // Sin embargo, si el usuario está en Managua, new Date() ya es local. 
+  // Para asegurar YYYY-MM-DD:
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 const fmtMoney = (n) => `C$${Number(n || 0).toFixed(2)}`;
@@ -258,20 +269,26 @@ const theme = {
   success: '#10b981', // Esmeralda
   danger: '#ef4444', // Rojo
   warning: '#f59e0b', // Ambar
-  bg: '#f8fafc', // Fondo muy suave
+  bg: '#f1f5f9', // Fondo muy suave slate-100
   surface: '#ffffff',
   text: '#1e293b',
   textLight: '#64748b',
-  border: '#e2e8f0'
+  border: '#e2e8f0',
+  glass: 'rgba(255, 255, 255, 0.7)'
 };
 
 const Container = styled.div`
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1.5rem;
   background-color: ${theme.bg};
   min-height: 100vh;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: ${theme.text};
+
+  @media (max-width: 640px) {
+    padding: 1rem;
+  }
 `;
 
 const Header = styled.header`
@@ -279,157 +296,233 @@ const Header = styled.header`
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
-  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-  padding: 2rem;
-  border-radius: 16px;
-  color: white;
-  box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.3);
+  background: white;
+  padding: 1.5rem 2rem;
+  border-radius: 24px;
+  box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.05);
+  border: 1px solid white;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.5rem;
+    padding: 1.5rem;
+  }
+`;
 
+const HeaderTitle = styled.div`
   h1 {
     font-size: 1.8rem;
-    font-weight: 700;
+    font-weight: 800;
+    margin: 0;
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin: 0;
+    gap: 12px;
+  }
+  p {
+    margin: 4px 0 0 0;
+    color: ${theme.textLight};
+    font-size: 0.95rem;
+    font-weight: 500;
   }
 `;
 
 const DateControl = styled.div`
   display: flex;
   align-items: center;
-  gap: 1rem;
-  background: rgba(255,255,255,0.15);
-  padding: 0.5rem 1rem;
-  border-radius: 12px;
-  backdrop-filter: blur(5px);
+  gap: 12px;
+  background: #f8fafc;
+  padding: 6px;
+  border-radius: 16px;
+  border: 1px solid ${theme.border};
 
-  input {
+  /* Input wrapper for custom icon */
+  .input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  input[type="date"] {
     border: none;
-    background: white;
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
+    background: transparent;
+    padding: 10px 16px;
     font-weight: 600;
     color: ${theme.text};
-    outline: none;
     font-family: inherit;
+    outline: none;
+    font-size: 0.95rem;
+    cursor: pointer;
+    
+    &::-webkit-calendar-picker-indicator {
+      cursor: pointer;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+      &:hover { opacity: 1; }
+    }
+  }
+
+  button {
+    background: white;
+    border: 1px solid ${theme.border};
+    color: ${theme.primary};
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 15px -3px rgba(37, 99, 235, 0.15);
+      background: ${theme.primary};
+      color: white;
+      border-color: ${theme.primary};
+    }
+    &:active { transform: translateY(0); }
   }
 `;
 
 const Grid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 24px;
+  
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const Card = styled.div`
-  background: ${theme.surface};
-  border-radius: 16px;
+  background: white;
+  border-radius: 24px;
   overflow: hidden;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  transition: transform 0.2s, box-shadow 0.2s;
-  border: 1px solid ${theme.border};
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  display: flex; flex-direction: column;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
+    border-color: rgba(59, 130, 246, 0.3);
   }
 `;
 
 const CardHeader = styled.div`
-  padding: 1.25rem;
+  padding: 1.5rem;
   border-bottom: 1px solid ${theme.border};
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: ${props => props.isOpen ? '#ecfdf5' : '#f8fafc'};
+  background: ${props => props.isOpen
+    ? 'linear-gradient(to right, #f0fdf4, #ffffff)'
+    : 'linear-gradient(to right, #f8fafc, #ffffff)'};
 `;
 
 const Badge = styled.span`
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0.25rem 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 0.35rem 0.85rem;
   border-radius: 20px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: ${props => props.isOpen ? '#065f46' : '#991b1b'};
-  background: ${props => props.isOpen ? '#d1fae5' : '#fee2e2'};
-  border: 1px solid ${props => props.isOpen ? '#34d399' : '#f87171'};
+  letter-spacing: 0.05em;
+  display: flex; align-items: center; gap: 6px;
+  
+  ${props => props.isOpen ? `
+    color: #15803d;
+    background: #dcfce7;
+    border: 1px solid #bbf7d0;
+    box-shadow: 0 2px 5px rgba(22, 163, 74, 0.1);
+  ` : `
+    color: #991b1b;
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+  `}
 `;
 
 const CardBody = styled.div`
   padding: 1.5rem;
+  flex: 1;
+  display: flex; flex-direction: column; gap: 12px;
 `;
 
 const StatRow = styled.div`
   display: flex;
   justify-content: space-between;
-  margin-bottom: 0.75rem;
   font-size: 0.95rem;
   color: ${theme.textLight};
+  padding: 4px 0;
 
   strong {
     color: ${theme.text};
-    font-weight: 600;
+    font-weight: 700;
+    font-feature-settings: "tnum";
+    font-variant-numeric: tabular-nums;
   }
 
   &.highlight {
-    background: #f1f5f9;
-    padding: 0.75rem;
-    border-radius: 8px;
-    margin-top: 1rem;
-    color: ${theme.text};
-    font-weight: 700;
-  }
-  
-  &.total-ventas {
-    background: #eff6ff;
-    color: #1e40af;
-    border: 1px dashed #60a5fa;
+    background: #f0f9ff;
+    padding: 1rem;
+    border-radius: 12px;
+    margin-top: 0.5rem;
+    color: #0369a1;
+    border: 1px dashed #bae6fd;
+    
+    strong { color: #0284c7; font-size: 1.1rem; }
   }
 `;
 
 const DifferenceBadge = styled.div`
   text-align: center;
-  margin-top: 1rem;
-  padding: 0.5rem;
-  border-radius: 8px;
+  margin-top: auto;
+  padding: 0.75rem;
+  border-radius: 12px;
   font-weight: 700;
   font-size: 0.9rem;
-  background: ${props => props.diff === 0 ? '#ecfdf5' : '#fef2f2'};
-  color: ${props => props.diff === 0 ? '#059669' : '#dc2626'};
-  border: 1px solid ${props => props.diff === 0 ? '#10b981' : '#ef4444'};
+  display: flex; justify-content: center; align-items: center; gap: 8px;
+  
+  ${props => props.diff === 0 ? `
+    background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0;
+  ` : `
+    background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
+  `}
 `;
 
 const CardFooter = styled.div`
-  padding: 1rem;
+  padding: 1rem 1.5rem;
   background: #f8fafc;
   border-top: 1px solid ${theme.border};
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
 `;
 
 const ActionButton = styled.button`
+  width: 100%;
   background: white;
   border: 1px solid ${theme.border};
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
+  padding: 0.75rem;
+  border-radius: 10px;
   font-weight: 600;
   color: ${theme.text};
   cursor: pointer;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  gap: 8px;
   transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 
   &:hover {
-    background: #f1f5f9;
+    background: #f8fafc;
     border-color: #cbd5e1;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
   }
-
-  &.text-blue { color: ${theme.primary}; }
-  &.text-green { color: ${theme.success}; }
+  
+  &:active { transform: translateY(0); }
 `;
 
 
@@ -580,36 +673,57 @@ const CashReport = () => {
       <PrintStyles />
       <Container>
         <Header>
-          <div>
-            <h1><FaFileAlt /> Reportes de Caja</h1>
-            <p style={{ margin: 0, opacity: 0.8 }}>Historial y Auditoría de Cierres</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <button title="Volver al Dashboard" onClick={() => navigate('/dashboard')} style={{
+              background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', width: '45px', height: '45px',
+              display: 'grid', placeItems: 'center', cursor: 'pointer', color: '#1e293b', boxShadow: '0 2px 4px rgba(0,0,0,0.03)'
+            }}>
+              <FaArrowLeft size={18} />
+            </button>
+            <HeaderTitle>
+              <h1><FaFileAlt color="#3b82f6" /> Reportes de Caja</h1>
+              <p>Historial de aperturas, cierres y auditoría</p>
+            </HeaderTitle>
           </div>
+
           <DateControl>
-            <FaCalendarAlt />
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            <button onClick={fetchData} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }} title="Refrescar"><FaSyncAlt /></button>
+            <div className="input-wrapper">
+              <FaCalendarAlt color="#64748b" style={{ position: 'absolute', left: 16 }} />
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ paddingLeft: 40 }} />
+            </div>
+            <button onClick={fetchData} title="Refrescar datos">
+              {loading ? <FaSyncAlt className="spin" /> : <FaSyncAlt />}
+            </button>
           </DateControl>
         </Header>
 
-        {loading && <div style={{ textAlign: 'center', padding: '3rem', color: theme.textLight }}>Cargando información...</div>}
+        {loading && <div style={{ textAlign: 'center', padding: '4rem', color: theme.textLight }}>
+          <FaSyncAlt size={40} className="spin" style={{ opacity: 0.3 }} />
+          <p style={{ marginTop: 20 }}>Cargando información...</p>
+        </div>}
 
         {!loading && (
           <Grid>
-            {/* CAJAS ABIERTAS AHORA (Independiente de la fecha si es que se quiere mostrar siempre) */}
+            {/* CAJAS ABIERTAS AHORA */}
             {abiertasActivas.map(s => renderSessionCard(s, true))}
 
             {/* CAJAS CERRADAS DE LA FECHA SELECCIONADA */}
             {cerradasHoy.map(s => renderSessionCard(s, false))}
 
-            {/* CAJAS ABIERTAS DE LA FECHA (Si consultamos historial pasado, pueden aparecer) */}
+            {/* CAJAS ABIERTAS DE LA FECHA (HISTORIAL) */}
             {abiertasHoy.map(s => renderSessionCard(s, true))}
           </Grid>
         )}
 
         {!loading && cerradasHoy.length === 0 && abiertasHoy.length === 0 && abiertasActivas.length === 0 && (
-          <div style={{ textAlign: 'center', color: theme.textLight, marginTop: '3rem' }}>
-            <FaExclamationTriangle size={40} style={{ marginBottom: '1rem', opacity: 0.5 }} />
-            <p>No se encontraron registros para esta fecha.</p>
+          <div style={{
+            textAlign: 'center', color: theme.textLight, marginTop: '4rem',
+            background: 'white', padding: '3rem', borderRadius: '24px', border: '1px dashed #e2e8f0',
+            maxWidth: '500px', marginInline: 'auto'
+          }}>
+            <FaExclamationTriangle size={48} style={{ marginBottom: '1.5rem', opacity: 0.3, color: theme.warning }} />
+            <h3 style={{ margin: '0 0 8px 0', color: theme.text }}>Sin Movimientos</h3>
+            <p style={{ margin: 0 }}>No se encontraron registros para la fecha <strong>{date}</strong>.</p>
           </div>
         )}
       </Container>

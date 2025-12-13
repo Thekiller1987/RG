@@ -239,7 +239,8 @@ const PaymentModal = ({
       transferencia: numTransferencia,
       dolares: numDolares,
       tasaDolarAlMomento: Number(tasaDolar),
-      referenciaTarjeta: numTarjeta > 0.01 ? referenciaTarjeta.trim() : null,
+      referenciaTarjeta: referenciaTarjeta.trim(), // Agregamos la referencia explícitamente
+      referenciaTransferencia: '', // Si hubiera campo para esto
       credito,                           // shorthand
       clienteId: finalClienteId,
       tipoVenta: computeTipoVenta({

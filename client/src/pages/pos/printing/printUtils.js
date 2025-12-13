@@ -50,6 +50,7 @@ export function buildTicketHTML(tx, clientes = [], users = []) {
       <div>Pago: ${(p.tipoVenta || 'contado').toString().toUpperCase()}</div>
       <div>Efectivo: C$${moneyNI(p.efectivo || 0)}</div>
       <div>Tarjeta: C$${moneyNI(p.tarjeta || 0)}</div>
+      ${p.referenciaTarjeta ? `<div>Ref. Tarjeta: ${p.referenciaTarjeta}</div>` : ''}
       <div>Transf.: C$${moneyNI(p.transferencia || 0)}</div>
       <div>USD: ${moneyNI(p.dolares || 0)} (Tasa C$${moneyNI(p.tasaDolarAlMomento || 0)})</div>
       <div>Cambio: C$${moneyNI(p.cambio || 0)}</div>
