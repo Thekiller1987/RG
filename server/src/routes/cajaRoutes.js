@@ -209,12 +209,19 @@ router.post('/session/close', async (req, res) => {
         totalGastos += monto;
         movimientoNetoEfectivo -= monto; // Resta dinero físico
       } else if (tipo === 'venta_contado') {
-        // En venta contado, lo que entra a caja es ingresoCaja (generalmente efectivo recibido)
-        // OJO: Si pagó con tarjeta, ingresoCaja es 0 (o debería serlo en lógica pura de efectivo).
-        // Revisemos cómo POS calcula `ingresoCaja`. Usualmente es efectivo - cambio.
-        // Si el frontend manda ingresoCaja correcto, usamos eso.
-        const entradaCaja = Number(detalles.ingresoCaja || 0);
-        movimientoNetoEfectivo += entradaCaja;
+        // CORRECCIÓN CRÍTICA:
+        // 'ingresoCaja' desde el POS trae la suma de TODO (Efectivo + Tarjeta + Transf).
+        // Para el cuadro de caja, SOLO nos interesa el EFECTIVO FÍSICO.
+        // Fórmula: (Efectivo Recibido + Dólares en C$) - Cambio
+
+        const cashIn = Number(detalles.efectivo || 0);
+        const dolaresVal = Number(detalles.dolares || 0);
+        const tasa = Number(detalles.tasaDolarAlMomento || s.tasaDolar || 1);
+        const cashOut = Number(detalles.cambio || 0);
+
+        const netoFisico = (cashIn + (dolaresVal * tasa)) - cashOut;
+
+        movimientoNetoEfectivo += netoFisico;
       }
 
       return tx; // Devolver para el snapshot

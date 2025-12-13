@@ -264,31 +264,26 @@ function calculateReportStats(session) {
 /* ================== COMPONENT ================== */
 /* ================== STYLED COMPONENTS (DISEÑO PREMIUM) ================== */
 const theme = {
-  primary: '#2563eb', // Azul real
-  secondary: '#64748b', // Gris pizarra
-  success: '#10b981', // Esmeralda
-  danger: '#ef4444', // Rojo
-  warning: '#f59e0b', // Ambar
-  bg: '#f1f5f9', // Fondo muy suave slate-100
-  surface: '#ffffff',
-  text: '#1e293b',
-  textLight: '#64748b',
-  border: '#e2e8f0',
-  glass: 'rgba(255, 255, 255, 0.7)'
+  primary: '#0f172a',    // Navy Corporate
+  secondary: '#475569',  // Slate
+  success: '#16a34a',    // Green Banking
+  danger: '#dc2626',     // Red Banking
+  warning: '#d97706',    // Amber
+  bg: '#f8fafc',         // Light Gray Background
+  surface: '#ffffff',    // Plain White
+  border: '#e2e8f0',     // Light Gray Border
+  text: '#1e293b',       // Dark Slate Text
+  textLight: '#64748b'   // Muted Text
 };
 
 const Container = styled.div`
   max-width: 1400px;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 2rem;
   background-color: ${theme.bg};
   min-height: 100vh;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: ${theme.text};
-
-  @media (max-width: 640px) {
-    padding: 1rem;
-  }
 `;
 
 const Header = styled.header`
@@ -298,26 +293,17 @@ const Header = styled.header`
   margin-bottom: 2rem;
   background: white;
   padding: 1.5rem 2rem;
-  border-radius: 24px;
-  box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.05);
-  border: 1px solid white;
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1.5rem;
-    padding: 1.5rem;
-  }
+  border-radius: 12px;
+  border: 1px solid ${theme.border};
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
 `;
 
 const HeaderTitle = styled.div`
   h1 {
-    font-size: 1.8rem;
-    font-weight: 800;
+    font-size: 1.5rem;
+    font-weight: 700;
     margin: 0;
-    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: ${theme.primary};
     display: flex;
     align-items: center;
     gap: 12px;
@@ -325,8 +311,7 @@ const HeaderTitle = styled.div`
   p {
     margin: 4px 0 0 0;
     color: ${theme.textLight};
-    font-size: 0.95rem;
-    font-weight: 500;
+    font-size: 0.9rem;
   }
 `;
 
@@ -334,12 +319,12 @@ const DateControl = styled.div`
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #f8fafc;
-  padding: 6px;
-  border-radius: 16px;
+  background: white;
+  padding: 8px;
+  border-radius: 8px;
   border: 1px solid ${theme.border};
+  box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
 
-  /* Input wrapper for custom icon */
   .input-wrapper {
     position: relative;
     display: flex;
@@ -349,142 +334,111 @@ const DateControl = styled.div`
   input[type="date"] {
     border: none;
     background: transparent;
-    padding: 10px 16px;
-    font-weight: 600;
+    padding: 8px 12px 8px 36px;
+    font-weight: 500;
     color: ${theme.text};
     font-family: inherit;
     outline: none;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     cursor: pointer;
-    
-    &::-webkit-calendar-picker-indicator {
-      cursor: pointer;
-      opacity: 0.6;
-      transition: opacity 0.2s;
-      &:hover { opacity: 1; }
-    }
   }
 
   button {
-    background: white;
+    background: ${theme.bg};
     border: 1px solid ${theme.border};
-    color: ${theme.primary};
-    width: 40px; height: 40px;
-    border-radius: 12px;
+    color: ${theme.secondary};
+    width: 36px; height: 36px;
+    border-radius: 6px;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+    transition: all 0.2s;
 
     &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 15px -3px rgba(37, 99, 235, 0.15);
       background: ${theme.primary};
       color: white;
       border-color: ${theme.primary};
     }
-    &:active { transform: translateY(0); }
-  }
-`;
-
-const Grid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-  gap: 24px;
-  
-  @media (max-width: 640px) {
-    grid-template-columns: 1fr;
   }
 `;
 
 const Card = styled.div`
   background: white;
-  border-radius: 24px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid rgba(226, 232, 240, 0.6);
+  border: 1px solid ${theme.border};
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
   display: flex; flex-direction: column;
 
   &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
-    border-color: rgba(59, 130, 246, 0.3);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transform: translateY(-2px);
   }
 `;
 
 const CardHeader = styled.div`
-  padding: 1.5rem;
+  padding: 1.25rem;
   border-bottom: 1px solid ${theme.border};
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: ${props => props.isOpen
-    ? 'linear-gradient(to right, #f0fdf4, #ffffff)'
-    : 'linear-gradient(to right, #f8fafc, #ffffff)'};
+  background: ${props => props.isOpen ? '#f0fdf4' : '#f8fafc'};
 `;
 
 const Badge = styled.span`
-  font-size: 0.7rem;
-  font-weight: 800;
-  padding: 0.35rem 0.85rem;
-  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  display: flex; align-items: center; gap: 6px;
   
   ${props => props.isOpen ? `
-    color: #15803d;
-    background: #dcfce7;
-    border: 1px solid #bbf7d0;
-    box-shadow: 0 2px 5px rgba(22, 163, 74, 0.1);
+    color: #166534; background: #dcfce7; border: 1px solid #bbf7d0;
   ` : `
-    color: #991b1b;
-    background: #fee2e2;
-    border: 1px solid #fecaca;
+    color: #1e293b; background: #f1f5f9; border: 1px solid #e2e8f0;
   `}
 `;
 
 const CardBody = styled.div`
   padding: 1.5rem;
   flex: 1;
-  display: flex; flex-direction: column; gap: 12px;
+  display: flex; flex-direction: column; gap: 1rem;
 `;
 
 const StatRow = styled.div`
   display: flex;
   justify-content: space-between;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   color: ${theme.textLight};
   padding: 4px 0;
+  align-items: center;
 
   strong {
     color: ${theme.text};
-    font-weight: 700;
-    font-feature-settings: "tnum";
-    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    font-family: 'Roboto Mono', monospace; // Banking feel for numbers
+    font-size: 1rem;
   }
 
   &.highlight {
-    background: #f0f9ff;
+    background: #f8fafc;
     padding: 1rem;
-    border-radius: 12px;
-    margin-top: 0.5rem;
-    color: #0369a1;
-    border: 1px dashed #bae6fd;
+    border-radius: 8px;
+    border: 1px solid ${theme.border};
+    margin: 0.5rem 0;
     
-    strong { color: #0284c7; font-size: 1.1rem; }
+    strong { color: ${theme.primary}; font-weight: 700; font-size: 1.1rem; }
   }
 `;
 
 const DifferenceBadge = styled.div`
-  text-align: center;
-  margin-top: auto;
   padding: 0.75rem;
-  border-radius: 12px;
-  font-weight: 700;
+  border-radius: 8px;
+  font-weight: 600;
   font-size: 0.9rem;
-  display: flex; justify-content: center; align-items: center; gap: 8px;
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: auto;
   
   ${props => props.diff === 0 ? `
     background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0;
@@ -503,26 +457,64 @@ const ActionButton = styled.button`
   width: 100%;
   background: white;
   border: 1px solid ${theme.border};
-  padding: 0.75rem;
-  border-radius: 10px;
+  padding: 0.6rem;
+  border-radius: 6px;
   font-weight: 600;
-  color: ${theme.text};
+  color: ${theme.secondary};
   cursor: pointer;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+  align-items: center; justify-content: center; gap: 8px;
+  font-size: 0.9rem;
   transition: all 0.2s;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 
   &:hover {
-    background: #f8fafc;
-    border-color: #cbd5e1;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    background: ${theme.primary};
+    color: white;
+    border-color: ${theme.primary};
   }
+`;
+
+const BackButton = styled.button`
+  background: white;
+  border: 1px solid ${theme.border};
+  width: 40px; height: 40px;
+  border-radius: 8px;
+  display: grid; place-items: center;
+  cursor: pointer;
+  color: ${theme.text};
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  transition: all 0.2s;
+
+  &:hover {
+    background: ${theme.bg};
+    border-color: ${theme.secondary};
+    color: ${theme.primary};
+  }
+`;
+
+// New Component: Data Table for Product Breakdown
+const BreakdownTable = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin-top: 1rem;
   
-  &:active { transform: translateY(0); }
+  th {
+    text-align: left;
+    padding: 8px;
+    background: #f1f5f9;
+    color: #475569;
+    font-weight: 600;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  td {
+    padding: 8px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #1e293b;
+  }
+  tr:last-child td { border-bottom: none; }
+  .num { text-align: right; font-family: 'Roboto Mono', monospace; }
+  .center { text-align: center; }
 `;
 
 
@@ -714,27 +706,27 @@ const CashReport = () => {
     if (sortedProducts.length === 0) return null; // No mostrar si no hay datos de productos
 
     return (
-      <div style={{ marginTop: '1.5rem', background: '#fff', borderRadius: '12px', padding: '1rem', border: '1px solid #e2e8f0' }}>
-        <h4 style={{ margin: '0 0 1rem 0', color: '#1e293b' }}>📦 Resumen de Productos Vendidos</h4>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+      <div style={{ marginTop: '1.5rem', background: '#f8fafc', borderRadius: '8px', padding: '1rem', border: '1px solid #e2e8f0' }}>
+        <h4 style={{ margin: '0 0 0.5rem 0', color: theme.primary, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📦 Productos Vendidos (Snapshot)</h4>
+        <BreakdownTable>
           <thead>
-            <tr style={{ background: '#f8fafc', color: '#64748b' }}>
-              <th style={{ textAlign: 'left', padding: '8px' }}>Producto</th>
-              <th style={{ textAlign: 'center', padding: '8px' }}>Cant.</th>
-              <th style={{ textAlign: 'right', padding: '8px' }}>Est. Total</th>
+            <tr>
+              <th>Producto</th>
+              <th className="center">Cant.</th>
+              <th className="num">Est. Total</th>
             </tr>
           </thead>
           <tbody>
             {sortedProducts.map((p, idx) => (
-              <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <td style={{ padding: '8px' }}>{p.name}</td>
-                <td style={{ textAlign: 'center', padding: '8px', fontWeight: 'bold' }}>{p.qty}</td>
-                <td style={{ textAlign: 'right', padding: '8px' }}>{fmtMoney(p.total)}</td>
+              <tr key={idx}>
+                <td>{p.name}</td>
+                <td className="center"><strong>{p.qty}</strong></td>
+                <td className="num">{fmtMoney(p.total)}</td>
               </tr>
             ))}
           </tbody>
-        </table>
-        <div style={{ textAlign: 'right', marginTop: '8px', fontSize: '0.85rem', color: '#64748b' }}>
+        </BreakdownTable>
+        <div style={{ textAlign: 'right', marginTop: '8px', fontSize: '0.8rem', color: theme.textLight }}>
           Total Unidades: <strong>{totalItems}</strong>
         </div>
       </div>
@@ -908,26 +900,6 @@ const CashReport = () => {
     </Container>
   );
 };
-
-// ... existing styles ...
-const BackButton = styled.button`
-  background: white;
-  border: 1px solid #e2e8f0;
-  width: 45px; height: 45px;
-  border-radius: 14px;
-  display: grid; place-items: center;
-  cursor: pointer;
-  color: #334155;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 12px -3px rgba(0,0,0,0.08);
-    background: #f8fafc;
-    color: #0f172a;
-  }
-`;
 
 export default CashReport;
 
