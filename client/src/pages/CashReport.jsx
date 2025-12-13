@@ -865,6 +865,28 @@ const CashReport = () => {
               </CardHeader>
 
               <CardBody>
+                {/* TOTAL VENTAS GLOBAL (Prominente) */}
+                <div style={{
+                  background: '#f1f5f9',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  border: `1px solid ${theme.border}`,
+                  marginBottom: '1rem',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                }}>
+                  <span style={{ fontWeight: '600', color: theme.secondary, textTransform: 'uppercase', fontSize: '0.85rem', letterSpacing: '0.05em' }}>
+                    💰 Ventas Totales (Todo Medio)
+                  </span>
+                  <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: theme.primary, fontFamily: 'Roboto Mono' }}>
+                    {fmtMoney(
+                      (stats.totalVentaContado || stats.total_efectivo || 0) +
+                      (stats.totalTarjeta || 0) +
+                      (stats.totalTransferencia || 0) +
+                      (stats.totalCredito || 0)
+                    )}
+                  </span>
+                </div>
+
                 {/* RESUMEN FINANCIERO DETALLADO */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                   <div>
