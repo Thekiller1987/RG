@@ -909,5 +909,25 @@ const CashReport = () => {
   );
 };
 
+// ... existing styles ...
+const BackButton = styled.button`
+  background: white;
+  border: 1px solid #e2e8f0;
+  width: 45px; height: 45px;
+  border-radius: 14px;
+  display: grid; place-items: center;
+  cursor: pointer;
+  color: #334155;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 12px -3px rgba(0,0,0,0.08);
+    background: #f8fafc;
+    color: #0f172a;
+  }
+`;
+
 export default CashReport;
 
