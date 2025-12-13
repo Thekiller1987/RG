@@ -875,7 +875,7 @@ const CashReport = () => {
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                 }}>
                   <span style={{ fontWeight: '600', color: theme.secondary, textTransform: 'uppercase', fontSize: '0.85rem', letterSpacing: '0.05em' }}>
-                    💰 Ventas Totales (Todo Medio)
+                    💰 Ventas Totales
                   </span>
                   <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: theme.primary, fontFamily: 'Roboto Mono' }}>
                     {fmtMoney(
