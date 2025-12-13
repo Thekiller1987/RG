@@ -855,7 +855,8 @@ const CashReport = () => {
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <strong style={{ fontSize: '1.1rem' }}>{resolveName(session.abierta_por)}</strong>
                   <span style={{ fontSize: '0.85rem', color: theme.textLight }}>
-                    {new Date(session.hora_apertura).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    📅 {new Date(session.hora_apertura).toLocaleDateString('es-NI')} |
+                    🕒 {new Date(session.hora_apertura).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     {' ➜ '}
                     {new Date(session.hora_cierre).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
@@ -864,35 +865,44 @@ const CashReport = () => {
               </CardHeader>
 
               <CardBody>
-                <StatRow>
-                  <span>Monto Inicial:</span>
-                  <strong>{fmtMoney(session.monto_inicial)}</strong>
-                </StatRow>
-                <StatRow>
-                  <span>Efectivo Esperado:</span>
-                  <strong>{fmtMoney(stats.efectivoEsperado)}</strong>
-                </StatRow>
-                <StatRow className="highlight">
-                  <span>Efectivo Contado:</span>
-                  <strong>{fmtMoney(session.contado)}</strong>
-                </StatRow>
+                {/* RESUMEN FINANCIERO DETALLADO */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div>
+                    <h5 style={{ margin: '0 0 0.5rem 0', color: theme.secondary, fontSize: '0.85rem' }}>💵 Arqueo Físico</h5>
+                    <StatRow>
+                      <span>Monto Inicial:</span>
+                      <strong>{fmtMoney(session.monto_inicial)}</strong>
+                    </StatRow>
+                    <StatRow>
+                      <span>Efectivo Esperado:</span>
+                      <strong>{fmtMoney(stats.efectivoEsperado)}</strong>
+                    </StatRow>
+                    <StatRow className="highlight">
+                      <span>Efectivo Contado:</span>
+                      <strong>{fmtMoney(session.contado)}</strong>
+                    </StatRow>
+                  </div>
+                  <div>
+                    <h5 style={{ margin: '0 0 0.5rem 0', color: theme.secondary, fontSize: '0.85rem' }}>💳 No Efectivo</h5>
+                    <StatRow>
+                      <span>Tarjeta:</span>
+                      <span style={{ fontFamily: 'Roboto Mono' }}>{fmtMoney(stats.totalTarjeta)}</span>
+                    </StatRow>
+                    <StatRow>
+                      <span>Transferencia:</span>
+                      <span style={{ fontFamily: 'Roboto Mono' }}>{fmtMoney(stats.totalTransferencia)}</span>
+                    </StatRow>
+                    <StatRow>
+                      <span>Crédito Otorgado:</span>
+                      <span style={{ fontFamily: 'Roboto Mono' }}>{fmtMoney(stats.totalCredito)}</span>
+                    </StatRow>
+                  </div>
+                </div>
 
                 <DifferenceBadge diff={diff}>
                   {diff === 0 ? <FaCheckCircle /> : <FaExclamationTriangle />}
                   {diff === 0 ? 'Cuadre Perfecto' : `${diff > 0 ? '+' : ''}${fmtMoney(diff)}`}
                 </DifferenceBadge>
-
-                {/* DESGLOSE RÁPIDO */}
-                <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#64748b' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Ventas Tarjeta:</span>
-                    <span>{fmtMoney(stats.totalTarjeta)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Ventas Efec:</span>
-                    <span>{fmtMoney(stats.totalVentaContado || stats.total_efectivo || 0)}</span>
-                  </div>
-                </div>
 
                 {/* TABLA DE PRODUCTOS (SI EXISTE EL SNAPSHOT) */}
                 <RenderProductBreakdown session={session} />
