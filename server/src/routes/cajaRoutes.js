@@ -2,11 +2,12 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const pool = require('../config/db'); // MySQL Pool
 
 const router = express.Router();
 const DB_FILE = path.join(process.cwd(), 'data', 'caja-sessions.json');
 
-// ───────── Helpers de archivo JSON ─────────
+// ───────── Helpers de archivo JSON (Mantener para sesión activa) ─────────
 function ensureDB() {
   const dir = path.dirname(DB_FILE);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -31,7 +32,6 @@ function writeDB(data) {
 }
 
 /* ───────── Utils AÑADIDOS ───────── */
-// Nombre mostrable robusto
 function displayName(u) {
   if (!u) return '—';
   if (typeof u === 'string') return u;
@@ -47,7 +47,6 @@ function displayName(u) {
   );
 }
 
-// Enriquecer objeto usuario guardado en sesión (sin borrar campos)
 function normalizeUser(u, fallbackId) {
   const base = (u && typeof u === 'object') ? { ...u } : {};
   const id = String(base.id ?? fallbackId ?? '').trim();
@@ -67,7 +66,6 @@ function normalizeUser(u, fallbackId) {
   };
 }
 
-// Fecha local YYYY-MM-DD (evita desfase por UTC)
 function localDayKey(isoOrDate) {
   if (!isoOrDate) return null;
   const d = (isoOrDate instanceof Date) ? isoOrDate : new Date(isoOrDate);
@@ -91,6 +89,9 @@ router.get('/session', (req, res) => {
   const open = sessions.find(s => !s.closedAt);
   if (open) return res.json(open);
 
+  // Intentar buscar el último cerrado en JSON (fallback rápido)
+  // Nota: Idealmente deberíamos buscar el último histórico en SQL también,
+  // pero el frontend usa esto para "resumir sesión anterior" o "abrir nueva".
   const last = sessions.sort((a, b) =>
     new Date(b.openedAt) - new Date(a.openedAt)
   )[0];
@@ -113,7 +114,7 @@ router.post('/session/open', (req, res) => {
   const session = {
     id: `caja-${userId}-${Date.now()}`,
     openedAt,
-    openedBy: normalizeUser(openedBy, userId), // AÑADIDO: guardar nombre normalizado
+    openedBy: normalizeUser(openedBy, userId),
     initialAmount: Number(initialAmount) || 0,
     transactions: [],
     closedAt: null,
@@ -128,7 +129,7 @@ router.post('/session/open', (req, res) => {
   res.status(201).json(session);
 });
 
-// POST /api/caja/session/tx
+// POST /api/caja/session/tx (Mantiene en JSON para control rápido durante el día)
 router.post('/session/tx', (req, res) => {
   const { userId, tx } = req.body || {};
   if (!userId || !tx) return res.status(400).json({ message: 'Faltan userId o tx' });
@@ -151,9 +152,9 @@ router.post('/session/tx', (req, res) => {
   res.status(201).json(s);
 });
 
-// POST /api/caja/session/close
-router.post('/session/close', (req, res) => {
-  const { userId, countedAmount = 0, closedAt, closedBy } = req.body || {};
+// POST /api/caja/session/close (MIGRADO A SQL CON SNAPSHOT)
+router.post('/session/close', async (req, res) => {
+  const { userId, countedAmount = 0, closedAt, closedBy, notes } = req.body || {};
   if (!userId || !closedAt || !closedBy) {
     return res.status(400).json({ message: 'Faltan campos: userId, closedAt, closedBy' });
   }
@@ -162,108 +163,221 @@ router.post('/session/close', (req, res) => {
   const s = db.sessions.find(
     s => String(s.openedBy?.id) === String(userId) && !s.closedAt
   );
-  if (!s) return res.status(404).json({ message: 'No hay sesión abierta' });
+  if (!s) return res.status(404).json({ message: 'No hay sesión abierta para cerrar.' });
 
-  const movimientoNetoEfectivo = (s.transactions || []).reduce((total, tx) => {
-    if (tx.type === 'venta_credito') return total;
-    const ingreso = Number(tx.pagoDetalles?.ingresoCaja || tx.amount || 0);
-    if (tx.type === 'entrada') return total + ingreso;
-    if (tx.type === 'salida') return total - ingreso;
-    return total + ingreso;
-  }, 0);
-  const esperado = Number(s.initialAmount) + movimientoNetoEfectivo;
+  try {
+    // 1. Calcular totales basados en la sesión actual (JSON) y/o verificar con SQL
+    //    Para simplificar y asegurar consistencia con lo que veía el cajero, usaremos
+    //    la lógica de acumulación que ya existía, pero guardaremos el resultado final en SQL.
 
-  s.closedAt = closedAt;
-  s.closedBy = normalizeUser(closedBy, closedBy?.id || userId); // AÑADIDO: guardar nombre normalizado
-  s.countedAmount = Number(countedAmount);
-  s.difference = s.countedAmount - esperado;
+    // a. Desglose de Ventas (Iterar transacciones de sesión)
+    //    Esto es clave: al leer del JSON "transactions", estamos leyendo lo que el frontend
+    //    registró como ventas durante el día. Esto incluye ventas efectivo, tarjeta, etc.
+    //    Esto asume que el backend `/session/tx` fue llamado correctamente cada vez.
 
-  writeDB(db);
-  res.json(s);
+    let totalEfectivo = 0;
+    let totalTarjeta = 0;
+    let totalTransferencia = 0;
+    let totalCredito = 0;
+    let totalIngresos = 0; // Entradas manuales
+    let totalGastos = 0;   // Salidas manuales
+
+    // Totales calculados para "Esperado en Caja" (Solo efectivo y movimientos de caja)
+    let movimientoNetoEfectivo = 0;
+
+    const detallesSnapshot = s.transactions.map(tx => {
+      // Analizar cada transacción para sumar totales
+      const tipo = tx.type; // venta_contado, venta_credito, entrada, salida
+      const detalles = tx.pagoDetalles || {};
+
+      // Sumar al global por método de pago (si es venta)
+      if (tipo.startsWith('venta')) {
+        totalEfectivo += Number(detalles.efectivo || 0);
+        totalTarjeta += Number(detalles.tarjeta || 0);
+        totalTransferencia += Number(detalles.transferencia || 0);
+        totalCredito += Number(detalles.credito || 0);
+      }
+
+      // Calcular impacto en CAJA FÍSICA (movimientoNetoEfectivo)
+      // Esto define cuánto dinero debería haber físicamente.
+      if (tipo === 'entrada') {
+        const monto = Number(tx.amount || 0);
+        totalIngresos += monto;
+        movimientoNetoEfectivo += monto;
+      } else if (tipo === 'salida') {
+        const monto = Number(tx.amount || 0);
+        totalGastos += monto;
+        movimientoNetoEfectivo -= monto; // Resta dinero físico
+      } else if (tipo === 'venta_contado') {
+        // En venta contado, lo que entra a caja es ingresoCaja (generalmente efectivo recibido)
+        // OJO: Si pagó con tarjeta, ingresoCaja es 0 (o debería serlo en lógica pura de efectivo).
+        // Revisemos cómo POS calcula `ingresoCaja`. Usualmente es efectivo - cambio.
+        // Si el frontend manda ingresoCaja correcto, usamos eso.
+        const entradaCaja = Number(detalles.ingresoCaja || 0);
+        movimientoNetoEfectivo += entradaCaja;
+      }
+
+      return tx; // Devolver para el snapshot
+    });
+
+    const montoInicial = Number(s.initialAmount || 0);
+    const finalEsperado = montoInicial + movimientoNetoEfectivo;
+    const finalReal = Number(countedAmount);
+    const diferencia = finalReal - finalEsperado;
+
+    // 2. Insertar en MySQL `cierres_caja`
+    const insertSQL = `
+      INSERT INTO cierres_caja (
+        fecha_apertura, fecha_cierre, usuario_id, usuario_nombre,
+        monto_inicial, final_esperado, final_real, diferencia,
+        total_ventas_efectivo, total_ventas_tarjeta, total_ventas_transferencia, total_ventas_credito,
+        total_entradas, total_salidas,
+        detalles_json, observaciones
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const usuarioNombre = displayName(s.openedBy);
+    const jsonStr = JSON.stringify({
+      transactions: detallesSnapshot,
+      session_id: s.id,
+      tasaDolar: s.tasaDolar
+    });
+
+    const [result] = await pool.execute(insertSQL, [
+      new Date(s.openedAt), new Date(closedAt), userId, usuarioNombre,
+      montoInicial, finalEsperado, finalReal, diferencia,
+      totalEfectivo, totalTarjeta, totalTransferencia, totalCredito,
+      totalIngresos, totalGastos,
+      jsonStr, notes || ''
+    ]);
+
+    // 3. Actualizar JSON para marcar cerrado (Legacy support)
+    s.closedAt = closedAt;
+    s.closedBy = normalizeUser(closedBy, closedBy?.id || userId);
+    s.countedAmount = finalReal;
+    s.difference = diferencia;
+    s.sqlId = result.insertId; // Referencia al ID SQL
+    writeDB(db);
+
+    res.json({ success: true, message: 'Cierre guardado en BD', id: result.insertId, ...s });
+
+  } catch (error) {
+    console.error('Error al guardar cierre en BD:', error);
+    res.status(500).json({ message: 'Error interno guardando el cierre', error: error.message });
+  }
 });
 
 
-// ───────── AÑADIDO: Sesiones Abiertas (para CashReport.jsx) ─────────
-// GET /api/caja/abiertas/activas
-router.get('/abiertas/activas', (req, res) => {
-  const db = readDB();
-  const sessions = db.sessions || [];
+// ───────── Reporte (MIGRADO A SQL) ─────────
+// GET /api/caja/reporte?date=YYYY-MM-DD
+router.get('/reporte', async (req, res) => {
+  const dateStr = (req.query.date || localDayKey(new Date())).trim(); // YYYY-MM-DD
 
-  const abiertas = sessions
-    .filter(s => !s.closedAt) // Solo las que no tienen fecha de cierre
-    .map(s => ({
-      id: s.id,
-      openedAt: s.openedAt,
-      openedBy: s.openedBy, // objeto completo
-      monto_inicial: Number(s.initialAmount || 0),
-      tasaDolar: Number(s.tasaDolar || 0),
-      abierta_por: displayName(s.openedBy), // nombre directo
+  try {
+    // 1. Obtener Cierres Completados desde SQL
+    // Filtramos por fecha de APERTURA o CIERRE? Usualmente Cierre.
+    // Aunque el usuario selecciona "Ver reporte del día X". Si cerró a las 00:05 del día siguiente,
+    // técnicamente pertenece a la venta del día anterior.
+    // Por simplicidad, buscaremos por fecha de APERTURA que coincida con el día, 
+    // O fecha de cierre que coincida.
+    // Vamos a buscar por fecha de APERTURA que inicie en ese día (00:00 a 23:59)
+    const startDay = `${dateStr} 00:00:00`;
+    const endDay = `${dateStr} 23:59:59`;
+
+    const [rows] = await pool.query(`
+      SELECT * FROM cierres_caja 
+      WHERE fecha_apertura BETWEEN ? AND ?
+      ORDER BY fecha_cierre DESC
+    `, [startDay, endDay]);
+
+    const cerradas = rows.map(r => ({
+      id: r.id,
+      sql: true,
+      abierta_por: r.usuario_nombre,
+      cerrada_por: r.usuario_nombre, // Asumimos mismo usuario por ahora o nulo
+      hora_apertura: r.fecha_apertura,
+      hora_cierre: r.fecha_cierre,
+      monto_inicial: Number(r.monto_inicial),
+      esperado: Number(r.final_esperado),
+      contado: Number(r.final_real),
+      diferencia: Number(r.diferencia),
+      // Campos extra para el frontend nuevo
+      total_efectivo: Number(r.total_ventas_efectivo),
+      total_tarjeta: Number(r.total_ventas_tarjeta),
+      total_transferencia: Number(r.total_ventas_transferencia),
+      total_credito: Number(r.total_ventas_credito),
+      total_gastos: Number(r.total_salidas),
+      total_ingresos: Number(r.total_entradas),
+      detalles_json: r.detalles_json // Snapshot completo con productos
     }));
 
-  abiertas.sort((a,b) => new Date(b.openedAt) - new Date(a.openedAt));
-  res.json({ abiertas }); 
-});
-
-
-// ───────── NUEVO: Reporte por fecha ─────────
-// GET /api/caja/reporte?date=YYYY-MM-DD
-router.get('/reporte', (req, res) => {
-  const date = (req.query.date || localDayKey(new Date())).trim(); // clave local del día seleccionado
-  const db = readDB();
-  const sessions = db.sessions || [];
-
-  const calcEsperado = (s) => {
-    const net = (s.transactions || []).reduce((total, tx) => {
-      if (tx.type === 'venta_credito') return total;
-      const ingreso = Number(tx.pagoDetalles?.ingresoCaja || tx.amount || 0);
-      if (tx.type === 'entrada') return total + ingreso;
-      if (tx.type === 'salida') return total - ingreso;
-      return total + ingreso;
-    }, 0);
-    return Number(s.initialAmount || 0) + net;
-  };
-
-  const abiertas = [];
-  const cerradas = [];
-
-  for (const s of sessions) {
-    const openedDay = localDayKey(s.openedAt); // ← FECHA LOCAL
-    const closedDay = localDayKey(s.closedAt); // ← FECHA LOCAL
-
-    if (!s.closedAt && openedDay === date) {
-      abiertas.push({
+    // 2. Obtener Sesiones ABIERTAS desde JSON (ya que esas no están en SQL todavía)
+    const dbJSON = readDB();
+    const abiertas = dbJSON.sessions
+      .filter(s => !s.closedAt && localDayKey(s.openedAt) === dateStr)
+      .map(s => ({
         id: s.id,
         abierta_por: displayName(s.openedBy),
         hora_apertura: s.openedAt,
         monto_inicial: Number(s.initialAmount || 0)
-      });
-    }
+      }));
 
-    if (s.closedAt && closedDay === date) {
-      const esperado = calcEsperado(s);
-      const contado = Number(s.countedAmount ?? 0);
-      const diferencia = Number(contado - esperado);
-
-      cerradas.push({
-        id: s.id,
-        abierta_por: displayName(s.openedBy),
-        cerrada_por: displayName(s.closedBy),
-        hora_apertura: s.openedAt,
-        hora_cierre: s.closedAt,
-        monto_inicial: Number(s.initialAmount || 0),
-        esperado,
-        contado,
-        diferencia,
-        reporte_url: null
+    // 3. Fusionar compatibilidad con cierres viejos en JSON (opcional)
+    // Para no perder el historial anterior a hoy, podemos leer también del JSON si lo desean.
+    // Pero el usuario pidió "crear tabla... guardar info". Asumimos que desde HOY usa SQL.
+    // Si quiere ver lo viejo, podríamos mezclar.
+    // Mezcla simple: Traer del JSON los que NO tengan sqlId (legacy).
+    const legacyClosed = dbJSON.sessions
+      .filter(s => s.closedAt && localDayKey(s.openedAt) === dateStr && !s.sqlId)
+      .map(s => {
+        // Recalcular esperado legacy
+        const calcEsperado = (sess) => {
+          const net = (sess.transactions || []).reduce((t, tx) => {
+            if (tx.type === 'venta_credito') return t;
+            const ing = Number(tx.pagoDetalles?.ingresoCaja || tx.amount || 0);
+            if (tx.type === 'entrada') return t + ing;
+            if (tx.type === 'salida') return t - ing;
+            return t + ing;
+          }, 0);
+          return Number(sess.initialAmount || 0) + net;
+        };
+        const esp = calcEsperado(s);
+        return {
+          id: s.id,
+          abierta_por: displayName(s.openedBy),
+          cerrada_por: displayName(s.closedBy),
+          hora_apertura: s.openedAt,
+          hora_cierre: s.closedAt,
+          monto_inicial: Number(s.initialAmount),
+          esperado: esp,
+          contado: Number(s.countedAmount),
+          diferencia: Number(s.countedAmount) - esp
+        };
       });
-    }
+
+    res.json({ abiertas, cerradas: [...cerradas, ...legacyClosed] });
+
+  } catch (error) {
+    console.error('Error fetching reports:', error);
+    res.status(500).json({ message: 'Error cargando reportes' });
   }
+});
 
-  abiertas.sort((a,b) => new Date(b.hora_apertura) - new Date(a.hora_apertura));
-  cerradas.sort((a,b) => new Date(b.hora_cierre) - new Date(a.hora_cierre));
-
-  res.json({ abiertas, cerradas });
+// GET /api/caja/abiertas/activas (Para CashReport: mostrar quién está trabajando)
+router.get('/abiertas/activas', (req, res) => {
+  const db = readDB();
+  const abiertas = (db.sessions || [])
+    .filter(s => !s.closedAt)
+    .map(s => ({
+      id: s.id,
+      openedAt: s.openedAt,
+      openedBy: s.openedBy,
+      monto_inicial: Number(s.initialAmount || 0),
+      tasaDolar: Number(s.tasaDolar || 0),
+      abierta_por: displayName(s.openedBy),
+    }));
+  abiertas.sort((a, b) => new Date(b.openedAt) - new Date(a.openedAt));
+  res.json({ abiertas });
 });
 
 module.exports = router;
-    

@@ -580,7 +580,7 @@ const CashReport = () => {
       .header { text-align: center; border-bottom: 2px dashed #333; padding-bottom: 10px; margin-bottom: 20px; }
       .box { border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
       .row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; }
-      .row.bold { font-weight: bold; font-size: 16px; margin-top: 5px; border-top: 1px solid #eee; padding-top: 5px; }
+      .row.bold { font-weight: bold; font-size: 16px; margin-top: 5px; padding-top: 5px; }
       .text-right { text-align: right; }
       .diff-negative { color: red; font-weight: bold; }
       .diff-positive { color: green; font-weight: bold; }
@@ -600,134 +600,312 @@ const CashReport = () => {
     // Diferencia calculada al vuelo
     const diff = Number(session.countedAmount || 0) - stats.efectivoEsperado;
 
-    win.document.write(`
+    // Layout HTML del Ticket
+    const html = `
+      <!DOCTYPE html>
       <html>
-      <head><title>Reporte Histórico</title><style>${css}</style></head>
+      <head>
+        <title>Reporte de Caja - ${fmtDT(session.closedAt)}</title>
+        <style>${css}</style>
+      </head>
       <body>
         <div class="header">
-          <h2>Reporte Histórico</h2>
-          <div>Fecha Original: ${new Date(session.openedAt).toLocaleDateString('es-NI')}</div>
+          <h2>Reporte de Caja</h2>
+          <p>${fmtDT(session.closedAt)}</p>
+          <p>Cajero: ${resolveName(session.closedBy) || resolveName(session.openedBy)}</p>
         </div>
+
         <div class="box">
-          <h3>Resumen Financiero</h3>
-          <div class="row"><div>(+) Fondo Inicial Caja:</div><div>${fmtMoney(stats.cajaInicial)}</div></div>
-          <div class="row"><div>(+) Ventas en Efectivo:</div><div>${fmtMoney(ventasEfectivoTotal)}</div></div>
-          <div class="row"><div>(+) Abonos/Otros Efectivo:</div><div>${fmtMoney(abonosEfectivoTotal)}</div></div>
-          <div class="row" style="color:red"><div>(-) Salidas/Gastos:</div><div>( ${fmtMoney(salidasTotal)} )</div></div>
-          <div class="row bold"><div>(=) EFECTIVO ESPERADO:</div><div>${fmtMoney(stats.efectivoEsperado)}</div></div>
+          <div class="row bold">
+            <span>Monto Inicial:</span>
+            <span>${fmtMoney(session.monto_inicial || session.initialAmount)}</span>
+          </div>
+          <div class="row">
+            <span>(+) Efectivo Ventas:</span>
+            <span>${fmtMoney(ventasEfectivoTotal)}</span>
+          </div>
+          <div class="row">
+            <span>(+) Abonos Efectivo:</span>
+            <span>${fmtMoney(abonosEfectivoTotal)}</span>
+          </div>
+           <div class="row">
+            <span>(-) Salidas Caja:</span>
+            <span>- ${fmtMoney(salidasTotal)}</span>
+          </div>
+          <div class="row bold" style="margin-top:10px; border-top:2px solid #333;">
+            <span>= Efectivo Esperado:</span>
+            <span>${fmtMoney(stats.efectivoEsperado)}</span>
+          </div>
+          <div class="row bold">
+            <span>Efectivo Contado (Real):</span>
+            <span>${fmtMoney(session.contado)}</span>
+          </div>
+          <div class="row bold text-right ${session.diferencia < 0 ? 'diff-negative' : 'diff-positive'}">
+            <span>Diferencia: ${fmtMoney(session.diferencia)}</span>
+          </div>
         </div>
-        <div class="box">
-            <div class="row"><div>Monto Contado:</div><div>${fmtMoney(session.countedAmount)}</div></div>
-            <div class="row bold ${diff < 0 ? 'diff-negative' : 'diff-positive'}">
-                <div>DIFERENCIA FINAL:</div><div>${fmtMoney(diff)}</div>
-            </div>
-        </div>
-        <div class="box" style="background:#f0f9ff; border:1px dashed #00f;">
-            <div class="row bold" style="color:#00f"><div>TOTAL VENTAS DEL DIA (Bruto):</div><div>${fmtMoney(stats.totalVentasDia)}</div></div>
-        </div>
-        <script>window.onload = () => window.print();</script>
-      </body></html>
-    `);
+      </body>
+      </html>
+    `;
+
+    win.document.write(html);
+    win.document.close();
+    win.print();
   };
 
-  // Renderizador de Tarjeta de Sesión
-  const renderSessionCard = (session, isOpen = false) => {
-    // Recalcular stats en cliente para asegurar precisión
-    const stats = calculateReportStats(session);
-    const diff = isOpen ? 0 : (Number(session.countedAmount || 0) - stats.efectivoEsperado);
+  // ───────── NUEVO: Renderizador de Productos Vendidos (Snapshot) ─────────
+  const RenderProductBreakdown = ({ session }) => {
+    // 1. Extraer transacciones
+    let transactions = [];
+    if (session.sql && session.detalles_json) {
+      // SQL Snapshot
+      try {
+        const json = typeof session.detalles_json === 'string'
+          ? JSON.parse(session.detalles_json)
+          : session.detalles_json;
+        transactions = json.transactions || [];
+      } catch (e) { console.error("Error parseando snapshot", e); }
+    } else {
+      // Legacy JSON
+      transactions = session.transactions || [];
+    }
+
+    // 2. Agrupar Productos
+    const productMap = {};
+    let totalItems = 0;
+
+    transactions.forEach(tx => {
+      // Solo nos interesan ventas completadas
+      if (tx.type?.startsWith('venta') && !tx.type?.includes('cancelacion')) {
+        // items suele estar en la venta original, pero en el snapshot de cierre
+        // guardamos la transacción resumida.
+        // OJO: El snapshot actual en cajaRoutes guarda "tx" que viene del body del cierre.
+        // Si el body del cierre NO enviaba los items, no los tenemos.
+
+        // REVISIÓN CRÍTICA: En el endpoint /session/tx, guardamos lo que el frontend manda.
+        // Si el frontend manda `items` en `tx`, entonces sí los tenemos.
+        // Verifiquemos si POS.jsx manda items en /session/tx...
+        // POS.jsx: registerTransition({ type:..., amount:..., pagoDetalles:... }) -> NO PARECE MANDAR ITEMS.
+
+        // SI NO MANDAMOS ITEMS, NO PODEMOS MOSTRARLOS.
+        // SOLUCIÓN RAPIDA: Si items existe, mostramos. Si no, mostramos advertencia.
+        // (Para el futuro: hay que asegurar que POS mande items en transaction).
+
+        if (Array.isArray(tx.items)) {
+          tx.items.forEach(item => {
+            const id = item.id || item.id_producto;
+            const name = item.nombre || item.name || 'Item';
+            const qty = Number(item.cantidad || item.quantity || 0);
+            const price = Number(item.precio || item.price || 0); // Precio unitario (estimado)
+
+            if (!productMap[id]) {
+              productMap[id] = { name, qty: 0, total: 0 };
+            }
+            productMap[id].qty += qty;
+            productMap[id].total += (qty * price);
+            totalItems += qty;
+          });
+        }
+      }
+    });
+
+    const sortedProducts = Object.values(productMap).sort((a, b) => b.qty - a.qty);
+
+    if (sortedProducts.length === 0) return null; // No mostrar si no hay datos de productos
 
     return (
-      <Card key={session._id || session.id}>
-        <CardHeader isOpen={isOpen}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{new Date(session.openedAt).toLocaleTimeString('es-NI', { hour: '2-digit', minute: '2-digit', hour12: true })}</h3>
-            <small style={{ color: theme.textLight }}>{resolveName(session.openedBy)}</small>
-          </div>
-          <Badge isOpen={isOpen}>{isOpen ? 'ABIERTA' : 'CERRADA'}</Badge>
-        </CardHeader>
-        <CardBody>
-          <StatRow><span>Fondo Inicial:</span><strong>{fmtMoney(stats.cajaInicial)}</strong></StatRow>
-          <StatRow><span>Efectivo Esperado:</span><strong>{fmtMoney(stats.efectivoEsperado)}</strong></StatRow>
-          {!isOpen && <StatRow><span>Contado Real:</span><strong>{fmtMoney(session.countedAmount)}</strong></StatRow>}
-          <StatRow className="highlight total-ventas">
-            <span>Ventas Totales (Día):</span>
-            <span>{fmtMoney(stats.totalVentasDia)}</span>
-          </StatRow>
-          {!isOpen && (
-            <DifferenceBadge diff={diff}>
-              {diff === 0 ? '✅ BALANCE PERFECTO' : `⚠️ DIFERENCIA: ${fmtMoney(diff)}`}
-            </DifferenceBadge>
-          )}
-        </CardBody>
-        <CardFooter>
-          <ActionButton onClick={() => handlePrintDetail(session)}>
-            <FaPrint /> Imprimir Detalle
-          </ActionButton>
-        </CardFooter>
-      </Card>
+      <div style={{ marginTop: '1.5rem', background: '#fff', borderRadius: '12px', padding: '1rem', border: '1px solid #e2e8f0' }}>
+        <h4 style={{ margin: '0 0 1rem 0', color: '#1e293b' }}>📦 Resumen de Productos Vendidos</h4>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+          <thead>
+            <tr style={{ background: '#f8fafc', color: '#64748b' }}>
+              <th style={{ textAlign: 'left', padding: '8px' }}>Producto</th>
+              <th style={{ textAlign: 'center', padding: '8px' }}>Cant.</th>
+              <th style={{ textAlign: 'right', padding: '8px' }}>Est. Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedProducts.map((p, idx) => (
+              <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '8px' }}>{p.name}</td>
+                <td style={{ textAlign: 'center', padding: '8px', fontWeight: 'bold' }}>{p.qty}</td>
+                <td style={{ textAlign: 'right', padding: '8px' }}>{fmtMoney(p.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div style={{ textAlign: 'right', marginTop: '8px', fontSize: '0.85rem', color: '#64748b' }}>
+          Total Unidades: <strong>{totalItems}</strong>
+        </div>
+      </div>
     );
   };
 
-  return (
-    <>
-      <PrintStyles />
-      <Container>
-        <Header>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <button title="Volver al Dashboard" onClick={() => navigate('/dashboard')} style={{
-              background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', width: '45px', height: '45px',
-              display: 'grid', placeItems: 'center', cursor: 'pointer', color: '#1e293b', boxShadow: '0 2px 4px rgba(0,0,0,0.03)'
-            }}>
-              <FaArrowLeft size={18} />
-            </button>
-            <HeaderTitle>
-              <h1><FaFileAlt color="#3b82f6" /> Reportes de Caja</h1>
-              <p>Historial de aperturas, cierres y auditoría</p>
-            </HeaderTitle>
-          </div>
 
+  return (
+    <Container>
+      <PrintStyles />
+      <Header className="no-print">
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <BackButton title="Volver al Dashboard" onClick={() => navigate('/dashboard')} >
+            <FaArrowLeft />
+          </BackButton>
+          <HeaderTitle>
+            <h1>Reportes de Caja</h1>
+            <p>Historial de aperturas, cierres y auditoría</p>
+          </HeaderTitle>
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          {loading && <span style={{ color: theme.textLight }}><FaSyncAlt className="icon-spin" /> Cargando...</span>}
           <DateControl>
             <div className="input-wrapper">
-              <FaCalendarAlt color="#64748b" style={{ position: 'absolute', left: 16 }} />
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ paddingLeft: 40 }} />
+              <FaCalendarAlt style={{ position: 'absolute', left: 12, color: theme.primary, pointerEvents: 'none' }} />
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
             </div>
-            <button onClick={fetchData} title="Refrescar datos">
-              {loading ? <FaSyncAlt className="spin" /> : <FaSyncAlt />}
-            </button>
+            <button onClick={fetchData} title="Refrescar"><FaSyncAlt /></button>
           </DateControl>
-        </Header>
+        </div>
+      </Header>
 
-        {loading && <div style={{ textAlign: 'center', padding: '4rem', color: theme.textLight }}>
-          <FaSyncAlt size={40} className="spin" style={{ opacity: 0.3 }} />
-          <p style={{ marginTop: 20 }}>Cargando información...</p>
-        </div>}
+      {error && (
+        <div style={{ textAlign: 'center', margin: '2rem', color: theme.danger }}>
+          <FaExclamationTriangle /> {error}
+        </div>
+      )}
 
-        {!loading && (
-          <Grid>
-            {/* CAJAS ABIERTAS AHORA */}
-            {abiertasActivas.map(s => renderSessionCard(s, true))}
+      {/* Grid ABIERTAS */}
+      <h3 style={{ marginLeft: '0.5rem', marginBottom: '1rem', color: theme.text }}>
+        <FaLockOpen /> Cajas Abiertas ({abiertasHoy.length})
+      </h3>
 
-            {/* CAJAS CERRADAS DE LA FECHA SELECCIONADA */}
-            {cerradasHoy.map(s => renderSessionCard(s, false))}
+      {!loading && !abiertasHoy.length && (
+        <p style={{ marginLeft: '1rem', color: theme.textLight, fontStyle: 'italic' }}>No hay cajas abiertas para esta fecha.</p>
+      )}
 
-            {/* CAJAS ABIERTAS DE LA FECHA (HISTORIAL) */}
-            {abiertasHoy.map(s => renderSessionCard(s, true))}
-          </Grid>
-        )}
+      <Grid className="cards-grid-print" style={{ marginBottom: '3rem' }}>
+        {abiertasHoy.map(session => (
+          <Card key={session.id} className="Card">
+            <CardHeader isOpen>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <strong style={{ fontSize: '1.1rem' }}>{resolveName(session.abierta_por)}</strong>
+                <span style={{ fontSize: '0.85rem', color: '#15803d' }}>
+                  Abierta: {new Date(session.hora_apertura).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+              <Badge isOpen>Abierta</Badge>
+            </CardHeader>
+            <CardBody>
+              <StatRow>
+                <span>Monto Inicial:</span>
+                <strong>{fmtMoney(session.monto_inicial)}</strong>
+              </StatRow>
+              <div style={{
+                marginTop: 'auto',
+                padding: '1rem',
+                background: '#f0fdf4',
+                borderRadius: '12px',
+                color: '#166534',
+                fontSize: '0.9rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <FaCheckCircle /> Caja activa actualmente
+              </div>
+            </CardBody>
+          </Card>
+        ))}
+      </Grid>
 
-        {!loading && cerradasHoy.length === 0 && abiertasHoy.length === 0 && abiertasActivas.length === 0 && (
-          <div style={{
-            textAlign: 'center', color: theme.textLight, marginTop: '4rem',
-            background: 'white', padding: '3rem', borderRadius: '24px', border: '1px dashed #e2e8f0',
-            maxWidth: '500px', marginInline: 'auto'
-          }}>
-            <FaExclamationTriangle size={48} style={{ marginBottom: '1.5rem', opacity: 0.3, color: theme.warning }} />
-            <h3 style={{ margin: '0 0 8px 0', color: theme.text }}>Sin Movimientos</h3>
-            <p style={{ margin: 0 }}>No se encontraron registros para la fecha <strong>{date}</strong>.</p>
-          </div>
-        )}
-      </Container>
-    </>
+      {/* Grid CERRADAS */}
+      <h3 style={{ marginLeft: '0.5rem', marginBottom: '1rem', color: theme.text }}>
+        <FaCheckCircle /> Cierres Completados ({cerradasHoy.length})
+      </h3>
+
+      {!loading && !cerradasHoy.length && (
+        <p style={{ marginLeft: '1rem', color: theme.textLight, fontStyle: 'italic' }}>No hay cierres registrados en esta fecha.</p>
+      )}
+
+      <Grid className="cards-grid-print">
+        {cerradasHoy.map(session => {
+          const stats = session.sql
+            ? {
+              efectivoEsperado: Number(session.esperado),
+              diferencia: Number(session.diferencia),
+              totalVentaContado: Number(session.total_efectivo),
+              totalTarjeta: Number(session.total_tarjeta),
+              totalTransferencia: Number(session.total_transferencia),
+              totalCredito: Number(session.total_credito)
+            }
+            : calculateReportStats(session); // Legacy logic
+
+          const diff = Number(session.diferencia);
+
+          return (
+            <Card key={session.id} className="Card">
+              <CardHeader>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <strong style={{ fontSize: '1.1rem' }}>{resolveName(session.abierta_por)}</strong>
+                  <span style={{ fontSize: '0.85rem', color: theme.textLight }}>
+                    {new Date(session.hora_apertura).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {' ➜ '}
+                    {new Date(session.hora_cierre).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <Badge>Cerrada</Badge>
+              </CardHeader>
+
+              <CardBody>
+                <StatRow>
+                  <span>Monto Inicial:</span>
+                  <strong>{fmtMoney(session.monto_inicial)}</strong>
+                </StatRow>
+                <StatRow>
+                  <span>Efectivo Esperado:</span>
+                  <strong>{fmtMoney(stats.efectivoEsperado)}</strong>
+                </StatRow>
+                <StatRow className="highlight">
+                  <span>Efectivo Contado:</span>
+                  <strong>{fmtMoney(session.contado)}</strong>
+                </StatRow>
+
+                <DifferenceBadge diff={diff}>
+                  {diff === 0 ? <FaCheckCircle /> : <FaExclamationTriangle />}
+                  {diff === 0 ? 'Cuadre Perfecto' : `${diff > 0 ? '+' : ''}${fmtMoney(diff)}`}
+                </DifferenceBadge>
+
+                {/* DESGLOSE RÁPIDO */}
+                <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#64748b' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Ventas Tarjeta:</span>
+                    <span>{fmtMoney(stats.totalTarjeta)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Ventas Efec:</span>
+                    <span>{fmtMoney(stats.totalVentaContado || stats.total_efectivo || 0)}</span>
+                  </div>
+                </div>
+
+                {/* TABLA DE PRODUCTOS (SI EXISTE EL SNAPSHOT) */}
+                <RenderProductBreakdown session={session} />
+
+              </CardBody>
+
+              <CardFooter className="no-print">
+                <ActionButton onClick={() => handlePrintDetail(session)}>
+                  <FaPrint /> Imprimir Reporte
+                </ActionButton>
+              </CardFooter>
+            </Card>
+          );
+        })}
+      </Grid>
+    </Container>
   );
 };
 

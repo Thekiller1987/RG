@@ -951,7 +951,8 @@ const POS = () => {
         amount: ingresoCaja,
         note: `Venta #${response?.saleId || ''} ${esCredito ? '(CRÉDITO)' : ''} ${saleToCreate.originalOrderId ? `(Pago Pedido #${saleToCreate.originalOrderId})` : ''}`,
         at: new Date().toISOString(),
-        pagoDetalles: { ...pagoDetalles, clienteId: finalClientId, ingresoCaja }
+        pagoDetalles: { ...pagoDetalles, clienteId: finalClientId, ingresoCaja },
+        items: itemsForSale // <-- AÑADIDO: Incluir items para el snapshot de cierre
       };
 
       addCajaTransaction(cajaTx);
