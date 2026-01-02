@@ -191,9 +191,27 @@ const POS = () => {
         // Lookup names for immediate display in History (fallback logic in SalesHistoryModal)
         const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
 
+        // --- SAFEGUARD: Force specific fields for Caja detection ---
+        const d_efectivo = Number(details.efectivo || 0);
+        const d_tarjeta = Number(details.tarjeta || 0);
+        const d_transf = Number(details.transferencia || 0);
+        const d_credito = Number(details.credito || 0);
+        const totalSale = Number(saleData.totalVenta || 0);
+
+        // If it looks like a pure cash sale (no digital payments), force effective cash values
+        // Note: Using 0.01 tolerance for Float comparisons
+        if (d_tarjeta < 0.01 && d_transf < 0.01 && d_credito < 0.01) {
+          details.efectivo = totalSale;
+          details.ingresoCaja = totalSale;
+        } else {
+          // Mixed payment: Ensure we respect the modal's calculation but ensure type Number
+          details.efectivo = d_efectivo;
+          details.ingresoCaja = Number(details.ingresoCaja || d_efectivo);
+        }
+
         const newTransaction = {
           type: 'venta', // Generic type, CajaModal handles details via pagoDetalles
-          amount: saleData.totalVenta,
+          amount: totalSale,
           at: new Date().toISOString(),
           userId,
           userName: currentUser?.nombre_usuario || 'Caja', // Explicitly save seller name
