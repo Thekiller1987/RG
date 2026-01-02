@@ -746,9 +746,10 @@ const POS = () => {
             onReturnItem={async (sale, item, qty) => {
               try {
                 // 1. Call Backend API to process return logic (Inventory, Status update)
+                // FIXED: Payload to match server expectation: { originalSaleId, item, quantity, userId }
                 const payload = {
-                  saleId: sale.id,
-                  itemId: item.id || item.id_producto,
+                  originalSaleId: sale.id,
+                  item: item,
                   quantity: qty,
                   userId
                 };

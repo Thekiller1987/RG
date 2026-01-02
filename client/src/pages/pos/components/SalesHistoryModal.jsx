@@ -370,22 +370,65 @@ function SalesHistoryModal({
           openAlert('Cantidad inválida', `Ingresa un número entre 1 y ${maxQty}.`);
           return;
         }
-        try {
-          await onReturnItem(selectedSale, item, qty);
-          openAlert('Éxito', `Se devolvieron ${qty} unidad(es) de ${safeItemName(item, index)}.`);
-          // CAMBIO: Pasar null para refrescar la lista completa y seleccionar el nuevo ticket automáticamente.
-          // Esto asume que el backend borra el ticket original y crea uno nuevo.
-          await afterMutationRefresh(null);
-        } catch (error) {
-          const msg = (error?.message || '').toLowerCase();
-          const cleaned =
-            msg.includes('not found') || msg.includes('404')
-              ? 'Ruta de API no encontrada. Verifica POST /api/sales/returns.'
+
+        // --- FEATURE: Sugerir Cancelación Completa si es el último ítem ---
+        const isLastItemAndFullQty = (selectedSale.items.length === 1 && qty === maxQty);
+
+        const proceedWithReturn = async () => {
+          try {
+            await onReturnItem(selectedSale, item, qty);
+            openAlert('Éxito', `Se devolvieron ${qty} unidad(es) de ${safeItemName(item, index)}.`);
+            await afterMutationRefresh(null);
+          } catch (error) {
+            const msg = (error?.message || '').toLowerCase();
+            const cleaned = (msg.includes('not found') || msg.includes('404'))
+              ? 'Ruta de API no encontrada.'
               : (error.message || 'No se pudo devolver el producto.');
-          openAlert('Error al Devolver', cleaned);
-        } finally {
-          closePrompt();
+            openAlert('Error al Devolver', cleaned);
+          }
+        };
+
+        if (isLastItemAndFullQty) {
+          // Close prompt first to switch context
+          // Note: closePrompt is called in finally block below, but we need to intercept flow here.
+          // We can't rely on 'finally' closing it before opening confirm if we await here.
+          // But openConfirm sets state, so it might overwrite prompt state if they share same modal?
+          // They are separate components (LocalPrompt vs LocalConfirm).
+
+          // Hack: Trigger confirm after a small tick or directly.
+          // We use openConfirm callback. 
+          // openConfirm(title, msg, onConfirm, onCancel) <- Need onCancel support if LocalConfirm supports it.
+          // Checking LocalConfirm implementation: usually it has onConfirm and onClose (cancel).
+
+          // Let's assume we can chain it.
+          closePrompt(); // Manually close existing prompt
+
+          setTimeout(() => {
+            setConfirmState({
+              isOpen: true,
+              title: '¿Cancelar Venta Completa?',
+              message: 'Este es el ÚLTIMO artículo de la venta. \n\n¿Prefieres CANCELAR toda la venta en lugar de hacer una devolución individual?\n(Esto revertirá todo el ticket).',
+              onConfirm: async () => {
+                // User chose Cancel Sale
+                setConfirmState({ isOpen: false, title: '', message: '', onConfirm: null });
+                if (onCancelSale) {
+                  handleCancel(selectedSale.id); // Re-use existing handleCancel logic
+                }
+              },
+              // If user cancels the confirmation, we proceed with INDIVIDUAL return automatically?
+              // Or we just do nothing? The user asked: "te diga es el ultimo articulo deseas cancelar pero que tambine te deje devolver individual"
+              // So "Cancel" on this prompt implies "No, I want individual return".
+              onClose: () => {
+                setConfirmState({ isOpen: false, title: '', message: '', onConfirm: null });
+                proceedWithReturn(); // Fallback to return
+              }
+            });
+          }, 100);
+          return;
         }
+
+        // Normal flow if not last item
+        await proceedWithReturn();
       }
     );
   }, [selectedSale, onReturnItem, afterMutationRefresh]);
