@@ -64,23 +64,28 @@ export const HeaderActions = styled.header`
   }
 `;
 
-/* 65% productos / 35% carrito en desktop */
+/* 65% productos / 35% carrito en desktop, pero mejorando el break point */
 export const PageContentWrapper = styled.div`
   display: grid;
-  grid-template-columns: 65% 35%;
+  grid-template-columns: minmax(0, 65%) minmax(340px, 35%);
   gap: 1.25rem;
   padding: 1.25rem;
   flex: 1;
   box-sizing: border-box;
+  height: calc(100vh - 80px); /* Ajuste para evitar scroll global innecesario */
+  overflow: hidden;
 
   @media (max-width: 1200px) {
-    grid-template-columns: 60% 40%;
+    grid-template-columns: 1fr 380px;
   }
-  @media (max-width: 900px) {
+  
+  @media (max-width: 960px) {
     grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
     gap: 1rem;
-    padding: 1rem;
-    min-height: 1px;
+    padding: 0.75rem;
+    height: auto;
+    overflow: visible;
   }
 `;
 
@@ -91,94 +96,90 @@ export const Panel = styled.div`
   padding: 1rem;
   display: flex;
   flex-direction: column;
-  min-height: 0; /* permite scroll interno */
+  min-height: 0; /* importante para scroll interno */
+  height: 100%;
 `;
 
 export const MainPanel = styled(Panel)`
   animation: ${slideInFromLeft} 0.6s ease-out forwards;
-  min-width: 0;
+  overflow: hidden; /* El grid interno hará scroll */
+  
+  @media (max-width: 960px) {
+    height: 60vh; /* En móvil, damos espacio fijo a la lista */
+    margin-bottom: 0;
+  }
 `;
 
 export const CartPanel = styled(Panel)`
   animation: ${slideInFromRight} 0.6s ease-out forwards;
-  min-width: 340px;
-  max-width: 560px;
-
-  /* Sticky dentro del viewport mientras se scrollean productos */
-  position: sticky;
-  top: 88px;
-
-  /* Layout: top / lista / bottom */
+  min-width: 0; /* Override */
+  max-width: none;
+  position: relative;
+  top: 0;
+  
+  /* Layout interno del carrito */
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: .65rem;
-
-  /* Alto para que siempre se vea la lista */
-  min-height: calc(100vh - 120px);
+  height: 100%;
 
   .cart-fixed-top {
     display: flex; flex-direction: column; gap: .5rem;
   }
 
   .cart-title {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    margin: 0;
+    display: flex; align-items: center; gap: .5rem; margin: 0;
   }
   .cart-title-name {
-    font-weight: 800;
-    font-size: 1.25rem;
-    line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 75%;
+    font-weight: 800; font-size: 1.25rem; line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%;
   }
   .cart-title-count {
-    font-weight: 600;
-    color: #6c757d;
-    font-size: .95rem;
+    font-weight: 600; color: #6c757d; font-size: .95rem;
   }
 
   .tickets-header { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
   .caja-pill { margin-bottom: .25rem; }
 
-  /* Lista con scroll real y espacio propio */
+  /* Lista con scroll real */
   .cart-scroll {
-    overflow: auto;
+    overflow-y: auto;
     padding-right: 4px;
     border: 1px solid #eef1f5;
     border-radius: 12px;
     background: #fafbfd;
-    min-height: 260px;
+    /* En desktop ocupa lo que sobra, en mobile definimos min-height */
   }
 
   .cart-fixed-bottom {
     display: flex; flex-direction: column; gap: .5rem;
     background: #fff;
-    position: sticky; bottom: 0;
+    padding-top: 5px;
   }
 
   .cart-actions {
     display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;
   }
 
-  @media (max-width: 900px) {
+  @media (max-width: 960px) {
+    position: fixed; /* Opcional: convertir en bottom sheet o dejar estático abajo */
+    /* Dejémoslo estático abajo por simplicidad pero bien dimensionado */
     position: static;
-    min-height: 65vh;
-    grid-template-rows: auto 1fr auto;
-  }
-
-  @media (min-height: 900px) {
-    min-height: calc(100vh - 120px);
+    height: auto;
+    min-height: auto;
+    border-top: 1px solid #eee;
+    
+    .cart-scroll {
+        max-height: 250px;
+        min-height: 150px;
+    }
   }
 `;
 
 /* ───────────────────────── COMPONENTES DE UI ───────────────────────── */
 const blocked = [
-  'pay','primary','info','cancel','$cancel','dark','mt',
-  'outOfStock','outofstock','lowStock','lowstock',
+  'pay', 'primary', 'info', 'cancel', '$cancel', 'dark', 'mt',
+  'outOfStock', 'outofstock', 'lowStock', 'lowstock',
   '$pulsate', '$bordered', '$bold', 'ref'
 ];
 const shouldForwardProp = (prop) => !blocked.includes(prop);
@@ -281,17 +282,40 @@ export const ProductCard = styled.div`
       &:hover { transform: translateY(-4px) scale(1.01); box-shadow: 0 15px 40px rgba(0,30,80,0.15); border-color: #007bff; }
     `}
 
+  /* Imagen del producto */
   .image-placeholder {
-    height: 100px; background: #f4f7fa;
+    height: 120px;
+    background: #f4f7fa;
     display: flex; align-items: center; justify-content: center;
-    font-size: 3rem; font-weight: bold; color: #ced4da;
+    position: relative; overflow: hidden;
     border-bottom: 1px solid #e9ecef;
 
-    @media (max-width: 768px) { height: 70px; font-size: 2rem; }
+    img {
+        width: 100%; height: 100%; object-fit: cover;
+        transition: transform 0.3s;
+    }
+    
+    .no-image-icon { font-size: 2.5rem; color: #ced4da; }
+
+    @media (max-width: 768px) { height: 90px; .no-image-icon{ font-size: 2rem; } }
   }
-  .info { padding: .75rem; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
-  p { margin: 0; font-size: .95em; color: #495057; font-weight: 600; line-height: 1.35; }
-  .price { font-weight: 700; color: #007bff; font-size: 1.15em; margin-top: .5rem; }
+
+  /* Info */
+  .info {
+    padding: .75rem;
+    flex-grow: 1;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  
+  .product-name {
+    margin: 0; font-size: .95em; color: #495057; font-weight: 600; line-height: 1.35;
+    /* Limit lines */
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  .price {
+    font-weight: 700; color: #007bff; font-size: 1.15em; margin-top: .5rem;
+  }
 `;
 
 export const StockBadge = styled.div`

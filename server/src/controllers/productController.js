@@ -11,7 +11,7 @@ const createProduct = async (req, res) => {
   const {
     codigo, nombre, costo, venta, existencia,
     minimo, maximo, id_categoria, id_proveedor,
-    tipo_venta, mayoreo
+    tipo_venta, mayoreo, imagen
   } = req.body;
 
   const id_usuario = req.user?.id_usuario || req.user?.id;
@@ -35,7 +35,7 @@ const createProduct = async (req, res) => {
     const productData = {
       codigo, nombre, costo, venta, existencia,
       minimo, maximo, id_categoria, id_proveedor,
-      tipo_venta, mayoreo
+      tipo_venta, mayoreo, imagen
     };
 
     const [result] = await connection.query('INSERT INTO productos SET ?', [productData]);
@@ -104,16 +104,16 @@ const getProductById = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   const { id } = req.params;
-console.log("🔥🔥🔥 ¡SÍ ESTOY USANDO EL CÓDIGO NUEVO PARA EDITAR! 🔥🔥🔥");
+  console.log("🔥🔥🔥 ¡SÍ ESTOY USANDO EL CÓDIGO NUEVO PARA EDITAR! 🔥🔥🔥");
 
 
 
-  
+
   // ✅ CAMBIO 1: Ya no se extrae 'existencia' del body.
   const {
     codigo, nombre, costo, venta,
     minimo, maximo, id_categoria, id_proveedor,
-    tipo_venta, mayoreo, descripcion // Se añade 'descripcion' si también la editas
+    tipo_venta, mayoreo, descripcion, imagen // Se añade 'descripcion' e 'imagen'
   } = req.body;
 
   const id_usuario = req.user?.id_usuario || req.user?.id;
@@ -147,7 +147,7 @@ console.log("🔥🔥🔥 ¡SÍ ESTOY USANDO EL CÓDIGO NUEVO PARA EDITAR! 🔥�
     const productData = {
       codigo, nombre, costo, venta,
       minimo, maximo, id_categoria, id_proveedor,
-      tipo_venta, mayoreo, descripcion
+      tipo_venta, mayoreo, descripcion, imagen
     };
 
     // Actualiza el producto en la base de datos
@@ -163,7 +163,7 @@ console.log("🔥🔥🔥 ¡SÍ ESTOY USANDO EL CÓDIGO NUEVO PARA EDITAR! 🔥�
 
     // Devuelve el objeto actualizado pero con la existencia que ya estaba en la BD.
     res.json({ id, ...productData, existencia: producto[0].existencia });
-    
+
   } catch (error) {
     if (connection) await connection.rollback();
     console.error('Error en updateProduct:', error);

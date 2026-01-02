@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import styled from 'styled-components'; // Importamos styled para los botones locales
-import { FaStore, FaExclamationTriangle, FaTags, FaBarcode, FaFont } from 'react-icons/fa';
+import { FaStore, FaExclamationTriangle, FaTags, FaBarcode, FaFont, FaImage } from 'react-icons/fa';
 import * as S from '../POS.styles.jsx';
 
 const PRODUCTS_PER_PAGE = 100;
@@ -36,9 +36,9 @@ export default function ProductPanel({
   inputRef,
   // Recibimos las nuevas propiedades
   searchType = 'description',
-  setSearchType = () => {} 
+  setSearchType = () => { }
 }) {
-  
+
   const qtyInCart = useMemo(() => {
     const map = new Map();
     for (const it of cartItems) {
@@ -49,7 +49,7 @@ export default function ProductPanel({
 
   const filteredProducts = useMemo(() => {
     const term = (searchTerm || '').toLowerCase().trim();
-    
+
     // 1. Si no hay búsqueda, mostrar los primeros N productos
     if (!term) {
       return products.slice(0, PRODUCTS_PER_PAGE);
@@ -58,7 +58,7 @@ export default function ProductPanel({
     // 2. Si es búsqueda por NOMBRE, mantenemos la restricción de 3 letras
     //    Pero si es CÓDIGO, permitimos buscar desde 1 caracter
     if (searchType === 'description' && term.length < 3) {
-       return products.slice(0, PRODUCTS_PER_PAGE);
+      return products.slice(0, PRODUCTS_PER_PAGE);
     }
 
     // 3. Filtramos los productos
@@ -67,7 +67,7 @@ export default function ProductPanel({
         // --- CORRECCIÓN: SOLO CÓDIGO Y BARRAS (SIN ID) ---
         const codigo = String(p.codigo || '').toLowerCase();
         const barras = String(p.codigo_barras || '').toLowerCase();
-        
+
         // Devuelve true si el código visible o de barras empieza con el término
         return codigo.startsWith(term) || barras.startsWith(term);
       } else {
@@ -84,21 +84,21 @@ export default function ProductPanel({
   const totalResults = useMemo(() => {
     const term = (searchTerm || '').toLowerCase().trim();
     if (!term) return products.length;
-    
+
     return products.filter(p => {
-        if (searchType === 'code') {
-            const codigo = String(p.codigo || '').toLowerCase();
-            const barras = String(p.codigo_barras || '').toLowerCase();
-            // Corrección aquí también: Quitamos el ID
-            return codigo.startsWith(term) || barras.startsWith(term);
-        }
-        return (p.nombre || '').toLowerCase().includes(term);
+      if (searchType === 'code') {
+        const codigo = String(p.codigo || '').toLowerCase();
+        const barras = String(p.codigo_barras || '').toLowerCase();
+        // Corrección aquí también: Quitamos el ID
+        return codigo.startsWith(term) || barras.startsWith(term);
+      }
+      return (p.nombre || '').toLowerCase().includes(term);
     }).length;
   }, [products, searchTerm, searchType]);
 
   return (
     <S.MainPanel>
-      
+
       {/* Contenedor Flex para la barra y los botones */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem' }}>
         <S.SearchInput
@@ -112,21 +112,21 @@ export default function ProductPanel({
         />
 
         {/* Botón para buscar por NOMBRE */}
-        <FilterButton 
-            $active={searchType === 'description'} 
-            onClick={() => { setSearchType('description'); inputRef.current?.focus(); }}
-            title="Buscar por Nombre"
+        <FilterButton
+          $active={searchType === 'description'}
+          onClick={() => { setSearchType('description'); inputRef.current?.focus(); }}
+          title="Buscar por Nombre"
         >
-            <FaFont />
+          <FaFont />
         </FilterButton>
 
         {/* Botón para buscar por CÓDIGO */}
-        <FilterButton 
-            $active={searchType === 'code'} 
-            onClick={() => { setSearchType('code'); inputRef.current?.focus(); }}
-            title="Buscar por Código"
+        <FilterButton
+          $active={searchType === 'code'}
+          onClick={() => { setSearchType('code'); inputRef.current?.focus(); }}
+          title="Buscar por Código"
         >
-            <FaBarcode />
+          <FaBarcode />
         </FilterButton>
       </div>
 
@@ -165,7 +165,13 @@ export default function ProductPanel({
                   {restante}
                 </S.StockBadge>
 
-                <div className="image-placeholder">{(p.nombre || '').charAt(0)}</div>
+                <div className="image-placeholder">
+                  {p.imagen ? (
+                    <img src={p.imagen} alt={p.nombre} loading="lazy" />
+                  ) : (
+                    <FaImage className="no-image-icon" />
+                  )}
+                </div>
 
                 <div className="info">
                   <p style={{
@@ -177,13 +183,13 @@ export default function ProductPanel({
                   }}>{p.nombre}</p>
 
                   <div className="price">C${fmt(p.precio)}</div>
-                  
+
                   {/* Mostrar código si se busca por código para confirmar visualmente */}
                   {searchType === 'code' && (
-                      <small style={{ display:'block', color:'#666', marginTop:'4px' }}>
-                          <FaBarcode style={{marginRight:4}}/> 
-                          {p.codigo || p.codigo_barras || 'S/C'}
-                      </small>
+                    <small style={{ display: 'block', color: '#666', marginTop: '4px' }}>
+                      <FaBarcode style={{ marginRight: 4 }} />
+                      {p.codigo || p.codigo_barras || 'S/C'}
+                    </small>
                   )}
 
                   {p.raw?.mayoreo > 0 && (
