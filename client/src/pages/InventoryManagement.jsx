@@ -334,9 +334,17 @@ const ManagementModal = ({ title, items, onAdd, onDelete, onClose }) => {
 
 const StockAdjustmentModal = ({ isOpen, product, onClose, onConfirm }) => {
   const [cantidad, setCantidad] = useState('');
-  const [razon, setRazon] = useState('Compra');
+  const [razon, setRazon] = useState('');
+  const [predefinedReason, setPredefinedReason] = useState('');
 
   if (!isOpen || !product) return null;
+
+  const handlePredefinedChange = (e) => {
+    const val = e.target.value;
+    setPredefinedReason(val);
+    if (val) setRazon(val);
+    else setRazon('');
+  };
 
   return (
     <ModalOverlay onClick={onClose}>
@@ -346,12 +354,19 @@ const StockAdjustmentModal = ({ isOpen, product, onClose, onConfirm }) => {
           <p><strong>Stock Actual:</strong> {product.existencia}</p>
         </div>
         <FormGroup style={{ marginBottom: '15px' }}>
-          <Label>Cantidad a agregar/quitar (use negativo para restar)</Label>
-          <Input type="number" value={cantidad} onChange={e => setCantidad(e.target.value)} autoFocus />
+          <Label>Cantidad (Positivo para agregar, Negativo para restar)</Label>
+          <Input
+            type="number"
+            value={cantidad}
+            onChange={e => setCantidad(e.target.value)}
+            placeholder="Ej: 10 o -5"
+            autoFocus
+          />
         </FormGroup>
-        <FormGroup style={{ marginBottom: '20px' }}>
-          <Label>Razón del movimiento</Label>
-          <Select value={razon} onChange={e => setRazon(e.target.value)}>
+        <FormGroup style={{ marginBottom: '10px' }}>
+          <Label>Razón (Seleccionar)</Label>
+          <Select value={predefinedReason} onChange={handlePredefinedChange}>
+            <option value="">-- Escribir manualmente --</option>
             <option value="Compra">Compra / Resurtido</option>
             <option value="Ajuste Inventario">Ajuste de Inventario</option>
             <option value="Devolución">Devolución Cliente</option>
@@ -359,11 +374,24 @@ const StockAdjustmentModal = ({ isOpen, product, onClose, onConfirm }) => {
             <option value="Uso Interno">Uso Interno</option>
           </Select>
         </FormGroup>
+        <FormGroup style={{ marginBottom: '20px' }}>
+          <Label>Razón (Manual)</Label>
+          <Input
+            type="text"
+            value={razon}
+            onChange={e => { setRazon(e.target.value); setPredefinedReason(''); }}
+            placeholder="Especifique el motivo..."
+          />
+        </FormGroup>
         <ModalActions>
           <CancelButton onClick={onClose}>Cancelar</CancelButton>
           <SaveButton onClick={() => {
             const val = parseInt(cantidad, 10);
-            if (!isNaN(val) && val !== 0) onConfirm(product, val, razon);
+            if (!isNaN(val) && val !== 0 && razon.trim()) {
+              onConfirm(product, val, razon);
+            } else {
+              alert('Debe ingresar una cantidad válida y una razón.');
+            }
           }}>Aplicar Ajuste</SaveButton>
         </ModalActions>
       </ModalContent>
@@ -372,15 +400,77 @@ const StockAdjustmentModal = ({ isOpen, product, onClose, onConfirm }) => {
 };
 
 const InventoryHistoryModal = ({ onClose }) => {
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await axios.get('/api/products/inventory/history', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setHistory(res.data);
+      } catch (err) {
+        console.error(err);
+        setError('No se pudo cargar el historial.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHistory();
+  }, []);
+
   return (
-    <ModalOverlay onClick={onClose}>
-      <ModalContent onClick={e => e.stopPropagation()}>
-        <ModalTitle>Historial de Movimientos</ModalTitle>
-        <div style={{ textAlign: 'center', padding: '20px', color: '#718096' }}>
-          <FaHistory size={40} style={{ marginBottom: '10px', opacity: 0.5 }} />
-          <p>Esta funcionalidad estará disponible próximamente.</p>
-          <small>Consulte la base de datos para ver el registro detallado.</small>
+    <ModalOverlay onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <ModalContent onClick={e => e.stopPropagation()} $large>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <ModalTitle style={{ margin: 0 }}><FaHistory /> Historial de Movimientos</ModalTitle>
+          <button onClick={onClose} style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer' }}><FaTimes /></button>
         </div>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '2rem' }}><Spinner /></div>
+        ) : error ? (
+          <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ background: '#f7fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left' }}>
+                  <th style={{ padding: '10px' }}>Fecha</th>
+                  <th style={{ padding: '10px' }}>Producto</th>
+                  <th style={{ padding: '10px' }}>Movimiento</th>
+                  <th style={{ padding: '10px' }}>Detalles</th>
+                  <th style={{ padding: '10px' }}>Usuario</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr key={h.id_movimiento} style={{ borderBottom: '1px solid #edf2f7' }}>
+                    <td style={{ padding: '10px' }}>{new Date(h.fecha).toLocaleString()}</td>
+                    <td style={{ padding: '10px', fontWeight: '600' }}>{h.nombre_producto || h.codigo_producto || 'N/A'}</td>
+                    <td style={{ padding: '10px' }}>
+                      <span style={{
+                        padding: '2px 6px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold',
+                        background: h.tipo_movimiento === 'VENTA' ? '#c6f6d5' : h.tipo_movimiento === 'CREACION' ? '#bee3f8' : '#fed7d7',
+                        color: h.tipo_movimiento === 'VENTA' ? '#22543d' : h.tipo_movimiento === 'CREACION' ? '#2b6cb0' : '#822727'
+                      }}>
+                        {h.tipo_movimiento}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px', color: '#4a5568' }}>{h.detalles}</td>
+                    <td style={{ padding: '10px', color: '#718096' }}>{h.nombre_usuario || 'Sistema'}</td>
+                  </tr>
+                ))}
+                {history.length === 0 && (
+                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>No hay movimientos registrados.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
         <ModalActions>
           <CancelButton onClick={onClose}>Cerrar</CancelButton>
         </ModalActions>
