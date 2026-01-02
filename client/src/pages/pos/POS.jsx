@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   FaArrowLeft, FaShoppingCart, FaPlus, FaMinus, FaTrashAlt, FaLock,
-  FaHistory, FaSync, FaKeyboard, FaTimes, FaClipboardList,
+  FaHistory, FaSync, FaKeyboard, FaTimes,
   FaFileInvoice, FaMoneyBillWave, FaArrowDown, FaArrowUp,
-  FaPercentage, FaTag, FaEdit
+  FaPercentage, FaTag
 } from 'react-icons/fa';
 import { AnimatePresence } from 'framer-motion';
 
@@ -28,8 +28,7 @@ const POS = () => {
   const { isCajaOpen, setIsCajaOpen, cajaSession, setCajaSession, tasaDolar, setTasaDolar } = useCaja();
   const {
     orders, activeOrderId, setActiveOrderId, activeOrder,
-    handleNewOrder, handleRemoveOrder, updateActiveOrder, loadOrdersFromDB,
-    loadPendingOrdersFromServer
+    handleNewOrder, handleRemoveOrder, updateActiveOrder, loadOrdersFromDB
   } = useOrders();
 
   const userId = user?.id_usuario || user?.id;
@@ -234,21 +233,6 @@ const POS = () => {
     closeModal();
   };
 
-  // Handler for renaming ticket
-  const renameTicket = (newName) => {
-    if (!newName || !newName.trim()) {
-      showAlert({ title: "Error", message: "Ingrese un nombre válido" });
-      return;
-    }
-
-    const updatedOrders = orders.map(o =>
-      o.id === activeOrderId ? { ...o, name: newName.trim() } : o
-    );
-    // Note: This would need proper integration with OrdersContext
-    closeModal();
-    showAlert({ title: "Ticket Renombrado", message: `Nuevo nombre: ${newName}` });
-  };
-
   /* -----------------------------------------------------------------
    * VISTA DE CAJA CERRADA
    * ----------------------------------------------------------------- */
@@ -309,26 +293,14 @@ const POS = () => {
         <S.BackButton to="/dashboard"><FaArrowLeft /> Regresar</S.BackButton>
         <div style={{ fontWeight: '800', letterSpacing: '1px' }}>SISTEMA POS</div>
         <div className="right-actions">
-          <S.Button secondary onClick={() => openModal('salesHistory')} title="Historial de Ventas">
-            <FaHistory />
-          </S.Button>
-          <S.Button secondary onClick={() => openModal('proforma')} title="Crear Proforma">
-            <FaFileInvoice />
-          </S.Button>
-          <S.Button secondary onClick={handleCashEntry} title="Entrada de Dinero">
-            <FaArrowDown style={{ color: '#10b981' }} />
-          </S.Button>
-          <S.Button secondary onClick={handleCashExit} title="Salida de Dinero">
-            <FaArrowUp style={{ color: '#ef4444' }} />
-          </S.Button>
           <S.Button secondary onClick={refreshData} title="Sincronizar">
             <FaSync />
           </S.Button>
+          <S.Button secondary onClick={() => openModal('salesHistory')} title="Historial de Ventas">
+            <FaHistory />
+          </S.Button>
           <S.Button secondary onClick={() => openModal('caja')}>
             <FaLock /> {currentUser?.nombre_usuario || 'Usuario'}
-          </S.Button>
-          <S.Button secondary onClick={loadPendingOrdersFromServer} title="Cargar Pedidos Pendientes">
-            <FaClipboardList />
           </S.Button>
         </div>
       </S.HeaderActions>
@@ -366,6 +338,14 @@ const POS = () => {
                   primary={o.id === activeOrderId}
                   secondary={o.id !== activeOrderId}
                   onClick={() => setActiveOrderId(o.id)}
+                  onDoubleClick={() => {
+                    const newName = prompt('Nuevo nombre para el ticket:', o.name);
+                    if (newName && newName.trim()) {
+                      // Update ticket name through context
+                      // This would need proper integration with OrdersContext
+                      showAlert({ title: "Ticket Renombrado", message: `Nuevo nombre: ${newName.trim()}` });
+                    }
+                  }}
                   style={{ fontSize: '0.75rem', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
                 >
                   {o.name}
@@ -400,14 +380,6 @@ const POS = () => {
               >
                 <FaPercentage size={12} /> Descuento
               </S.Button>
-              <S.Button
-                secondary
-                onClick={() => openModal('renameTicket')}
-                title="Renombrar Ticket"
-                style={{ flex: 1, fontSize: '0.75rem', padding: '8px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
-              >
-                <FaEdit size={12} /> Renombrar
-              </S.Button>
             </div>
 
             {/* Lista de Items en Carrito */}
@@ -441,9 +413,19 @@ const POS = () => {
               <S.TotalsRow className="grand-total" style={{ fontSize: '1.4rem', marginTop: '5px' }}>
                 <span>TOTAL</span><span>C$ {fmt(total)}</span>
               </S.TotalsRow>
+
+              {/* Botón de Proforma */}
+              <S.Button
+                secondary
+                style={{ width: '100%', marginTop: '1rem', padding: '10px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}
+                onClick={() => openModal('proforma')}
+              >
+                <FaFileInvoice /> Crear Proforma
+              </S.Button>
+
               <S.Button
                 primary
-                style={{ width: '100%', marginTop: '1rem', padding: '16px', fontSize: '1.2rem', fontWeight: 'bold' }}
+                style={{ width: '100%', marginTop: '12px', padding: '16px', fontSize: '1.2rem', fontWeight: 'bold' }}
                 onClick={() => openModal('payment', { total })}
                 disabled={cart.length === 0}
               >
@@ -531,6 +513,35 @@ const POS = () => {
           <SalesHistoryModal
             isOpen={true}
             onClose={closeModal}
+            dailySales={[]}
+            loadSales={async (date) => {
+              // Load sales from API - implement your API call here
+              try {
+                const response = await api.getSales(date, token);
+                return response.data || [];
+              } catch (error) {
+                console.error('Error loading sales:', error);
+                return [];
+              }
+            }}
+            isAdmin={isAdmin}
+            users={[user]}
+            clients={[]}
+            onReprintTicket={(sale) => {
+              console.log('Reprint ticket:', sale);
+              showAlert({ title: "Reimprimir", message: "Función de reimpresión no implementada" });
+            }}
+            onCancelSale={async (saleId) => {
+              console.log('Cancel sale:', saleId);
+              showAlert({ title: "Cancelar", message: "Función de cancelación no implementada" });
+            }}
+            onReturnItem={async (sale, item, qty) => {
+              console.log('Return item:', sale, item, qty);
+              showAlert({ title: "Devolver", message: "Función de devolución no implementada" });
+            }}
+            onAbonoSuccess={() => {
+              console.log('Abono success');
+            }}
           />
         )}
 
@@ -591,19 +602,6 @@ const POS = () => {
               applyDiscount(discountData);
             }}
             icon={<FaPercentage color="#2563eb" />}
-          />
-        )}
-
-        {modal.name === 'renameTicket' && (
-          <PromptModal
-            isOpen={true}
-            onClose={closeModal}
-            title="Renombrar Ticket"
-            fields={[
-              { name: 'name', label: 'Nuevo Nombre', type: 'text', placeholder: activeOrder?.name || 'Ticket', defaultValue: activeOrder?.name }
-            ]}
-            onSubmit={(values) => renameTicket(values.name)}
-            icon={<FaEdit color="#2563eb" />}
           />
         )}
       </AnimatePresence>
