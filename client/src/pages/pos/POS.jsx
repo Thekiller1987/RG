@@ -21,14 +21,13 @@ import SalesHistoryModal from './components/SalesHistoryModal.jsx';
 import {
   saveCajaSession,
   fetchCajaSessionFromServer,
-  subscribeCajaChanges,
-  addCajaTransaction
-} from '../../service/storage';
+  subscribeCajaChanges
+} from '../../utils/caja';
 
 const fmt = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const POS = () => {
-  const { user, products: initialProducts, token, refreshProducts } = useAuth();
+  const { user, products: initialProducts, token, refreshProducts, addCajaTransaction } = useAuth();
   const { isCajaOpen, setIsCajaOpen, setCajaSession, tasaDolar, setTasaDolar } = useCaja();
   const {
     orders, setOrders, activeOrderId, setActiveOrderId, activeOrder,
