@@ -252,11 +252,19 @@ const ProformaGenerator = () => {
 
 
     const addToCart = (product) => {
+        if (!product.existencia || product.existencia <= 0) {
+            return alert("Este producto está agotado.");
+        }
+
         setCart(prev => {
             const existing = prev.find(p => p.id === product.id);
             const finalPrice = parseFloat(product.precio_venta || product.precio || 0);
 
             if (existing) {
+                if (existing.quantity >= product.existencia) {
+                    alert(`No puedes agregar más de ${product.existencia} unidades de este producto.`);
+                    return prev;
+                }
                 return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
             }
 
@@ -270,17 +278,24 @@ const ProformaGenerator = () => {
 
     const updateQuantity = (id, delta) => {
         setCart(prev => {
-            const newCart = prev.map(p => {
-                if (p.id === id) {
-                    const newQty = p.quantity + delta;
-                    if (newQty < 1) {
-                        return null;
-                    }
-                    return { ...p, quantity: newQty };
-                }
-                return p;
-            }).filter(Boolean);
-            return newCart;
+            const item = prev.find(p => p.id === id);
+            if (!item) return prev;
+
+            const productInfo = products.find(p => p.id === id) || item;
+            const maxStock = productInfo.existencia || 9999;
+
+            const newQty = item.quantity + delta;
+
+            if (newQty > maxStock) {
+                alert(`Stock máximo alcanzado (${maxStock}).`);
+                return prev;
+            }
+
+            if (newQty < 1) {
+                return prev.filter(p => p.id !== id);
+            }
+
+            return prev.map(p => p.id === id ? { ...p, quantity: newQty } : p);
         });
     };
 
