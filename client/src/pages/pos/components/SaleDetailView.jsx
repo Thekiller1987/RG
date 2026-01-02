@@ -181,7 +181,7 @@ const SaleDetailView = ({
       )}
 
       {/* Acciones */}
-      {isAdmin && sale.estado !== 'CANCELADA' && (
+      {sale.estado !== 'CANCELADA' && (
         <DetailSection>
           <h4>Acciones</h4>
           <ActionsContainer>

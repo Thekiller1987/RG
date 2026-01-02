@@ -237,15 +237,21 @@ const POS = () => {
   const handleItemWholesale = (item) => {
     const pid = item.id_producto || item.id;
     const product = products.find(p => (p.id_producto || p.id) === pid) || item;
-    const mayorista = product.mayorista || product.mayoreo || 0;
+    const mayorista = Number(product.mayorista || product.mayoreo || 0);
 
     if (!mayorista) {
       showAlert({ title: "Aviso", message: "Este producto no tiene precio mayorista." });
       return;
     }
 
-    const isWholesale = item.precio_venta === mayorista;
-    const newPrice = isWholesale ? (product.venta || product.precio) : mayorista;
+    // Toggle: if current price is equal to wholesale price (approx), switch back to retail
+    const currentPrice = Number(item.precio_venta || 0);
+    const isWholesale = Math.abs(currentPrice - mayorista) < 0.01;
+
+    // Retail price fallback: product.venta, product.precio, or current item price if we are not wholesale
+    const retailPrice = Number(product.venta || product.precio || (isWholesale ? item.originalPrice : item.precio_venta) || 0);
+
+    const newPrice = isWholesale ? retailPrice : mayorista;
 
     const newCart = cart.map(i => (i.id_producto || i.id) === pid ? { ...i, precio_venta: newPrice } : i);
     updateActiveCart(newCart);
@@ -258,6 +264,11 @@ const POS = () => {
     const pid = item.id_producto || item.id;
     let newPrice = item.precio_venta;
     const value = parseFloat(val);
+
+    if (isNaN(value) || value < 0) {
+      showAlert({ title: "Valor Inválido", message: "Ingrese un valor de descuento válido." });
+      return;
+    }
 
     if (type === 'percentage') {
       newPrice = newPrice - (newPrice * (value / 100));
@@ -284,8 +295,14 @@ const POS = () => {
       if (!product) return item;
 
       // Toggle between retail (venta) and wholesale (mayorista)
-      const isCurrentlyWholesale = item.precio_venta === product.mayorista;
-      const newPrice = isCurrentlyWholesale ? (product.venta || product.precio) : (product.mayorista || product.venta || product.precio);
+      const mayorista = Number(product.mayorista || product.mayoreo || 0);
+      if (!mayorista) return item;
+
+      const currentPrice = Number(item.precio_venta || 0);
+      const isCurrentlyWholesale = Math.abs(currentPrice - mayorista) < 0.01;
+
+      const retailPrice = Number(product.venta || product.precio || (isCurrentlyWholesale ? item.originalPrice : item.precio_venta) || 0);
+      const newPrice = isCurrentlyWholesale ? retailPrice : mayorista;
 
       return { ...item, precio_venta: newPrice };
     });

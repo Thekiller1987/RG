@@ -244,9 +244,14 @@ const CajaModal = ({
     };
 
     if (Math.abs(diferencia) > 0.01) {
+      const tipo = diferencia < 0 ? 'FALTANTE' : 'SOBRANTE';
+      const msg = diferencia < 0
+        ? `⚠️ Hay un FALTANTE de C$${Math.abs(diferencia).toFixed(2)}.\n¿Está seguro de cerrar con este faltante?`
+        : `⚠️ Hay un SOBRANTE de C$${diferencia.toFixed(2)}.\n¿Está seguro de cerrar con este sobrante?`;
+
       showConfirmation({
-        title: 'Diferencia en Arqueo',
-        message: `Hay una diferencia de C$${diferencia.toFixed(2)}. ¿Cerrar caja de todos modos?`,
+        title: `Diferencia: ${tipo}`,
+        message: msg,
         onConfirm: proceedClose
       });
     } else {
@@ -545,7 +550,7 @@ const CajaModal = ({
             )}
 
             <div style={{ display: 'flex', gap: 8, marginTop: '1rem' }}>
-              <Button primary onClick={handlePrepareClose} disabled={!canClose} style={{ flex: 1, padding: '12px' }}>
+              <Button primary onClick={handlePrepareClose} disabled={!canClose || !montoContado || isNaN(parseFloat(montoContado))} style={{ flex: 1, padding: '12px' }}>
                 Generar Reporte y Cerrar
               </Button>
               <Button onClick={onClose} style={{ flex: 0.6 }}>Cancelar</Button>
