@@ -148,7 +148,7 @@ export const CartPanel = styled(Panel)`
     border: 1px solid #eef1f5;
     border-radius: 12px;
     background: #fafbfd;
-    /* En desktop ocupa lo que sobra, en mobile definimos min-height */
+    flex: 1; min-height: 0; /* Ensures it fills space but respects grid */
   }
 
   .cart-fixed-bottom {
@@ -172,6 +172,7 @@ export const CartPanel = styled(Panel)`
     .cart-scroll {
         max-height: 250px;
         min-height: 150px;
+        flex: none; /* In mobile we use fixed height, not flex */
     }
   }
 `;
@@ -320,6 +321,7 @@ export const ProductCard = styled.div`
 
 export const StockBadge = styled.div`
   position: absolute; top: 8px; right: 8px;
+  z-index: 10; /* Ensure it is above the image */
   padding: 3px 8px; border-radius: 16px;
   font-size: 0.75em; font-weight: 700; color: white;
   background-color: ${p => {

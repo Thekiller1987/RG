@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import styled from 'styled-components'; // Importamos styled para los botones locales
-import { FaStore, FaExclamationTriangle, FaTags, FaBarcode, FaFont, FaImage } from 'react-icons/fa';
+import { FaStore, FaExclamationTriangle, FaTags, FaBarcode, FaFont, FaImage, FaExpand, FaTimes } from 'react-icons/fa';
+import { motion, AnimatePresence } from 'framer-motion';
 import * as S from '../POS.styles.jsx';
 
 const PRODUCTS_PER_PAGE = 100;
@@ -27,6 +28,39 @@ const FilterButton = styled.button`
   }
 `;
 
+const ImageViewModal = ({ isOpen, imageSrc, onClose }) => {
+  if (!isOpen || !imageSrc) return null;
+  return (
+    <S.ModalOverlay onClick={onClose}>
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        style={{ position: 'relative', maxWidth: '90%', maxHeight: '90vh', background: 'transparent' }}
+      >
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute', top: -15, right: -15,
+            background: 'white', width: 30, height: 30, borderRadius: '50%',
+            border: 'none', cursor: 'pointer', fontWeight: 'bold',
+            boxShadow: '0 2px 5px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 10
+          }}
+        >
+          <FaTimes />
+        </button>
+        <img
+          src={imageSrc}
+          alt="Full view"
+          style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: '8px', boxShadow: '0 5px 20px rgba(0,0,0,0.5)', display: 'block' }}
+        />
+      </motion.div>
+    </S.ModalOverlay>
+  );
+};
+
 export default function ProductPanel({
   products = [],
   searchTerm,
@@ -38,6 +72,7 @@ export default function ProductPanel({
   searchType = 'description',
   setSearchType = () => { }
 }) {
+  const [viewImage, setViewImage] = useState({ isOpen: false, imageUrl: null });
 
   const qtyInCart = useMemo(() => {
     const map = new Map();
@@ -158,12 +193,30 @@ export default function ProductPanel({
                 outOfStock={restante <= 0}
                 title={p.nombre}
               >
+                {/* Stock Badge - Top Right */}
                 <S.StockBadge
                   lowstock={restante < 10 && restante > 0}
                   outOfStock={restante <= 0}
                 >
                   {restante}
                 </S.StockBadge>
+
+                {/* Expand Image Button - Top Left */}
+                {p.imagen && (
+                  <div
+                    onClick={(e) => { e.stopPropagation(); setViewImage({ isOpen: true, imageUrl: p.imagen }); }}
+                    style={{
+                      position: 'absolute', top: 8, left: 8, zIndex: 10,
+                      background: 'rgba(255,255,255,0.9)', borderRadius: '50%',
+                      width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      color: '#495057'
+                    }}
+                    title="Ver imagen completa"
+                  >
+                    <FaExpand size={12} />
+                  </div>
+                )}
 
                 <div className="image-placeholder">
                   {p.imagen ? (
@@ -209,6 +262,16 @@ export default function ProductPanel({
           )}
         </S.ProductGrid>
       </div>
+
+      <AnimatePresence>
+        {viewImage.isOpen && (
+          <ImageViewModal
+            isOpen={viewImage.isOpen}
+            imageSrc={viewImage.imageUrl}
+            onClose={() => setViewImage({ isOpen: false, imageUrl: null })}
+          />
+        )}
+      </AnimatePresence>
     </S.MainPanel>
   );
 }
