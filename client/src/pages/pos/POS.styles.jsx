@@ -116,6 +116,7 @@ export const CartPanel = styled(Panel)`
   max-width: none;
   position: relative;
   top: 0;
+  overflow: hidden; /* Ensure content stays within rounded corners */
   
   /* Layout interno del carrito */
   display: grid;
@@ -170,8 +171,8 @@ export const CartPanel = styled(Panel)`
     border-top: 1px solid #eee;
     
     .cart-scroll {
-        max-height: 250px;
-        min-height: 150px;
+        max-height: 35vh; /* Larger but limited height for mobile */
+        min-height: 20vh;
         flex: none; /* In mobile we use fixed height, not flex */
     }
   }

@@ -214,7 +214,7 @@ export default function ProductPanel({
                     }}
                     title="Ver imagen completa"
                   >
-                    <FaExpand size={12} />
+                    <FaEye size={12} />
                   </div>
                 )}
 

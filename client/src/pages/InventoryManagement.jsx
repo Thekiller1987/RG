@@ -10,6 +10,26 @@ import {
 } from 'react-icons/fa';
 
 /* ================================
+   STYLED COMPONENTS LOCALES
+================================ */
+const PageWrapper = styled.div`
+  padding: 20px;
+  background-color: #f0f2f5;
+  min-height: 100vh;
+`;
+
+const CenteredMessage = styled.div`
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  height: 50vh; opacity: 0.7; font-size: 1.2rem;
+`;
+
+const Spinner = styled(FaSpinner)`
+  animation: ${keyframes`from {transform:rotate(0deg);} to {transform:rotate(360deg);}`} 1s linear infinite;
+  font-size: 2rem; margin-bottom: 1rem;
+`;
+
+/* ================================
    HELPER: IMAGE UPLOAD & COMPRESS
 ================================ */
 const ImageUpload = ({ currentImage, onImageChange }) => {
