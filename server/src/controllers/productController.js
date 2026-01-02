@@ -70,7 +70,14 @@ const getAllProducts = async (_req, res) => {
       ORDER BY p.nombre ASC
     `;
     const [rows] = await db.query(query);
-    res.json(rows);
+
+    // Convertir Buffer a string si es necesario (para imágenes Base64 guardadas en BLOB)
+    const products = rows.map(p => ({
+      ...p,
+      imagen: p.imagen ? (Buffer.isBuffer(p.imagen) ? p.imagen.toString('utf-8') : p.imagen) : null
+    }));
+
+    res.json(products);
   } catch (error) {
     console.error('Error en getAllProducts:', error);
     res.status(500).json({ msg: 'Error al obtener productos.' });
@@ -89,7 +96,14 @@ const getProductById = async (req, res) => {
       [id]
     );
     if (!rows.length) return res.status(404).json({ msg: 'Producto no encontrado.' });
-    res.json(rows[0]);
+
+    const p = rows[0];
+    const product = {
+      ...p,
+      imagen: p.imagen ? (Buffer.isBuffer(p.imagen) ? p.imagen.toString('utf-8') : p.imagen) : null
+    };
+
+    res.json(product);
   } catch (error) {
     console.error('Error en getProductById:', error);
     res.status(500).json({ msg: 'Error al obtener el producto.' });
