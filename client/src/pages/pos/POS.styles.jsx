@@ -369,92 +369,33 @@ export const TotalsRow = styled.div`
 `;
 
 /* Ítem de carrito COMPACTO en desktop */
-/* Ítem de carrito estilo limpio (Similar a Catálogo) */
+/* Ítem de carrito estilo limpio (Igual a Catálogo) */
 export const CartItemWrapper = styled.div`
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   padding: 12px 10px;
   border-bottom: 1px solid #f1f5f9;
   background: white;
+  transition: background 0.2s;
+  
+  &:hover { background: #f8fafc; }
+`;
 
-  .item-left {
-    flex: 1;
-    padding-right: 12px;
-    min-width: 0;
-  }
+export const QtyControl = styled.div`
+  display: flex; align-items: center; gap: 8px;
+  background: #f8fafc; padding: 4px; border-radius: 6px;
+  border: 1px solid #e2e8f0;
+`;
 
-  .item-name {
-    font-weight: 600;
-    font-size: 0.9rem;
-    margin-bottom: 4px;
-    color: #334155;
-    white-space: normal;
-    line-height: 1.3;
-  }
-
-  .item-meta {
-    color: #64748b;
-    font-size: 0.8rem;
-  }
-
-  .item-right {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 6px;
-  }
-
-  .item-total {
-    font-weight: bold;
-    color: #334155;
-    font-size: 0.95rem;
-  }
-
-  .qty-control {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: #f8fafc;
-    padding: 3px;
-    border-radius: 6px;
-    border: 1px solid #e2e8f0;
-  }
-
-  .qty-btn {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    border: 1px solid #e2e8f0;
-    background: white;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #475569;
-    font-size: 0.8rem;
-    &:hover { background: #e2e8f0; border-color: #cbd5e1; }
-  }
-
-  .qty-val {
-    font-size: 0.9rem;
-    font-weight: 600;
-    min-width: 20px;
-    text-align: center;
-    color: #334155;
-  }
-
-  /* Support for action buttons in this layout */
-  .action-row {
-      display: flex; gap: 5px; margin-top: 5px; justify-content: flex-end;
-  }
-
-  @media (max-width: 768px) {
-    padding: 10px 8px;
-    .item-name { font-size: 0.85rem; }
-    .item-total { font-size: 0.9rem; }
-  }
+export const RoundBtn = styled.button`
+  width: 24px; height: 24px; border-radius: 50%; border: none;
+  background: white; box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: #475569; transition: all 0.2s;
+  
+  &:hover { background: #e2e8f0; color: #1e293b; }
+  &:active { transform: scale(0.95); }
 `;
 
 export const BackButton = styled(Link)`

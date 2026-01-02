@@ -29,6 +29,15 @@ const Spinner = styled(FaSpinner)`
   font-size: 2rem; margin-bottom: 1rem;
 `;
 
+const BackButton = styled(Link)`
+  display: inline-flex; align-items: center; gap: 8px;
+  background: white; padding: 8px 16px; border-radius: 8px;
+  color: #4a5568; text-decoration: none; font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s;
+  margin-bottom: 1rem;
+  &:hover { transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: #2d3748; }
+`;
+
 /* ================================
    HELPER: IMAGE UPLOAD & COMPRESS
 ================================ */

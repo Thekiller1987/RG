@@ -1646,44 +1646,53 @@ function CartContentView({
 
           return (
             <S.CartItemWrapper key={item.id}>
-              {/* IZQUIERDA: Nombre, Metadata y Acciones Admin */}
-              <div className="item-left">
-                <div className="item-name" title={item.nombre}>
+              <div style={{ flex: 1, paddingRight: 10 }}>
+                <div style={{ fontWeight: '600', fontSize: '0.9rem', color: '#334155', lineHeight: '1.2', marginBottom: '2px' }} title={item.nombre}>
                   {item.nombre}
                 </div>
-                <div className="item-meta">
-                  C${fmt(unit)} x {item.quantity} {code ? `| ${code}` : ''}
+                <div style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                  C$ {fmt(unit)} x {item.quantity} {code ? `| ${code}` : ''}
                 </div>
+
                 {isAdmin && (
-                  <div className="action-row">
-                    <S.ActionButton title="Precio Manual" onClick={() => onSetManualPrice(item)}><FaEdit size={12} /></S.ActionButton>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                    <div title="Precio Manual" style={{ cursor: 'pointer', color: '#6b7280' }} onClick={() => onSetManualPrice(item)}>
+                      <FaEdit size={12} />
+                    </div>
                     {hasWholesalePrice && (
-                      <S.ActionButton title="Aplicar Mayoreo" onClick={() => onApplyWholesalePrice(item)}>
+                      <div title="Aplicar Mayoreo" style={{ cursor: 'pointer', color: '#6b7280' }} onClick={() => onApplyWholesalePrice(item)}>
                         <FaTags size={12} />
-                      </S.ActionButton>
+                      </div>
                     )}
                     {isPriceModified && (
-                      <S.ActionButton title="Revertir a Precio Normal" onClick={() => onRevertRetailPrice(item)}>
+                      <div title="Revertir Precio" style={{ cursor: 'pointer', color: '#6b7280' }} onClick={() => onRevertRetailPrice(item)}>
                         <FaRedo size={12} />
-                      </S.ActionButton>
+                      </div>
                     )}
                   </div>
                 )}
               </div>
 
-              {/* DERECHA: Total y Controles de Cantidad */}
-              <div className="item-right">
-                <div className="item-total">C${fmt(totalLine)}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
+                <div style={{ fontWeight: 'bold', color: '#334155', fontSize: '0.95rem' }}>
+                  C$ {fmt(totalLine)}
+                </div>
 
-                <div className="qty-control">
-                  <button className="qty-btn" onClick={() => onUpdateQty(item.id, Math.max(1, Number(item.quantity) - 1))}>
-                    <FaMinus size={10} />
-                  </button>
-                  <span className="qty-val">{item.quantity}</span>
-                  <button className="qty-btn" onClick={() => onUpdateQty(item.id, Number(item.quantity) + 1)}>
-                    <FaPlus size={10} />
-                  </button>
-                  <button className="delete-btn" onClick={() => onRemoveFromCart(item.id)}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <S.QtyControl>
+                    <S.RoundBtn onClick={() => onUpdateQty(item.id, Math.max(1, Number(item.quantity) - 1))}>
+                      <FaMinus size={10} />
+                    </S.RoundBtn>
+                    <span style={{ fontSize: '0.9rem', minWidth: 15, textAlign: 'center', fontWeight: '600', color: '#334155' }}>{item.quantity}</span>
+                    <S.RoundBtn onClick={() => onUpdateQty(item.id, Number(item.quantity) + 1)}>
+                      <FaPlus size={10} />
+                    </S.RoundBtn>
+                  </S.QtyControl>
+                  <button
+                    onClick={() => onRemoveFromCart(item.id)}
+                    style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer', padding: 5 }}
+                    title="Eliminar"
+                  >
                     <FaTrashAlt size={14} />
                   </button>
                 </div>
