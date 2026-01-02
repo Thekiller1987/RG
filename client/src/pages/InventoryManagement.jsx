@@ -133,6 +133,8 @@ const ImageViewModal = ({ isOpen, imageSrc, onClose }) => {
   );
 };
 
+const norm = (str) => String(str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
 const MAX_RESULTS_SEARCH = 100;
 const PRODUCTS_INITIAL_LOAD = 20;
 const SLICE_STEP = 20;

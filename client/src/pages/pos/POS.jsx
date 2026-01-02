@@ -7,7 +7,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 
 // Iconos
 import {
-  FaArrowLeft, FaKeyboard, FaTags, FaShoppingCart, FaPlus,
+  FaArrowLeft, FaKeyboard, FaTags, FaShoppingCart, FaPlus, FaMinus,
   FaTrashAlt, FaTimes, FaPercentage, FaHistory, FaLock, FaDollarSign, FaEdit, FaRedo,
   FaSignInAlt, FaSignOutAlt, FaPrint,
   FaBarcode, FaAlignLeft,
@@ -1646,50 +1646,48 @@ function CartContentView({
 
           return (
             <S.CartItemWrapper key={item.id}>
-              <div className="item-qty">
-                <input
-                  type="number"
-                  value={item.quantity}
-                  min="1"
-                  max={item.existencia}
-                  onChange={(e) => onUpdateQty(item.id, e.target.value)}
-                />
-              </div>
-
-              <div className="item-info" style={{ display: 'grid', gap: 6, width: '100%' }}>
-                <p className="item-name" title={item.nombre}
-                  style={{ margin: 0, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.2 }}>
+              {/* IZQUIERDA: Nombre, Metadata y Acciones Admin */}
+              <div className="item-left">
+                <div className="item-name" title={item.nombre}>
                   {item.nombre}
-                </p>
-
-                <div className="item-meta" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: -2 }}>
-                  {code && <span>Código: <strong>{code}</strong></span>}
-                  <span>Stock: <strong>{item.existencia}</strong></span>
                 </div>
-
+                <div className="item-meta">
+                  C${fmt(unit)} x {item.quantity} {code ? `| ${code}` : ''}
+                </div>
                 {isAdmin && (
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <S.ActionButton title="Precio Manual" onClick={() => onSetManualPrice(item)}><FaEdit /></S.ActionButton>
+                  <div className="action-row">
+                    <S.ActionButton title="Precio Manual" onClick={() => onSetManualPrice(item)}><FaEdit size={12} /></S.ActionButton>
                     {hasWholesalePrice && (
                       <S.ActionButton title="Aplicar Mayoreo" onClick={() => onApplyWholesalePrice(item)}>
-                        <FaTags />
+                        <FaTags size={12} />
                       </S.ActionButton>
                     )}
                     {isPriceModified && (
                       <S.ActionButton title="Revertir a Precio Normal" onClick={() => onRevertRetailPrice(item)}>
-                        <FaRedo />
+                        <FaRedo size={12} />
                       </S.ActionButton>
                     )}
                   </div>
                 )}
               </div>
 
-              <div className="item-unit">C${fmt(unit)} <span style={{ color: '#6c757d' }}>/u</span></div>
-              <div className="item-total">C${fmt(totalLine)}</div>
+              {/* DERECHA: Total y Controles de Cantidad */}
+              <div className="item-right">
+                <div className="item-total">C${fmt(totalLine)}</div>
 
-              <S.Button $cancel style={{ padding: '0.4rem', minWidth: 'auto', marginLeft: '1rem' }} onClick={() => onRemoveFromCart(item.id)}>
-                <FaTimes />
-              </S.Button>
+                <div className="qty-control">
+                  <button className="qty-btn" onClick={() => onUpdateQty(item.id, Math.max(1, Number(item.quantity) - 1))}>
+                    <FaMinus size={10} />
+                  </button>
+                  <span className="qty-val">{item.quantity}</span>
+                  <button className="qty-btn" onClick={() => onUpdateQty(item.id, Number(item.quantity) + 1)}>
+                    <FaPlus size={10} />
+                  </button>
+                  <button className="delete-btn" onClick={() => onRemoveFromCart(item.id)}>
+                    <FaTrashAlt size={14} />
+                  </button>
+                </div>
+              </div>
             </S.CartItemWrapper>
           );
         })}

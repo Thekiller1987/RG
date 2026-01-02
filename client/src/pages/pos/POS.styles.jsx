@@ -369,53 +369,91 @@ export const TotalsRow = styled.div`
 `;
 
 /* Ítem de carrito COMPACTO en desktop */
+/* Ítem de carrito estilo limpio (Similar a Catálogo) */
 export const CartItemWrapper = styled.div`
-  display: grid;
-  grid-template-columns: 72px 1fr 120px 110px auto;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-bottom: 1px solid #eef1f5;
-  background: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 12px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  background: white;
 
-  &:last-child { border-bottom: none; }
-
-  .item-qty { display:flex; align-items:center; gap:6px; }
-
-  /* 🔸 El bloque de información (nombre + meta) usa 3 columnas para tener más ancho */
-  .item-info { min-width: 0; grid-column: 2 / 5; }
+  .item-left {
+    flex: 1;
+    padding-right: 12px;
+    min-width: 0;
+  }
 
   .item-name {
-    font-weight: 600; color: #343a40; margin: 0; font-size: 1rem;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+    color: #334155;
+    white-space: normal;
+    line-height: 1.3;
   }
 
-  .item-meta { margin-top: 2px; font-size: 0.85rem; color: #6c757d; }
-
-  /* 🔸 Reubico unit y total en sus columnas para mantener orden */
-  .item-unit { grid-column: 3; text-align: right; font-size: 0.95rem; color: #495057; }
-  .item-total { grid-column: 4; font-weight: 700; color: #007bff; text-align: right; font-size: 1.05rem; }
-
-  input[type="number"] {
-    width: 64px; padding: 6px; border-radius: 8px; border: 1px solid #c7d2e0;
-    text-align: center; background-color: #fcfcfc; min-height: 36px;
-    &:focus { border-color: #007bff; box-shadow: 0 0 0 2px rgba(0,123,255,0.1); outline: none; }
+  .item-meta {
+    color: #64748b;
+    font-size: 0.8rem;
   }
 
-  @media (max-width: 1100px) {
-    grid-template-columns: 60px 1fr 100px 90px auto;
+  .item-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
   }
+
+  .item-total {
+    font-weight: bold;
+    color: #334155;
+    font-size: 0.95rem;
+  }
+
+  .qty-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #f8fafc;
+    padding: 3px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+  }
+
+  .qty-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid #e2e8f0;
+    background: white;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    font-size: 0.8rem;
+    &:hover { background: #e2e8f0; border-color: #cbd5e1; }
+  }
+
+  .qty-val {
+    font-size: 0.9rem;
+    font-weight: 600;
+    min-width: 20px;
+    text-align: center;
+    color: #334155;
+  }
+
+  /* Support for action buttons in this layout */
+  .action-row {
+      display: flex; gap: 5px; margin-top: 5px; justify-content: flex-end;
+  }
+
   @media (max-width: 768px) {
-    grid-template-columns: 56px 1fr 90px;
-    grid-template-areas:
-      "qty name actions"
-      "qty meta total";
-    .item-qty { grid-area: qty; }
-    .item-info { grid-area: name; grid-column: auto; }
-    .item-meta { grid-area: meta; }
-    .item-total { grid-area: total; }
+    padding: 10px 8px;
+    .item-name { font-size: 0.85rem; }
+    .item-total { font-size: 0.9rem; }
   }
 `;
 

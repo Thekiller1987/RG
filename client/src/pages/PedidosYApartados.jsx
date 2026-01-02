@@ -1,20 +1,20 @@
 // Archivo: src/pages/PedidosYApartados.jsx
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import styled, { keyframes } from 'styled-components'; 
-import { 
-    FaSearch, FaFilePdf, FaPlus, FaTrash, 
-    FaSync, FaBarcode, FaFont, FaMinus, FaFileAlt, 
-    FaArrowLeft, FaPhone 
-} from 'react-icons/fa'; 
+import styled, { keyframes } from 'styled-components';
+import {
+    FaSearch, FaFilePdf, FaPlus, FaTrash,
+    FaSync, FaBarcode, FaFont, FaMinus, FaFileAlt,
+    FaArrowLeft, FaPhone, FaImage
+} from 'react-icons/fa';
 
 // NOTA: Si usas react-router-dom, DEBES descomentar y usar:
 // import { useNavigate } from 'react-router-dom'; 
 
-import { useAuth } from '../context/AuthContext'; 
-import * as api from '../service/api'; 
+import { useAuth } from '../context/AuthContext';
+import * as api from '../service/api';
 
-import ProformaEmpleadoModal from './pos/components/ProformaEmpleadoModal.jsx'; 
+import ProformaEmpleadoModal from './pos/components/ProformaEmpleadoModal.jsx';
 
 
 // =================================================================
@@ -164,25 +164,25 @@ const sanitizeText = (text) => String(text || '').toLowerCase().normalize("NFD")
 
 const ProformaGenerator = () => {
     // const navigate = useNavigate(); // Descomenta si usas React Router
-    
-    const { user, products: authProducts } = useAuth(); 
+
+    const { user, products: authProducts } = useAuth();
     const token = localStorage.getItem('token');
-    
-    const [products, setProducts] = useState(authProducts || []); 
+
+    const [products, setProducts] = useState(authProducts || []);
     const [cart, setCart] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
-    const [searchType, setSearchType] = useState('nombre'); 
+    const [searchType, setSearchType] = useState('nombre');
     const [loading, setLoading] = useState(false);
-    
+
     const [clientName, setClientName] = useState('');
     const [clientPhone, setClientPhone] = useState(''); // Estado para teléfono
     const [proformaNumber, setProformaNumber] = useState(''); // Estado para número opcional
-    
+
     const [isProformaModalOpen, setIsProformaModalOpen] = useState(false);
     const [proformaDetails, setProformaDetails] = useState(null);
 
     const searchInputRef = useRef(null);
-    
+
     useEffect(() => {
         if (authProducts?.length) {
             setProducts(authProducts);
@@ -192,7 +192,7 @@ const ProformaGenerator = () => {
     const fetchProducts = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await api.fetchProducts(token); 
+            const data = await api.fetchProducts(token);
             const normalizedData = Array.isArray(data) ? data : (data?.data || []);
             setProducts(normalizedData);
             alert("Inventario de productos actualizado.");
@@ -207,24 +207,24 @@ const ProformaGenerator = () => {
     const goToDashboard = () => {
         // CORRECCIÓN: Usar navigate() si está disponible, sino, fallback
         // navigate('/dashboard'); 
-        window.location.href = '/dashboard'; 
+        window.location.href = '/dashboard';
     };
 
 
     const addToCart = (product) => {
         setCart(prev => {
             const existing = prev.find(p => p.id === product.id);
-            const finalPrice = parseFloat(product.precio_venta || product.precio || 0); 
-            
+            const finalPrice = parseFloat(product.precio_venta || product.precio || 0);
+
             if (existing) {
                 return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
             }
 
-            return [...prev, { 
-                ...product, 
-                quantity: 1, 
-                precio_venta: finalPrice 
-            }]; 
+            return [...prev, {
+                ...product,
+                quantity: 1,
+                precio_venta: finalPrice
+            }];
         });
     };
 
@@ -234,7 +234,7 @@ const ProformaGenerator = () => {
                 if (p.id === id) {
                     const newQty = p.quantity + delta;
                     if (newQty < 1) {
-                        return null; 
+                        return null;
                     }
                     return { ...p, quantity: newQty };
                 }
@@ -243,16 +243,16 @@ const ProformaGenerator = () => {
             return newCart;
         });
     };
-    
+
     const filteredProducts = useMemo(() => {
         const term = sanitizeText(searchTerm);
         if (term.length < 3 && searchType === 'nombre') {
-            return products.slice(0, 100); 
+            return products.slice(0, 100);
         }
 
         const filtered = products.filter(p => {
-            if (!term) return true; 
-            
+            if (!term) return true;
+
             if (searchType === 'codigo') {
                 return sanitizeText(p.codigo).includes(term);
             } else {
@@ -260,21 +260,21 @@ const ProformaGenerator = () => {
             }
         });
 
-        return filtered.slice(0, 100); 
+        return filtered.slice(0, 100);
     }, [products, searchTerm, searchType]);
 
 
     const handleSearchSubmit = (e) => {
         if (e.key === 'Enter') {
-            e.preventDefault(); 
+            e.preventDefault();
             if (searchType === 'codigo' && searchTerm) {
-                const exactMatch = products.find(p => 
+                const exactMatch = products.find(p =>
                     sanitizeText(p.codigo) === sanitizeText(searchTerm)
                 );
-                
+
                 if (exactMatch) {
                     addToCart(exactMatch);
-                    setSearchTerm(''); 
+                    setSearchTerm('');
                     searchInputRef.current?.focus();
                 } else {
                     alert(`Producto con código ${searchTerm} no encontrado.`);
@@ -287,7 +287,7 @@ const ProformaGenerator = () => {
 
     const total = useMemo(() => {
         return cart.reduce((acc, item) => {
-            const precio = parseFloat(item.precio_venta || item.precio || 0); 
+            const precio = parseFloat(item.precio_venta || item.precio || 0);
             return acc + (precio * item.quantity);
         }, 0);
     }, [cart]);
@@ -301,19 +301,19 @@ const ProformaGenerator = () => {
         setClientPhone(''); // Limpiar teléfono
         setProformaDetails(null);
         setIsProformaModalOpen(false);
-        setProformaNumber(''); 
+        setProformaNumber('');
         searchInputRef.current?.focus();
     }, []);
 
     // FUNCIÓN: PREPARA LOS DATOS Y ABRE EL MODAL
     const handleGenerateProforma = async () => {
         if (cart.length === 0) return alert("El carrito está vacío. Agrega productos para generar la proforma.");
-        
+
         const clientTrimmed = clientName.trim();
         if (!clientTrimmed) {
             return alert("🚨 Por favor, introduce el Nombre del Cliente antes de generar la proforma.");
         }
-        
+
         setLoading(true);
 
         // 1. Prepara el objeto de la Proforma con todos los datos necesarios
@@ -322,12 +322,12 @@ const ProformaGenerator = () => {
             total: total,
             subtotal: subtotal,
             discount: discount,
-            proformaNumber: proformaNumber.trim(), 
-            proformaFor: clientTrimmed, 
-            client: { 
-                nombre: clientTrimmed, 
+            proformaNumber: proformaNumber.trim(),
+            proformaFor: clientTrimmed,
+            client: {
+                nombre: clientTrimmed,
                 telefono: clientPhone.trim() || 'N/D' // <- TELÉFONO INCLUIDO (o 'N/D')
-            }, 
+            },
         };
 
         setProformaDetails(newProformaDetails);
@@ -347,35 +347,35 @@ const ProformaGenerator = () => {
             {/* ================= PANEL IZQUIERDO (PRODUCTOS) ================= */}
             <LeftPanel>
                 <Header>
-                    <h2 style={{margin:0, color:'#1e293b'}}>Catálogo y Proformas</h2>
+                    <h2 style={{ margin: 0, color: '#1e293b' }}>Catálogo y Proformas</h2>
                     <HeaderActions>
-                        <BackButton 
-                            onClick={goToDashboard} 
+                        <BackButton
+                            onClick={goToDashboard}
                         >
-                            <FaArrowLeft size={14}/> Regresar
+                            <FaArrowLeft size={14} /> Regresar
                         </BackButton>
-                        
-                        <button 
-                            onClick={fetchProducts} 
+
+                        <button
+                            onClick={fetchProducts}
                             disabled={loading}
-                            style={{background:'white', border:'1px solid #cbd5e1', color: '#475569'}}
+                            style={{ background: 'white', border: '1px solid #cbd5e1', color: '#475569' }}
                         >
-                            {loading ? <LoadingIcon size={14}/> : <FaSync size={14}/>}
+                            {loading ? <LoadingIcon size={14} /> : <FaSync size={14} />}
                             {loading ? 'Cargando...' : 'Recargar'}
                         </button>
                     </HeaderActions>
                 </Header>
-                
+
                 <SearchContainer>
                     <SearchTypeToggle>
-                        <ToggleButton 
-                            active={searchType === 'nombre'} 
+                        <ToggleButton
+                            active={searchType === 'nombre'}
                             onClick={() => { setSearchType('nombre'); setSearchTerm(''); searchInputRef.current?.focus(); }}
                         >
                             <FaFont /> Nombre
                         </ToggleButton>
-                        <ToggleButton 
-                            active={searchType === 'codigo'} 
+                        <ToggleButton
+                            active={searchType === 'codigo'}
                             onClick={() => { setSearchType('codigo'); setSearchTerm(''); searchInputRef.current?.focus(); }}
                         >
                             <FaBarcode /> Código
@@ -384,7 +384,7 @@ const ProformaGenerator = () => {
 
                     <SearchInputWrapper>
                         <FaSearch color="#94a3b8" />
-                        <Input 
+                        <Input
                             ref={searchInputRef}
                             placeholder={searchType === 'codigo' ? "Escanea o escribe código y pulsa Enter..." : "Busca por descripción (mínimo 3 letras)..."}
                             value={searchTerm}
@@ -393,7 +393,7 @@ const ProformaGenerator = () => {
                             autoFocus
                         />
                     </SearchInputWrapper>
-                    <p style={{margin:0, fontSize:'0.8rem', color:'#64748b'}}>
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
                         Mostrando **{filteredProducts.length}** productos filtrados.
                     </p>
                 </SearchContainer>
@@ -402,26 +402,33 @@ const ProformaGenerator = () => {
                     {filteredProducts.map(p => {
                         const precio = parseFloat(p.precio_venta || p.precio || 0);
                         const tieneStock = p.existencia > 0;
-                        
+
                         return (
                             <ProductCard key={p.id} onClick={() => addToCart(p)}>
-                                <div>
-                                    <div style={{fontWeight:'600', color:'#334155', lineHeight:'1.2', maxHeight: '2.4em', overflow: 'hidden'}} title={p.nombre}>{p.nombre}</div>
-                                    <div style={{fontSize:'0.8rem', color:'#64748b', marginTop:4}}>
+                                <div style={{ height: '140px', background: '#f8fafc', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
+                                    {p.imagen ? (
+                                        <img src={p.imagen} alt={p.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                                    ) : (
+                                        <FaImage size={40} color="#cbd5e1" />
+                                    )}
+                                </div>
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                    <div style={{ fontWeight: '600', color: '#334155', lineHeight: '1.2', maxHeight: '2.4em', overflow: 'hidden', marginBottom: '4px' }} title={p.nombre}>{p.nombre}</div>
+                                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
                                         {p.codigo || `ID: ${p.id}`}
                                     </div>
-                                </div>
-                                
-                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginTop:'auto'}}>
-                                    <div style={{fontSize:'1.1rem', fontWeight:'bold', color:'#2563eb'}}>
-                                        C$ {precio.toFixed(2)}
+
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 'auto', paddingTop: '10px' }}>
+                                        <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#2563eb' }}>
+                                            C$ {precio.toFixed(2)}
+                                        </div>
+                                        <Badge
+                                            bg={tieneStock ? '#dcfce7' : '#fee2e2'}
+                                            color={tieneStock ? '#166534' : '#991b1b'}
+                                        >
+                                            Stock: {p.existencia}
+                                        </Badge>
                                     </div>
-                                    <Badge 
-                                        bg={tieneStock ? '#dcfce7' : '#fee2e2'} 
-                                        color={tieneStock ? '#166534' : '#991b1b'}
-                                    >
-                                        Stock: {p.existencia}
-                                    </Badge>
                                 </div>
                             </ProductCard>
                         );
@@ -431,26 +438,26 @@ const ProformaGenerator = () => {
 
             {/* ================= PANEL DERECHO (DETALLE DE PROFORMA) ================= */}
             <RightPanel>
-                <div style={{borderBottom:'1px solid #e2e8f0', paddingBottom:15}}>
-                    <h3 style={{margin:0, display:'flex', alignItems:'center', gap:10}}>
-                        <FaFileAlt color="#059669"/> Detalle de Proforma
+                <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 15 }}>
+                    <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <FaFileAlt color="#059669" /> Detalle de Proforma
                     </h3>
-                    
+
                     {/* CAMPO DE NOMBRE DEL CLIENTE (OBLIGATORIO) */}
-                    <Input 
+                    <Input
                         style={{
-                            width:'100%', padding: '10px', marginTop: 15, 
-                            border: '1px solid #cbd5e1', borderRadius: 6, outline:'none', background:'white'
+                            width: '100%', padding: '10px', marginTop: 15,
+                            border: '1px solid #cbd5e1', borderRadius: 6, outline: 'none', background: 'white'
                         }}
                         placeholder="Nombre del Cliente (Obligatorio)"
                         value={clientName}
                         onChange={e => setClientName(e.target.value)}
                     />
-                    
+
                     {/* CAMPO DE NÚMERO DE TELÉFONO (OPCIONAL) */}
                     <InputGroup>
                         <FaPhone size={14} />
-                        <input 
+                        <input
                             type="tel"
                             placeholder="Teléfono del Cliente (Opcional)"
                             value={clientPhone}
@@ -459,10 +466,10 @@ const ProformaGenerator = () => {
                     </InputGroup>
 
                     {/* CAMPO DE NÚMERO DE PROFORMA (OPCIONAL) */}
-                    <Input 
+                    <Input
                         style={{
-                            width:'100%', padding: '10px', marginTop: 10, 
-                            border: '1px solid #cbd5e1', borderRadius: 6, outline:'none', background:'white'
+                            width: '100%', padding: '10px', marginTop: 10,
+                            border: '1px solid #cbd5e1', borderRadius: 6, outline: 'none', background: 'white'
                         }}
                         placeholder="Número de Proforma (Opcional)"
                         value={proformaNumber}
@@ -472,34 +479,34 @@ const ProformaGenerator = () => {
 
                 <CartList>
                     {cart.length === 0 ? (
-                        <div style={{textAlign:'center', color:'#94a3b8', marginTop: 40}}>
-                            <FaFilePdf size={40} style={{opacity:0.3}}/>
+                        <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: 40 }}>
+                            <FaFilePdf size={40} style={{ opacity: 0.3 }} />
                             <p>Agrega productos para cotizar</p>
                         </div>
                     ) : (
                         cart.map(item => (
                             <CartItem key={item.id}>
-                                <div style={{flex:1, paddingRight:10}}>
-                                    <div style={{fontWeight:'600', fontSize:'0.9rem'}}>{item.nombre}</div>
-                                    <div style={{color:'#64748b', fontSize:'0.8rem'}}>
+                                <div style={{ flex: 1, paddingRight: 10 }}>
+                                    <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{item.nombre}</div>
+                                    <div style={{ color: '#64748b', fontSize: '0.8rem' }}>
                                         C$ {parseFloat(item.precio_venta).toFixed(2)} x {item.quantity}
                                     </div>
                                 </div>
-                                
-                                <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:5}}>
-                                    <div style={{fontWeight:'bold', color:'#334155'}}>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
+                                    <div style={{ fontWeight: 'bold', color: '#334155' }}>
                                         C$ {(parseFloat(item.precio_venta) * item.quantity).toFixed(2)}
                                     </div>
-                                    
-                                    <div style={{display:'flex', alignItems:'center', gap:5}}>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                                         <QtyControl>
-                                            <RoundBtn onClick={() => updateQuantity(item.id, -1)}><FaMinus size={10}/></RoundBtn>
-                                            <span style={{fontSize:'0.9rem', minWidth:15, textAlign:'center'}}>{item.quantity}</span>
-                                            <RoundBtn onClick={() => updateQuantity(item.id, 1)}><FaPlus size={10}/></RoundBtn>
+                                            <RoundBtn onClick={() => updateQuantity(item.id, -1)}><FaMinus size={10} /></RoundBtn>
+                                            <span style={{ fontSize: '0.9rem', minWidth: 15, textAlign: 'center' }}>{item.quantity}</span>
+                                            <RoundBtn onClick={() => updateQuantity(item.id, 1)}><FaPlus size={10} /></RoundBtn>
                                         </QtyControl>
-                                        <button 
-                                            onClick={() => setCart(prev => prev.filter(p => p.id !== item.id))} 
-                                            style={{border:'none', background:'none', color:'#ef4444', cursor:'pointer', padding:5}}
+                                        <button
+                                            onClick={() => setCart(prev => prev.filter(p => p.id !== item.id))}
+                                            style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer', padding: 5 }}
                                         >
                                             <FaTrash />
                                         </button>
@@ -510,26 +517,26 @@ const ProformaGenerator = () => {
                     )}
                 </CartList>
 
-                <div style={{borderTop:'2px dashed #cbd5e1', paddingTop:20, marginTop:10}}>
-                    <div style={{display:'flex', justifyContent:'space-between', fontSize:'1.3rem', fontWeight:'bold', marginBottom:15, color:'#1e293b'}}>
+                <div style={{ borderTop: '2px dashed #cbd5e1', paddingTop: 20, marginTop: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.3rem', fontWeight: 'bold', marginBottom: 15, color: '#1e293b' }}>
                         <span>Total:</span>
                         <span>C$ {total.toFixed(2)}</span>
                     </div>
 
-                    <ActionButton 
+                    <ActionButton
                         bg="#059669" // Color verde
                         onClick={handleGenerateProforma}
                         disabled={cart.length === 0 || loading || !clientName.trim()}
                     >
                         {loading ? <LoadingIcon /> : <FaFilePdf />} GENERAR PROFORMA PDF
                     </ActionButton>
-                    
+
                     {/* Botón para vaciar carrito */}
-                    <ActionButton 
-                        bg="#dc2626" 
+                    <ActionButton
+                        bg="#dc2626"
                         onClick={() => resetCart()}
                         disabled={cart.length === 0 || loading}
-                        style={{marginTop: 5, padding: 10}}
+                        style={{ marginTop: 5, padding: 10 }}
                     >
                         <FaTrash /> VACIAR CARRO
                     </ActionButton>
@@ -538,11 +545,11 @@ const ProformaGenerator = () => {
 
             {/* 5. RENDERING CONDICIONAL DEL MODAL DE PROFORMA - Usa el nuevo componente */}
             {isProformaModalOpen && proformaDetails && (
-                <ProformaEmpleadoModal 
-                    {...proformaDetails} 
-                    onClose={() => setIsProformaModalOpen(false)} 
-                    setTicketData={handleSetTicketData} 
-                    currentUser={user} 
+                <ProformaEmpleadoModal
+                    {...proformaDetails}
+                    onClose={() => setIsProformaModalOpen(false)}
+                    setTicketData={handleSetTicketData}
+                    currentUser={user}
                     client={proformaDetails.client}
                 />
             )}
