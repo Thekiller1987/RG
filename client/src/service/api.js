@@ -80,6 +80,8 @@ export const fetchProducts = async (token) => {
         imagen: p.imagen || null,
         descripcion: p.descripcion || '',
         categoria: p.nombre_categoria || '',
+        costo: Number(p.costo || 0),
+        mayorista: Number(p.mayoreo || p.mayorista || 0),
         raw: p,
     }));
 };

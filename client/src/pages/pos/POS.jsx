@@ -3,7 +3,7 @@ import {
   FaArrowLeft, FaShoppingCart, FaPlus, FaMinus, FaTrashAlt, FaLock,
   FaHistory, FaSync, FaKeyboard, FaTimes,
   FaFileInvoice, FaMoneyBillWave, FaArrowDown, FaArrowUp,
-  FaPercentage, FaTag
+  FaPercentage, FaTag, FaEdit, FaPencilAlt
 } from 'react-icons/fa';
 import { AnimatePresence } from 'framer-motion';
 
@@ -205,7 +205,79 @@ const POS = () => {
     });
   };
 
-  // Handler for wholesale price toggle
+  const renameTicket = (newName) => {
+    if (newName && newName.trim()) {
+      updateActiveOrder('name', newName.trim());
+      closeModal();
+      showAlert({ title: "Ticket Renombrado", message: `Nombre actualizado a: ${newName.trim()}` });
+    }
+  };
+
+
+
+  // Handlers for Item Actions
+  const handleUpdateItemPrice = (newItemPrice) => {
+    const item = modal.data?.item;
+    if (!item) return;
+
+    const price = parseFloat(newItemPrice);
+    const costo = item.costo || item.raw?.costo || 0;
+
+    if (price < costo) {
+      showAlert({ title: "Precio Inválido", message: `El precio C$${price.toFixed(2)} es menor al costo (C$${costo.toFixed(2)}).` });
+      return;
+    }
+
+    const pid = item.id_producto || item.id;
+    const newCart = cart.map(i => (i.id_producto || i.id) === pid ? { ...i, precio_venta: price } : i);
+    updateActiveCart(newCart);
+    closeModal();
+  };
+
+  const handleItemWholesale = (item) => {
+    const pid = item.id_producto || item.id;
+    const product = products.find(p => (p.id_producto || p.id) === pid) || item;
+    const mayorista = product.mayorista || product.mayoreo || 0;
+
+    if (!mayorista) {
+      showAlert({ title: "Aviso", message: "Este producto no tiene precio mayorista." });
+      return;
+    }
+
+    const isWholesale = item.precio_venta === mayorista;
+    const newPrice = isWholesale ? (product.venta || product.precio) : mayorista;
+
+    const newCart = cart.map(i => (i.id_producto || i.id) === pid ? { ...i, precio_venta: newPrice } : i);
+    updateActiveCart(newCart);
+  };
+
+  const handleItemDiscount = (val, type) => {
+    const item = modal.data?.item;
+    if (!item) return;
+
+    const pid = item.id_producto || item.id;
+    let newPrice = item.precio_venta;
+    const value = parseFloat(val);
+
+    if (type === 'percentage') {
+      newPrice = newPrice - (newPrice * (value / 100));
+    } else {
+      newPrice = newPrice - value;
+    }
+
+    // Cost check
+    const costo = item.costo || item.raw?.costo || 0;
+    if (newPrice < costo) {
+      showAlert({ title: "Precio Inválido", message: `El descuento deja el precio (C$${newPrice.toFixed(2)}) por debajo del costo.` });
+      return;
+    }
+
+    const newCart = cart.map(i => (i.id_producto || i.id) === pid ? { ...i, precio_venta: newPrice } : i);
+    updateActiveCart(newCart);
+    closeModal();
+  };
+
+  // Handler for global wholesale price toggle
   const toggleWholesalePrice = () => {
     const newCart = cart.map(item => {
       const product = products.find(p => (p.id_producto || p.id) === (item.id_producto || item.id));
@@ -299,6 +371,12 @@ const POS = () => {
           <S.Button secondary onClick={() => openModal('salesHistory')} title="Historial de Ventas">
             <FaHistory />
           </S.Button>
+          <S.Button secondary onClick={() => openModal('cashEntry')} title="Entrada de Dinero">
+            <FaArrowDown color="#10b981" />
+          </S.Button>
+          <S.Button secondary onClick={() => openModal('cashExit')} title="Salida de Dinero">
+            <FaArrowUp color="#ef4444" />
+          </S.Button>
           <S.Button secondary onClick={() => openModal('caja')}>
             <FaLock /> {currentUser?.nombre_usuario || 'Usuario'}
           </S.Button>
@@ -338,14 +416,7 @@ const POS = () => {
                   primary={o.id === activeOrderId}
                   secondary={o.id !== activeOrderId}
                   onClick={() => setActiveOrderId(o.id)}
-                  onDoubleClick={() => {
-                    const newName = prompt('Nuevo nombre para el ticket:', o.name);
-                    if (newName && newName.trim()) {
-                      // Update ticket name through context
-                      // This would need proper integration with OrdersContext
-                      showAlert({ title: "Ticket Renombrado", message: `Nuevo nombre: ${newName.trim()}` });
-                    }
-                  }}
+                  onDoubleClick={() => openModal('renameTicket')}
                   style={{ fontSize: '0.75rem', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
                 >
                   {o.name}
@@ -392,6 +463,17 @@ const POS = () => {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1e293b' }}>{item.nombre}</div>
                       <div style={{ fontSize: '0.8rem', color: '#64748b' }}>C$ {fmt(item.precio_venta)}</div>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                        <S.RoundBtn title="Editar Precio" onClick={() => openModal('editPrice', { item })} style={{ width: 26, height: 26, background: '#f1f5f9', color: '#334155' }}>
+                          <FaPencilAlt size={10} />
+                        </S.RoundBtn>
+                        <S.RoundBtn title="Precio Mayorista" onClick={() => handleItemWholesale(item)} style={{ width: 26, height: 26, background: '#f1f5f9', color: '#334155' }}>
+                          <FaTag size={10} />
+                        </S.RoundBtn>
+                        <S.RoundBtn title="Descuento Item" onClick={() => openModal('itemDiscount', { item })} style={{ width: 26, height: 26, background: '#f1f5f9', color: '#334155' }}>
+                          <FaPercentage size={10} />
+                        </S.RoundBtn>
+                      </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <S.QtyControl>
@@ -577,6 +659,51 @@ const POS = () => {
             ]}
             onSubmit={(values) => processCashTransaction('salida', values.amount, values.note)}
             icon={<FaMoneyBillWave color="#ef4444" />}
+          />
+        )}
+
+        {modal.name === 'renameTicket' && (
+          <PromptModal
+            isOpen={true}
+            onClose={closeModal}
+            title="Renombrar Ticket"
+            fields={[
+              { name: 'name', label: 'Nuevo Nombre', type: 'text', defaultValue: activeOrder?.name || 'Ticket' }
+            ]}
+            onSubmit={(values) => renameTicket(values.name)}
+            icon={<FaEdit color="#2563eb" />}
+          />
+        )}
+
+        {modal.name === 'editPrice' && (
+          <PromptModal
+            isOpen={true}
+            onClose={closeModal}
+            title="Editar Precio"
+            fields={[
+              { name: 'price', label: 'Nuevo Precio (C$)', type: 'number', defaultValue: modal.data?.item?.precio_venta }
+            ]}
+            onSubmit={(values) => handleUpdateItemPrice(values.price)}
+            icon={<FaPencilAlt color="#f59e0b" />}
+          />
+        )}
+
+        {modal.name === 'itemDiscount' && (
+          <PromptModal
+            isOpen={true}
+            onClose={closeModal}
+            title="Descuento al Producto"
+            fields={[
+              {
+                name: 'type', label: 'Tipo', type: 'select', options: [
+                  { value: 'fixed', label: 'Monto Fijo (C$)' },
+                  { value: 'percentage', label: 'Porcentaje (%)' }
+                ], defaultValue: 'fixed'
+              },
+              { name: 'value', label: 'Valor', type: 'number', placeholder: '0.00' }
+            ]}
+            onSubmit={(values) => handleItemDiscount(values.value, values.type)}
+            icon={<FaPercentage color="#2563eb" />}
           />
         )}
 
