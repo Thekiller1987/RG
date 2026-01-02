@@ -19,6 +19,7 @@ import PaymentModal from './components/PaymentModal.jsx';
 import SalesHistoryModal from './components/SalesHistoryModal.jsx';
 import ProformaModal from './components/ProformaModal.jsx';
 import PromptModal from './components/PromptModal.jsx';
+import TicketModal from './components/TicketModal.jsx';
 
 const fmt = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -41,6 +42,7 @@ const POS = () => {
   const [searchType, setSearchType] = useState('description');
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [modal, setModal] = useState({ name: null, data: null });
+  const [ticketData, setTicketData] = useState(null); // State for the ticket to print
   const [alert, setAlert] = useState({ isOpen: false, title: '', message: '' });
   const [confirmation, setConfirmation] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
@@ -157,13 +159,46 @@ const POS = () => {
     };
 
     try {
-      await api.createSale(saleData, token);
+      const response = await api.createSale(saleData, token);
       handleRemoveOrder(orderToCloseId);
       await refreshData();
-      showAlert({ title: "¡Éxito!", message: "La venta se ha registrado correctamente." });
+
+      // If sale creation returns the sale object, use it. Otherwise, construct a local representation for the ticket.
+      const savedSale = response?.data || response || saleData;
+      // Ensure specific fields for printing
+      savedSale.items = payloadItems;
+      savedSale.pagoDetalles = pagoDetalles;
+      savedSale.fecha = new Date().toISOString();
+      savedSale.id = savedSale.id || 'N/A'; // Backend should ideally return the real ID
+
+      if (pagoDetalles.shouldPrintNow) {
+        setTicketData(savedSale); // Open TicketModal
+      } else {
+        showAlert({ title: "¡Éxito!", message: "Venta registrada sin impresión." });
+      }
+
+      // --- CRITICAL UPDATE: Add transaction to local session so 'Caja' updates in real-time ---
+      if (isCajaOpen && cajaSession) {
+        const newTransaction = {
+          type: 'venta', // Generic type, CajaModal handles details via pagoDetalles
+          amount: saleData.totalVenta,
+          at: new Date().toISOString(),
+          userId,
+          pagoDetalles: pagoDetalles, // Pass full details for correct breakdown
+          id: savedSale.id || 'TEMP-' + Date.now()
+        };
+        const updatedSession = {
+          ...cajaSession,
+          transactions: [newTransaction, ...(cajaSession.transactions || [])]
+        };
+        setCajaSession(updatedSession);
+      }
+      // --------------------------------------------------------------------------------------
+
       return true;
     } catch (err) {
-      showAlert({ title: "Error en Venta", message: err.message });
+      console.error("Error creating sale:", err);
+      showAlert({ title: "Error en Venta", message: err.message || "No se pudo registrar la venta." });
       return false;
     }
   };
@@ -246,15 +281,21 @@ const POS = () => {
 
     // Toggle: if current price is equal to wholesale price (approx), switch back to retail
     const currentPrice = Number(item.precio_venta || 0);
-    const isWholesale = Math.abs(currentPrice - mayorista) < 0.01;
+    const isWholesaleConfigured = Math.abs(currentPrice - mayorista) < 0.01;
 
     // Retail price fallback: product.venta, product.precio, or current item price if we are not wholesale
-    const retailPrice = Number(product.venta || product.precio || (isWholesale ? item.originalPrice : item.precio_venta) || 0);
+    const retailPrice = Number(product.venta || product.precio || (isWholesaleConfigured ? item.originalPrice : item.precio_venta) || 0);
 
-    const newPrice = isWholesale ? retailPrice : mayorista;
+    const newPrice = isWholesaleConfigured ? retailPrice : mayorista;
 
     const newCart = cart.map(i => (i.id_producto || i.id) === pid ? { ...i, precio_venta: newPrice } : i);
     updateActiveCart(newCart);
+
+    if (isWholesaleConfigured) {
+      showAlert({ title: "Precio Revertido", message: "Se ha restablecido el precio regular." });
+    } else {
+      showAlert({ title: "Precio Mayorista", message: "✅ ACTIVADO Precio Mayorista" });
+    }
   };
 
   const handleItemDiscount = (val, type) => {
@@ -422,7 +463,7 @@ const POS = () => {
             <FaArrowUp color="#ef4444" />
           </S.Button>
           <S.Button secondary onClick={() => openModal('caja')}>
-            <FaLock /> {currentUser?.nombre_usuario || 'Usuario'}
+            <FaLock /> {currentUser?.nombre_usuario || 'Caja'}
           </S.Button>
         </div>
       </S.HeaderActions>
@@ -507,6 +548,7 @@ const POS = () => {
                   <S.CartItemWrapper key={item.id_producto || item.id}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1e293b' }}>{item.nombre}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>#{item.codigo}</div>
                       <div style={{ fontSize: '0.8rem', color: '#64748b' }}>C$ {fmt(item.precio_venta)}</div>
                       <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
                         <S.RoundBtn title="Editar Precio" onClick={() => openModal('editPrice', { item })} style={{ width: 26, height: 26, background: '#f1f5f9', color: '#334155' }}>
@@ -657,8 +699,7 @@ const POS = () => {
             users={[user]}
             clients={[]}
             onReprintTicket={(sale) => {
-              console.log('Reprint ticket:', sale);
-              showAlert({ title: "Reimprimir", message: "Función de reimpresión no implementada" });
+              setTicketData(sale); // Open TicketModal for reprint
             }}
             onCancelSale={async (saleId) => {
               console.log('Cancel sale:', saleId);
@@ -671,6 +712,18 @@ const POS = () => {
             onAbonoSuccess={() => {
               console.log('Abono success');
             }}
+          />
+        )}
+
+        {/* Ticket Modal for Printing */}
+        {ticketData && (
+          <TicketModal
+            isOpen={true}
+            transaction={ticketData}
+            onClose={() => setTicketData(null)}
+            clients={clients}
+            users={[user]}
+            currentUser={user}
           />
         )}
 

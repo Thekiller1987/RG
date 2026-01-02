@@ -194,6 +194,9 @@ export default function ProductPanel({
                 }}>
                   {p.nombre}
                 </div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', marginBottom: '4px' }}>
+                  #{p.codigo || 'S/C'}
+                </div>
                 {(Number(p.mayorista) > 0 || Number(p.mayoreo) > 0) && (
                   <div style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px' }}>
                     <FaTags size={10} /> May: C$ {fmt(p.mayorista || p.mayoreo)}
