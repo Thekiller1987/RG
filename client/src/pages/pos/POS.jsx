@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   FaArrowLeft, FaShoppingCart, FaPlus, FaMinus, FaTrashAlt, FaLock,
   FaHistory, FaSync, FaKeyboard, FaTimes,
@@ -209,7 +209,7 @@ const POS = () => {
     if (newName && newName.trim()) {
       updateActiveOrder('name', newName.trim());
       closeModal();
-      showAlert({ title: "Ticket Renombrado", message: `Nombre actualizado a: ${newName.trim()}` });
+      showAlert({ title: "Ticket Renombrado", message: `Nombre actualizado a: ${newName.trim()} ` });
     }
   };
 
@@ -224,7 +224,7 @@ const POS = () => {
     const costo = item.costo || item.raw?.costo || 0;
 
     if (price < costo) {
-      showAlert({ title: "Precio Inválido", message: `El precio C$${price.toFixed(2)} es menor al costo (C$${costo.toFixed(2)}).` });
+      showAlert({ title: "Precio Inválido", message: `El precio C$${price.toFixed(2)} es menor al costo(C$${costo.toFixed(2)}).` });
       return;
     }
 
@@ -279,7 +279,7 @@ const POS = () => {
     // Cost check
     const costo = item.costo || item.raw?.costo || 0;
     if (newPrice < costo) {
-      showAlert({ title: "Precio Inválido", message: `El descuento deja el precio (C$${newPrice.toFixed(2)}) por debajo del costo.` });
+      showAlert({ title: "Precio Inválido", message: `El descuento deja el precio(C$${newPrice.toFixed(2)}) por debajo del costo.` });
       return;
     }
 
@@ -748,7 +748,7 @@ const POS = () => {
             fields={[
               {
                 name: 'price',
-                label: `Nuevo Precio (C$) [Costo: C$${(modal.data?.item?.costo || 0).toFixed(2)}]`,
+                label: `Nuevo Precio(C$)[Costo: C$${(modal.data?.item?.costo || 0).toFixed(2)}]`,
                 type: 'number',
                 defaultValue: modal.data?.item?.precio_venta
               }
