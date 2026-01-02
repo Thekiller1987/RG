@@ -192,7 +192,12 @@ export default function ProductPanel({
                 }}>
                   {p.nombre}
                 </div>
-                <div className="price" style={{ fontWeight: 800, color: '#2563eb', fontSize: '1.05rem', marginTop: 'auto' }}>
+                {(Number(p.mayorista) > 0 || Number(p.mayoreo) > 0) && (
+                  <div style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px' }}>
+                    <FaTags size={10} /> May: C$ {fmt(p.mayorista || p.mayoreo)}
+                  </div>
+                )}
+                <div className="price" style={{ fontWeight: 800, color: '#2563eb', fontSize: '1.05rem', marginTop: !((Number(p.mayorista) > 0 || Number(p.mayoreo) > 0)) ? 'auto' : 0 }}>
                   C$ {fmt(p.precio_venta || p.precio)}
                 </div>
               </div>

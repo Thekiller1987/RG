@@ -29,6 +29,11 @@ const CajaModal = ({
   const [viewingReport, setViewingReport] = useState(false);
   const navigate = useNavigate();
 
+  const userId = currentUser?.id_usuario || currentUser?.id;
+  const openedById = session?.openedBy?.id || session?.openedBy;
+  // Allow close if Admin OR if current user opened the box
+  const canClose = isAdmin || (String(userId) === String(openedById));
+
   const transactions = useMemo(
     () => Array.isArray(session?.transactions) ? session.transactions : [],
     [session]
@@ -233,7 +238,11 @@ const CajaModal = ({
   };
 
   const handleConfirmClose = () => {
-    const proceedClose = () => onCloseCaja(Number(montoContado));
+    const proceedClose = () => {
+      printReport();
+      setTimeout(() => onCloseCaja(Number(montoContado)), 500);
+    };
+
     if (Math.abs(diferencia) > 0.01) {
       showConfirmation({
         title: 'Diferencia en Arqueo',
@@ -492,7 +501,7 @@ const CajaModal = ({
             {devoluciones?.length > 0 && <SectionList title="Devoluciones" items={devoluciones} neutral />}
 
             <div style={{ display: 'flex', gap: 8, marginTop: 16, alignItems: 'center' }}>
-              <Button primary onClick={handleConfirmClose} style={{ flex: 1 }} disabled={!isAdmin}>
+              <Button primary onClick={handleConfirmClose} style={{ flex: 1 }} disabled={!canClose}>
                 Confirmar y Cerrar Caja
               </Button>
               <Button onClick={() => setViewingReport(false)} style={{ flex: 0.6 }}>Volver</Button>
@@ -500,7 +509,7 @@ const CajaModal = ({
                 <FaPrint /> Imprimir
               </Button>
             </div>
-            {!isAdmin && <p style={{ color: '#dc3545', marginTop: 8, textAlign: 'center', fontSize: '0.9rem' }}>Solo un Administrador puede cerrar la caja.</p>}
+            {!canClose && <p style={{ color: '#dc3545', marginTop: 8, textAlign: 'center', fontSize: '0.9rem' }}>Solo el Administrador o quien abrió la caja puede cerrarla.</p>}
           </>
         ) : (
           <>
@@ -536,11 +545,12 @@ const CajaModal = ({
             )}
 
             <div style={{ display: 'flex', gap: 8, marginTop: '1rem' }}>
-              <Button primary onClick={handlePrepareClose} disabled={!isAdmin} style={{ flex: 1, padding: '12px' }}>
+              <Button primary onClick={handlePrepareClose} disabled={!canClose} style={{ flex: 1, padding: '12px' }}>
                 Generar Reporte y Cerrar
               </Button>
               <Button onClick={onClose} style={{ flex: 0.6 }}>Cancelar</Button>
             </div>
+            {!canClose && <p style={{ color: '#dc3545', marginTop: 8, textAlign: 'center', fontSize: '0.9rem' }}>Solo el Administrador o quien abrió la caja puede cerrarla.</p>}
           </>
         )}
       </ModalContent>

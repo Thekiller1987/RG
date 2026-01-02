@@ -500,7 +500,7 @@ const POS = () => {
               <S.Button
                 secondary
                 style={{ width: '100%', marginTop: '1rem', padding: '10px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}
-                onClick={() => openModal('proforma')}
+                onClick={() => openModal('proformaName')}
               >
                 <FaFileInvoice /> Crear Proforma
               </S.Button>
@@ -627,10 +627,30 @@ const POS = () => {
           />
         )}
 
+        {modal.name === 'proformaName' && (
+          <PromptModal
+            isOpen={true}
+            onClose={closeModal}
+            title="Datos de Proforma"
+            fields={[{ name: 'name', label: 'A nombre de:', type: 'text', placeholder: 'Nombre del Cliente (Opcional)' }]}
+            onSubmit={(values) => {
+              closeModal();
+              setTimeout(() => openModal('proforma', { proformaFor: values.name }), 200);
+            }}
+            icon={<FaFileInvoice color="#0b72b9" />}
+          />
+        )}
+
         {modal.name === 'proforma' && (
           <ProformaModal
             isOpen={true}
             onClose={closeModal}
+            cart={cart}
+            total={total}
+            subtotal={subtotal}
+            discount={discountAmount}
+            proformaFor={modal.data?.proformaFor}
+            currentUser={currentUser}
           />
         )}
 
@@ -681,7 +701,12 @@ const POS = () => {
             onClose={closeModal}
             title="Editar Precio"
             fields={[
-              { name: 'price', label: 'Nuevo Precio (C$)', type: 'number', defaultValue: modal.data?.item?.precio_venta }
+              {
+                name: 'price',
+                label: `Nuevo Precio (C$) [Costo: C$${(modal.data?.item?.costo || 0).toFixed(2)}]`,
+                type: 'number',
+                defaultValue: modal.data?.item?.precio_venta
+              }
             ]}
             onSubmit={(values) => handleUpdateItemPrice(values.price)}
             icon={<FaPencilAlt color="#f59e0b" />}
