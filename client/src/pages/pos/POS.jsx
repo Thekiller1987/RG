@@ -515,10 +515,10 @@ const POS = () => {
             onClose={closeModal}
             dailySales={[]}
             loadSales={async (date) => {
-              // Load sales from API - implement your API call here
               try {
-                const response = await api.getSales(date, token);
-                return response.data || [];
+                // Correctly call fetchSales from api.js with (token, date)
+                const data = await api.fetchSales(token, date);
+                return data || [];
               } catch (error) {
                 console.error('Error loading sales:', error);
                 return [];
