@@ -1,11 +1,11 @@
 // Archivo: src/pages/PedidosYApartados.jsx
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import styled, { keyframes } from 'styled-components';
+import styled, { keyframes, css } from 'styled-components';
 import {
     FaSearch, FaFilePdf, FaPlus, FaTrash,
     FaSync, FaBarcode, FaFont, FaMinus, FaFileAlt,
-    FaArrowLeft, FaPhone, FaImage, FaEye, FaTimes
+    FaArrowLeft, FaPhone, FaImage, FaEye, FaTimes, FaShoppingCart
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -16,192 +16,116 @@ import ProformaEmpleadoModal from './pos/components/ProformaEmpleadoModal.jsx';
 
 
 // =================================================================
-// ESTILOS RESPONSIVE
+// ESTILOS PREMIUM
 // =================================================================
 const spin = keyframes`
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 `;
+const fadeIn = keyframes`
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
+
 const Container = styled.div`
-    display: flex; height: 100vh; background: #f1f5f9; font-family: 'Segoe UI', sans-serif; overflow: hidden;
-    @media (max-width: 768px) { flex-direction: column; height: auto; min-height: 100vh; overflow-y: auto; }
+    display: flex; height: 100vh; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); font-family: 'Inter', sans-serif; overflow: hidden;
+    @media (max-width: 960px) { flex-direction: column; overflow-y: auto; height: auto; min-height: 100vh; }
 `;
 const LeftPanel = styled.div`
-    flex: 2; padding: 20px; display: flex; flex-direction: column; gap: 15px; overflow-y: hidden;
-    @media (max-width: 768px) { flex: none; height: auto; overflow-y: visible; padding: 15px; } 
+    flex: 1; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; overflow-y: hidden;
+    @media (max-width: 960px) { padding: 12px; height: auto; overflow: visible; }
 `;
 const RightPanel = styled.div`
-    flex: 1; background: white; padding: 20px; display: flex; flex-direction: column; box-shadow: -4px 0 15px rgba(0,0,0,0.05); border-left: 1px solid #e2e8f0; min-width: 350px;
-    @media (max-width: 768px) { flex: none; width: 100%; border-left: none; border-top: 1px solid #e2e8f0; min-width: 0; padding: 15px; } 
+    width: 420px; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(16px); padding: 1.5rem; display: flex; flex-direction: column; box-shadow: -10px 0 30px rgba(0,0,0,0.03); border-left: 1px solid rgba(255,255,255,0.5);
+    @media (max-width: 960px) { width: 100%; border-left: none; border-top: 1px solid #eee; padding: 15px; }
 `;
 const Header = styled.div` 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    margin-bottom: 10px; 
-    gap: 10px;
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;
 `;
 
 const HeaderActions = styled.div`
-    display: flex;
-    gap: 10px;
-    
-    button {
-        padding: 8px 12px;
-        border-radius: 6px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        transition: background 0.2s;
-        white-space: nowrap; 
-    }
-
-    @media (max-width: 768px) {
-        flex-direction: column;
-        
-        button {
-            width: 100%;
-            justify-content: center;
-        }
-    }
+    display: flex; gap: 10px;
 `;
 
-const BackButton = styled.button`
-    background: #3b82f6; 
-    border: none;
-    color: white;
-    &:hover { background: #1d4ed8; }
+const BackButton = styled(motion.button)`
+    background: white; border: 1px solid #e2e8f0; color: #64748b; padding: 8px 16px; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.9rem;
+    &:hover { background: #f8fafc; color: #334155; border-color: #cbd5e1; }
 `;
 
 const SearchContainer = styled.div`
-    background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px;
+    background: white; padding: 1.5rem; border-radius: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); display: flex; flex-direction: column; gap: 12px; border: 1px solid #f1f5f9;
 `;
 const SearchTypeToggle = styled.div` display: flex; gap: 10px; `;
 const ToggleButton = styled.button`
-    flex: 1; padding: 8px; border-radius: 6px; border: 1px solid ${props => props.active ? '#3b82f6' : '#cbd5e1'};
-    background: ${props => props.active ? '#eff6ff' : 'white'}; color: ${props => props.active ? '#1d4ed8' : '#64748b'};
-    font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;
-    &:hover { background: #f1f5f9; }
+    flex: 1; padding: 10px; border-radius: 12px; border: 1px solid ${props => props.active ? '#3b82f6' : '#e2e8f0'};
+    background: ${props => props.active ? '#eff6ff' : 'white'}; color: ${props => props.active ? '#2563eb' : '#64748b'};
+    font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;
+    &:hover { border-color: #3b82f6; }
 `;
 const SearchInputWrapper = styled.div`
-    display: flex; align-items: center; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; padding: 0 10px; &:focus-within { border-color: #3b82f6; background: white; }
+    display: flex; align-items: center; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 14px; padding: 0 15px; transition: all 0.2s;
+    &:focus-within { border-color: #3b82f6; background: white; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
 `;
-const Input = styled.input` flex: 1; padding: 12px; border: none; background: transparent; outline: none; font-size: 1rem; `;
-const InputGroup = styled.div`
-    display: flex;
-    align-items: center;
-    width: 100%;
-    padding: 0;
-    margin-top: 10px;
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    background: white;
+const Input = styled.input` flex: 1; padding: 12px 0; border: none; background: transparent; outline: none; font-size: 1rem; color: #1e293b; `;
 
-    &:focus-within {
-        border-color: #3b82f6;
-    }
-
-    input {
-        flex: 1;
-        padding: 10px;
-        border: none;
-        outline: none;
-        background: transparent;
-        font-size: 1rem;
-    }
-
-    svg {
-        margin-left: 10px;
-        color: #94a3b8;
-    }
-`;
 const ProductGrid = styled.div`
-    display: grid; 
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
-    gap: 15px; 
-    overflow-y: auto; 
-    padding-bottom: 20px; 
-    flex: 1;
-    
-    @media (max-width: 768px) { 
-        grid-template-columns: repeat(2, 1fr); 
-        max-height: 60vh; 
-    }
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.25rem; overflow-y: auto; padding-bottom: 30px; flex: 1;
+    &::-webkit-scrollbar { width: 4px; }
+    &::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+    @media (max-width: 768px) { grid-template-columns: repeat(2, 1fr); gap: 10px; }
 `;
+
 const ProductCard = styled.div`
-    background: white; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; transition: transform 0.2s; cursor: pointer; position: relative;
-    &:hover { transform: translateY(-3px); border-color: #3b82f6; box-shadow: 0 5px 15px rgba(59,130,246,0.1); }
+    background: white; border-radius: 18px; border: 1px solid #f1f5f9; display: flex; flex-direction: column; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; position: relative; overflow: hidden;
+    &:hover { transform: translateY(-4px); border-color: #3b82f680; box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.08); .eye-icon { opacity: 1; transform: scale(1); } }
+    ${p => p.outOfStock && css` opacity: 0.6; filter: grayscale(0.5); background: #f8fafc; `}
 `;
-const Badge = styled.span`
-    background: ${props => props.bg}; color: ${props => props.color}; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold;
+
+const StockBadge = styled.div`
+  position: absolute; top: 10px; right: 10px; background: ${p => p.outOfStock ? '#ef4444' : p.lowstock ? '#f59e0b' : '#10b981'};
+  color: white; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 30px; z-index: 10; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 `;
-const CartList = styled.div` flex: 1; overflow-y: auto; margin-top: 15px; `;
-const CartItem = styled.div` display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f1f5f9; `;
-const QtyControl = styled.div` display: flex; align-items: center; gap: 8px; background: #f8fafc; padding: 4px; border-radius: 6px; `;
+
+const CartList = styled.div` flex: 1; overflow-y: auto; margin-top: 15px; padding-right: 5px; &::-webkit-scrollbar { width: 4px; } `;
+
+const CartItem = styled.div`
+    display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: white; margin-bottom: 10px; border-radius: 16px; border: 1px solid #f1f5f9;
+`;
+const QtyControl = styled.div`
+    display: flex; align-items: center; gap: 10px; background: #f8fafc; padding: 6px; border-radius: 12px; border: 1px solid #f1f5f9;
+`;
 const RoundBtn = styled.button`
-    width: 24px; height: 24px; border-radius: 50%; border: none; background: white; box-shadow: 0 1px 2px rgba(0,0,0,0.1); cursor: pointer; display: flex; align-items: center; justify-content: center;
-    &:hover { background: #e2e8f0; }
+    width: 32px; height: 32px; border-radius: 10px; border: none; background: white; color: #64748b; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); cursor: pointer; transition: all 0.2s;
+    &:hover { color: #3b82f6; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
 `;
 const ActionButton = styled.button`
-    background: ${props => props.bg || '#059669'}; 
-    color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 1rem; width: 100%; margin-top: 10px; 
-    &:disabled { background: #cbd5e1; cursor: not-allowed; } 
-    &:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    background: ${props => props.bg || '#3b82f6'}; color: white; border: none; padding: 16px; border-radius: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 1rem; width: 100%; transition: all 0.2s;
+    &:disabled { opacity: 0.5; cursor: not-allowed; } 
+    &:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
 `;
-const LoadingIcon = styled(FaSync)`
-    animation: ${spin} 1s linear infinite;
-`;
+const LoadingIcon = styled(FaSync)` animation: ${spin} 1s linear infinite; `;
 
 const ModalOverlay = styled.div`
-  position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;
-  backdrop-filter: blur(3px);
+  position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 5000;
 `;
-
-
-const sanitizeText = (text) => String(text || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 const ImageViewModal = ({ isOpen, imageSrc, onClose }) => {
     if (!isOpen || !imageSrc) return null;
     return (
         <ModalOverlay onClick={onClose}>
-            <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                onClick={(e) => e.stopPropagation()}
-                style={{ position: 'relative', maxWidth: '90%', maxHeight: '90vh', background: 'transparent' }}
-            >
-                <button
-                    onClick={onClose}
-                    style={{
-                        position: 'absolute', top: -15, right: -15,
-                        background: 'white', width: 32, height: 32, borderRadius: '50%',
-                        border: 'none', cursor: 'pointer', fontWeight: 'bold',
-                        boxShadow: '0 2px 5px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        zIndex: 10, color: '#ef4444'
-                    }}
-                >
-                    <FaTimes />
-                </button>
-                <img
-                    src={imageSrc}
-                    alt="Vista Completa"
-                    style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: '8px', boxShadow: '0 5px 20px rgba(0,0,0,0.5)', display: 'block', background: 'white' }}
-                />
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={(e) => e.stopPropagation()} style={{ position: 'relative', maxWidth: '95%', maxHeight: '90vh' }}>
+                <button onClick={onClose} style={{ position: 'absolute', top: -15, right: -15, background: 'white', width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, color: '#ef4444' }}><FaTimes /></button>
+                <img src={imageSrc} alt="Vista Completa" style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: '16px', boxShadow: '0 20px 40px rgba(0,0,0,0.3)', display: 'block', background: 'white', objectFit: 'contain' }} />
             </motion.div>
         </ModalOverlay>
     );
 };
 
-
 // =================================================================
-// COMPONENTE PRINCIPAL: ProformaGenerator
+// COMPONENTE PRINCIPAL
 // =================================================================
 
 const ProformaGenerator = () => {
-    // const navigate = useNavigate(); // Descomenta si usas React Router
-
     const { user, products: authProducts } = useAuth();
     const token = localStorage.getItem('token');
 
@@ -212,67 +136,37 @@ const ProformaGenerator = () => {
     const [loading, setLoading] = useState(false);
 
     const [clientName, setClientName] = useState('');
-    const [clientPhone, setClientPhone] = useState(''); // Estado para teléfono
-    const [proformaNumber, setProformaNumber] = useState(''); // Estado para número opcional
+    const [clientPhone, setClientPhone] = useState('');
+    const [proformaNumber, setProformaNumber] = useState('');
 
     const [isProformaModalOpen, setIsProformaModalOpen] = useState(false);
     const [proformaDetails, setProformaDetails] = useState(null);
-
-    // Estado para ver imagen
     const [viewImage, setViewImage] = useState({ isOpen: false, imageUrl: null });
 
     const searchInputRef = useRef(null);
 
-    useEffect(() => {
-        if (authProducts?.length) {
-            setProducts(authProducts);
-        }
-    }, [authProducts]);
+    useEffect(() => { if (authProducts?.length) setProducts(authProducts); }, [authProducts]);
 
     const fetchProducts = useCallback(async () => {
         setLoading(true);
         try {
             const data = await api.fetchProducts(token);
-            const normalizedData = Array.isArray(data) ? data : (data?.data || []);
-            setProducts(normalizedData);
-            alert("Inventario de productos actualizado.");
+            setProducts(Array.isArray(data) ? data : (data?.data || []));
         } catch (error) {
-            const msg = error.message || (error.response?.data?.message) || "Verifique su conexión de red o token.";
-            alert(`Error de conexión al cargar productos: ${msg}`);
-        } finally {
-            setLoading(false);
-        }
+            console.error(error);
+        } finally { setLoading(false); }
     }, [token]);
 
-    const goToDashboard = () => {
-        // CORRECCIÓN: Usar navigate() si está disponible, sino, fallback
-        // navigate('/dashboard'); 
-        window.location.href = '/dashboard';
-    };
-
+    const goToDashboard = () => { window.location.href = '/dashboard'; };
 
     const addToCart = (product) => {
-        if (!product.existencia || product.existencia <= 0) {
-            return alert("Este producto está agotado.");
-        }
+        const currentQty = cart.find(i => i.id === product.id)?.quantity || 0;
+        if (currentQty >= product.existencia) { return alert(`Stock máximo alcanzado (${product.existencia}).`); }
 
         setCart(prev => {
             const existing = prev.find(p => p.id === product.id);
-            const finalPrice = parseFloat(product.precio_venta || product.precio || 0);
-
-            if (existing) {
-                if (existing.quantity >= product.existencia) {
-                    alert(`No puedes agregar más de ${product.existencia} unidades de este producto.`);
-                    return prev;
-                }
-                return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
-            }
-
-            return [...prev, {
-                ...product,
-                quantity: 1,
-                precio_venta: finalPrice
-            }];
+            if (existing) return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
+            return [...prev, { ...product, quantity: 1, precio_venta: parseFloat(product.precio_venta || product.precio || 0) }];
         });
     };
 
@@ -280,227 +174,72 @@ const ProformaGenerator = () => {
         setCart(prev => {
             const item = prev.find(p => p.id === id);
             if (!item) return prev;
-
-            const productInfo = products.find(p => p.id === id) || item;
-            const maxStock = productInfo.existencia || 9999;
-
+            const product = products.find(p => p.id === id) || item;
             const newQty = item.quantity + delta;
-
-            if (newQty > maxStock) {
-                alert(`Stock máximo alcanzado (${maxStock}).`);
-                return prev;
-            }
-
-            if (newQty < 1) {
-                return prev.filter(p => p.id !== id);
-            }
-
+            if (newQty > product.existencia) { alert(`Stock máximo alcanzado (${product.existencia}).`); return prev; }
+            if (newQty < 1) return prev.filter(p => p.id !== id);
             return prev.map(p => p.id === id ? { ...p, quantity: newQty } : p);
         });
     };
 
     const filteredProducts = useMemo(() => {
-        const term = sanitizeText(searchTerm);
-        if (term.length < 3 && searchType === 'nombre') {
-            return products.slice(0, 100);
-        }
-
-        const filtered = products.filter(p => {
-            if (!term) return true;
-
-            if (searchType === 'codigo') {
-                return sanitizeText(p.codigo).includes(term);
-            } else {
-                return sanitizeText(p.nombre).includes(term);
-            }
-        });
-
-        return filtered.slice(0, 100);
+        const term = searchTerm.toLowerCase().trim();
+        if (!term) return products.slice(0, 100);
+        return products.filter(p => {
+            if (searchType === 'codigo') return String(p.codigo || '').toLowerCase().includes(term);
+            return String(p.nombre || '').toLowerCase().includes(term);
+        }).slice(0, 100);
     }, [products, searchTerm, searchType]);
 
+    const total = useMemo(() => cart.reduce((acc, item) => acc + (parseFloat(item.precio_venta) * item.quantity), 0), [cart]);
 
-    const handleSearchSubmit = (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            if (searchType === 'codigo' && searchTerm) {
-                const exactMatch = products.find(p =>
-                    sanitizeText(p.codigo) === sanitizeText(searchTerm)
-                );
-
-                if (exactMatch) {
-                    addToCart(exactMatch);
-                    setSearchTerm('');
-                    searchInputRef.current?.focus();
-                } else {
-                    alert(`Producto con código ${searchTerm} no encontrado.`);
-                }
-            } else {
-                searchInputRef.current?.focus();
-            }
-        }
-    };
-
-    const total = useMemo(() => {
-        return cart.reduce((acc, item) => {
-            const precio = parseFloat(item.precio_venta || item.precio || 0);
-            return acc + (precio * item.quantity);
-        }, 0);
-    }, [cart]);
-
-    const subtotal = total;
-    const discount = 0;
-
-    const resetCart = useCallback(() => {
-        setCart([]);
-        setClientName('');
-        setClientPhone(''); // Limpiar teléfono
-        setProformaDetails(null);
-        setIsProformaModalOpen(false);
-        setProformaNumber('');
-        searchInputRef.current?.focus();
-    }, []);
-
-    // FUNCIÓN: PREPARA LOS DATOS Y ABRE EL MODAL
-    const handleGenerateProforma = async () => {
-        if (cart.length === 0) return alert("El carrito está vacío. Agrega productos para generar la proforma.");
-
-        const clientTrimmed = clientName.trim();
-        if (!clientTrimmed) {
-            return alert("🚨 Por favor, introduce el Nombre del Cliente antes de generar la proforma.");
-        }
-
-        setLoading(true);
-
-        // 1. Prepara el objeto de la Proforma con todos los datos necesarios
-        const newProformaDetails = {
-            cart: cart,
-            total: total,
-            subtotal: subtotal,
-            discount: discount,
-            proformaNumber: proformaNumber.trim(),
-            proformaFor: clientTrimmed,
-            client: {
-                nombre: clientTrimmed,
-                telefono: clientPhone.trim() || 'N/D' // <- TELÉFONO INCLUIDO (o 'N/D')
-            },
-        };
-
-        setProformaDetails(newProformaDetails);
+    const handleGenerateProforma = () => {
+        if (!clientName.trim()) return alert("El nombre del cliente es obligatorio.");
+        setProformaDetails({ cart, total, subtotal: total, discount: 0, proformaNumber, client: { nombre: clientName, telefono: clientPhone || 'N/D' } });
         setIsProformaModalOpen(true);
-        setLoading(false);
     };
-
-    // FUNCIÓN MODIFICADA: solo limpia el carro (llamada desde ProformaEmpleadoModal)
-    const handleSetTicketData = useCallback(() => {
-        // Asumimos que la descarga fue iniciada y ahora limpiamos el estado.
-        resetCart();
-    }, [resetCart]);
-
 
     return (
         <Container>
-            {/* ================= PANEL IZQUIERDO (PRODUCTOS) ================= */}
             <LeftPanel>
                 <Header>
-                    <h2 style={{ margin: 0, color: '#1e293b' }}>Catálogo y Proformas</h2>
+                    <h2 style={{ margin: 0, fontWeight: 800, color: '#0f172a' }}>Catálogo y Proformas</h2>
                     <HeaderActions>
-                        <BackButton
-                            onClick={goToDashboard}
-                        >
-                            <FaArrowLeft size={14} /> Regresar
-                        </BackButton>
-
-                        <button
-                            onClick={fetchProducts}
-                            disabled={loading}
-                            style={{ background: 'white', border: '1px solid #cbd5e1', color: '#475569' }}
-                        >
-                            {loading ? <LoadingIcon size={14} /> : <FaSync size={14} />}
-                            {loading ? 'Cargando...' : 'Recargar'}
-                        </button>
+                        <BackButton onClick={goToDashboard} whileHover={{ x: -4 }}><FaArrowLeft size={14} /> Regresar</BackButton>
+                        <BackButton onClick={fetchProducts} disabled={loading}>{loading ? <LoadingIcon size={14} /> : <FaSync size={14} />} Actualizar</BackButton>
                     </HeaderActions>
                 </Header>
 
                 <SearchContainer>
                     <SearchTypeToggle>
-                        <ToggleButton
-                            active={searchType === 'nombre'}
-                            onClick={() => { setSearchType('nombre'); setSearchTerm(''); searchInputRef.current?.focus(); }}
-                        >
-                            <FaFont /> Nombre
-                        </ToggleButton>
-                        <ToggleButton
-                            active={searchType === 'codigo'}
-                            onClick={() => { setSearchType('codigo'); setSearchTerm(''); searchInputRef.current?.focus(); }}
-                        >
-                            <FaBarcode /> Código
-                        </ToggleButton>
+                        <ToggleButton active={searchType === 'nombre'} onClick={() => { setSearchType('nombre'); setSearchTerm(''); searchInputRef.current?.focus(); }}><FaFont /> Nombre</ToggleButton>
+                        <ToggleButton active={searchType === 'codigo'} onClick={() => { setSearchType('codigo'); setSearchTerm(''); searchInputRef.current?.focus(); }}><FaBarcode /> Código</ToggleButton>
                     </SearchTypeToggle>
-
                     <SearchInputWrapper>
                         <FaSearch color="#94a3b8" />
-                        <Input
-                            ref={searchInputRef}
-                            placeholder={searchType === 'codigo' ? "Escanea o escribe código y pulsa Enter..." : "Busca por descripción (mínimo 3 letras)..."}
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                            onKeyDown={handleSearchSubmit}
-                            autoFocus
-                        />
+                        <Input ref={searchInputRef} placeholder="Escribe para buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} autoFocus />
                     </SearchInputWrapper>
-                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
-                        Mostrando **{filteredProducts.length}** productos filtrados.
-                    </p>
                 </SearchContainer>
 
                 <ProductGrid>
                     {filteredProducts.map(p => {
-                        const precio = parseFloat(p.precio_venta || p.precio || 0);
-                        const tieneStock = p.existencia > 0;
-
+                        const agotado = p.existencia <= 0;
                         return (
-                            <ProductCard key={p.id} onClick={() => addToCart(p)}>
-                                {/* Botón "Ojito" para ver imagen completa */}
+                            <ProductCard key={p.id} onClick={() => !agotado && addToCart(p)} outOfStock={agotado}>
+                                <StockBadge outOfStock={agotado} lowstock={p.existencia < 5 && !agotado}>
+                                    {agotado ? 'Agotado' : `Stock: ${p.existencia}`}
+                                </StockBadge>
                                 {p.imagen && (
-                                    <div
-                                        onClick={(e) => { e.stopPropagation(); setViewImage({ isOpen: true, imageUrl: p.imagen }); }}
-                                        style={{
-                                            position: 'absolute', top: 10, left: 10, zIndex: 10,
-                                            background: 'rgba(255,255,255,0.9)', borderRadius: '50%',
-                                            width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-                                            color: '#334155'
-                                        }}
-                                        title="Ver imagen completa"
-                                    >
-                                        <FaEye size={14} />
+                                    <div className="eye-icon" onClick={(e) => { e.stopPropagation(); setViewImage({ isOpen: true, imageUrl: p.imagen }); }} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 10, background: 'rgba(255,255,255,0.9)', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', opacity: 0, transition: 'all 0.2s' }} title="Ver imagen">
+                                        <FaEye size={14} color="#475569" />
                                     </div>
                                 )}
-
-                                <div style={{ height: '140px', background: '#f8fafc', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px', position: 'relative' }}>
-                                    {p.imagen ? (
-                                        <img src={p.imagen} alt={p.nombre} style={{ width: '100%', height: '100%', objectFit: 'contain', background: 'white' }} loading="lazy" />
-                                    ) : (
-                                        <FaImage size={40} color="#cbd5e1" />
-                                    )}
+                                <div style={{ height: 160, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f1f5f9' }}>
+                                    {p.imagen ? <img src={p.imagen} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <FaImage size={40} color="#e2e8f0" />}
                                 </div>
-                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                                    <div style={{ fontWeight: '600', color: '#334155', lineHeight: '1.2', maxHeight: '2.4em', overflow: 'hidden', marginBottom: '4px' }} title={p.nombre}>{p.nombre}</div>
-                                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                        {p.codigo || `ID: ${p.id}`}
-                                    </div>
-
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 'auto', paddingTop: '10px' }}>
-                                        <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#2563eb' }}>
-                                            C$ {precio.toFixed(2)}
-                                        </div>
-                                        <Badge
-                                            bg={tieneStock ? '#dcfce7' : '#fee2e2'}
-                                            color={tieneStock ? '#166534' : '#991b1b'}
-                                        >
-                                            Stock: {p.existencia}
-                                        </Badge>
-                                    </div>
+                                <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#0f172a', marginBottom: '8px', overflow: 'hidden', height: '2.8em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{p.nombre}</div>
+                                    <div style={{ fontWeight: 800, color: '#2563eb', fontSize: '1.1rem', marginTop: 'auto' }}>C$ {parseFloat(p.precio_venta || p.precio || 0).toFixed(2)}</div>
                                 </div>
                             </ProductCard>
                         );
@@ -508,135 +247,40 @@ const ProformaGenerator = () => {
                 </ProductGrid>
             </LeftPanel>
 
-            {/* ================= PANEL DERECHO (DETALLE DE PROFORMA) ================= */}
             <RightPanel>
-                <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 15 }}>
-                    <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <FaFileAlt color="#059669" /> Detalle de Proforma
-                    </h3>
-
-                    {/* CAMPO DE NOMBRE DEL CLIENTE (OBLIGATORIO) */}
-                    <Input
-                        style={{
-                            width: '100%', padding: '10px', marginTop: 15,
-                            border: '1px solid #cbd5e1', borderRadius: 6, outline: 'none', background: 'white'
-                        }}
-                        placeholder="Nombre del Cliente (Obligatorio)"
-                        value={clientName}
-                        onChange={e => setClientName(e.target.value)}
-                    />
-
-                    {/* CAMPO DE NÚMERO DE TELÉFONO (OPCIONAL) */}
-                    <InputGroup>
-                        <FaPhone size={14} />
-                        <input
-                            type="tel"
-                            placeholder="Teléfono del Cliente (Opcional)"
-                            value={clientPhone}
-                            onChange={e => setClientPhone(e.target.value)}
-                        />
-                    </InputGroup>
-
-                    {/* CAMPO DE NÚMERO DE PROFORMA (OPCIONAL) */}
-                    <Input
-                        style={{
-                            width: '100%', padding: '10px', marginTop: 10,
-                            border: '1px solid #cbd5e1', borderRadius: 6, outline: 'none', background: 'white'
-                        }}
-                        placeholder="Número de Proforma (Opcional)"
-                        value={proformaNumber}
-                        onChange={e => setProformaNumber(e.target.value)}
-                    />
+                <div style={{ marginBottom: '20px' }}>
+                    <h3 style={{ margin: 0, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 10 }}><FaShoppingCart color="#3b82f6" /> Tu Proforma</h3>
+                    <input style={{ width: '100%', padding: '12px', marginTop: 15, border: '2px solid #e2e8f0', borderRadius: 12, outline: 'none' }} placeholder="Nombre del Cliente" value={clientName} onChange={e => setClientName(e.target.value)} />
+                    <input style={{ width: '100%', padding: '12px', marginTop: 10, border: '2px solid #e2e8f0', borderRadius: 12, outline: 'none' }} placeholder="Teléfono" value={clientPhone} onChange={e => setClientPhone(e.target.value)} />
                 </div>
 
                 <CartList>
-                    {cart.length === 0 ? (
-                        <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: 40 }}>
-                            <FaFilePdf size={40} style={{ opacity: 0.3 }} />
-                            <p>Agrega productos para cotizar</p>
-                        </div>
-                    ) : (
-                        cart.map(item => (
-                            <CartItem key={item.id}>
-                                <div style={{ flex: 1, paddingRight: 10 }}>
-                                    <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{item.nombre}</div>
-                                    <div style={{ color: '#64748b', fontSize: '0.8rem' }}>
-                                        C$ {parseFloat(item.precio_venta).toFixed(2)} x {item.quantity}
-                                    </div>
-                                </div>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
-                                    <div style={{ fontWeight: 'bold', color: '#334155' }}>
-                                        C$ {(parseFloat(item.precio_venta) * item.quantity).toFixed(2)}
-                                    </div>
-
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                        <QtyControl>
-                                            <RoundBtn onClick={() => updateQuantity(item.id, -1)}><FaMinus size={10} /></RoundBtn>
-                                            <span style={{ fontSize: '0.9rem', minWidth: 15, textAlign: 'center' }}>{item.quantity}</span>
-                                            <RoundBtn onClick={() => updateQuantity(item.id, 1)}><FaPlus size={10} /></RoundBtn>
-                                        </QtyControl>
-                                        <button
-                                            onClick={() => setCart(prev => prev.filter(p => p.id !== item.id))}
-                                            style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer', padding: 5 }}
-                                        >
-                                            <FaTrash />
-                                        </button>
-                                    </div>
-                                </div>
-                            </CartItem>
-                        ))
-                    )}
+                    {cart.length === 0 ? <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: 40 }}><FaFilePdf size={48} style={{ opacity: 0.1, marginBottom: 15 }} /><p>Agrega productos</p></div> : cart.map(item => (
+                        <CartItem key={item.id}>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{item.nombre}</div>
+                                <div style={{ color: '#64748b', fontSize: '0.85rem' }}>C$ {parseFloat(item.precio_venta).toFixed(2)}</div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <QtyControl>
+                                    <RoundBtn onClick={() => updateQuantity(item.id, -1)}><FaMinus size={10} /></RoundBtn>
+                                    <span style={{ fontWeight: 700 }}>{item.quantity}</span>
+                                    <RoundBtn onClick={() => updateQuantity(item.id, 1)}><FaPlus size={10} /></RoundBtn>
+                                </QtyControl>
+                                <RoundBtn onClick={() => setCart(c => c.filter(x => x.id !== item.id))} style={{ color: '#ef4444' }}><FaTrash /></RoundBtn>
+                            </div>
+                        </CartItem>
+                    ))}
                 </CartList>
 
-                <div style={{ borderTop: '2px dashed #cbd5e1', paddingTop: 20, marginTop: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.3rem', fontWeight: 'bold', marginBottom: 15, color: '#1e293b' }}>
-                        <span>Total:</span>
-                        <span>C$ {total.toFixed(2)}</span>
-                    </div>
-
-                    <ActionButton
-                        bg="#059669" // Color verde
-                        onClick={handleGenerateProforma}
-                        disabled={cart.length === 0 || loading || !clientName.trim()}
-                    >
-                        {loading ? <LoadingIcon /> : <FaFilePdf />} GENERAR PROFORMA PDF
-                    </ActionButton>
-
-                    {/* Botón para vaciar carrito */}
-                    <ActionButton
-                        bg="#dc2626"
-                        onClick={() => resetCart()}
-                        disabled={cart.length === 0 || loading}
-                        style={{ marginTop: 5, padding: 10 }}
-                    >
-                        <FaTrash /> VACIAR CARRO
-                    </ActionButton>
+                <div style={{ borderTop: '2px dashed #e2e8f0', paddingTop: '20px', marginTop: 'auto' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.5rem', fontWeight: 900, marginBottom: 20 }}><span>TOTAL</span><span>C$ {total.toFixed(2)}</span></div>
+                    <ActionButton onClick={handleGenerateProforma} disabled={cart.length === 0 || !clientName.trim()}><FaFilePdf /> GENERAR PROFORMA PDF</ActionButton>
                 </div>
             </RightPanel>
 
-            {/* 5. RENDERING CONDICIONAL DEL MODAL DE PROFORMA - Usa el nuevo componente */}
-            {isProformaModalOpen && proformaDetails && (
-                <ProformaEmpleadoModal
-                    {...proformaDetails}
-                    onClose={() => setIsProformaModalOpen(false)}
-                    setTicketData={handleSetTicketData}
-                    currentUser={user}
-                    client={proformaDetails.client}
-                />
-            )}
-
-            {/* MODAL DE VISTA DE IMAGEN (NUEVO) */}
-            <AnimatePresence>
-                {viewImage.isOpen && (
-                    <ImageViewModal
-                        isOpen={viewImage.isOpen}
-                        imageSrc={viewImage.imageUrl}
-                        onClose={() => setViewImage({ isOpen: false, imageUrl: null })}
-                    />
-                )}
-            </AnimatePresence>
-
+            <AnimatePresence>{viewImage.isOpen && <ImageViewModal isOpen={true} imageSrc={viewImage.imageUrl} onClose={() => setViewImage({ isOpen: false, imageUrl: null })} />}</AnimatePresence>
+            {isProformaModalOpen && <ProformaEmpleadoModal {...proformaDetails} onClose={() => setIsProformaModalOpen(false)} setTicketData={() => setCart([])} currentUser={user} client={proformaDetails.client} />}
         </Container>
     );
 };

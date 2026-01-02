@@ -373,9 +373,8 @@ const ImageViewModal = ({ isOpen, imageSrc, onClose }) => {
 
 const norm = (str) => String(str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
-const MAX_RESULTS_SEARCH = 100;
-const PRODUCTS_INITIAL_LOAD = 40;
-const SLICE_STEP = 40;
+const MAX_RESULTS_SEARCH = 10000; // Aumentado para permitir filtrar todo el inventario
+const ITEMS_PER_PAGE = 50;
 const LARGE_LIST_CUTOFF = 500;
 
 // ... (Rest of existing imports and constants)
@@ -846,8 +845,18 @@ const InventoryManagement = () => {
   const [adjustmentModal, setAdjustmentModal] = useState({ isOpen: false, product: null });
   const [alert, setAlert] = useState({ isOpen: false, title: '', message: '' });
   const [archivePrompt, setArchivePrompt] = useState({ open: false, product: null, detail: null });
+  const [currentPage, setCurrentPage] = useState(1);
   const [viewImage, setViewImage] = useState({ isOpen: false, imageUrl: null });
-  const [visibleCount, setVisibleCount] = useState(MAX_RESULTS_SEARCH);
+
+  // Resetear a página 1 cuando cambian filtros o búsqueda
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [deferredSearch, filterCategory, filterProvider, searchType]);
+
+  // Scroll al inicio cuando cambia la página
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
 
   const showAlert = useCallback(({ title, message, type }) => setAlert({ isOpen: true, title, message, type }), []);
   const closeAlert = () => setAlert({ isOpen: false });
@@ -911,29 +920,10 @@ const InventoryManagement = () => {
     if (cat) matched = matched.filter(p => String(p.id_categoria) === cat);
     if (prov) matched = matched.filter(p => String(p.id_proveedor) === prov);
 
-    // --- NUEVA LÓGICA DE BÚSQUEDA ---
-    if (!q) {
-      return {
-        filtered: matched.slice(0, PRODUCTS_INITIAL_LOAD),
-        totalFilteredCount: matched.length
-      };
-    }
-
-    if (searchType === 'description' && q.length < 3) {
-      return {
-        filtered: matched.slice(0, PRODUCTS_INITIAL_LOAD),
-        totalFilteredCount: matched.length
-      };
-    }
-
     const results = matched.filter(p => {
       if (searchType === 'code') {
         const codigo = String(p.codigo || '').toLowerCase();
-        // --- CORRECCIÓN: ELIMINADO ID DE LA BÚSQUEDA ---
-        // const id = String(p.id_producto || '').toLowerCase(); 
         const barras = String(p.codigo_barras || '').toLowerCase();
-
-        // Ahora solo buscamos en código y código de barras
         return codigo.startsWith(q) || barras.startsWith(q);
       } else {
         const nombre = (p.nombre || '').toLowerCase();
@@ -941,13 +931,17 @@ const InventoryManagement = () => {
         return nombre.includes(q) || desc.includes(q);
       }
     });
-    // ---------------------------------
+
+    // --- NUEVA LÓGICA DE PAGINACIÓN ---
+    const totalCount = results.length;
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const paginatedResults = results.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     return {
-      filtered: results.slice(0, visibleCount),
-      totalFilteredCount: results.length
+      filtered: paginatedResults,
+      totalFilteredCount: totalCount
     };
-  }, [allProducts, deferredSearch, filterCategory, filterProvider, visibleCount, searchType]);
+  }, [allProducts, deferredSearch, filterCategory, filterProvider, currentPage, searchType]);
 
   // Handlers para abrir modales
   const openCreateModal = () => setIsCreateModalOpen(true);
@@ -1081,8 +1075,7 @@ const InventoryManagement = () => {
   if (error) return <PageWrapper><CenteredMessage style={{ color: '#c53030' }}>{error}</CenteredMessage></PageWrapper>;
 
   const animationsEnabled = filtered.length <= LARGE_LIST_CUTOFF;
-  const showLoadMore = filtered.length < totalFilteredCount;
-  const isQuickLoad = !searchTerm && !filterCategory && !filterProvider && allProducts.length > PRODUCTS_INITIAL_LOAD;
+  const totalPages = Math.ceil(totalFilteredCount / ITEMS_PER_PAGE);
 
   return (
     <PageWrapper>
@@ -1127,16 +1120,9 @@ const InventoryManagement = () => {
         </Select>
       </FilterContainer>
 
-      <div style={{ textAlign: 'right', marginBottom: '.5rem', color: '#4a5568', fontWeight: 'bold' }}>
-        Mostrando {filtered.length} de {totalFilteredCount} productos filtrados (Total en BD: {allProducts.length})
+      <div style={{ textAlign: 'right', marginBottom: '.5rem', color: '#4a5568', fontWeight: 'bold', fontSize: '0.9rem' }}>
+        Página {currentPage} de {totalPages || 1} | Mostrando {filtered.length} de {totalFilteredCount} productos filtrados
       </div>
-
-      {isQuickLoad && (
-        <div style={{ padding: '.75rem', marginBottom: '1.5rem', background: '#fff3cd', color: '#856404', border: '1px solid #ffeeba', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <FaExclamationTriangle style={{ minWidth: 20 }} />
-          <small><strong>Carga Rápida:</strong> Se muestran los primeros {PRODUCTS_INITIAL_LOAD}. Escribe o filtra para ver más.</small>
-        </div>
-      )}
 
       <MobileCardGrid>
         {filtered.map((p) => {
@@ -1175,25 +1161,42 @@ const InventoryManagement = () => {
         })}
       </MobileCardGrid>
 
-      {/* --- PAGINACIÓN --- */}
       {totalFilteredCount > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '2rem', marginBottom: '3rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1.5rem', marginTop: '2rem', marginBottom: '3rem' }}>
           <Button
             secondary
-            onClick={() => setVisibleCount(v => Math.max(PRODUCTS_INITIAL_LOAD, v - PRODUCTS_INITIAL_LOAD))}
-            disabled={visibleCount <= PRODUCTS_INITIAL_LOAD}
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
           >
             Anterior
           </Button>
 
-          <span style={{ color: '#475569', fontWeight: '600' }}>
-            Viendo {Math.min(visibleCount, totalFilteredCount)} de {totalFilteredCount}
-          </span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {[...Array(totalPages)].map((_, i) => {
+              const pageIdx = i + 1;
+              // Mostrar solo algunas páginas si hay muchas
+              if (totalPages > 7 && (pageIdx > 2 && pageIdx < totalPages - 1 && Math.abs(pageIdx - currentPage) > 1)) {
+                if (pageIdx === 3 || pageIdx === totalPages - 2) return <span key={pageIdx}>...</span>;
+                return null;
+              }
+              return (
+                <Button
+                  key={pageIdx}
+                  secondary={pageIdx !== currentPage}
+                  primary={pageIdx === currentPage}
+                  style={{ minWidth: '40px', padding: '0.5rem' }}
+                  onClick={() => setCurrentPage(pageIdx)}
+                >
+                  {pageIdx}
+                </Button>
+              );
+            })}
+          </div>
 
           <Button
             secondary
-            onClick={() => setVisibleCount(v => v + PRODUCTS_INITIAL_LOAD)}
-            disabled={visibleCount >= totalFilteredCount}
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
           >
             Siguiente
           </Button>

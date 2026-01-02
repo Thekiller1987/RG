@@ -19,11 +19,11 @@ const FilterButton = styled.button`
   border: 1px solid ${props => props.$active ? '#3b82f6' : '#cbd5e1'};
   background-color: ${props => props.$active ? '#eff6ff' : '#fff'};
   color: ${props => props.$active ? '#3b82f6' : '#64748b'};
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
   font-size: 1.1rem;
   transition: all 0.2s ease;
-  box-shadow: ${props => props.$active ? '0 2px 4px rgba(59,130,246,0.2)' : 'none'};
+  box-shadow: ${props => props.$active ? '0 4px 6px -1px rgba(59,130,246,0.2)' : 'none'};
 
   &:hover {
     border-color: #3b82f6;
@@ -35,7 +35,7 @@ const FilterButton = styled.button`
 const ImageViewModal = ({ isOpen, imageSrc, onClose }) => {
   if (!isOpen || !imageSrc) return null;
   return (
-    <S.ModalOverlay onClick={onClose} style={{ zIndex: 11000, backdropFilter: 'blur(5px)' }}>
+    <S.ModalOverlay onClick={onClose}>
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -61,7 +61,7 @@ const ImageViewModal = ({ isOpen, imageSrc, onClose }) => {
           style={{
             maxWidth: '100%',
             maxHeight: '85vh',
-            borderRadius: '12px',
+            borderRadius: '16px',
             boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
             display: 'block',
             objectFit: 'contain',
@@ -97,18 +97,13 @@ export default function ProductPanel({
   const filteredProducts = useMemo(() => {
     const term = (searchTerm || '').toLowerCase().trim();
 
-    // 1. Sin búsqueda: mostrar primeros N
     if (!term) return products.slice(0, PRODUCTS_PER_PAGE);
-
-    // 2. Búsqueda por Nombre: requiere 3 caracteres
     if (searchType === 'description' && term.length < 3) return products.slice(0, PRODUCTS_PER_PAGE);
 
-    // 3. Filtrado
     const results = products.filter(p => {
       if (searchType === 'code') {
         const codigo = String(p.codigo || '').toLowerCase();
         const barras = String(p.codigo_barras || '').toLowerCase();
-        // Coincidencia exacta o inicio para rapidez
         return codigo.startsWith(term) || barras.startsWith(term);
       } else {
         const nombre = (p.nombre || '').toLowerCase();
@@ -117,13 +112,12 @@ export default function ProductPanel({
       }
     });
 
-    return results.slice(0, 500); // Límite de seguridad
+    return results.slice(0, 500);
   }, [products, searchTerm, searchType]);
 
   const totalResults = useMemo(() => {
     const term = (searchTerm || '').toLowerCase().trim();
     if (!term) return products.length;
-    // Cálculo rápido aproximado si son muchos productos
     if (products.length > 5000 && term.length < 3) return products.length;
 
     return products.filter(p => {
@@ -138,11 +132,11 @@ export default function ProductPanel({
 
   return (
     <S.MainPanel>
-      {/* Barra de Búsqueda y Filtros */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem', alignItems: 'center' }}>
+      {/* Barra de Búsqueda */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '1.25rem', alignItems: 'center' }}>
         <S.SearchInput
           ref={inputRef}
-          style={{ marginBottom: 0, flex: 1, height: '45px' }}
+          style={{ flex: 1, padding: '12px 18px' }}
           placeholder={searchType === 'code' ? "Escanea o escribe código..." : "Buscar producto..."}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -151,7 +145,7 @@ export default function ProductPanel({
         <FilterButton
           $active={searchType === 'description'}
           onClick={() => { setSearchType('description'); inputRef.current?.focus(); }}
-          title="Buscar por Nombre (ABC)"
+          title="Buscar por Nombre"
         >
           <FaFont size={16} />
         </FilterButton>
@@ -165,22 +159,22 @@ export default function ProductPanel({
         </FilterButton>
       </div>
 
-      {/* Grid de Productos con Scroll */}
-      <div style={{ flex: 1, overflowY: 'auto', paddingRight: '5px', display: 'flex', flexDirection: 'column' }}>
+      {/* Grid de Productos */}
+      <div style={{ flex: 1, overflowY: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
         {/* Header conteo */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', color: '#64748b' }}>
-          <h4 style={{ margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <FaStore /> Catálogo ({filteredProducts.length} vis.)
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', color: '#64748b', padding: '0 4px' }}>
+          <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, color: '#334155' }}>
+            <FaStore color="#3b82f6" /> {filteredProducts.length} productos mostrados
           </h4>
-          <span style={{ fontSize: '0.8rem' }}>Total: {totalResults}</span>
+          <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Total: {totalResults}</span>
         </div>
 
         {/* Alerta de búsqueda corta */}
         {(searchTerm.length < 3 && searchType === 'description' && totalResults > PRODUCTS_PER_PAGE) && (
-          <S.InfoBox style={{ marginBottom: '1rem', padding: '8px 12px', fontSize: '0.85rem' }}>
-            <FaExclamationTriangle style={{ marginRight: '6px' }} />
-            Mostrando primeros {PRODUCTS_PER_PAGE}. Escribe más para filtrar.
+          <S.InfoBox>
+            <FaExclamationTriangle />
+            Escribe 3+ letras para filtrar mejor.
           </S.InfoBox>
         )}
 
@@ -196,11 +190,10 @@ export default function ProductPanel({
                 onClick={() => !agotado && onProductClick(p)}
                 outOfStock={agotado}
                 title={p.nombre}
-                style={{ opacity: agotado ? 0.6 : 1 }}
               >
                 {/* Badge de Stock */}
                 <S.StockBadge lowstock={restante < 5 && !agotado} outOfStock={agotado}>
-                  {agotado ? '0' : restante}
+                  {agotado ? 'Agotado' : `Stock: ${restante}`}
                 </S.StockBadge>
 
                 {/* Botón Ver Imagen (Oculto si no hay imagen) */}
@@ -208,16 +201,9 @@ export default function ProductPanel({
                   <div
                     className="eye-icon"
                     onClick={(e) => { e.stopPropagation(); setViewImage({ isOpen: true, imageUrl: p.imagen }); }}
-                    style={{
-                      position: 'absolute', top: 5, left: 5, zIndex: 5,
-                      background: 'rgba(255,255,255,0.85)', borderRadius: '50%',
-                      width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                      color: '#334155', transition: 'transform 0.2s'
-                    }}
                     title="Ver imagen grande"
                   >
-                    <FaEye size={12} />
+                    <FaEye size={14} />
                   </div>
                 )}
 
@@ -225,28 +211,21 @@ export default function ProductPanel({
                   {p.imagen ? (
                     <img src={p.imagen} alt={p.nombre} loading="lazy" />
                   ) : (
-                    <FaImage className="no-image-icon" size={24} style={{ opacity: 0.3 }} />
+                    <FaImage className="no-image-icon" />
                   )}
                 </div>
 
                 <div className="info">
-                  <div className="product-name" style={{ fontWeight: '500', lineHeight: '1.2', maxHeight: '40px', overflow: 'hidden', fontSize: '0.9rem', marginBottom: '4px' }}>
+                  <div className="product-name">
                     {p.nombre}
                   </div>
 
                   <div className="price">C$ {fmt(p.precio_venta || p.precio)}</div>
 
                   {searchType === 'code' && (
-                    <small style={{ display: 'block', color: '#64748b', fontSize: '0.75rem', marginTop: '2px' }}>
-                      <FaBarcode style={{ marginRight: 3, verticalAlign: 'text-bottom' }} />
-                      {p.codigo || p.codigo_barras || 'S/Código'}
+                    <small style={{ display: 'block', color: '#64748b', fontSize: '0.75rem', marginTop: '2px', fontFamily: 'monospace' }}>
+                      {p.codigo || p.codigo_barras || 'S/C'}
                     </small>
-                  )}
-
-                  {p.raw?.mayoreo > 0 && (
-                    <div style={{ color: '#2563eb', fontSize: '0.75rem', marginTop: '2px', display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <FaTags size={10} /> May: C${fmt(p.raw.mayoreo)}
-                    </div>
                   )}
                 </div>
               </S.ProductCard>
@@ -254,8 +233,9 @@ export default function ProductPanel({
           })}
 
           {filteredProducts.length === 0 && (
-            <div style={{ gridColumn: '1 / -1', padding: '30px', textAlign: 'center', color: '#94a3b8' }}>
-              <p>No se encontraron productos para "{searchTerm}"</p>
+            <div style={{ gridColumn: '1 / -1', padding: '60px 20px', textAlign: 'center', color: '#94a3b8' }}>
+              <FaStore size={48} style={{ opacity: 0.1, marginBottom: 15 }} />
+              <p style={{ fontSize: '1.1rem', fontWeight: 500 }}>No hay resultados para tu búsqueda.</p>
             </div>
           )}
         </S.ProductGrid>

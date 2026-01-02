@@ -4,11 +4,11 @@ require('dotenv').config();
 
 // Crear pool de conexiones usando variables del .env
 const pool = mysql.createPool({
-  host: process.env.MYSQL_HOST || 'localhost',   // tu droplet
-  port: Number(process.env.MYSQL_PORT) || 3306,
-  user: process.env.MYSQL_USER || 'appuser',
-  password: process.env.MYSQL_PASSWORD || 'AppSegura_2025!',
-  database: process.env.MYSQL_DATABASE || 'multirepuestosrg',
+  host: process.env.DB_HOST || 'localhost',
+  port: Number(process.env.DB_PORT) || 3306,
+  user: process.env.DB_USER || 'appuser',
+  password: process.env.DB_PASSWORD || 'AppSegura_2025!',
+  database: process.env.DB_DATABASE || 'multirepuestosrg',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
