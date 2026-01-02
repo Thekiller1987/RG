@@ -288,32 +288,59 @@ const POS = () => {
     closeModal();
   };
 
+  // Calculate Reserved Stock from other open tickets
+  const reservedStock = useMemo(() => {
+    const reserved = new Map();
+    orders.forEach(order => {
+      // Skip the current active order to avoid double counting (ProductPanel handles current cart)
+      if (order.id === activeOrder?.id) return;
+
+      order.items.forEach(item => {
+        const pid = item.id_producto || item.id;
+        const qty = Number(item.cantidad || item.quantity || 0);
+        reserved.set(pid, (reserved.get(pid) || 0) + qty);
+      });
+    });
+    return reserved;
+  }, [orders, activeOrder]);
+
   // Handler for global wholesale price toggle
   const toggleWholesalePrice = () => {
+    let updatedCount = 0;
     const newCart = cart.map(item => {
       const product = products.find(p => (p.id_producto || p.id) === (item.id_producto || item.id));
       if (!product) return item;
 
-      // Toggle between retail (venta) and wholesale (mayorista)
       const mayorista = Number(product.mayorista || product.mayoreo || 0);
       if (!mayorista) return item;
 
       const currentPrice = Number(item.precio_venta || 0);
       const isCurrentlyWholesale = Math.abs(currentPrice - mayorista) < 0.01;
 
-      const retailPrice = Number(product.venta || product.precio || (isCurrentlyWholesale ? item.originalPrice : item.precio_venta) || 0);
-      const newPrice = isCurrentlyWholesale ? retailPrice : mayorista;
+      const retailPrice = Number(product.venta || product.precio || item.originalPrice || item.precio_venta || 0);
+      const targetPrice = isCurrentlyWholesale ? retailPrice : mayorista;
 
-      return { ...item, precio_venta: newPrice };
+      // Only update if price actually changes
+      if (Math.abs(currentPrice - targetPrice) > 0.01) {
+        updatedCount++;
+        return { ...item, precio_venta: targetPrice };
+      }
+      return item;
     });
 
-    updateActiveCart(newCart);
-    const firstProduct = products.find(p => cart[0] && ((p.id_producto || p.id) === (cart[0].id_producto || cart[0].id)));
-    const isNowWholesale = newCart[0] && newCart[0].precio_venta === firstProduct?.mayorista;
-    showAlert({
-      title: "Precio Actualizado",
-      message: isNowWholesale ? "Aplicado precio mayorista" : "Aplicado precio de venta"
-    });
+    if (updatedCount > 0) {
+      updateActiveCart(newCart);
+      const firstChanged = newCart.find((item, i) => Math.abs(item.precio_venta - (cart[i]?.precio_venta || 0)) > 0.01);
+      const product = products.find(p => (p.id_producto || p.id) === (firstChanged?.id_producto || firstChanged?.id));
+      const isNowWholesale = product && Math.abs(firstChanged.precio_venta - Number(product.mayorista || 0)) < 0.01;
+
+      showAlert({
+        title: "Precio Actualizado",
+        message: `${isNowWholesale ? "ACTIVADO" : "DESACTIVADO"} precio mayorista en ${updatedCount} producto(s).`
+      });
+    } else {
+      showAlert({ title: "Sin Cambios", message: "No hay productos con precio mayorista disponible o ya están aplicados." });
+    }
   };
 
   // Handler for discount
@@ -412,6 +439,7 @@ const POS = () => {
             onProductClick={(p) => handleAddToCart(p, 1)}
             cartItems={cart}
             inputRef={searchRef}
+            reservedStock={reservedStock} // Pass the reservation map
           />
         </S.MainPanel>
 

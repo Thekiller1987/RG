@@ -60,6 +60,7 @@ export default function ProductPanel({
   setSearchTerm,
   onProductClick,
   cartItems = [],
+  reservedStock, // Recibimos el mapa de stock reservado
   inputRef,
   searchType = 'description',
   setSearchType = () => { }
@@ -146,7 +147,8 @@ export default function ProductPanel({
         {filteredProducts.map(p => {
           const pid = p.id_producto || p.id;
           const enCarrito = qtyInCart.get(pid) || 0;
-          const restante = Math.max(0, Number(p.existencia || 0) - enCarrito);
+          const enOtrosTickets = reservedStock?.get(pid) || 0;
+          const restante = Math.max(0, Number(p.existencia || 0) - enCarrito - enOtrosTickets);
           const agotado = restante <= 0;
 
           return (
