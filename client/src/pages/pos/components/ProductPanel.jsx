@@ -160,16 +160,23 @@ export default function ProductPanel({
                 {agotado ? 'Agotado' : `Stock: ${restante}`}
               </S.StockBadge>
 
-              {p.imagen && (
-                <div
-                  className="eye-icon"
-                  onClick={(e) => { e.stopPropagation(); setViewImage({ isOpen: true, imageUrl: p.imagen }); }}
-                >
-                  <FaEye size={14} />
-                </div>
-              )}
-
-              <div className="image-placeholder" style={{ height: 160, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f1f5f9' }}>
+              <div className="image-placeholder" style={{ position: 'relative', height: 160, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f1f5f9', overflow: 'hidden' }}>
+                {p.imagen && (
+                  <div
+                    className="eye-icon"
+                    onClick={(e) => { e.stopPropagation(); setViewImage({ isOpen: true, imageUrl: p.imagen }); }}
+                    style={{
+                      position: 'absolute', top: 10, left: 10, zIndex: 20,
+                      background: 'white', borderRadius: '50%', width: 32, height: 32,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)', cursor: 'pointer',
+                      transition: 'transform 0.2s',
+                    }}
+                    title="Ver imagen"
+                  >
+                    <FaEye size={14} color="#64748b" />
+                  </div>
+                )}
                 {p.imagen ? (
                   <img src={p.imagen} alt={p.nombre} loading="lazy" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                 ) : (

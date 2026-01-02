@@ -162,16 +162,16 @@ export const ProductCard = styled.div`
   }
 
   .eye-icon {
-    position: absolute; bottom: 8px; left: 8px; z-index: 10;
+    position: absolute; top: 10px; left: 10px; z-index: 20;
     background: white; border-radius: 50%;
     width: 32px; height: 32px;
     display: flex; align-items: center; justify-content: center;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     color: #475569;
-    opacity: 0; transform: scale(0.8);
+    opacity: 1; transform: scale(1);
     transition: all 0.2s;
     
-    &:hover { color: #2563eb; transform: scale(1.1) !important; }
+    &:hover { color: #2563eb; transform: scale(1.1); }
   }
 
   .info {
