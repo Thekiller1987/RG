@@ -13,10 +13,10 @@ export { API_URL };
 const request = async (method, path, token = null, data = null, config = {}) => {
     const headers = { 'Content-Type': 'application/json', ...(config.headers || {}) };
     if (token) headers.Authorization = `Bearer ${token}`;
-    
+
     // =======================================================
     // ESTA ES LA LINEA CLAVE: USA LA URL ABSOLUTA COMPLETA
-    const fullUrl = `${RAW_BASE}${path}`; 
+    const fullUrl = `${RAW_BASE}${path}`;
     // =======================================================
 
     try {
@@ -39,7 +39,7 @@ const request = async (method, path, token = null, data = null, config = {}) => 
 
         const res = await axios.request(requestConfig); // Usamos axios directamente
         return res.data;
-        
+
     } catch (err) {
         if (err.response) {
             const msg = err.response.data?.message || err.response.data?.msg || JSON.stringify(err.response.data);
@@ -52,9 +52,9 @@ const request = async (method, path, token = null, data = null, config = {}) => 
 };
 
 export const login = async (credentials) => {
-  const { username, nombre_usuario, password } = credentials;
-  const body = { nombre_usuario: nombre_usuario ?? username, password };
-  return await request('post', '/auth/login', null, body);
+    const { username, nombre_usuario, password } = credentials;
+    const body = { nombre_usuario: nombre_usuario ?? username, password };
+    return await request('post', '/auth/login', null, body);
 };
 
 export const fetchMe = async (token) => {
@@ -71,10 +71,15 @@ export const fetchProducts = async (token) => {
     const list = Array.isArray(data) ? data : [];
     return list.map(p => ({
         id: p.id_producto ?? p.id ?? p._id,
+        id_producto: p.id_producto ?? p.id ?? p._id, // Duplicado por compatibilidad
         codigo: p.codigo ?? p.code ?? '',
         nombre: p.nombre ?? p.nombre_producto ?? p.name ?? 'Sin nombre',
         precio: Number(p.venta ?? p.precio ?? p.price ?? 0),
+        precio_venta: Number(p.venta ?? p.precio ?? p.price ?? 0),
         existencia: Number(p.existencia ?? p.stock ?? 0),
+        imagen: p.imagen || null,
+        descripcion: p.descripcion || '',
+        categoria: p.nombre_categoria || '',
         raw: p,
     }));
 };
@@ -86,10 +91,10 @@ export const fetchProducts = async (token) => {
 export const fetchClients = async (token) => {
     const data = await request('get', '/clients', token);
     const list = Array.isArray(data) ? data : [];
-    
+
     const contado = list.find(c => (c.nombre || '').toLowerCase().includes('contado'));
     const others = list.filter(c => contado ? c.id_cliente !== contado.id_cliente : true);
-    
+
     return contado ? [contado, ...others] : list;
 };
 
@@ -109,7 +114,7 @@ export const fetchSales = async (token, date = null) => {
     const config = {};
     if (date) {
         // Axios usará esto para añadir ?date=YYYY-MM-DD a la URL
-        config.params = { date }; 
+        config.params = { date };
     }
     return await request('get', '/sales', token, null, config);
 };
@@ -127,7 +132,7 @@ export const addPaymentToSale = async (paymentData, token) => {
 // ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 
 // ==================== DEVOLUCIONES (AJUSTADO) ====================
-export const returnItem = async (returnData, token) => { 
+export const returnItem = async (returnData, token) => {
     // Ahora apunta al endpoint correcto del servidor
     return await request('post', '/sales/returns', token, returnData);
 };
@@ -425,6 +430,6 @@ const fetchActiveBoxes = async (token) => {
     } catch (error) {
         console.error("Error al obtener cajas activas:", error);
         // Devolver un array vacío para manejarlo elegantemente
-        return []; 
+        return [];
     }
 };

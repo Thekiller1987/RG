@@ -69,7 +69,9 @@ const SearchInputWrapper = styled.div`
 const Input = styled.input` flex: 1; padding: 12px 0; border: none; background: transparent; outline: none; font-size: 1rem; color: #1e293b; `;
 
 const ProductGrid = styled.div`
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.25rem; overflow-y: auto; padding-bottom: 30px; flex: 1;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); 
+    grid-auto-rows: min-content; align-content: start;
+    gap: 1.25rem; overflow-y: auto; padding-bottom: 30px; flex: 1;
     &::-webkit-scrollbar { width: 4px; }
     &::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
     @media (max-width: 768px) { grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -223,23 +225,58 @@ const ProformaGenerator = () => {
 
                 <ProductGrid>
                     {filteredProducts.map(p => {
-                        const agotado = p.existencia <= 0;
+                        const pid = p.id_producto || p.id;
+                        const enCarrito = cart.find(i => (i.id_producto || i.id) === pid)?.quantity || 0;
+                        const restante = Math.max(0, Number(p.existencia || 0) - enCarrito);
+                        const agotado = restante <= 0;
+
                         return (
-                            <ProductCard key={p.id} onClick={() => !agotado && addToCart(p)} outOfStock={agotado}>
-                                <StockBadge outOfStock={agotado} lowstock={p.existencia < 5 && !agotado}>
-                                    {agotado ? 'Agotado' : `Stock: ${p.existencia}`}
+                            <ProductCard
+                                key={pid}
+                                onClick={() => !agotado && addToCart(p)}
+                                outOfStock={agotado}
+                                title={p.nombre}
+                            >
+                                <StockBadge outOfStock={agotado} lowstock={restante < 5 && !agotado}>
+                                    {agotado ? 'Agotado' : `Stock: ${restante}`}
                                 </StockBadge>
+
                                 {p.imagen && (
-                                    <div className="eye-icon" onClick={(e) => { e.stopPropagation(); setViewImage({ isOpen: true, imageUrl: p.imagen }); }} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 10, background: 'rgba(255,255,255,0.9)', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', opacity: 0, transition: 'all 0.2s' }} title="Ver imagen">
-                                        <FaEye size={14} color="#475569" />
+                                    <div
+                                        className="eye-icon"
+                                        onClick={(e) => { e.stopPropagation(); setViewImage({ isOpen: true, imageUrl: p.imagen }); }}
+                                        style={{
+                                            position: 'absolute', top: 10, left: 10, zIndex: 20,
+                                            background: 'white', borderRadius: '50%', width: 32, height: 32,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)', cursor: 'pointer',
+                                            transition: 'transform 0.2s',
+                                        }}
+                                        title="Ver imagen"
+                                    >
+                                        <FaEye size={14} color="#64748b" />
                                     </div>
                                 )}
-                                <div style={{ height: 160, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f1f5f9' }}>
-                                    {p.imagen ? <img src={p.imagen} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <FaImage size={40} color="#e2e8f0" />}
+
+                                <div style={{ height: 160, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+                                    {p.imagen ? (
+                                        <img src={p.imagen} alt={p.nombre} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                    ) : (
+                                        <FaImage size={40} color="#e2e8f0" />
+                                    )}
                                 </div>
-                                <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#0f172a', marginBottom: '8px', overflow: 'hidden', height: '2.8em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{p.nombre}</div>
-                                    <div style={{ fontWeight: 800, color: '#2563eb', fontSize: '1.1rem', marginTop: 'auto' }}>C$ {parseFloat(p.precio_venta || p.precio || 0).toFixed(2)}</div>
+
+                                <div style={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{
+                                        fontWeight: 600, fontSize: '0.88rem', color: '#1e293b',
+                                        lineHeight: '1.25', height: '2.5rem', overflow: 'hidden',
+                                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'
+                                    }}>
+                                        {p.nombre}
+                                    </div>
+                                    <div style={{ fontWeight: 800, color: '#2563eb', fontSize: '1.05rem', marginTop: 'auto' }}>
+                                        C$ {parseFloat(p.precio_venta || p.precio || 0).toFixed(2)}
+                                    </div>
                                 </div>
                             </ProductCard>
                         );
