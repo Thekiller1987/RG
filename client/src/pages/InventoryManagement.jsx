@@ -38,6 +38,115 @@ const BackButton = styled(Link)`
   &:hover { transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: #2d3748; }
 `;
 
+const HeaderContainer = styled.div`
+  display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem;
+  @media(min-width: 768px) { flex-direction: row; justify-content: space-between; align-items: center; }
+`;
+
+const Title = styled.h1`
+  font-size: 1.8rem; color: #2d3748; display: flex; align-items: center; gap: 0.5rem; margin: 0;
+`;
+
+const ButtonGroup = styled.div`
+  display: flex; gap: 0.5rem; flex-wrap: wrap;
+`;
+
+const Button = styled.button`
+  background-color: ${p => p.primary ? '#3b82f6' : p.secondary ? '#a0aec0' : p.tertiary ? '#fff' : '#e2e8f0'};
+  color: ${p => p.tertiary ? '#4a5568' : '#fff'};
+  border: ${p => p.tertiary ? '1px solid #cbd5e1' : 'none'};
+  padding: 0.6rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;
+  &:hover { opacity: 0.9; transform: translateY(-1px); }
+`;
+
+const FilterContainer = styled.div`
+  display: flex; flex-direction: column; gap: 1rem; background: white; padding: 1rem; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 1.5rem;
+  @media(min-width: 768px) { flex-direction: row; align-items: center; }
+`;
+
+const SearchInputWrapper = styled.div`
+  position: relative; flex: 1;
+`;
+
+const SearchInput = styled.input`
+  width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 2px solid #e2e8f0; border-radius: 8px; outline: none; transition: border-color 0.2s;
+  &:focus { border-color: #3b82f6; }
+`;
+
+const FilterToggleButton = styled.button`
+  background: ${p => p.$active ? '#ebf8ff' : '#fff'}; border: 1px solid ${p => p.$active ? '#3b82f6' : '#e2e8f0'};
+  color: ${p => p.$active ? '#3b82f6' : '#718096'}; padding: 0.7rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+`;
+
+const Select = styled.select`
+  padding: 0.7rem; border: 2px solid #e2e8f0; border-radius: 8px; background: white; color: #4a5568; outline: none;
+  &:focus { border-color: #3b82f6; }
+`;
+
+const MobileCardGrid = styled.div`
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;
+`;
+
+const ProductCard = styled(motion.div)`
+  background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; display: flex; flex-direction: column; transition: transform 0.2s;
+  
+  .image-placeholder {
+    height: 160px; background: #f7fafc; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; border-bottom: 1px solid #edf2f7;
+    img { width: 100%; height: 100%; object-fit: cover; }
+    .no-image-text { color: #cbd5e1; font-size: 3rem; }
+    .overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.3); color: white; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; font-size: 2rem; }
+    &:hover .overlay { opacity: 1; }
+  }
+`;
+
+const CardHeader = styled.div` padding: 1rem; `;
+const CardTitle = styled.h3` font-size: 1.1rem; margin: 0; color: #2d3748; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; `;
+const CardCode = styled.div` font-size: 0.85rem; color: #718096; margin-top: 2px; `;
+
+const CardBody = styled.div` padding: 0 1rem 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem; `;
+const InfoTag = styled.div`
+  background: #f7fafc; padding: 4px 8px; border-radius: 4px; border: 1px solid #edf2f7; display: flex; flex-direction: column; align-items: flex-start; min-width: 80px; flex: 1;
+  span { font-size: 0.7rem; color: #718096; text-transform: uppercase; }
+  strong { color: #2d3748; font-size: 0.95rem; }
+`;
+const StockTag = styled(InfoTag)`
+  background: ${p => p.$out ? '#fff5f5' : p.$low ? '#fffaf0' : '#f0fff4'};
+  border-color: ${p => p.$out ? '#feb2b2' : p.$low ? '#fbd38d' : '#9ae6b4'};
+  strong { color: ${p => p.$out ? '#c53030' : p.$low ? '#c05621' : '#2f855a'}; }
+`;
+
+const CardFooter = styled.div`
+  margin-top: auto; padding: 1rem; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; gap: 0.5rem;
+`;
+const ActionButton = styled.button`
+  flex: 1; padding: 0.5rem; border-radius: 6px; border: 1px solid; cursor: pointer; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 4px;
+  &.adjust { background: white; border-color: #cbd5e1; color: #4a5568; &:hover { background: #f1f5f9; } }
+  &.edit { background: #ebf8ff; border-color: #bee3f8; color: #3182ce; &:hover { background: #bee3f8; } }
+  &.delete { background: #fff5f5; border-color: #fed7d7; color: #e53e3e; &:hover { background: #fed7d7; } }
+`;
+
+/* ESTILOS MODAL (Simples para que funcione rápido) */
+const ModalOverlay = styled(motion.div)`
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px;
+`;
+const ModalContent = styled.div`
+  background: white; width: 100%; max-width: 600px; border-radius: 12px; padding: 2rem; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+`;
+const ModalTitle = styled.h2` margin-top: 0; color: #2d3748; margin-bottom: 1.5rem; `;
+const ModalError = styled.div`
+  background: #fff5f5; color: #c53030; padding: 10px; border-radius: 6px; margin-bottom: 1rem; border: 1px solid #fed7d7; font-size: 0.9rem;
+`;
+const InputGrid = styled.div` display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem; @media(max-width: 500px){ grid-template-columns: 1fr; } `;
+const FormGroup = styled.div` display: flex; flex-direction: column; gap: 5px; `;
+const Label = styled.label` font-size: 0.85rem; font-weight: 600; color: #4a5568; `;
+const Input = styled.input`
+  padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;
+  &:focus { outline: none; border-color: #3b82f6; ring: 2px solid rgba(59,130,246,0.2); }
+`;
+const ModalActions = styled.div` display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1rem; `;
+const CancelButton = styled.button` background: transparent; color: #718096; border: 1px solid #cbd5e1; padding: 8px 16px; border-radius: 6px; cursor: pointer; &:hover { background: #f7fafc; } `;
+const SaveButton = styled.button` background: #3b82f6; color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; &:hover { background: #2563eb; } `;
+
 /* ================================
    HELPER: IMAGE UPLOAD & COMPRESS
 ================================ */
@@ -152,6 +261,135 @@ const LARGE_LIST_CUTOFF = 500;
 // ... (Rest of existing imports and constants)
 
 /* ==================================
+   COMPONENTES DE MODAL FALTANTES
+================================== */
+
+const AlertModal = ({ isOpen, onClose, title, message }) => {
+  if (!isOpen) return null;
+  return (
+    <ModalOverlay onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <ModalContent as="div" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center' }}>
+        <ModalTitle>{title}</ModalTitle>
+        <p style={{ color: '#4a5568', marginBottom: '20px' }}>{message}</p>
+        <SaveButton onClick={onClose} style={{ width: '100%' }}>Aceptar</SaveButton>
+      </ModalContent>
+    </ModalOverlay>
+  );
+};
+
+const ConfirmDialog = ({ open, onCancel, onConfirm, title, message, confirmLabel, danger }) => {
+  if (!open) return null;
+  return (
+    <ModalOverlay onClick={onCancel} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <ModalContent as="div" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+        <ModalTitle style={{ color: danger ? '#e53e3e' : '#2d3748' }}>{title}</ModalTitle>
+        <div style={{ marginBottom: '25px', color: '#4a5568' }}>{message}</div>
+        <ModalActions>
+          <CancelButton onClick={onCancel}>Cancelar</CancelButton>
+          <SaveButton onClick={onConfirm} style={{ background: danger ? '#e53e3e' : '#3b82f6' }}>{confirmLabel || 'Confirmar'}</SaveButton>
+        </ModalActions>
+      </ModalContent>
+    </ModalOverlay>
+  );
+};
+
+const ManagementModal = ({ title, items, onAdd, onDelete, onClose }) => {
+  const [newItem, setNewItem] = useState('');
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (newItem.trim()) {
+      onAdd(newItem);
+      setNewItem('');
+    }
+  };
+  return (
+    <ModalOverlay onClick={onClose}>
+      <ModalContent onClick={e => e.stopPropagation()}>
+        <ModalTitle>{title}</ModalTitle>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+          <Input value={newItem} onChange={e => setNewItem(e.target.value)} placeholder="Nuevo nombre..." style={{ flex: 1 }} />
+          <SaveButton type="submit"><FaPlus /> Agregar</SaveButton>
+        </form>
+        <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {items.map((item, idx) => {
+            // Detectar si es categoría o proveedor
+            const id = item.id_categoria || item.id_proveedor || idx;
+            const nombre = item.nombre;
+            return (
+              <div key={id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', background: '#f7fafc', borderRadius: '8px', alignItems: 'center' }}>
+                <span>{nombre}</span>
+                <button onClick={() => onDelete(id)} style={{ color: '#e53e3e', background: 'none', border: 'none', cursor: 'pointer' }}><FaTrash /></button>
+              </div>
+            );
+          })}
+          {items.length === 0 && <p style={{ textAlign: 'center', color: '#a0aec0' }}>No hay elementos registrados.</p>}
+        </div>
+        <ModalActions>
+          <CancelButton onClick={onClose}>Cerrar</CancelButton>
+        </ModalActions>
+      </ModalContent>
+    </ModalOverlay>
+  );
+};
+
+const StockAdjustmentModal = ({ isOpen, product, onClose, onConfirm }) => {
+  const [cantidad, setCantidad] = useState('');
+  const [razon, setRazon] = useState('Compra');
+
+  if (!isOpen || !product) return null;
+
+  return (
+    <ModalOverlay onClick={onClose}>
+      <ModalContent onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+        <ModalTitle>Ajustar Stock: {product.nombre}</ModalTitle>
+        <div style={{ marginBottom: '15px' }}>
+          <p><strong>Stock Actual:</strong> {product.existencia}</p>
+        </div>
+        <FormGroup style={{ marginBottom: '15px' }}>
+          <Label>Cantidad a agregar/quitar (use negativo para restar)</Label>
+          <Input type="number" value={cantidad} onChange={e => setCantidad(e.target.value)} autoFocus />
+        </FormGroup>
+        <FormGroup style={{ marginBottom: '20px' }}>
+          <Label>Razón del movimiento</Label>
+          <Select value={razon} onChange={e => setRazon(e.target.value)}>
+            <option value="Compra">Compra / Resurtido</option>
+            <option value="Ajuste Inventario">Ajuste de Inventario</option>
+            <option value="Devolución">Devolución Cliente</option>
+            <option value="Dañado">Producto Dañado/Merma</option>
+            <option value="Uso Interno">Uso Interno</option>
+          </Select>
+        </FormGroup>
+        <ModalActions>
+          <CancelButton onClick={onClose}>Cancelar</CancelButton>
+          <SaveButton onClick={() => {
+            const val = parseInt(cantidad, 10);
+            if (!isNaN(val) && val !== 0) onConfirm(product, val, razon);
+          }}>Aplicar Ajuste</SaveButton>
+        </ModalActions>
+      </ModalContent>
+    </ModalOverlay>
+  );
+};
+
+const InventoryHistoryModal = ({ onClose }) => {
+  return (
+    <ModalOverlay onClick={onClose}>
+      <ModalContent onClick={e => e.stopPropagation()}>
+        <ModalTitle>Historial de Movimientos</ModalTitle>
+        <div style={{ textAlign: 'center', padding: '20px', color: '#718096' }}>
+          <FaHistory size={40} style={{ marginBottom: '10px', opacity: 0.5 }} />
+          <p>Esta funcionalidad estará disponible próximamente.</p>
+          <small>Consulte la base de datos para ver el registro detallado.</small>
+        </div>
+        <ModalActions>
+          <CancelButton onClick={onClose}>Cerrar</CancelButton>
+        </ModalActions>
+      </ModalContent>
+    </ModalOverlay>
+  );
+};
+
+/* ==================================
   MODAL DE CREACIÓN ACTUALIZADO
 ================================== */
 const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, allProductsRaw }) => {
@@ -253,10 +491,10 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
               <CancelButton type="button" onClick={onClose}>Cancelar</CancelButton>
               <SaveButton type="submit">Crear Producto</SaveButton>
             </ModalActions>
-          </form>
-        </ModalContent>
-      </motion.div>
-    </ModalOverlay>
+          </form >
+        </ModalContent >
+      </motion.div >
+    </ModalOverlay >
   );
 };
 
