@@ -11,8 +11,10 @@ const createProduct = async (req, res) => {
   const {
     codigo, nombre, costo, venta, existencia,
     minimo, maximo, id_categoria, id_proveedor,
-    tipo_venta, mayoreo, imagen
+    tipo_venta, mayoreo, imagen, descripcion
   } = req.body;
+
+  console.log('CREATE PRODUCT REQUEST:', { codigo, nombre, imagenLength: imagen ? imagen.length : 'NULL' });
 
   const id_usuario = req.user?.id_usuario || req.user?.id;
 
@@ -35,7 +37,7 @@ const createProduct = async (req, res) => {
     const productData = {
       codigo, nombre, costo, venta, existencia,
       minimo, maximo, id_categoria, id_proveedor,
-      tipo_venta, mayoreo, imagen
+      tipo_venta, mayoreo, imagen, descripcion
     };
 
     const [result] = await connection.query('INSERT INTO productos SET ?', [productData]);
@@ -129,6 +131,8 @@ const updateProduct = async (req, res) => {
     minimo, maximo, id_categoria, id_proveedor,
     tipo_venta, mayoreo, descripcion, imagen // Se añade 'descripcion' e 'imagen'
   } = req.body;
+
+  console.log('UPDATE PRODUCT REQUEST:', { id, codigo, nombre, imagenLength: imagen ? imagen.length : 'NULL' });
 
   const id_usuario = req.user?.id_usuario || req.user?.id;
 

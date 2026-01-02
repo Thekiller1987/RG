@@ -963,24 +963,28 @@ const InventoryManagement = () => {
   // Handlers de Lógica (API calls)
   const handleCreateProduct = async (payload) => {
     try {
+      console.log('CLIENT SENDING CREATE PAYLOAD:', { ...payload, imagenLength: payload.imagen ? payload.imagen.length : 'NULL' });
       const token = localStorage.getItem('token');
       await axios.post('/api/products', payload, { headers: { Authorization: `Bearer ${token}` } });
       setIsCreateModalOpen(false);
       showAlert({ title: 'Éxito', message: 'Producto creado correctamente.' });
       await fetchData();
     } catch (err) {
+      console.error('CLIENT CREATE ERROR:', err);
       showAlert({ title: 'Error', message: err.response?.data?.msg || 'Error al crear el producto.', type: 'error' });
     }
   };
 
   const handleUpdateProduct = async (payload, productId) => {
     try {
+      console.log('CLIENT SENDING UPDATE PAYLOAD:', { ...payload, imagenLength: payload.imagen ? payload.imagen.length : 'NULL' });
       const token = localStorage.getItem('token');
       await axios.put(`/api/products/${productId}`, payload, { headers: { Authorization: `Bearer ${token}` } });
       setIsEditModalOpen(false);
       showAlert({ title: 'Éxito', message: 'Producto actualizado correctamente.' });
       await fetchData();
     } catch (err) {
+      console.error('CLIENT UPDATE ERROR:', err);
       showAlert({ title: 'Error', message: err.response?.data?.msg || 'Error al actualizar el producto.', type: 'error' });
     }
   };
@@ -1152,7 +1156,7 @@ const InventoryManagement = () => {
                 )}
               </div>
               <CardHeader>
-                <CardTitle>{p.nombre}</CardTitle>
+                <CardTitle title={p.nombre}>{p.nombre}</CardTitle>
                 <CardCode>Código: {p.codigo}</CardCode>
               </CardHeader>
               <CardBody>
@@ -1171,17 +1175,30 @@ const InventoryManagement = () => {
         })}
       </MobileCardGrid>
 
-      {showLoadMore && (
-        <div style={{ display: 'flex', justifyContent: 'center', margin: '1rem 0 2rem' }}>
-          <Button onClick={() => setVisibleCount(v => v + SLICE_STEP)}><FaPlus /> Cargar más resultados</Button>
+      {/* --- PAGINACIÓN --- */}
+      {totalFilteredCount > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '2rem', marginBottom: '3rem' }}>
+          <Button
+            secondary
+            onClick={() => setVisibleCount(v => Math.max(PRODUCTS_INITIAL_LOAD, v - PRODUCTS_INITIAL_LOAD))}
+            disabled={visibleCount <= PRODUCTS_INITIAL_LOAD}
+          >
+            Anterior
+          </Button>
+
+          <span style={{ color: '#475569', fontWeight: '600' }}>
+            Viendo {Math.min(visibleCount, totalFilteredCount)} de {totalFilteredCount}
+          </span>
+
+          <Button
+            secondary
+            onClick={() => setVisibleCount(v => v + PRODUCTS_INITIAL_LOAD)}
+            disabled={visibleCount >= totalFilteredCount}
+          >
+            Siguiente
+          </Button>
         </div>
       )}
-
-      {filtered.length === 0 && initialLoadComplete && (
-        <CenteredMessage><p>No se encontraron productos que coincidan con la búsqueda.</p></CenteredMessage>
-      )}
-
-      {/* --- Renderizado de Modales --- */}
       <AnimatePresence>
         {isCreateModalOpen && (
           <CreateProductModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSave={handleCreateProduct} categories={categories} providers={providers} allProductsRaw={allProductsRaw} />
