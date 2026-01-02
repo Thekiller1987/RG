@@ -581,7 +581,12 @@ const POS = () => {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1e293b' }}>{item.nombre}</div>
                       <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', fontStyle: 'normal' }}>{item.codigo}</div>
-                      <div style={{ fontSize: '0.8rem', color: '#64748b' }}>C$ {fmt(item.precio_venta)}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                        Unit: C$ {fmt(item.precio_venta)}
+                      </div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#2563eb', marginTop: '2px' }}>
+                        Total: C$ {fmt(Number(item.quantity || 1) * Number(item.precio_venta || 0))}
+                      </div>
                       <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
                         <S.RoundBtn title="Editar Precio" onClick={() => openModal('editPrice', { item })} style={{ width: 26, height: 26, background: '#f1f5f9', color: '#334155' }}>
                           <FaPencilAlt size={10} />

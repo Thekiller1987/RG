@@ -405,12 +405,12 @@ function SalesHistoryModal({
 
           setTimeout(() => {
             setConfirmState({
-              isOpen: true,
+              open: true, // FIXED: Changed from 'isOpen' to 'open' to match render logic
               title: '¿Cancelar Venta Completa?',
               message: 'Este es el ÚLTIMO artículo de la venta. \n\n¿Prefieres CANCELAR toda la venta en lugar de hacer una devolución individual?\n(Esto revertirá todo el ticket).',
               onConfirm: async () => {
                 // User chose Cancel Sale
-                setConfirmState({ isOpen: false, title: '', message: '', onConfirm: null });
+                setConfirmState({ open: false, title: '', message: '', onConfirm: null });
                 if (onCancelSale) {
                   handleCancel(selectedSale.id); // Re-use existing handleCancel logic
                 }
@@ -419,7 +419,7 @@ function SalesHistoryModal({
               // Or we just do nothing? The user asked: "te diga es el ultimo articulo deseas cancelar pero que tambine te deje devolver individual"
               // So "Cancel" on this prompt implies "No, I want individual return".
               onClose: () => {
-                setConfirmState({ isOpen: false, title: '', message: '', onConfirm: null });
+                setConfirmState({ open: false, title: '', message: '', onConfirm: null });
                 proceedWithReturn(); // Fallback to return
               }
             });
