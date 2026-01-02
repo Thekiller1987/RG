@@ -179,12 +179,26 @@ const POS = () => {
 
       // --- CRITICAL UPDATE: Add transaction to local session so 'Caja' updates in real-time ---
       if (isCajaOpen && cajaSession) {
+        // Ensure pagoDetalles has explicit 'efectivo' field if not present, for CajaModal to detect it as cash
+        const details = { ...pagoDetalles };
+
+        // If it's a cash payment (no card/transfer/credit), ensure 'efectivo' is set for the logic
+        const isCash = !details.tarjeta && !details.transferencia && !details.credito;
+        if (isCash && details.efectivo === undefined) {
+          details.efectivo = saleData.totalVenta; // Assume full cash if not specified
+        }
+
+        // Lookup names for immediate display in History (fallback logic in SalesHistoryModal)
+        const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
+
         const newTransaction = {
           type: 'venta', // Generic type, CajaModal handles details via pagoDetalles
           amount: saleData.totalVenta,
           at: new Date().toISOString(),
           userId,
-          pagoDetalles: pagoDetalles, // Pass full details for correct breakdown
+          userName: currentUser?.nombre_usuario || 'Caja', // Explicitly save seller name
+          clientName: clientNameFound, // Explicitly save client name
+          pagoDetalles: details, // Pass enriched details
           id: savedSale.id || 'TEMP-' + Date.now()
         };
         const updatedSession = {
@@ -548,7 +562,7 @@ const POS = () => {
                   <S.CartItemWrapper key={item.id_producto || item.id}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1e293b' }}>{item.nombre}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>#{item.codigo}</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', fontStyle: 'normal' }}>{item.codigo}</div>
                       <div style={{ fontSize: '0.8rem', color: '#64748b' }}>C$ {fmt(item.precio_venta)}</div>
                       <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
                         <S.RoundBtn title="Editar Precio" onClick={() => openModal('editPrice', { item })} style={{ width: 26, height: 26, background: '#f1f5f9', color: '#334155' }}>
@@ -697,7 +711,7 @@ const POS = () => {
             }}
             isAdmin={isAdmin}
             users={[user]}
-            clients={[]}
+            clients={clients || []} // Pass clients from auth context
             onReprintTicket={(sale) => {
               setTicketData(sale); // Open TicketModal for reprint
             }}
@@ -706,8 +720,32 @@ const POS = () => {
               showAlert({ title: "Cancelar", message: "Función de cancelación no implementada" });
             }}
             onReturnItem={async (sale, item, qty) => {
-              console.log('Return item:', sale, item, qty);
-              showAlert({ title: "Devolver", message: "Función de devolución no implementada" });
+              // Calculate refund amount
+              const unitPrice = item.precio || item.precio_venta || 0;
+              const refundAmount = unitPrice * qty;
+
+              // Update Caja Session locally to reflect cash outflow (Return)
+              if (isCajaOpen && cajaSession) {
+                const refundTransaction = {
+                  type: 'devolucion',
+                  amount: -refundAmount, // Negative amount for deduction
+                  at: new Date().toISOString(),
+                  userId,
+                  userName: currentUser?.nombre_usuario || 'Caja',
+                  note: `Devolución: ${qty}x ${item.nombre}`,
+                  pagoDetalles: { efectivo: refundAmount, ingresoCaja: -refundAmount }, // Explicit cash details
+                  id: 'REFUND-' + Date.now()
+                };
+                const updatedSession = {
+                  ...cajaSession,
+                  transactions: [refundTransaction, ...(cajaSession.transactions || [])]
+                };
+                setCajaSession(updatedSession);
+
+                showAlert({ title: "Devolución Procesada", message: `Se ha registrado la devolución de C$${refundAmount.toFixed(2)} en caja.` });
+              } else {
+                showAlert({ title: "Caja Cerrada", message: "No se puede procesar devolución de efectivo con la caja cerrada." });
+              }
             }}
             onAbonoSuccess={() => {
               console.log('Abono success');

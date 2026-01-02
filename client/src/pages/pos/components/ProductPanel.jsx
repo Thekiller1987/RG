@@ -189,13 +189,13 @@ export default function ProductPanel({
               <div className="info" style={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <div className="product-name" style={{
                   fontWeight: 600, fontSize: '0.88rem', color: '#1e293b',
-                  lineHeight: '1.25', height: '2.5rem', overflow: 'hidden',
-                  display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'
+                  lineHeight: '1.25', height: '3.8rem', overflow: 'hidden',
+                  display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical'
                 }}>
                   {p.nombre}
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', marginBottom: '4px' }}>
-                  #{p.codigo || 'S/C'}
+                <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
+                  {p.codigo || 'S/C'}
                 </div>
                 {(Number(p.mayorista) > 0 || Number(p.mayoreo) > 0) && (
                   <div style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px' }}>
