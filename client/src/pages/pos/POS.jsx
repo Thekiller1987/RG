@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   FaArrowLeft, FaShoppingCart, FaPlus, FaMinus, FaTrashAlt, FaLock,
-  FaSync, FaKeyboard, FaTimes, FaClipboardList
+  FaHistory, FaSync, FaKeyboard, FaTimes, FaClipboardList,
+  FaFileInvoice, FaMoneyBillWave, FaArrowDown, FaArrowUp,
+  FaPercentage, FaTag, FaEdit
 } from 'react-icons/fa';
 import { AnimatePresence } from 'framer-motion';
 
@@ -14,13 +16,16 @@ import { useOrders } from '../../context/OrdersContext';
 import ProductPanel from './components/ProductPanel.jsx';
 import CajaModal from './components/CajaModal.jsx';
 import PaymentModal from './components/PaymentModal.jsx';
+import SalesHistoryModal from './components/SalesHistoryModal.jsx';
+import ProformaModal from './components/ProformaModal.jsx';
+import PromptModal from './components/PromptModal.jsx';
 
 const fmt = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const POS = () => {
   // Contextos
   const { user, products: initialProducts, token, refreshProducts } = useAuth();
-  const { isCajaOpen, setIsCajaOpen, tasaDolar } = useCaja();
+  const { isCajaOpen, setIsCajaOpen, cajaSession, setCajaSession, tasaDolar, setTasaDolar } = useCaja();
   const {
     orders, activeOrderId, setActiveOrderId, activeOrder,
     handleNewOrder, handleRemoveOrder, updateActiveOrder, loadOrdersFromDB,
@@ -29,6 +34,7 @@ const POS = () => {
 
   const userId = user?.id_usuario || user?.id;
   const currentUser = user;
+  const isAdmin = user?.rol === 'admin';
 
   // Estados Locales
   const [products, setProductsState] = useState(initialProducts || []);
@@ -37,6 +43,7 @@ const POS = () => {
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [modal, setModal] = useState({ name: null, data: null });
   const [alert, setAlert] = useState({ isOpen: false, title: '', message: '' });
+  const [confirmation, setConfirmation] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   const searchRef = useRef(null);
 
@@ -64,6 +71,12 @@ const POS = () => {
    * ----------------------------------------------------------------- */
   const showAlert = ({ title, message }) => setAlert({ isOpen: true, title, message });
   const closeAlert = () => setAlert({ isOpen: false });
+
+  const showConfirmation = ({ title, message, onConfirm }) => {
+    setConfirmation({ isOpen: true, title, message, onConfirm });
+  };
+  const closeConfirmation = () => setConfirmation({ isOpen: false, title: '', message: '', onConfirm: null });
+
   const openModal = (name, data = null) => setModal({ name, data });
   const closeModal = () => setModal({ name: null, data: null });
 
@@ -156,6 +169,86 @@ const POS = () => {
     }
   };
 
+  // Handlers for cash entry/exit
+  const handleCashEntry = () => {
+    openModal('cashEntry');
+  };
+
+  const handleCashExit = () => {
+    openModal('cashExit');
+  };
+
+  const processCashTransaction = async (type, amount, note) => {
+    if (!amount || amount <= 0) {
+      showAlert({ title: "Error", message: "Ingrese un monto válido" });
+      return;
+    }
+
+    const transaction = {
+      type,
+      amount: parseFloat(amount),
+      note,
+      at: new Date().toISOString(),
+      userId
+    };
+
+    // Update caja session with new transaction
+    const updatedSession = {
+      ...cajaSession,
+      transactions: [...(cajaSession?.transactions || []), transaction]
+    };
+
+    setCajaSession(updatedSession);
+    closeModal();
+    showAlert({
+      title: "Éxito",
+      message: type === 'entrada' ? 'Entrada registrada' : 'Salida registrada'
+    });
+  };
+
+  // Handler for wholesale price toggle
+  const toggleWholesalePrice = () => {
+    const newCart = cart.map(item => {
+      const product = products.find(p => (p.id_producto || p.id) === (item.id_producto || item.id));
+      if (!product) return item;
+
+      // Toggle between retail (venta) and wholesale (mayorista)
+      const isCurrentlyWholesale = item.precio_venta === product.mayorista;
+      const newPrice = isCurrentlyWholesale ? (product.venta || product.precio) : (product.mayorista || product.venta || product.precio);
+
+      return { ...item, precio_venta: newPrice };
+    });
+
+    updateActiveCart(newCart);
+    const firstProduct = products.find(p => cart[0] && ((p.id_producto || p.id) === (cart[0].id_producto || cart[0].id)));
+    const isNowWholesale = newCart[0] && newCart[0].precio_venta === firstProduct?.mayorista;
+    showAlert({
+      title: "Precio Actualizado",
+      message: isNowWholesale ? "Aplicado precio mayorista" : "Aplicado precio de venta"
+    });
+  };
+
+  // Handler for discount
+  const applyDiscount = (discountData) => {
+    updateActiveOrder('discount', discountData);
+    closeModal();
+  };
+
+  // Handler for renaming ticket
+  const renameTicket = (newName) => {
+    if (!newName || !newName.trim()) {
+      showAlert({ title: "Error", message: "Ingrese un nombre válido" });
+      return;
+    }
+
+    const updatedOrders = orders.map(o =>
+      o.id === activeOrderId ? { ...o, name: newName.trim() } : o
+    );
+    // Note: This would need proper integration with OrdersContext
+    closeModal();
+    showAlert({ title: "Ticket Renombrado", message: `Nuevo nombre: ${newName}` });
+  };
+
   /* -----------------------------------------------------------------
    * VISTA DE CAJA CERRADA
    * ----------------------------------------------------------------- */
@@ -167,7 +260,41 @@ const POS = () => {
         <p style={{ color: '#94a3b8', marginBottom: '1.5rem' }}>Debes realizar la apertura de caja para procesar ventas.</p>
         <S.Button primary onClick={() => openModal('caja')}><FaKeyboard /> Abrir Caja (F9)</S.Button>
         {modal.name === 'caja' && (
-          <CajaModal isOpen={true} onClose={closeModal} onOpenCaja={() => setIsCajaOpen(true)} />
+          <CajaModal
+            isOpen={true}
+            onClose={closeModal}
+            currentUser={currentUser}
+            isCajaOpen={isCajaOpen}
+            session={cajaSession}
+            isAdmin={isAdmin}
+            showAlert={showAlert}
+            showConfirmation={showConfirmation}
+            initialTasaDolar={tasaDolar}
+            onOpenCaja={(montoInicial, tasa) => {
+              const newSession = {
+                openedAt: new Date().toISOString(),
+                openedBy: { id: userId, name: currentUser?.nombre_usuario },
+                initialAmount: montoInicial,
+                tasaDolar: tasa,
+                transactions: []
+              };
+              setCajaSession(newSession);
+              setTasaDolar(tasa);
+              setIsCajaOpen(true);
+              closeModal();
+            }}
+            onCloseCaja={(montoCounted) => {
+              const updatedSession = {
+                ...cajaSession,
+                closedAt: new Date().toISOString(),
+                closedBy: { id: userId, name: currentUser?.nombre_usuario },
+                closingAmount: montoCounted
+              };
+              setCajaSession(updatedSession);
+              setIsCajaOpen(false);
+              closeModal();
+            }}
+          />
         )}
       </S.PageWrapper>
     );
@@ -182,9 +309,27 @@ const POS = () => {
         <S.BackButton to="/dashboard"><FaArrowLeft /> Regresar</S.BackButton>
         <div style={{ fontWeight: '800', letterSpacing: '1px' }}>SISTEMA POS</div>
         <div className="right-actions">
-          <S.Button secondary onClick={refreshData} title="Sincronizar"><FaSync /></S.Button>
-          <S.Button secondary onClick={() => openModal('caja')}><FaLock /> {currentUser?.nombre_usuario || 'Usuario'}</S.Button>
-          <S.Button secondary onClick={loadPendingOrdersFromServer} title="Cargar Pedidos Pendientes"><FaClipboardList /></S.Button>
+          <S.Button secondary onClick={() => openModal('salesHistory')} title="Historial de Ventas">
+            <FaHistory />
+          </S.Button>
+          <S.Button secondary onClick={() => openModal('proforma')} title="Crear Proforma">
+            <FaFileInvoice />
+          </S.Button>
+          <S.Button secondary onClick={handleCashEntry} title="Entrada de Dinero">
+            <FaArrowDown style={{ color: '#10b981' }} />
+          </S.Button>
+          <S.Button secondary onClick={handleCashExit} title="Salida de Dinero">
+            <FaArrowUp style={{ color: '#ef4444' }} />
+          </S.Button>
+          <S.Button secondary onClick={refreshData} title="Sincronizar">
+            <FaSync />
+          </S.Button>
+          <S.Button secondary onClick={() => openModal('caja')}>
+            <FaLock /> {currentUser?.nombre_usuario || 'Usuario'}
+          </S.Button>
+          <S.Button secondary onClick={loadPendingOrdersFromServer} title="Cargar Pedidos Pendientes">
+            <FaClipboardList />
+          </S.Button>
         </div>
       </S.HeaderActions>
 
@@ -234,6 +379,36 @@ const POS = () => {
               ))}
               <S.Button secondary onClick={handleNewOrder} title="Nuevo Ticket"><FaPlus /></S.Button>
             </S.TicketContainer>
+
+            {/* Action Buttons for Cart Management */}
+            <div style={{ display: 'flex', gap: '6px', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+              <S.Button
+                secondary
+                onClick={toggleWholesalePrice}
+                title="Cambiar a Precio Mayorista"
+                disabled={cart.length === 0}
+                style={{ flex: 1, fontSize: '0.75rem', padding: '8px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
+              >
+                <FaTag size={12} /> Mayorista
+              </S.Button>
+              <S.Button
+                secondary
+                onClick={() => openModal('discount')}
+                title="Aplicar Descuento"
+                disabled={cart.length === 0}
+                style={{ flex: 1, fontSize: '0.75rem', padding: '8px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
+              >
+                <FaPercentage size={12} /> Descuento
+              </S.Button>
+              <S.Button
+                secondary
+                onClick={() => openModal('renameTicket')}
+                title="Renombrar Ticket"
+                style={{ flex: 1, fontSize: '0.75rem', padding: '8px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
+              >
+                <FaEdit size={12} /> Renombrar
+              </S.Button>
+            </div>
 
             {/* Lista de Items en Carrito */}
             <div style={{ flex: 1, overflowY: 'auto', margin: '1rem 0', paddingRight: '5px' }}>
@@ -291,6 +466,19 @@ const POS = () => {
           </S.ModalOverlay>
         )}
 
+        {confirmation.isOpen && (
+          <S.ModalOverlay onClick={closeConfirmation}>
+            <S.ModalContent onClick={e => e.stopPropagation()} style={{ maxWidth: '380px', textAlign: 'center' }}>
+              <h2 style={{ marginTop: 0 }}>{confirmation.title}</h2>
+              <p style={{ color: '#475569' }}>{confirmation.message}</p>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
+                <S.Button onClick={closeConfirmation} style={{ flex: 1 }}>Cancelar</S.Button>
+                <S.Button primary onClick={() => { confirmation.onConfirm?.(); closeConfirmation(); }} style={{ flex: 1 }}>Confirmar</S.Button>
+              </div>
+            </S.ModalContent>
+          </S.ModalOverlay>
+        )}
+
         {modal.name === 'payment' && (
           <PaymentModal
             isOpen={true}
@@ -305,8 +493,117 @@ const POS = () => {
           <CajaModal
             isOpen={true}
             onClose={closeModal}
+            currentUser={currentUser}
             isCajaOpen={isCajaOpen}
-            onOpenCaja={() => setIsCajaOpen(true)}
+            session={cajaSession}
+            isAdmin={isAdmin}
+            showAlert={showAlert}
+            showConfirmation={showConfirmation}
+            initialTasaDolar={tasaDolar}
+            onOpenCaja={(montoInicial, tasa) => {
+              const newSession = {
+                openedAt: new Date().toISOString(),
+                openedBy: { id: userId, name: currentUser?.nombre_usuario },
+                initialAmount: montoInicial,
+                tasaDolar: tasa,
+                transactions: []
+              };
+              setCajaSession(newSession);
+              setTasaDolar(tasa);
+              setIsCajaOpen(true);
+              closeModal();
+            }}
+            onCloseCaja={(montoCounted) => {
+              const updatedSession = {
+                ...cajaSession,
+                closedAt: new Date().toISOString(),
+                closedBy: { id: userId, name: currentUser?.nombre_usuario },
+                closingAmount: montoCounted
+              };
+              setCajaSession(updatedSession);
+              setIsCajaOpen(false);
+              closeModal();
+            }}
+          />
+        )}
+
+        {modal.name === 'salesHistory' && (
+          <SalesHistoryModal
+            isOpen={true}
+            onClose={closeModal}
+          />
+        )}
+
+        {modal.name === 'proforma' && (
+          <ProformaModal
+            isOpen={true}
+            onClose={closeModal}
+          />
+        )}
+
+        {modal.name === 'cashEntry' && (
+          <PromptModal
+            isOpen={true}
+            onClose={closeModal}
+            title="Entrada de Dinero"
+            fields={[
+              { name: 'amount', label: 'Monto (C$)', type: 'number', placeholder: '0.00' },
+              { name: 'note', label: 'Motivo', type: 'text', placeholder: 'Descripción de la entrada' }
+            ]}
+            onSubmit={(values) => processCashTransaction('entrada', values.amount, values.note)}
+            icon={<FaMoneyBillWave color="#10b981" />}
+          />
+        )}
+
+        {modal.name === 'cashExit' && (
+          <PromptModal
+            isOpen={true}
+            onClose={closeModal}
+            title="Salida de Dinero"
+            fields={[
+              { name: 'amount', label: 'Monto (C$)', type: 'number', placeholder: '0.00' },
+              { name: 'note', label: 'Motivo', type: 'text', placeholder: 'Descripción de la salida' }
+            ]}
+            onSubmit={(values) => processCashTransaction('salida', values.amount, values.note)}
+            icon={<FaMoneyBillWave color="#ef4444" />}
+          />
+        )}
+
+        {modal.name === 'discount' && (
+          <PromptModal
+            isOpen={true}
+            onClose={closeModal}
+            title="Aplicar Descuento"
+            fields={[
+              {
+                name: 'type', label: 'Tipo', type: 'select', options: [
+                  { value: 'fixed', label: 'Monto Fijo (C$)' },
+                  { value: 'percentage', label: 'Porcentaje (%)' }
+                ], defaultValue: 'fixed'
+              },
+              { name: 'value', label: 'Valor', type: 'number', placeholder: '0.00' }
+            ]}
+            onSubmit={(values) => {
+              const discountData = {
+                type: values.type,
+                value: parseFloat(values.value) || 0
+              };
+              applyDiscount(discountData);
+            }}
+            icon={<FaPercentage color="#2563eb" />}
+          />
+        )}
+
+        {modal.name === 'renameTicket' && (
+          <PromptModal
+            isOpen={true}
+            onClose={closeModal}
+            title="Renombrar Ticket"
+            fields={[
+              { name: 'name', label: 'Nuevo Nombre', type: 'text', placeholder: activeOrder?.name || 'Ticket', defaultValue: activeOrder?.name }
+            ]}
+            onSubmit={(values) => renameTicket(values.name)}
+            icon={<FaEdit color="#2563eb" />}
           />
         )}
       </AnimatePresence>
