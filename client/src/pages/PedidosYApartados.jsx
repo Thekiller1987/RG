@@ -5,11 +5,9 @@ import styled, { keyframes } from 'styled-components';
 import {
     FaSearch, FaFilePdf, FaPlus, FaTrash,
     FaSync, FaBarcode, FaFont, FaMinus, FaFileAlt,
-    FaArrowLeft, FaPhone, FaImage
+    FaArrowLeft, FaPhone, FaImage, FaEye, FaTimes
 } from 'react-icons/fa';
-
-// NOTA: Si usas react-router-dom, DEBES descomentar y usar:
-// import { useNavigate } from 'react-router-dom'; 
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { useAuth } from '../context/AuthContext';
 import * as api from '../service/api';
@@ -18,7 +16,7 @@ import ProformaEmpleadoModal from './pos/components/ProformaEmpleadoModal.jsx';
 
 
 // =================================================================
-// ESTILOS RESPONSIVE (MANTENIDOS)
+// ESTILOS RESPONSIVE
 // =================================================================
 const spin = keyframes`
     0% { transform: rotate(0deg); }
@@ -132,7 +130,7 @@ const ProductGrid = styled.div`
     }
 `;
 const ProductCard = styled.div`
-    background: white; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; transition: transform 0.2s; cursor: pointer; 
+    background: white; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; transition: transform 0.2s; cursor: pointer; position: relative;
     &:hover { transform: translateY(-3px); border-color: #3b82f6; box-shadow: 0 5px 15px rgba(59,130,246,0.1); }
 `;
 const Badge = styled.span`
@@ -155,8 +153,47 @@ const LoadingIcon = styled(FaSync)`
     animation: ${spin} 1s linear infinite;
 `;
 
+const ModalOverlay = styled.div`
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;
+  backdrop-filter: blur(3px);
+`;
+
 
 const sanitizeText = (text) => String(text || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+const ImageViewModal = ({ isOpen, imageSrc, onClose }) => {
+    if (!isOpen || !imageSrc) return null;
+    return (
+        <ModalOverlay onClick={onClose}>
+            <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                style={{ position: 'relative', maxWidth: '90%', maxHeight: '90vh', background: 'transparent' }}
+            >
+                <button
+                    onClick={onClose}
+                    style={{
+                        position: 'absolute', top: -15, right: -15,
+                        background: 'white', width: 32, height: 32, borderRadius: '50%',
+                        border: 'none', cursor: 'pointer', fontWeight: 'bold',
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        zIndex: 10, color: '#ef4444'
+                    }}
+                >
+                    <FaTimes />
+                </button>
+                <img
+                    src={imageSrc}
+                    alt="Vista Completa"
+                    style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: '8px', boxShadow: '0 5px 20px rgba(0,0,0,0.5)', display: 'block', background: 'white' }}
+                />
+            </motion.div>
+        </ModalOverlay>
+    );
+};
+
 
 // =================================================================
 // COMPONENTE PRINCIPAL: ProformaGenerator
@@ -180,6 +217,9 @@ const ProformaGenerator = () => {
 
     const [isProformaModalOpen, setIsProformaModalOpen] = useState(false);
     const [proformaDetails, setProformaDetails] = useState(null);
+
+    // Estado para ver imagen
+    const [viewImage, setViewImage] = useState({ isOpen: false, imageUrl: null });
 
     const searchInputRef = useRef(null);
 
@@ -405,9 +445,26 @@ const ProformaGenerator = () => {
 
                         return (
                             <ProductCard key={p.id} onClick={() => addToCart(p)}>
-                                <div style={{ height: '140px', background: '#f8fafc', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
+                                {/* Botón "Ojito" para ver imagen completa */}
+                                {p.imagen && (
+                                    <div
+                                        onClick={(e) => { e.stopPropagation(); setViewImage({ isOpen: true, imageUrl: p.imagen }); }}
+                                        style={{
+                                            position: 'absolute', top: 10, left: 10, zIndex: 10,
+                                            background: 'rgba(255,255,255,0.9)', borderRadius: '50%',
+                                            width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                                            color: '#334155'
+                                        }}
+                                        title="Ver imagen completa"
+                                    >
+                                        <FaEye size={14} />
+                                    </div>
+                                )}
+
+                                <div style={{ height: '140px', background: '#f8fafc', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px', position: 'relative' }}>
                                     {p.imagen ? (
-                                        <img src={p.imagen} alt={p.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                                        <img src={p.imagen} alt={p.nombre} style={{ width: '100%', height: '100%', objectFit: 'contain', background: 'white' }} loading="lazy" />
                                     ) : (
                                         <FaImage size={40} color="#cbd5e1" />
                                     )}
@@ -553,6 +610,18 @@ const ProformaGenerator = () => {
                     client={proformaDetails.client}
                 />
             )}
+
+            {/* MODAL DE VISTA DE IMAGEN (NUEVO) */}
+            <AnimatePresence>
+                {viewImage.isOpen && (
+                    <ImageViewModal
+                        isOpen={viewImage.isOpen}
+                        imageSrc={viewImage.imageUrl}
+                        onClose={() => setViewImage({ isOpen: false, imageUrl: null })}
+                    />
+                )}
+            </AnimatePresence>
+
         </Container>
     );
 };

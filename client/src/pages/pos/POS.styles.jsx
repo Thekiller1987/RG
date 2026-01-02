@@ -8,446 +8,327 @@ export const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
 `;
-export const slideInFromLeft = keyframes`
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
-`;
-export const slideInFromRight = keyframes`
-  from { opacity: 0; transform: translateX(20px); }
-  to { opacity: 1; transform: translateX(0); }
+export const slideUp = keyframes`
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 `;
 export const spin = keyframes`
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
-`;
-export const pulseGreen = keyframes`
-  0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
 `;
 
 export const SpinningSpinner = styled(FaSpinner)`
   animation: ${spin} 1s linear infinite;
 `;
 
-/* ─────────────────────── CONTENEDORES BASE ───────────────────── */
+/* ─────────────────────── LAYOUT PRINCIPAL ───────────────────── */
 export const PageWrapper = styled.div`
-  display: flex; flex-direction: column; min-height: 100vh;
-  background-color: #f5f7fa;
-  font-family: 'Inter','Poppins',sans-serif; color: #333;
+  display: flex; flex-direction: column; height: 100vh;
+  background-color: #f0f4f8; /* Un gris azulado muy suave */
+  font-family: 'Inter', sans-serif;
+  color: #1e293b;
+  overflow: hidden; /* Evitar scroll en el body, lo manejamos internamente */
 `;
 
+/* Header Glassmorphism */
 export const HeaderActions = styled.header`
-  position: sticky; top: 0; z-index: 1000;
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  padding: 1rem 1.25rem;
-  background-color: #fff;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-  box-sizing: border-box;
+  position: sticky; top: 0; z-index: 50;
+  width: 100%; height: 70px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 1.5rem;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 
   .right-actions {
-    justify-self: end;
-    display: inline-flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
+    display: flex; gap: 10px; align-items: center;
   }
 
-  @media (max-width: 900px) {
-    grid-template-columns: 1fr auto;
-    grid-template-rows: auto auto;
-    row-gap: .5rem;
-    .right-actions { grid-column: 1 / -1; justify-self: end; }
+  @media (max-width: 768px) {
+    padding: 0 1rem;
+    height: 60px;
+    .right-actions { gap: 5px; }
   }
 `;
 
-/* 65% productos / 35% carrito en desktop, pero mejorando el break point */
 export const PageContentWrapper = styled.div`
-  display: grid;
-  grid-template-columns: minmax(0, 65%) minmax(340px, 35%);
-  gap: 1.25rem;
-  padding: 1.25rem;
-  flex: 1;
-  box-sizing: border-box;
-  height: calc(100vh - 80px); /* Ajuste para evitar scroll global innecesario */
-  overflow: hidden;
-
-  @media (max-width: 1200px) {
-    grid-template-columns: 1fr 380px;
-  }
-  
-  @media (max-width: 960px) {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
-    gap: 1rem;
-    padding: 0.75rem;
-    height: auto;
-    overflow: visible;
-  }
-`;
-
-export const Panel = styled.div`
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 12px 30px rgba(0, 30, 80, 0.08);
-  padding: 1rem;
   display: flex;
-  flex-direction: column;
-  min-height: 0; /* importante para scroll interno */
-  height: 100%;
-`;
-
-export const MainPanel = styled(Panel)`
-  animation: ${slideInFromLeft} 0.6s ease-out forwards;
-  overflow: hidden; /* El grid interno hará scroll */
-  
-  @media (max-width: 960px) {
-    height: 60vh; /* En móvil, damos espacio fijo a la lista */
-    margin-bottom: 0;
-  }
-`;
-
-export const CartPanel = styled(Panel)`
-  animation: ${slideInFromRight} 0.6s ease-out forwards;
-  min-width: 0; /* Override */
-  max-width: none;
+  flex: 1;
+  overflow: hidden; /* Para que el scroll sea interno en los paneles */
+  gap: 1.5rem;
+  padding: 1.5rem;
   position: relative;
-  top: 0;
-  overflow: hidden; /* Ensure content stays within rounded corners */
-  
-  /* Layout interno del carrito */
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: .65rem;
-  height: 100%;
-
-  .cart-fixed-top {
-    display: flex; flex-direction: column; gap: .5rem;
-  }
-
-  .cart-title {
-    display: flex; align-items: center; gap: .5rem; margin: 0;
-  }
-  .cart-title-name {
-    font-weight: 800; font-size: 1.25rem; line-height: 1.2;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%;
-  }
-  .cart-title-count {
-    font-weight: 600; color: #6c757d; font-size: .95rem;
-  }
-
-  .tickets-header { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-  .caja-pill { margin-bottom: .25rem; }
-
-  /* Lista con scroll real */
-  .cart-scroll {
-    overflow-y: auto;
-    padding-right: 4px;
-    border: 1px solid #eef1f5;
-    border-radius: 12px;
-    background: #fafbfd;
-    flex: 1; min-height: 0; /* Ensures it fills space but respects grid */
-  }
-
-  .cart-fixed-bottom {
-    display: flex; flex-direction: column; gap: .5rem;
-    background: #fff;
-    padding-top: 5px;
-  }
-
-  .cart-actions {
-    display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;
-  }
 
   @media (max-width: 960px) {
-    position: fixed; /* Opcional: convertir en bottom sheet o dejar estático abajo */
-    /* Dejémoslo estático abajo por simplicidad pero bien dimensionado */
-    position: static;
-    height: auto;
-    min-height: auto;
-    border-top: 1px solid #eee;
-    
-    .cart-scroll {
-        max-height: 35vh; /* Larger but limited height for mobile */
-        min-height: 20vh;
-        flex: none; /* In mobile we use fixed height, not flex */
-    }
+    padding: 10px;
+    gap: 0; /* En móvil, stackeamos o superponemos */
   }
 `;
 
-/* ───────────────────────── COMPONENTES DE UI ───────────────────────── */
-const blocked = [
-  'pay', 'primary', 'info', 'cancel', '$cancel', 'dark', 'mt',
-  'outOfStock', 'outofstock', 'lowStock', 'lowstock',
-  '$pulsate', '$bordered', '$bold', 'ref'
-];
-const shouldForwardProp = (prop) => !blocked.includes(prop);
+/* Panel Base */
+export const Panel = styled.div`
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+`;
 
-export const Button = styled.button.withConfig({ shouldForwardProp })`
-  min-height: 42px;
-  padding: 0.75rem 1rem;
-  border: none; border-radius: 12px;
-  cursor: pointer;
-  font-weight: 600; font-size: 0.95rem;
-  transition: all 0.2s cubic-bezier(0.165, 0.84, 0.44, 1);
-  display: inline-flex; align-items: center; justify-content: center;
-  gap: 0.6rem;
-  margin-top: ${p => p.mt ? '0.75rem' : '0'};
-  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-  flex-shrink: 0;
+/* Panel Izquierdo (Productos) */
+export const MainPanel = styled(Panel)`
+  flex: 1; /* Ocupa todo el espacio disponible */
+  padding: 1.5rem;
+  animation: ${fadeIn} 0.5s ease-out;
 
-  background-color: ${p => {
-    if (p.primary) return '#28a745';
-    if (p.$cancel || p.cancel) return '#dc3545';
-    if (p.pay) return '#007bff';
-    if (p.info) return '#17a2b8';
-    if (p.dark) return '#343a40';
-    return '#6c757d';
-  }};
-  color: white;
-
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-    opacity: 0.95;
-  }
-  &:disabled {
-    opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none;
-  }
-
-  ${p => (p.outOfStock || p.outofstock) && 'opacity: 0.6; pointer-events: none;'}
-
-  @media (max-width: 768px) {
-    padding: 0.6rem 0.9rem; font-size: 0.88rem; gap: 0.5rem;
+  @media (max-width: 960px) {
+    width: 100%;
+    padding: 1rem;
+    background: transparent; /* En móvil, quitamos el fondo del contenedor mcpal para dar aire */
+    box-shadow: none; border: none; backdrop-filter: none;
+    border-radius: 0;
   }
 `;
 
-export const SearchInput = styled.input`
-  width: 100%; min-height: 48px; padding: 0.9rem 1.2rem;
-  border-radius: 12px; border: 1px solid #c7d2e0; background-color: #fff;
-  font-size: 1.05rem; transition: all 0.2s ease;
-  box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
-
-  &:focus {
-    border-color: #007bff;
-    box-shadow: 0 0 0 4px rgba(0,123,255,0.15), inset 0 2px 5px rgba(0,0,0,0.05);
-    outline: none;
-  }
-
-  @media (max-width: 768px) {
-    min-height: 44px; font-size: 1rem;
+/* Panel Derecho (Carrito) */
+export const CartPanel = styled(Panel)`
+  width: 400px;
+  padding: 1.5rem;
+  animation: ${fadeIn} 0.5s ease-out;
+  display: flex; flex-direction: column;
+  
+  @media (max-width: 960px) {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    top: 0; /* Full screen en móvil */
+    width: 100%; height: 100%;
+    z-index: 2000;
+    border-radius: 0;
+    transform: translateY(${p => (p.isOpen ? '0' : '110%')}); /* Slide up logic */
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 -10px 50px rgba(0,0,0,0.2);
   }
 `;
+
+/* Botón flotante para ver carrito en móvil */
+export const MobileCartToggle = styled.button`
+  display: none;
+  @media (max-width: 960px) {
+    display: flex; align-items: center; justify-content: space-between;
+    position: fixed; bottom: 20px; left: 20px; right: 20px;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 50px;
+    border: none;
+    box-shadow: 0 10px 25px rgba(37, 99, 235, 0.5);
+    z-index: 1000;
+    font-weight: 700; font-size: 1.1rem;
+    animation: ${slideUp} 0.4s ease-out;
+  }
+`;
+
+/* ───────────────────────── COMPONENTES UI ───────────────────────── */
 
 export const ProductGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
   overflow-y: auto;
-  flex-grow: 1;
-  padding: 0.5rem 0.25rem;
-  align-content: start;
+  padding-bottom: 80px; /* Espacio para el botón flotante en móvil */
+  padding-right: 5px;
 
-  @media (min-width: 1400px) {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1rem;
-  }
+  /* Scrollbar bonita */
+  &::-webkit-scrollbar { width: 6px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+
   @media (max-width: 768px) {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 0.75rem;
-    height: 100%;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* Tarjetas más pequeñas en móvil */
+    gap: 10px;
   }
 `;
 
 export const ProductCard = styled.div`
-  border: 1px solid #e0e6ed;
-  border-radius: 12px;
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.165, 0.84, 0.44, 1);
-  text-align: center;
-  position: relative; overflow: hidden;
   display: flex; flex-direction: column;
 
-  ${p => (p.outOfStock || p.outofstock) ? css`
-      background-color: #fef0f0 !important;
-      border: 2px solid #dc3545 !important;
-      opacity: 0.9;
-      cursor: not-allowed;
-      box-shadow: 0 4px 15px rgba(220,53,69,.3);
-    ` : css`
-      background-color: white;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-      &:active { transform: scale(0.98); box-shadow: 0 2px 8px rgba(0,30,80,0.15); }
-      &:hover { transform: translateY(-4px) scale(1.01); box-shadow: 0 15px 40px rgba(0,30,80,0.15); border-color: #007bff; }
-    `}
-
-  /* Imagen del producto */
-  .image-placeholder {
-    height: 120px;
-    background: #f4f7fa;
-    display: flex; align-items: center; justify-content: center;
-    position: relative; overflow: hidden;
-    border-bottom: 1px solid #e9ecef;
-
-    img {
-        width: 100%; height: 100%; object-fit: cover;
-        transition: transform 0.3s;
-    }
-    
-    .no-image-icon { font-size: 2.5rem; color: #ced4da; }
-
-    @media (max-width: 768px) { height: 90px; .no-image-icon{ font-size: 2rem; } }
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border-color: #bfdbfe;
   }
 
-  /* Info */
+  ${p => p.outOfStock && css`
+    opacity: 0.6; pointer-events: none; filter: grayscale(1);
+    background: #f1f5f9;
+  `}
+
+  .image-placeholder {
+    width: 100%; height: 140px;
+    background: #f8fafc;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    
+    img { width: 100%; height: 100%; object-fit: cover; }
+    .no-image-icon { font-size: 2.5rem; color: #cbd5e1; }
+  }
+
   .info {
-    padding: .75rem;
+    padding: 12px;
     flex-grow: 1;
     display: flex; flex-direction: column; justify-content: space-between;
   }
-  
+
   .product-name {
-    margin: 0; font-size: .95em; color: #495057; font-weight: 600; line-height: 1.35;
-    /* Limit lines */
+    font-weight: 600; font-size: 0.95rem; color: #334155; margin-bottom: 5px;
+    line-height: 1.3;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
 
   .price {
-    font-weight: 700; color: #007bff; font-size: 1.15em; margin-top: .5rem;
+    font-weight: 800; color: #2563eb; font-size: 1.1rem;
   }
 `;
 
 export const StockBadge = styled.div`
-  position: absolute; top: 8px; right: 8px;
-  z-index: 10; /* Ensure it is above the image */
-  padding: 3px 8px; border-radius: 16px;
-  font-size: 0.75em; font-weight: 700; color: white;
-  background-color: ${p => {
-    const out = p.outOfStock || p.outofstock;
-    const low = p.lowStock || p.lowstock;
-    if (out) return '#dc3545';
-    if (low) return '#ffc107';
-    return '#28a745';
-  }}; 
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  position: absolute; top: 10px; right: 10px;
+  background: ${p => p.outOfStock ? '#ef4444' : p.lowstock ? '#f59e0b' : '#10b981'};
+  color: white;
+  font-size: 0.7rem; font-weight: 800;
+  padding: 4px 8px;
+  border-radius: 20px;
+  z-index: 10;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 `;
 
-export const InfoBox = styled.div`
-  background-color: #e6f7ff;
-  color: #0056b3;
-  padding: 0.8rem 1rem;
+export const SearchInput = styled.input`
+  width: 100%;
+  padding: 12px 16px;
   border-radius: 12px;
-  margin-bottom: 0.25rem;
-  font-weight: 500;
-  display: flex; justify-content: space-between; align-items: center;
-  border: 1px solid #bde0ff;
-  ${p => p.$pulsate && css`animation: ${pulseGreen} 2s infinite;`}
-  box-shadow: 0 2px 10px rgba(0, 123, 255, 0.08);
-
-  strong { font-weight: 700; color: #007bff; }
-`;
-
-export const TotalsRow = styled.div`
-  display: flex; justify-content: space-between; align-items: center;
-  font-size: 1.05rem;
-  font-weight: ${p => p.$bold ? '700' : '500'};
-  padding: 0.5rem 0;
-  border-top: ${p => p.$bordered ? '1px solid #e0e6ed' : 'none'};
-
-  &.grand-total {
-    font-size: 1.75rem; font-weight: 800; color: #28a745;
-    padding: .6rem 0;
-  }
-
-  @media (max-width: 768px) {
-    font-size: 1rem;
-    &.grand-total { font-size: 1.5rem; }
-  }
-`;
-
-/* Ítem de carrito COMPACTO en desktop */
-/* Ítem de carrito estilo limpio (Igual a Catálogo) */
-export const CartItemWrapper = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 10px;
-  border-bottom: 1px solid #f1f5f9;
-  background: white;
-  transition: background 0.2s;
+  border: 2px solid #e2e8f0;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s;
   
+  &:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+`;
+
+/* Botones Modernos (Pill Shapes) */
+export const Button = styled.button`
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 20px;
+  border-radius: 50px; /* Pill shape */
+  font-weight: 600;
+  font-size: 0.95rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+
+  /* Variantes */
+  ${p => p.primary && css`
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white;
+    &:hover { box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3); transform: translateY(-1px); }
+  `}
+
+  ${p => p.secondary && css`
+    background: white; color: #475569; border: 1px solid #e2e8f0;
+    &:hover { background: #f8fafc; border-color: #cbd5e1; color: #1e293b; }
+  `}
+
+  ${p => p.danger && css`
+    background: #fee2e2; color: #991b1b;
+    &:hover { background: #fecaca; }
+  `}
+
+  ${p => p.success && css`
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white;
+  `}
+
+  &:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+`;
+
+export const BackButton = styled(Link)`
+  display: flex; align-items: center; gap: 8px;
+  color: #64748b; text-decoration: none; font-weight: 600;
+  padding: 8px 12px; border-radius: 12px;
+  &:hover { background: #f1f5f9; color: #334155; }
+`;
+
+/* Elementos del Carrito */
+export const CartItemWrapper = styled.div`
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  background: white; margin-bottom: 8px; border-radius: 12px;
+  transition: background 0.2s;
   &:hover { background: #f8fafc; }
 `;
 
 export const QtyControl = styled.div`
   display: flex; align-items: center; gap: 8px;
-  background: #f8fafc; padding: 4px; border-radius: 6px;
-  border: 1px solid #e2e8f0;
+  background: #f1f5f9; padding: 4px; border-radius: 50px;
 `;
 
 export const RoundBtn = styled.button`
-  width: 24px; height: 24px; border-radius: 50%; border: none;
-  background: white; box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  color: #475569; transition: all 0.2s;
-  
-  &:hover { background: #e2e8f0; color: #1e293b; }
-  &:active { transform: scale(0.95); }
+  width: 28px; height: 28px; border-radius: 50%;
+  border: none; background: white;
+  color: #475569;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  cursor: pointer;
+  &:hover { color: #2563eb; transform: scale(1.1); }
 `;
 
-export const BackButton = styled(Link)`
-  display: inline-flex; align-items: center; gap: 0.5rem;
-  text-decoration: none; color: #495057; font-weight: 600; font-size: 1.05rem;
-  transition: color 0.2s, transform 0.2s;
-  padding: 8px; margin: -8px;
+export const TotalsRow = styled.div`
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0;
+  font-size: 1rem; color: #64748b; font-weight: 500;
 
-  &:hover { color: #007bff; transform: translateX(-3px); }
+  &.grand-total {
+    font-size: 1.5rem; color: #1e293b; font-weight: 800;
+    border-top: 2px dashed #e2e8f0; margin-top: 10px; padding-top: 15px;
+  }
 `;
 
-export const ActionButton = styled.button`
-  background: #fff; border: 1px solid #e0e6ed; color: #6c757d;
-  padding: 6px; margin: 0; display: flex; align-items: center; justify-content: center;
-  border-radius: 8px; cursor: pointer; line-height: 1; transition: all 0.2s ease;
-  min-width: 36px; min-height: 36px;
-
-  &:hover { background-color: #e9f5ff; color: #007bff; border-color: #bde0ff; }
+export const InfoBox = styled.div`
+  background: #eff6ff; border: 1px solid #dbeafe;
+  color: #1e40af; padding: 10px 15px; border-radius: 12px;
+  font-size: 0.9rem; display: flex; align-items: center; gap: 8px;
 `;
 
 export const TicketContainer = styled.div`
-  display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;
-
-  & > ${Button} { flex-shrink: 0; padding: 0.5rem 0.75rem; font-size: 0.85rem; }
-
-  scrollbar-width: thin; scrollbar-color: #007bff #f0f2f5;
-  &::-webkit-scrollbar { height: 6px; }
-  &::-webkit-scrollbar-thumb { background-color: #007bff; border-radius: 3px; }
-  &::-webkit-scrollbar-track { background: #f0f2f5; }
+  display: flex; gap: 8px; overflow-x: auto; padding: 5px 0;
+  margin-bottom: 10px;
+  &::-webkit-scrollbar { height: 4px; }
 `;
 
-/* ────────────────────────── MODALES ────────────────────────── */
+/* Modales */
 export const ModalOverlay = styled.div`
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.6);
-  display: flex; justify-content: center; align-items: center;
-  z-index: 2000; backdrop-filter: blur(5px);
+  position: fixed; inset: 0; z-index: 3000;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(5px);
+  display: flex; align-items: center; justify-content: center;
 `;
 
 export const ModalContent = styled.div`
   background: white;
-  padding: 2.0rem;
-  border-radius: 16px;
-  width: 92%;
-  max-width: ${p => p.$large ? '900px' : '760px'};
-  box-shadow: 0 15px 40px rgba(0,0,0,0.2);
-  max-height: 92vh;
-  overflow-y: auto;
-  animation: ${fadeIn} 0.4s ease-out;
+  padding: 2rem;
+  border-radius: 20px;
+  width: 90%; max-width: 600px;
+  max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  animation: ${fadeIn} 0.3s ease-out;
 
-  @media (max-width: 768px) {
-    padding: 1.2rem;
-    max-height: 95vh;
-  }
+  h2 { margin-top: 0; color: #1e293b; }
 `;
