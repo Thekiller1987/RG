@@ -20,6 +20,7 @@ import SalesHistoryModal from './components/SalesHistoryModal.jsx';
 import ProformaModal from './components/ProformaModal.jsx';
 import PromptModal from './components/PromptModal.jsx';
 import TicketModal from './components/TicketModal.jsx';
+import ConfirmationModal from './components/ConfirmationModal.jsx';
 
 const fmt = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -940,6 +941,17 @@ const POS = () => {
             icon={<FaPercentage color="#2563eb" />}
           />
         )}
+
+        <ConfirmationModal
+          isOpen={confirmation.isOpen}
+          onClose={closeConfirmation}
+          title={confirmation.title}
+          message={confirmation.message}
+          onConfirm={() => {
+            if (confirmation.onConfirm) confirmation.onConfirm();
+            closeConfirmation();
+          }}
+        />
       </AnimatePresence>
 
       {/* Botón flotante para móviles */}
