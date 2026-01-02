@@ -734,35 +734,57 @@ const POS = () => {
               setTicketData(sale); // Open TicketModal for reprint
             }}
             onCancelSale={async (saleId) => {
-              console.log('Cancel sale:', saleId);
-              showAlert({ title: "Cancelar", message: "Función de cancelación no implementada" });
+              try {
+                await api.cancelSale(saleId, token);
+                showAlert({ title: "Venta Cancelada", message: `La venta #${saleId} ha sido cancelada exitosamente.` });
+              } catch (error) {
+                console.error('Cancel error:', error);
+                showAlert({ title: "Error", message: "No se pudo cancelar la venta: " + (error.message || 'Error desconocido') });
+                throw error;
+              }
             }}
             onReturnItem={async (sale, item, qty) => {
-              // Calculate refund amount
-              const unitPrice = item.precio || item.precio_venta || 0;
-              const refundAmount = unitPrice * qty;
-
-              // Update Caja Session locally to reflect cash outflow (Return)
-              if (isCajaOpen && cajaSession) {
-                const refundTransaction = {
-                  type: 'devolucion',
-                  amount: -refundAmount, // Negative amount for deduction
-                  at: new Date().toISOString(),
-                  userId,
-                  userName: currentUser?.nombre_usuario || 'Caja',
-                  note: `Devolución: ${qty}x ${item.nombre}`,
-                  pagoDetalles: { efectivo: refundAmount, ingresoCaja: -refundAmount }, // Explicit cash details
-                  id: 'REFUND-' + Date.now()
+              try {
+                // 1. Call Backend API to process return logic (Inventory, Status update)
+                const payload = {
+                  saleId: sale.id,
+                  itemId: item.id || item.id_producto,
+                  quantity: qty,
+                  userId
                 };
-                const updatedSession = {
-                  ...cajaSession,
-                  transactions: [refundTransaction, ...(cajaSession.transactions || [])]
-                };
-                setCajaSession(updatedSession);
+                await api.returnItem(payload, token);
 
-                showAlert({ title: "Devolución Procesada", message: `Se ha registrado la devolución de C$${refundAmount.toFixed(2)} en caja.` });
-              } else {
-                showAlert({ title: "Caja Cerrada", message: "No se puede procesar devolución de efectivo con la caja cerrada." });
+                // 2. Calculate refund amount for Cash Register
+                const unitPrice = item.precio || item.precio_venta || 0;
+                const refundAmount = unitPrice * qty;
+
+                // 3. Update Caja Session locally to reflect cash outflow (Return)
+                if (isCajaOpen && cajaSession) {
+                  const refundTransaction = {
+                    type: 'devolucion',
+                    amount: -refundAmount, // Negative amount for deduction
+                    at: new Date().toISOString(),
+                    userId,
+                    userName: currentUser?.nombre_usuario || 'Caja',
+                    note: `Devolución: ${qty}x ${item.nombre}`,
+                    pagoDetalles: { efectivo: refundAmount, ingresoCaja: -refundAmount }, // Explicit cash details
+                    id: 'REFUND-' + Date.now()
+                  };
+                  const updatedSession = {
+                    ...cajaSession,
+                    transactions: [refundTransaction, ...(cajaSession.transactions || [])]
+                  };
+                  setCajaSession(updatedSession);
+
+                  showAlert({ title: "Devolución Exitosa", message: `Devolución registrada en sistema y C$${refundAmount.toFixed(2)} descontados de caja.` });
+                } else {
+                  showAlert({ title: "Devolución Exitosa (Caja Cerrada)", message: "Devolución registrada, pero NO se descontó de caja porque está cerrada." });
+                }
+
+              } catch (error) {
+                console.error('Return error:', error);
+                showAlert({ title: "Error", message: "Error al procesar devolución: " + (error.message || 'Error desconocido') });
+                throw error;
               }
             }}
             onAbonoSuccess={() => {
