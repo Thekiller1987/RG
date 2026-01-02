@@ -24,7 +24,7 @@ const fmt = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigit
 
 const POS = () => {
   // Contextos
-  const { user, products: initialProducts, token, refreshProducts } = useAuth();
+  const { user, products: initialProducts, token, refreshProducts, clients } = useAuth();
   const { isCajaOpen, setIsCajaOpen, cajaSession, setCajaSession, tasaDolar, setTasaDolar } = useCaja();
   const {
     orders, activeOrderId, setActiveOrderId, activeOrder,
@@ -593,8 +593,10 @@ const POS = () => {
             isOpen={true}
             onClose={closeModal}
             total={modal.data.total}
-            onFinish={handleFinishSale}
+            onFinishSale={handleFinishSale} // Corrected prop name
             tasaDolar={tasaDolar}
+            clientes={clients || []} // Pass clients from auth context
+            showAlert={showAlert} // Pass alert handler
           />
         )}
 
