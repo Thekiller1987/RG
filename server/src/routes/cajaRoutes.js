@@ -208,8 +208,26 @@ router.post('/session/close', async (req, res) => {
         const monto = Number(tx.amount || 0);
         totalGastos += monto;
         movimientoNetoEfectivo -= monto; // Resta dinero físico
-      } else if (tipo === 'venta_contado') {
-        // CORRECCIÓN CRÍTICA:
+
+      } else if (tipo === 'devolucion' || tipo === 'cancelacion') {
+        // NUEVO: Manejo de devoluciones y cancelaciones
+        // 1. Restar de los acumuladores de ventas para reflejar VENTAS NETAS
+        totalEfectivo -= Number(detalles.efectivo || 0);
+        totalTarjeta -= Number(detalles.tarjeta || 0);
+        totalTransferencia -= Number(detalles.transferencia || 0);
+        totalCredito -= Number(detalles.credito || 0);
+
+        // 2. Calcular impacto en Efectivo Físico (Neto)
+        // El monto suele venir negativo en 'amount' o en 'ingresoCaja'
+        let impactoCaja = Number(detalles.ingresoCaja || tx.amount || 0);
+
+        // Si por alguna razón viene positivo, lo invertimos (es una salida de dinero)
+        if (impactoCaja > 0) impactoCaja = -impactoCaja;
+
+        movimientoNetoEfectivo += impactoCaja;
+
+      } else if (tipo === 'venta_contado' || tipo === 'venta') {
+        // CORRECCIÓN CRÍTICA: Incluir 'venta' genérica que envía el POS
         // 'ingresoCaja' desde el POS trae la suma de TODO (Efectivo + Tarjeta + Transf).
         // Para el cuadro de caja, SOLO nos interesa el EFECTIVO FÍSICO.
         // Fórmula: (Efectivo Recibido + Dólares en C$) - Cambio

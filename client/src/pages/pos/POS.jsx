@@ -739,10 +739,65 @@ const POS = () => {
             onReprintTicket={(sale) => {
               setTicketData(sale); // Open TicketModal for reprint
             }}
-            onCancelSale={async (saleId) => {
+            onCancelSale={async (sale) => {
               try {
+                // Determine sale ID whether passing object or just ID (legacy safety)
+                const saleId = sale?.id || sale;
                 await api.cancelSale(saleId, token);
                 showAlert({ title: "Venta Cancelada", message: `La venta #${saleId} ha sido cancelada exitosamente.` });
+
+                // --- CRITICAL UPDATE: Update Caja with Cancellation ---
+                if (isCajaOpen && cajaSession && typeof sale === 'object') {
+                  // Calculate amount to deduct (similar to logic in backend or return)
+                  // We assume we revert the CASH portion. Or if it was all cash, revert all.
+                  // SafeParse payment details
+                  let detalles = typeof sale.pagoDetalles === 'string'
+                    ? JSON.parse(sale.pagoDetalles || '{}')
+                    : (sale.pagoDetalles || {});
+
+                  // Check how much cash was actually in the box for this sale
+                  // If 'ingresoCaja' exists, use it. Otherwise calculate.
+                  let cashToRevert = Number(detalles.ingresoCaja || 0);
+
+                  // Fallback if ingresoCaja not set but efectivo is
+                  if (!cashToRevert && detalles.efectivo) {
+                    cashToRevert = Number(detalles.efectivo);
+                    // If there was change given, net might be less? 
+                    // Usually 'ingresoCaja' = efectivo - cambio. 
+                    // If only 'efectivo' is stored, we might assume it's the net paid?
+                    // Let's safe bet on totalVenta if it was a cash sale.
+                  }
+
+                  // If logic is ambiguous, default to Sale Total if it was CASH/CONTADO
+                  const isCredit = detalles.credito > 0;
+                  if (cashToRevert === 0 && !isCredit && sale.totalVenta) {
+                    cashToRevert = Number(sale.totalVenta);
+                  }
+
+                  // Don't deduct if it was purely credit or transfer (unless transfer is counted in box? Usually not physical)
+                  // We only deduct PHYSICAL CASH.
+                  if (cashToRevert > 0) {
+                    const cancelTx = {
+                      type: 'cancelacion',
+                      amount: -cashToRevert,
+                      at: new Date().toISOString(),
+                      userId,
+                      userName: currentUser?.nombre_usuario || 'Caja',
+                      note: `Cancelación Venta #${saleId}`,
+                      pagoDetalles: { efectivo: cashToRevert, ingresoCaja: -cashToRevert },
+                      id: 'CANCEL-' + Date.now()
+                    };
+
+                    const updatedSession = {
+                      ...cajaSession,
+                      transactions: [cancelTx, ...(cajaSession.transactions || [])]
+                    };
+                    setCajaSession(updatedSession);
+                    console.log("Caja actualizada por cancelación:", cancelTx);
+                  }
+                }
+                // -----------------------------------------------------
+
               } catch (error) {
                 console.error('Cancel error:', error);
                 showAlert({ title: "Error", message: "No se pudo cancelar la venta: " + (error.message || 'Error desconocido') });

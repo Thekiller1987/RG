@@ -216,6 +216,29 @@ const createReturn = async (req, res) => {
   }
 };
 
+/* ───────────────────────── syncCart (NUEVO: RESERVA STOCK TEMPORAL) ───────────────────────── */
+const syncCart = async (req, res) => {
+  const userId = req.user?.id || req.body.userId;
+  const { cart } = req.body;
+
+  if (!userId) return res.status(400).json({ message: 'User ID required' });
+
+  try {
+    const cartJson = JSON.stringify(cart || []);
+
+    await pool.query(
+      `INSERT INTO active_carts (user_id, cart_data) VALUES (?, ?) 
+       ON DUPLICATE KEY UPDATE cart_data = VALUES(cart_data)`,
+      [userId, cartJson]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error syncing cart:', error);
+    res.status(500).json({ message: 'Error syncing cart' });
+  }
+};
+
 /* ───────────────────────── getSales (SIN CAMBIOS) ───────────────────────── */
 const getSales = async (req, res) => {
   try {
@@ -253,4 +276,4 @@ const getSales = async (req, res) => {
   }
 };
 
-module.exports = { createSale, getSales, createReturn, cancelSale };
+module.exports = { createSale, getSales, createReturn, cancelSale, syncCart };

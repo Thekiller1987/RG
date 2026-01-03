@@ -336,7 +336,8 @@ function SalesHistoryModal({
       async () => {
         closeConfirm();
         try {
-          await onCancelSale(saleId);
+          // Changed: Passing the full sale object instead of just ID
+          await onCancelSale(selectedSale);
           openAlert('Éxito', `Venta #${saleId} cancelada.`);
           await afterMutationRefresh(null);
         } catch (error) {

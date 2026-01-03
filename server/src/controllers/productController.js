@@ -73,11 +73,43 @@ const getAllProducts = async (_req, res) => {
     `;
     const [rows] = await db.query(query);
 
-    // Convertir Buffer a string si es necesario (para imágenes Base64 guardadas en BLOB)
-    const products = rows.map(p => ({
-      ...p,
-      imagen: p.imagen ? (Buffer.isBuffer(p.imagen) ? p.imagen.toString('utf-8') : p.imagen) : null
-    }));
+    // 1. Obtener carritos activos (últimos 60 min) EXCLUYENDO al usuario actual
+    const requestingUserId = _req.user?.id_usuario || _req.user?.id;
+    const [carts] = await db.query(
+      "SELECT user_id, cart_data FROM active_carts WHERE updated_at > NOW() - INTERVAL 60 MINUTE AND user_id != ?",
+      [requestingUserId || -1]
+    );
+
+    // 2. Calcular stock reservado por producto
+    const reservedMap = new Map();
+    carts.forEach(c => {
+      try {
+        const items = JSON.parse(c.cart_data || '[]');
+        if (Array.isArray(items)) {
+          items.forEach(item => {
+            const pid = item.id_producto || item.id;
+            const qty = Number(item.quantity || item.cantidad || 0);
+            reservedMap.set(pid, (reservedMap.get(pid) || 0) + qty);
+          });
+        }
+      } catch (e) { /* ignore parse error */ }
+    });
+
+    // 3. Formatear y restar stock reservado
+    const products = rows.map(p => {
+      const pid = p.id_producto;
+      const reserved = reservedMap.get(pid) || 0;
+      // Restar lo reservado (pero no bajar de 0 visualmente para no confundir, o sí?)
+      // User says "no le salga", so reducing existence is correct.
+      const existenciaReal = Math.max(0, p.existencia - reserved);
+
+      return {
+        ...p,
+        existencia: existenciaReal, // Override existence with Available Stock
+        reserved: reserved,         // Optional: expose reserved count
+        imagen: p.imagen ? (Buffer.isBuffer(p.imagen) ? p.imagen.toString('utf-8') : p.imagen) : null
+      };
+    });
 
     res.json(products);
   } catch (error) {
