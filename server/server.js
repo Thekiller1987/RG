@@ -25,25 +25,6 @@ const providerInvoiceRoutes = require('./src/routes/providerInvoiceRoutes.js');
 // 2. Crear una instancia de Express
 const app = express();
 
-// 2b. Configurar Socket.io
-const http = require('http');
-const { Server } = require("socket.io");
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE"]
-  }
-});
-
-// Compartir io a toda la app
-app.set('io', io);
-
-io.on('connection', (socket) => {
-  // console.log('Cliente conectado a Socket.io:', socket.id);
-});
-
-
 // 3. Configurar Middlewares
 app.use(cors({
   origin: [
@@ -73,7 +54,7 @@ app.use('/api/sales', salesRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/caja', cajaRoutes);
-// NUEVA RUTA USADA
+// NUEVA RUTA AGREGADA
 app.use('/api/facturas-proveedores', providerInvoiceRoutes);
 
 app.get('/api', (_req, res) => {
@@ -91,7 +72,7 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ message: err.message || 'Error interno del servidor' });
 });
 
-// 7. Poner el servidor a escuchar (server.listen, NO app.listen)
-server.listen(PORT, () => {
+// 7. Poner el servidor a escuchar
+app.listen(PORT, () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
