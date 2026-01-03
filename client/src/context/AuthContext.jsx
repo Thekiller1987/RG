@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import * as api from '../service/api.js';
 import { loadCajaSession, saveCajaSession } from '../utils/caja.js';
 
+import { io } from 'socket.io-client';
+
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
@@ -24,7 +26,8 @@ export const AuthProvider = ({ children }) => {
     }, [navigate]);
 
     const loadMasterData = useCallback(async (token) => {
-        setIsLoading(true);
+        // isLoading is false here usually, so we don't block UI if refreshing
+        // But initial load handles that via useEffect
         try {
             const [usersData, productsData, clientsData] = await Promise.all([
                 api.fetchUsers(token),
@@ -37,14 +40,52 @@ export const AuthProvider = ({ children }) => {
         } catch (err) {
             console.error("Fallo al cargar datos maestros:", err);
             if (err.status === 401) logout();
-        } finally {
-            setIsLoading(false);
         }
     }, [logout]);
 
+    // --- SOCKET.IO LISTENER ---
+    const refreshProducts = useCallback(async () => {
+        if (!token) return;
+        try {
+            const data = await api.fetchProducts(token);
+            setProducts(data || []);
+            // console.log("Inventario actualizado en tiempo real");
+        } catch (e) {
+            console.error("Error actualizando inventario socket:", e);
+        }
+    }, [token]);
+
+    useEffect(() => {
+        const socket = io('https://multirepuestos-rg-server-production.up.railway.app' || 'http://localhost:3001'); // Ajustar URL si es necesario
+        // O mejor usar la URL de la API configurada
+
+        // Determinar URL del socket: Si estamos en production usamos la del host, si no localhost
+        // Como api.js usa una base URL, idealmente socket usa lo mismo.
+        // Asumiremos localhost si no hay env, o la URL de producción.
+        // Pero para no romper, usaremos lógica simple:
+        const socketUrl = api.API_URL.replace('/api', '');
+        // const socketIo = io(socketUrl); // SI API_URL está exportada, pero no lo está directamente usuamente es axios instance.
+
+        // Hardcode fallback robusto o relativo
+        // Si el cliente se sirve desde el mismo dominio (producción), usas '/'
+        const isProduction = window.location.hostname !== 'localhost';
+        const sUrl = isProduction ? '/' : 'http://localhost:3001';
+
+        const socketIo = io(sUrl);
+
+        socketIo.on('inventory_update', () => {
+            refreshProducts();
+        });
+
+        return () => {
+            socketIo.disconnect();
+        };
+    }, [refreshProducts]);
+    // --------------------------
+
     useEffect(() => {
         const initializeAuth = async () => {
-            setIsLoading(true);
+            setIsLoading(true); // Bloqueo solo inicial
             try {
                 const tokenInStorage = localStorage.getItem('token');
                 const storedUser = localStorage.getItem('user');
@@ -64,28 +105,30 @@ export const AuthProvider = ({ children }) => {
         };
         initializeAuth();
     }, [logout, loadMasterData]);
-    
+
     const login = async (userData, token) => {
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);
         setToken(token);
+        setIsLoading(true);
         await loadMasterData(token);
+        setIsLoading(false);
         navigate('/dashboard');
     };
 
     const refreshClients = useCallback(async () => {
         const currentToken = localStorage.getItem('token');
         if (currentToken) {
-           try {
-               const clientsData = await api.fetchClients(currentToken);
-               setClients(clientsData || []);
-           } catch (error) {
-               console.error("Error al refrescar clientes:", error);
-           }
+            try {
+                const clientsData = await api.fetchClients(currentToken);
+                setClients(clientsData || []);
+            } catch (error) {
+                console.error("Error al refrescar clientes:", error);
+            }
         }
     }, []);
-    
+
     // Tu lógica de caja se mantiene
     useEffect(() => {
         if (user) {
@@ -117,21 +160,22 @@ export const AuthProvider = ({ children }) => {
         login,
         logout,
         loadMasterData,
+        refreshProducts, // Exportar para uso manual si se requiere
         refreshClients,
         cajaSession,
         setCajaSession,
         addCajaTransaction
     };
-    
+
     if (isLoading && !user) {
-        return <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontSize: '1.5rem'}}>Cargando Aplicación...</div>;
+        return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontSize: '1.5rem' }}>Cargando Aplicación...</div>;
     }
 
     return (
         <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider> // <-- CORRECCIÓN AQUÍ
-        
+
     );
 };
 

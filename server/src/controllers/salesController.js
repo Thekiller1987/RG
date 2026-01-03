@@ -51,6 +51,11 @@ const createSale = async (req, res) => {
     }
 
     await connection.commit();
+
+    // ─── SOCKET.IO EMIT ───
+    const io = req.app.get('io');
+    if (io) io.emit('inventory_update');
+
     const [newSale] = await connection.query('SELECT * FROM ventas WHERE id_venta = ?', [saleId]);
 
     res.status(201).json({
@@ -95,6 +100,11 @@ const cancelSale = async (req, res) => {
 
     await connection.query('UPDATE ventas SET estado = ? WHERE id_venta = ?', ['CANCELADA', id]);
     await connection.commit();
+
+    // ─── SOCKET.IO EMIT ───
+    const io = req.app.get('io');
+    if (io) io.emit('inventory_update');
+
     res.status(200).json({ message: 'Venta cancelada exitosamente.' });
   } catch (error) {
     await connection.rollback();
@@ -199,6 +209,10 @@ const createReturn = async (req, res) => {
     );
 
     await connection.commit();
+
+    // ─── SOCKET.IO EMIT ───
+    const io = req.app.get('io');
+    if (io) io.emit('inventory_update');
 
     // Enviamos refundAmount para que el Frontend reste de la caja (POS.jsx lo maneja)
     res.status(201).json({
