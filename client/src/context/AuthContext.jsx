@@ -56,24 +56,25 @@ export const AuthProvider = ({ children }) => {
     }, [token]);
 
     useEffect(() => {
-        const socket = io('https://multirepuestos-rg-server-production.up.railway.app' || 'http://localhost:3001'); // Ajustar URL si es necesario
-        // O mejor usar la URL de la API configurada
+        // Usar la URL de producción correcta (sin /api)
+        // Dado que api.js usa https://multirepuestosrg.com/api, el host es https://multirepuestosrg.com
+        const socketUrl = 'https://multirepuestosrg.com';
 
-        // Determinar URL del socket: Si estamos en production usamos la del host, si no localhost
-        // Como api.js usa una base URL, idealmente socket usa lo mismo.
-        // Asumiremos localhost si no hay env, o la URL de producción.
-        // Pero para no romper, usaremos lógica simple:
-        const socketUrl = api.API_URL.replace('/api', '');
-        // const socketIo = io(socketUrl); // SI API_URL está exportada, pero no lo está directamente usuamente es axios instance.
+        const socketIo = io(socketUrl, {
+            path: '/socket.io/', // Path por defecto, asegurar que Nginx lo permita
+            transports: ['polling', 'websocket'], // Intentar ambos
+        });
 
-        // Hardcode fallback robusto o relativo
-        // Si el cliente se sirve desde el mismo dominio (producción), usas '/'
-        const isProduction = window.location.hostname !== 'localhost';
-        const sUrl = isProduction ? '/' : 'http://localhost:3001';
+        socketIo.on('connect', () => {
+            console.log('Cliente Socket conectado a:', socketUrl);
+        });
 
-        const socketIo = io(sUrl);
+        socketIo.on('connect_error', (err) => {
+            console.error('Error conexión Socket:', err.message);
+        });
 
         socketIo.on('inventory_update', () => {
+            console.log("Evento recibido: inventory_update");
             refreshProducts();
         });
 
