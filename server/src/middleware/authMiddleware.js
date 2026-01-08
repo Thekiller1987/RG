@@ -10,7 +10,7 @@ const verifyToken = (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
 
       // Verificamos la validez del token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_key_reemplazo_seguro');
 
       // Adjuntamos los datos del usuario (id y rol) a la petición
       req.user = decoded;

@@ -45,7 +45,7 @@ const login = async (req, res) => {
   try {
     // 1. Buscar al usuario en la base de datos
     const [users] = await db.query('SELECT * FROM usuarios WHERE nombre_usuario = ?', [nombre_usuario]);
-    
+
     if (users.length === 0) {
       return res.status(400).json({ msg: 'Usuario no encontrado' });
     }
@@ -64,7 +64,7 @@ const login = async (req, res) => {
       rol: user.rol,
     };
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+    const token = jwt.sign(payload, process.env.JWT_SECRET || 'secret_key_reemplazo_seguro', {
       expiresIn: '8h', // El token expirará en 8 horas
     });
 
