@@ -65,7 +65,8 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // 4. Definir el puerto
-const PORT = process.env.PORT || 3001;
+// Usamos BACKEND_PORT si existe (según tu .env), o PORT, o 3001 por defecto
+const PORT = process.env.BACKEND_PORT || process.env.PORT || 3001;
 
 // 5. Usar las rutas
 app.use('/api/auth', authRoutes);
