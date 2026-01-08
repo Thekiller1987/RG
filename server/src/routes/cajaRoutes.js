@@ -160,9 +160,18 @@ router.post('/session/close', async (req, res) => {
   }
 
   const db = readDB();
+
+  console.log('[DEBUG-CLOSE] Request body userId:', userId, typeof userId);
+  console.log('[DEBUG-CLOSE] DB sessions count:', db.sessions.length);
+
   // 1. Buscar sesión (incluso si ya está cerrada, para manejar idempotencia o reintentos)
   let s = db.sessions.find(
-    s => String(s.openedBy?.id) === String(userId) && !s.closedAt
+    s => {
+      const matchUser = String(s.openedBy?.id) === String(userId);
+      const isOpen = !s.closedAt;
+      if (matchUser && isOpen) console.log('[DEBUG-CLOSE] Found open session candidate:', s.id);
+      return matchUser && isOpen;
+    }
   );
 
   // Si no encuentra abierta, buscar la última cerrada del usuario HOY (para evitar error 404 en doble click)
