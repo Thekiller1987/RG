@@ -25,14 +25,39 @@ const providerInvoiceRoutes = require('./src/routes/providerInvoiceRoutes.js');
 // 2. Crear una instancia de Express
 const app = express();
 
-// 3. Configurar Middlewares
-app.use(cors({
-  origin: [
-    'https://multirepuestosrg.netlify.app', // frontend Netlify
-    'https://www.multirepuestosrg.com'     // dominio propio
-  ],
+// Helper para CORS dinámico (permite LAN IPs)
+const allowedOrigins = [
+  'https://multirepuestosrg.netlify.app',
+  'https://www.multirepuestosrg.com',
+  'http://localhost:5173',
+  'http://64.23.228.145',
+  'https://64.23.228.145'
+];
+
+const corsOriginHelper = (origin, callback) => {
+  // Permitir requests sin origin (como apps móviles o Postman)
+  if (!origin) return callback(null, true);
+
+  // Orígenes explícitos
+  if (allowedOrigins.includes(origin)) return callback(null, true);
+
+  // Permitir IPs de red local (192.168.x.x, 10.x.x.x, 172.16.x.x)
+  if (origin.startsWith('http://192.168.') ||
+    origin.startsWith('http://10.') ||
+    origin.startsWith('http://172.')) {
+    return callback(null, true);
+  }
+
+  callback(new Error('Not allowed by CORS'));
+};
+
+const corsOptions = {
+  origin: corsOriginHelper,
   credentials: true
-}));
+};
+
+// 3. Configurar Middlewares
+app.use(cors(corsOptions));
 
 // Evita 413: payload grande
 app.use(express.json({ limit: '50mb' }));
@@ -78,15 +103,7 @@ const { Server } = require('socket.io');
 
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
-  cors: {
-    origin: [
-      'https://multirepuestosrg.netlify.app',
-      'https://www.multirepuestosrg.com',
-      'http://localhost:5173' // Para desarrollo local
-    ],
-    methods: ["GET", "POST"],
-    credentials: true
-  }
+  cors: corsOptions // Reutilizamos la misma config
 });
 
 io.on('connection', (socket) => {
@@ -100,6 +117,6 @@ io.on('connection', (socket) => {
 app.set('io', io);
 
 // 8. Poner el servidor a escuchar (usando httpServer)
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
