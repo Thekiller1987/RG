@@ -77,245 +77,303 @@ function localDayKey(isoOrDate) {
 
 // ───────── Sesiones de Caja ─────────
 
+// ───────── Sesiones de Caja (MIGRADO A SQL COMPLETAMENTE) ─────────
+
+// Helper: Reconstruir objeto de sesión desde fila SQL
+function mapRowToSession(row) {
+  if (!row) return null;
+  let details = {};
+  try {
+    details = (typeof row.detalles_json === 'string')
+      ? JSON.parse(row.detalles_json)
+      : (row.detalles_json || { transactions: [] });
+  } catch (e) {
+    details = { transactions: [] };
+  }
+
+  return {
+    id: row.id, // ID numérico de SQL
+    sqlId: row.id,
+    openedAt: row.fecha_apertura,
+    openedBy: { id: row.usuario_id, name: row.usuario_nombre },
+    initialAmount: Number(row.monto_inicial || 0),
+    transactions: details.transactions || [],
+    closedAt: row.fecha_cierre, // Será null si está abierta
+    closedBy: row.fecha_cierre ? { id: row.usuario_id, name: row.usuario_nombre } : null,
+    countedAmount: row.final_real ? Number(row.final_real) : null,
+    difference: row.diferencia ? Number(row.diferencia) : null,
+    tasaDolar: Number(details.tasaDolar || 0),
+    notes: row.observaciones || ''
+  };
+}
+
 // GET /api/caja/session?userId=123
-router.get('/session', (req, res) => {
+router.get('/session', async (req, res) => {
   const userId = String(req.query.userId || '').trim();
   if (!userId) return res.status(400).json({ message: 'Falta userId' });
 
-  const db = readDB();
-  const sessions = db.sessions.filter(s => String(s.openedBy?.id) === userId);
-  if (!sessions.length) return res.json(null);
+  try {
+    // 1. Buscar sesión ABIERTA en SQL
+    const [openRows] = await pool.query(`
+      SELECT * FROM cierres_caja 
+      WHERE usuario_id = ? AND fecha_cierre IS NULL 
+      ORDER BY fecha_apertura DESC LIMIT 1
+    `, [userId]);
 
-  const open = sessions.find(s => !s.closedAt);
-  if (open) return res.json(open);
+    if (openRows.length > 0) {
+      return res.json(mapRowToSession(openRows[0]));
+    }
 
-  // Intentar buscar el último cerrado en JSON (fallback rápido)
-  // Nota: Idealmente deberíamos buscar el último histórico en SQL también,
-  // pero el frontend usa esto para "resumir sesión anterior" o "abrir nueva".
-  const last = sessions.sort((a, b) =>
-    new Date(b.openedAt) - new Date(a.openedAt)
-  )[0];
-  return res.json(last || null);
+    // 2. Si no hay abierta, buscar la última CERRADA (para UI de "abrir caja")
+    const [lastRows] = await pool.query(`
+      SELECT * FROM cierres_caja 
+      WHERE usuario_id = ? AND fecha_cierre IS NOT NULL 
+      ORDER BY fecha_cierre DESC LIMIT 1
+    `, [userId]);
+
+    if (lastRows.length > 0) {
+      return res.json(mapRowToSession(lastRows[0]));
+    }
+
+    return res.json(null);
+
+  } catch (error) {
+    console.error('Error GET /session:', error);
+    res.status(500).json({ message: 'Error recuperando sesión' });
+  }
 });
 
 // POST /api/caja/session/open
-router.post('/session/open', (req, res) => {
+router.post('/session/open', async (req, res) => {
   const { userId, openedAt, openedBy, initialAmount = 0, tasaDolar } = req.body || {};
   if (!userId || !openedAt || !openedBy) {
     return res.status(400).json({ message: 'Faltan campos: userId, openedAt, openedBy' });
   }
 
-  const db = readDB();
-  const yaAbierta = db.sessions.find(
-    s => String(s.openedBy?.id) === String(userId) && !s.closedAt
-  );
-  if (yaAbierta) return res.json(yaAbierta);
+  try {
+    // 1. Verificar si ya tiene una abierta (Idempotencia DB)
+    const [existing] = await pool.query(`
+      SELECT * FROM cierres_caja 
+      WHERE usuario_id = ? AND fecha_cierre IS NULL 
+      LIMIT 1
+    `, [userId]);
 
-  const session = {
-    id: `caja-${userId}-${Date.now()}`,
-    openedAt,
-    openedBy: normalizeUser(openedBy, userId),
-    initialAmount: Number(initialAmount) || 0,
-    transactions: [],
-    closedAt: null,
-    closedBy: null,
-    countedAmount: null,
-    difference: null,
-    notes: '',
-    tasaDolar: Number(tasaDolar ?? 0)
-  };
-  db.sessions.push(session);
-  writeDB(db);
-  res.status(201).json(session);
+    if (existing.length > 0) {
+      return res.json(mapRowToSession(existing[0]));
+    }
+
+    // 2. Crear nueva sesión en SQL
+    const usuarioNombre = displayName(openedBy);
+    const initialJson = JSON.stringify({
+      transactions: [],
+      session_id_legacy: `caja-${userId}-${Date.now()}`, // Solo referencia
+      tasaDolar: Number(tasaDolar || 0)
+    });
+
+    const [result] = await pool.query(`
+      INSERT INTO cierres_caja (
+        fecha_apertura, usuario_id, usuario_nombre, 
+        monto_inicial, final_esperado, final_real, diferencia,
+        total_ventas_efectivo, total_ventas_tarjeta, total_ventas_transferencia, total_ventas_credito,
+        total_entradas, total_salidas, detalles_json
+      ) VALUES (?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?)
+    `, [
+      new Date(openedAt), userId, usuarioNombre,
+      initialAmount, initialJson
+    ]);
+
+    // Devolver objeto sesión completo
+    const newSession = {
+      id: result.insertId,
+      openedAt,
+      openedBy: { id: userId, name: usuarioNombre },
+      initialAmount: Number(initialAmount),
+      transactions: [],
+      tasaDolar: Number(tasaDolar || 0),
+      closedAt: null
+    };
+
+    res.status(201).json(newSession);
+
+  } catch (error) {
+    console.error('Error POST /session/open:', error);
+    res.status(500).json({ message: 'Error abriendo sesión' });
+  }
 });
 
-// POST /api/caja/session/tx (Mantiene en JSON para control rápido durante el día)
-router.post('/session/tx', (req, res) => {
+// POST /api/caja/session/tx
+router.post('/session/tx', async (req, res) => {
   const { userId, tx } = req.body || {};
   if (!userId || !tx) return res.status(400).json({ message: 'Faltan userId o tx' });
 
-  const db = readDB();
-  const s = db.sessions.find(
-    s => String(s.openedBy?.id) === String(userId) && !s.closedAt
-  );
-  if (!s) return res.status(404).json({ message: 'No hay sesión abierta' });
+  try {
+    // 1. Obtener sesión abierta
+    const [rows] = await pool.query(`
+      SELECT * FROM cierres_caja 
+      WHERE usuario_id = ? AND fecha_cierre IS NULL 
+      LIMIT 1
+    `, [userId]);
 
-  s.transactions.push({
-    id: tx.id || `tx-${Date.now()}`,
-    type: tx.type,
-    amount: Number(tx.amount || 0),
-    note: tx.note || '',
-    at: tx.at || new Date().toISOString(),
-    pagoDetalles: tx.pagoDetalles || {}
-  });
-  writeDB(db);
-  res.status(201).json(s);
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'No hay sesión abierta' });
+    }
+
+    const row = rows[0];
+    let details = {};
+    try {
+      details = (typeof row.detalles_json === 'string')
+        ? JSON.parse(row.detalles_json)
+        : (row.detalles_json || {});
+    } catch { details = {}; }
+
+    if (!details.transactions) details.transactions = [];
+
+    // 2. Agregar transacción
+    details.transactions.push({
+      id: tx.id || `tx-${Date.now()}`,
+      type: tx.type,
+      amount: Number(tx.amount || 0),
+      note: tx.note || '',
+      at: tx.at || new Date().toISOString(),
+      pagoDetalles: tx.pagoDetalles || {}
+    });
+
+    // 3. Guardar JSON actualizado en BD
+    await pool.query(`
+      UPDATE cierres_caja 
+      SET detalles_json = ? 
+      WHERE id = ?
+    `, [JSON.stringify(details), row.id]);
+
+    // 4. Devolver sesión actualizada
+    res.status(201).json(mapRowToSession({ ...row, detalles_json: details }));
+
+  } catch (error) {
+    console.error('Error POST /session/tx:', error);
+    res.status(500).json({ message: 'Error guardando transacción' });
+  }
 });
 
-// POST /api/caja/session/close (MIGRADO A SQL CON SNAPSHOT)
+// POST /api/caja/session/close
 router.post('/session/close', async (req, res) => {
   const { userId, countedAmount = 0, closedAt, closedBy, notes } = req.body || {};
   if (!userId || !closedAt || !closedBy) {
     return res.status(400).json({ message: 'Faltan campos: userId, closedAt, closedBy' });
   }
 
-  const db = readDB();
-
-  console.log('[DEBUG-CLOSE] Request body userId:', userId, typeof userId);
-  console.log('[DEBUG-CLOSE] DB sessions count:', db.sessions.length);
-
-  // 1. Buscar sesión (incluso si ya está cerrada, para manejar idempotencia o reintentos)
-  let s = db.sessions.find(
-    s => {
-      const matchUser = String(s.openedBy?.id) === String(userId);
-      const isOpen = !s.closedAt;
-      if (matchUser && isOpen) console.log('[DEBUG-CLOSE] Found open session candidate:', s.id);
-      return matchUser && isOpen;
-    }
-  );
-
-  // Si no encuentra abierta, buscar la última cerrada del usuario HOY (para evitar error 404 en doble click)
-  if (!s) {
-    const lastClosed = db.sessions
-      .filter(s => String(s.openedBy?.id) === String(userId) && s.closedAt)
-      .sort((a, b) => new Date(b.closedAt) - new Date(a.closedAt))[0];
-
-    if (lastClosed) {
-      // Verificar si se cerró hace menos de 1 minuto (probable doble submit)
-      const diff = Date.now() - new Date(lastClosed.closedAt).getTime();
-      if (diff < 60000) { // 1 minuto de tolerancia
-        return res.json({ success: true, message: 'Sesión ya cerrada previamente (Idempotente)', id: lastClosed.sqlId, ...lastClosed });
-      }
-    }
-    // FALLBACK FINAL: Autocorrección para desbloquear frontend
-    // Si el servidor se reinició y perdió el JSON, permitimos al frontend 'cerrar' para limpiar su estado.
-    return res.json({ success: true, message: 'Sesión no encontrada (Autocorrección)', id: null });
-  }
-
   try {
-    // 1. Calcular totales basados en la sesión actual (JSON) y/o verificar con SQL
-    //    Para simplificar y asegurar consistencia con lo que veía el cajero, usaremos
-    //    la lógica de acumulación que ya existía, pero guardaremos el resultado final en SQL.
+    // 1. Buscar sesión abierta
+    const [rows] = await pool.query(`
+      SELECT * FROM cierres_caja 
+      WHERE usuario_id = ? AND fecha_cierre IS NULL 
+      LIMIT 1
+    `, [userId]);
 
-    // a. Desglose de Ventas (Iterar transacciones de sesión)
-    //    Esto es clave: al leer del JSON "transactions", estamos leyendo lo que el frontend
-    //    registró como ventas durante el día. Esto incluye ventas efectivo, tarjeta, etc.
-    //    Esto asume que el backend `/session/tx` fue llamado correctamente cada vez.
+    // Manejo de Idempotencia: Si no hay abierta, buscar reciente cerrada
+    if (rows.length === 0) {
+      const [lastClosed] = await pool.query(`
+        SELECT * FROM cierres_caja 
+        WHERE usuario_id = ? AND fecha_cierre IS NOT NULL 
+        ORDER BY fecha_cierre DESC LIMIT 1
+      `, [userId]);
 
-    let totalEfectivo = 0;
-    let totalTarjeta = 0;
-    let totalTransferencia = 0;
-    let totalCredito = 0;
-    let totalIngresos = 0; // Entradas manuales
-    let totalGastos = 0;   // Salidas manuales
+      if (lastClosed.length > 0) {
+        const diff = Date.now() - new Date(lastClosed[0].fecha_cierre).getTime();
+        if (diff < 60000) {
+          return res.json({ success: true, message: 'Sesión ya cerrada (Idempotente)', ...mapRowToSession(lastClosed[0]) });
+        }
+      }
+      return res.json({ success: true, message: 'Sesión no encontrada (Autocorrección)', id: null });
+    }
 
-    // Totales calculados para "Esperado en Caja" (Solo efectivo y movimientos de caja)
+    const row = rows[0];
+    let details = {};
+    try {
+      details = (typeof row.detalles_json === 'string')
+        ? JSON.parse(row.detalles_json)
+        : (row.detalles_json || {});
+    } catch { details = { transactions: [] }; }
+
+    const transactions = details.transactions || [];
+
+    // 2. Calcular totales finales
+    let totalEfectivo = 0, totalTarjeta = 0, totalTransferencia = 0, totalCredito = 0;
+    let totalIngresos = 0, totalGastos = 0;
     let movimientoNetoEfectivo = 0;
 
-    const detallesSnapshot = s.transactions.map(tx => {
-      // Analizar cada transacción para sumar totales
-      const tipo = tx.type; // venta_contado, venta_credito, entrada, salida
-      const detalles = tx.pagoDetalles || {};
+    transactions.forEach(tx => {
+      const tipo = tx.type;
+      const d = tx.pagoDetalles || {};
 
-      // Sumar al global por método de pago (si es venta)
       if (tipo.startsWith('venta')) {
-        totalEfectivo += Number(detalles.efectivo || 0);
-        totalTarjeta += Number(detalles.tarjeta || 0);
-        totalTransferencia += Number(detalles.transferencia || 0);
-        totalCredito += Number(detalles.credito || 0);
+        totalEfectivo += Number(d.efectivo || 0);
+        totalTarjeta += Number(d.tarjeta || 0);
+        totalTransferencia += Number(d.transferencia || 0);
+        totalCredito += Number(d.credito || 0);
       }
 
-      // Calcular impacto en CAJA FÍSICA (movimientoNetoEfectivo)
-      // Esto define cuánto dinero debería haber físicamente.
       if (tipo === 'entrada') {
-        const monto = Number(tx.amount || 0);
-        totalIngresos += monto;
-        movimientoNetoEfectivo += monto;
+        const m = Number(tx.amount || 0);
+        totalIngresos += m;
+        movimientoNetoEfectivo += m;
       } else if (tipo === 'salida') {
-        const monto = Number(tx.amount || 0);
-        totalGastos += monto;
-        movimientoNetoEfectivo -= monto; // Resta dinero físico
-
+        const m = Number(tx.amount || 0);
+        totalGastos += m;
+        movimientoNetoEfectivo -= m;
       } else if (tipo === 'devolucion' || tipo === 'cancelacion') {
-        // NUEVO: Manejo de devoluciones y cancelaciones
-        // 1. Restar de los acumuladores de ventas para reflejar VENTAS NETAS
-        totalEfectivo -= Number(detalles.efectivo || 0);
-        totalTarjeta -= Number(detalles.tarjeta || 0);
-        totalTransferencia -= Number(detalles.transferencia || 0);
-        totalCredito -= Number(detalles.credito || 0);
+        totalEfectivo -= Number(d.efectivo || 0);
+        totalTarjeta -= Number(d.tarjeta || 0);
+        totalTransferencia -= Number(d.transferencia || 0);
+        totalCredito -= Number(d.credito || 0);
 
-        // 2. Calcular impacto en Efectivo Físico (Neto)
-        // El monto suele venir negativo en 'amount' o en 'ingresoCaja'
-        let impactoCaja = Number(detalles.ingresoCaja || tx.amount || 0);
-
-        // Si por alguna razón viene positivo, lo invertimos (es una salida de dinero)
-        if (impactoCaja > 0) impactoCaja = -impactoCaja;
-
-        movimientoNetoEfectivo += impactoCaja;
+        let impacto = Number(d.ingresoCaja || tx.amount || 0);
+        if (impacto > 0) impacto = -impacto;
+        movimientoNetoEfectivo += impacto;
 
       } else if (tipo === 'venta_contado' || tipo === 'venta') {
-        // CORRECCIÓN CRÍTICA: Incluir 'venta' genérica que envía el POS
-        // 'ingresoCaja' desde el POS trae la suma de TODO (Efectivo + Tarjeta + Transf).
-        // Para el cuadro de caja, SOLO nos interesa el EFECTIVO FÍSICO.
-        // Fórmula: (Efectivo Recibido + Dólares en C$) - Cambio
-
-        const cashIn = Number(detalles.efectivo || 0);
-        const dolaresVal = Number(detalles.dolares || 0);
-        const tasa = Number(detalles.tasaDolarAlMomento || s.tasaDolar || 1);
-        const cashOut = Number(detalles.cambio || 0);
-
+        const cashIn = Number(d.efectivo || 0);
+        const dolaresVal = Number(d.dolares || 0);
+        const tasa = Number(d.tasaDolarAlMomento || details.tasaDolar || 1);
+        const cashOut = Number(d.cambio || 0);
         const netoFisico = (cashIn + (dolaresVal * tasa)) - cashOut;
-
         movimientoNetoEfectivo += netoFisico;
       }
-
-      return tx; // Devolver para el snapshot
     });
 
-    const montoInicial = Number(s.initialAmount || 0);
+    const montoInicial = Number(row.monto_inicial || 0);
     const finalEsperado = montoInicial + movimientoNetoEfectivo;
     const finalReal = Number(countedAmount);
     const diferencia = finalReal - finalEsperado;
 
-    // 2. Insertar en MySQL `cierres_caja`
-    const insertSQL = `
-      INSERT INTO cierres_caja (
-        fecha_apertura, fecha_cierre, usuario_id, usuario_nombre,
-        monto_inicial, final_esperado, final_real, diferencia,
-        total_ventas_efectivo, total_ventas_tarjeta, total_ventas_transferencia, total_ventas_credito,
-        total_entradas, total_salidas,
-        detalles_json, observaciones
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    const usuarioNombre = displayName(s.openedBy);
-    const jsonStr = JSON.stringify({
-      transactions: detallesSnapshot,
-      session_id: s.id,
-      tasaDolar: s.tasaDolar
-    });
-
-    const [result] = await pool.execute(insertSQL, [
-      new Date(s.openedAt), new Date(closedAt), userId, usuarioNombre,
-      montoInicial, finalEsperado, finalReal, diferencia,
+    // 3. Actualizar la fila (Cierre definitivo)
+    await pool.query(`
+      UPDATE cierres_caja SET
+        fecha_cierre = ?,
+        final_esperado = ?,
+        final_real = ?,
+        diferencia = ?,
+        total_ventas_efectivo = ?,
+        total_ventas_tarjeta = ?,
+        total_ventas_transferencia = ?,
+        total_ventas_credito = ?,
+        total_entradas = ?,
+        total_salidas = ?,
+        observaciones = ?
+      WHERE id = ?
+    `, [
+      new Date(closedAt), finalEsperado, finalReal, diferencia,
       totalEfectivo, totalTarjeta, totalTransferencia, totalCredito,
       totalIngresos, totalGastos,
-      jsonStr, notes || ''
+      notes || '',
+      row.id
     ]);
 
-    // 3. Actualizar JSON para marcar cerrado (Legacy support)
-    s.closedAt = closedAt;
-    s.closedBy = normalizeUser(closedBy, closedBy?.id || userId);
-    s.countedAmount = finalReal;
-    s.difference = diferencia;
-    s.sqlId = result.insertId; // Referencia al ID SQL
-    writeDB(db);
-
-    res.json({ success: true, message: 'Cierre guardado en BD', id: result.insertId, ...s });
+    // Responder éxito
+    res.json({ success: true, message: 'Cierre guardado en BD', id: row.id, ...mapRowToSession({ ...row, fecha_cierre: closedAt }) });
 
   } catch (error) {
-    console.error('Error al guardar cierre en BD:', error);
-    res.status(500).json({ message: 'Error interno guardando el cierre', error: error.message });
+    console.error('Error POST /session/close:', error);
+    res.status(500).json({ message: 'Error cerrando sesión' });
   }
 });
 
