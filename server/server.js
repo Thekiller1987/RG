@@ -29,6 +29,7 @@ const app = express();
 const allowedOrigins = [
   'https://multirepuestosrg.netlify.app',
   'https://www.multirepuestosrg.com',
+  'https://multirepuestosrg.com', // Added non-www version
   'http://localhost:5173',
   'http://64.23.228.145',
   'https://64.23.228.145'
