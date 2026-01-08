@@ -58,11 +58,15 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         // Usar la URL de producción correcta (sin /api)
         // Dado que api.js usa https://multirepuestosrg.com/api, el host es https://multirepuestosrg.com
-        const socketUrl = 'https://multirepuestosrg.com';
+        // MEJORA: Usar window.location.origin si estamos en el mismo dominio, o extraer de API_URL
+        const socketUrl = 'https://multirepuestosrg.com'; // Ojo: Si API_URL cambia, esto debería ser dinámico.
 
+        // Configuración para Producción (Nginx path /socket.io/)
         const socketIo = io(socketUrl, {
-            path: '/socket.io/', // Path por defecto, asegurar que Nginx lo permita
-            transports: ['polling', 'websocket'], // Intentar ambos
+            path: '/socket.io/',
+            transports: ['polling', 'websocket'],
+            reconnection: true,
+            reconnectionAttempts: 5
         });
 
         socketIo.on('connect', () => {

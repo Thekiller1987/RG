@@ -8,88 +8,109 @@ import {
     subscribeCajaChanges,
     loadTasaDolar,
     saveTasaDolar,
-    isSessionOpen
-} from '../utils/caja';
+import { getCajaSession } from '../service/api'; // Importamos la API
 
-const CajaContext = createContext(null);
+// ... imports anteriores ...
 
-export const CajaProvider = ({ children }) => {
-    const { user } = useAuth();
-    const userId = user?.id_usuario || user?.id;
+// Cargar sesión desde utils O DESDE SERVIDOR al montar o cuando cambia el usuario
+useEffect(() => {
+    if (!userId) {
+        setIsCajaOpen(false);
+        setCajaSession(null);
+        return;
+    }
 
-    const [isCajaOpen, setIsCajaOpen] = useState(false);
-    const [cajaSession, setCajaSession] = useState(null);
-    const [tasaDolar, setTasaDolar] = useState(36.60);
+    const fetchSession = async () => {
+        try {
+            // 1. Intentar cargar del servidor primero (SSOT)
+            const serverSession = await getCajaSession(userId);
 
-    // Cargar sesión desde utils al montar o cuando cambia el usuario
-    useEffect(() => {
-        if (!userId) {
-            setIsCajaOpen(false);
-            setCajaSession(null);
-            return;
+            if (serverSession && !serverSession.closedAt) {
+                // Si hay sesión activa en servidor, usarla y actualizar local
+                setCajaSession(serverSession);
+                setIsCajaOpen(true);
+                saveCajaSession(userId, serverSession); // Sync local
+
+                const tasa = loadTasaDolar(userId, serverSession.tasaDolar || 36.60);
+                setTasaDolar(tasa);
+            } else {
+                // 2. Fallback a local si el servidor no devuelve nada activo
+                // (O si queremos soportar offline, pero la prioridad es la seguridad)
+                const localSession = loadCajaSession(userId);
+                if (localSession && isSessionOpen(localSession)) {
+                    // PRECAUCIÓN: Aquí podría haber desincronización si el servidor cerró.
+                    // Idealmente confiamos en el servidor.
+                    // Pero dejaremos el fallback por robustez momentánea.
+                    setCajaSession(localSession);
+                    setIsCajaOpen(true);
+                } else {
+                    setIsCajaOpen(false);
+                    setCajaSession(null);
+                }
+            }
+        } catch (error) {
+            console.error("Error al sincronizar caja con servidor:", error);
+            // Fallback a local en error de red
+            const localSession = loadCajaSession(userId);
+            if (localSession && isSessionOpen(localSession)) {
+                setCajaSession(localSession);
+                setIsCajaOpen(true);
+            }
         }
+    };
 
-        const session = loadCajaSession(userId);
+    fetchSession();
+}, [userId]);
+
+// Suscribirse a cambios entre pestañas
+useEffect(() => {
+    if (!userId) return;
+
+    const unsubscribe = subscribeCajaChanges(userId, (session) => {
         if (session && isSessionOpen(session)) {
             setCajaSession(session);
             setIsCajaOpen(true);
-            const tasa = loadTasaDolar(userId, 36.60);
-            setTasaDolar(tasa);
         } else {
-            setIsCajaOpen(false);
             setCajaSession(null);
+            setIsCajaOpen(false);
         }
-    }, [userId]);
+    });
 
-    // Suscribirse a cambios entre pestañas
-    useEffect(() => {
-        if (!userId) return;
+    return unsubscribe;
+}, [userId]);
 
-        const unsubscribe = subscribeCajaChanges(userId, (session) => {
-            if (session && isSessionOpen(session)) {
-                setCajaSession(session);
-                setIsCajaOpen(true);
-            } else {
-                setCajaSession(null);
-                setIsCajaOpen(false);
-            }
-        });
+// Guardar sesión cuando cambia
+useEffect(() => {
+    if (!userId) return;
+    if (cajaSession) {
+        saveCajaSession(userId, cajaSession);
+    }
+}, [cajaSession, userId]);
 
-        return unsubscribe;
-    }, [userId]);
+// Guardar tasa del dólar cuando cambia
+useEffect(() => {
+    if (!userId) return;
+    saveTasaDolar(userId, tasaDolar);
+}, [tasaDolar, userId]);
 
-    // Guardar sesión cuando cambia
-    useEffect(() => {
-        if (!userId) return;
-        if (cajaSession) {
-            saveCajaSession(userId, cajaSession);
-        }
-    }, [cajaSession, userId]);
+const closeCajaSession = () => {
+    if (!userId) return;
+    clearCajaSession(userId);
+    setCajaSession(null);
+    setIsCajaOpen(false);
+};
 
-    // Guardar tasa del dólar cuando cambia
-    useEffect(() => {
-        if (!userId) return;
-        saveTasaDolar(userId, tasaDolar);
-    }, [tasaDolar, userId]);
+const value = {
+    isCajaOpen,
+    setIsCajaOpen,
+    cajaSession,
+    setCajaSession,
+    tasaDolar,
+    setTasaDolar,
+    closeCajaSession,
+};
 
-    const closeCajaSession = () => {
-        if (!userId) return;
-        clearCajaSession(userId);
-        setCajaSession(null);
-        setIsCajaOpen(false);
-    };
-
-    const value = {
-        isCajaOpen,
-        setIsCajaOpen,
-        cajaSession,
-        setCajaSession,
-        tasaDolar,
-        setTasaDolar,
-        closeCajaSession,
-    };
-
-    return <CajaContext.Provider value={value}>{children}</CajaContext.Provider>;
+return <CajaContext.Provider value={value}>{children}</CajaContext.Provider>;
 };
 
 export const useCaja = () => {

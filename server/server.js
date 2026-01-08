@@ -72,7 +72,34 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ message: err.message || 'Error interno del servidor' });
 });
 
-// 7. Poner el servidor a escuchar
-app.listen(PORT, () => {
+// 7. Configuración de Socket.IO
+const http = require('http');
+const { Server } = require('socket.io');
+
+const httpServer = http.createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: [
+      'https://multirepuestosrg.netlify.app',
+      'https://www.multirepuestosrg.com',
+      'http://localhost:5173' // Para desarrollo local
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
+
+io.on('connection', (socket) => {
+  console.log('Cliente conectado al socket:', socket.id);
+  socket.on('disconnect', () => {
+    console.log('Cliente desconectado:', socket.id);
+  });
+});
+
+// Guardar io en la app para usarlo en controladores
+app.set('io', io);
+
+// 8. Poner el servidor a escuchar (usando httpServer)
+httpServer.listen(PORT, () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
 });

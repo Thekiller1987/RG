@@ -262,7 +262,8 @@ const CajaModal = ({
   const printReport = () => {
     const win = window.open('', '_blank');
     if (!win) return;
-    const fmt = (n) => `C$${Number(n || 0).toFixed(2)}`;
+    const fmt = (n) => `C$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const fmtUsd = (n) => `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     // Filtramos SOLO lo que fue efectivo real para mostrarlo claro
     const cls = {
@@ -271,34 +272,28 @@ const CajaModal = ({
       salidas: salidas || []
     };
 
-    // Calculo para display en impresion
-    const ventasEfectivoTotal = cls.ventasContado.reduce((sum, tx) => sum + (Number(tx.pagoDetalles?.efectivo || 0) - Number(tx.pagoDetalles?.cambio || 0) + (Number(tx.pagoDetalles?.dolares || 0) * Number(tx.pagoDetalles?.tasa || 1))), 0);
-    const abonosEfectivoTotal = cls.abonos.reduce((sum, tx) => sum + (Number(tx.pagoDetalles?.ingresoCaja || 0)), 0);
-    const salidasTotal = Math.abs(cls.salidas.reduce((sum, tx) => sum + Number(tx.displayAmount || tx.amount || 0), 0));
-
     const css = `
-      body { font-family: 'Courier New', Courier, monospace; padding: 20px; max-width: 800px; margin: 0 auto; color: #333; }
-      h2, h3 { text-align: center; margin: 5px 0; text-transform: uppercase; }
-      .header { text-align: center; border-bottom: 2px dashed #333; padding-bottom: 10px; margin-bottom: 20px; }
-      .box { border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+      body { font-family: 'Courier New', Courier, monospace; padding: 20px; max-width: 800px; margin: 0 auto; color: #000; font-weight: 600; }
+      h2, h3 { text-align: center; margin: 5px 0; text-transform: uppercase; font-weight: 900; }
+      .header { text-align: center; border-bottom: 3px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+      .box { border: 2px solid #000; padding: 15px; border-radius: 4px; margin-bottom: 15px; }
       .row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; }
-      .row.bold { font-weight: bold; font-size: 16px; margin-top: 5px; border-top: 1px solid #eee; padding-top: 5px; }
-      .big-total { font-size: 24px; font-weight: bold; text-align: center; margin: 10px 0; background: #eee; padding: 10px; border-radius: 5px; }
-      table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
-      th { border-bottom: 1px solid #333; text-align: left; padding: 5px; }
-      td { border-bottom: 1px solid #eee; padding: 5px; }
+      .row.bold { font-weight: 900; font-size: 16px; margin-top: 5px; border-top: 2px solid #000; padding-top: 5px; }
+      .big-total { font-size: 26px; font-weight: 900; text-align: center; margin: 10px 0; background: #eee; padding: 15px; border: 2px solid #000; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; border: 1px solid #000; }
+      th { border-bottom: 2px solid #000; text-align: left; padding: 5px; font-weight: 900; }
+      td { border-bottom: 1px solid #000; padding: 5px; font-weight: 600; }
       .text-right { text-align: right; }
-      .section-title { font-weight: bold; font-size: 16px; margin-top: 20px; border-bottom: 1px solid #ccc; padding-bottom: 2px; }
-      .diff-negative { color: red; font-weight: bold; }
-      .diff-positive { color: green; font-weight: bold; }
-      .sub-row { margin-left: 20px; font-size: 0.9em; font-style: italic; color: #555; }
+      .diff-negative { color: #000; font-weight: 900; text-decoration: underline; } 
+      .diff-positive { color: #000; font-weight: 900; }
+      .sub-row { margin-left: 20px; font-size: 0.9em; font-style: italic; color: #000; }
     `;
 
-    const rows = (arr, color = '#333') => arr.map(tx => `
+    const rows = (arr) => arr.map(tx => `
       <tr>
         <td>${tx.at ? new Date(tx.at).toLocaleTimeString() : ''}</td>
         <td>${tx.note || tx.type || ''}</td>
-        <td class="text-right" style="color:${color}">${fmt(tx.displayAmount)}</td>
+        <td class="text-right">${fmt(tx.displayAmount)}</td>
       </tr>`).join('');
 
     win.document.write(`
@@ -310,72 +305,63 @@ const CajaModal = ({
       <body>
         <div class="header">
           <h2>Arqueo de Caja</h2>
-          <p>${new Date().toLocaleString('es-NI')}</p>
-          <p>Cierra: ${currentUser?.nombre_usuario || 'Usuario'}</p>
+          <p><strong>${new Date().toLocaleString('es-NI')}</strong></p>
+          <p>Cierra: <strong>${currentUser?.nombre_usuario || 'Usuario'}</strong></p>
         </div>
 
         <div class="box">
           <div class="big-total">
-             <div>Total Ventas del Día:</div>
+             <div>TOTAL VENTAS DÍA:</div>
              <div>${fmt(totalVentasDia)}</div>
           </div>
           
           <div class="row"><div>Fondo Inicial:</div><div>${fmt(cajaInicial)}</div></div>
 
-          <div style="margin: 10px 0; border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 10px 0;">
-             <div class="row bold"><span>MOVIMIENTOS DE CAJA</span></div>
+          <div style="margin: 15px 0; border-top: 2px dashed #000; border-bottom: 2px dashed #000; padding: 10px 0;">
+             <div class="row bold"><span>MOVIMIENTOS DE CAJA (DESGLOSE)</span></div>
              <div class="row"><span>(+) Efectivo C$:</span><span>${fmt(netCordobas)}</span></div>
-             <div class="row"><span>(+) Efectivo USD:</span><span>$${Number(netDolares).toFixed(2)}</span></div>
+             <div class="row"><span>(+) Efectivo USD:</span><span>${fmtUsd(netDolares)}</span></div>
              <div class="row"><span>(Tasa: ${tasaRef})</span><span>= ${fmt(netDolares * tasaRef)}</span></div>
           </div>
           
-          <div class="row red"><div>(-) Devoluciones/Cancelaciones:</div><div>${fmt(sumDevolucionesCancelaciones)}</div></div>
+          <div class="row"><div>(-) Devoluciones/Cancelaciones:</div><div>${fmt(sumDevolucionesCancelaciones)}</div></div>
 
           <div class="sep"></div>
-          <div class="row bold"><div>= Efectivo Esperado Total:</div><div>${fmt(efectivoEsperado)}</div></div>
-          <div class="sub-row"> (C$${Number(efectivoEsperadoCordobas).toFixed(2)} + $${Number(efectivoEsperadoDolares).toFixed(2)}) </div>
+          <div class="row bold" style="font-size: 18px;"><div>EFECTIVO ESPERADO:</div><div>${fmt(efectivoEsperado)}</div></div>
+          <div class="sub-row"> (C$${Number(efectivoEsperadoCordobas).toLocaleString()} + ${fmtUsd(efectivoEsperadoDolares)}) </div>
           
-          <div class="row" style="margin-top:10px;"><div>Monto Físico Contado:</div><div>${fmt(montoContado)}</div></div>
+          <div class="row" style="margin-top:10px; font-size: 16px;"><div>Monto Físico Contado:</div><div>${fmt(montoContado)}</div></div>
           <div class="row bold ${diferencia < 0 ? 'diff-negative' : 'diff-positive'}"><div>DIFERENCIA:</div><div>${fmt(diferencia)}</div></div>
         </div>
 
         <div class="box">
-          <div class="bold" style="margin-bottom:6px;">Resumen de Ingresos (No Efectivo)</div>
+          <div class="bold" style="margin-bottom:6px;">INGRESOS NO EFECTIVO</div>
           <div class="row"><div>Tarjeta:</div><div>${fmt(totalTarjeta)}</div></div>
           <div class="row"><div>Transferencia:</div><div>${fmt(totalTransferencia)}</div></div>
           <div class="row"><div>Crédito:</div><div>${fmt(totalCredito)}</div></div>
-          <div class="row bold"><div>Total No Efectivo:</div><div>${fmt(totalNoEfectivo)}</div></div>
+          <div class="row bold"><div>TOTAL NO EFECTIVO:</div><div>${fmt(totalNoEfectivo)}</div></div>
         </div>
 
         <div class="box">
-          <h3>Abonos y Otros Ingresos</h3>
-          <table>
-             <thead><tr><th>Fecha</th><th>Nota / Tipo</th><th style="text-align:right">Monto</th></tr></thead>
-             <tbody>${abonos.length > 0 ? rows(abonos, '#198754') : '<tr><td colspan="3" style="text-align:center; color:#999;">Sin abonos</td></tr>'}</tbody>
-          </table>
-
           <h3>Entradas</h3>
           <table>
-            <thead><tr><th>Fecha</th><th>Nota</th><th style="text-align:right">Monto</th></tr></thead>
-            <tbody>${rows(entradas, '#198754')}</tbody>
+            <thead><tr><th>Hora</th><th>Nota</th><th class="text-right">Monto</th></tr></thead>
+            <tbody>${rows(entradas)}</tbody>
           </table>
 
           <h3>Salidas</h3>
           <table>
-            <thead><tr><th>Fecha</th><th>Nota</th><th style="text-align:right">Monto</th></tr></thead>
-            <tbody>${rows(salidas, '#dc3545')}</tbody>
+            <thead><tr><th>Hora</th><th>Nota</th><th class="text-right">Monto</th></tr></thead>
+            <tbody>${rows(salidas)}</tbody>
           </table>
 
-          <h3>Cancelaciones</h3>
+          <h3>Cancelaciones / Devoluciones</h3>
           <table>
-            <thead><tr><th>Fecha</th><th>Nota</th><th style="text-align:right">Efectivo</th></tr></thead>
-            <tbody>${rows(cancelaciones, '#6c757d')}</tbody>
-          </table>
-
-          <h3>Devoluciones</h3>
-          <table>
-            <thead><tr><th>Fecha</th><th>Nota</th><th style="text-align:right">Efectivo</th></tr></thead>
-            <tbody>${rows(devoluciones, '#6c757d')}</tbody>
+            <thead><tr><th>Hora</th><th>Nota</th><th class="text-right">Monto</th></tr></thead>
+            <tbody>
+               ${rows(cancelaciones)}
+               ${rows(devoluciones)}
+            </tbody>
           </table>
         </div>
 
@@ -529,16 +515,28 @@ const CajaModal = ({
               </TotalsRow>
             </div>
 
-            <TotalsRow $bold style={{ backgroundColor: '#fff3cd', padding: '10px', borderRadius: '4px' }}>
-              <span><FaMoneyBillWave /> Efectivo Esperado:</span>
-              <span>C${efectivoEsperado.toFixed(2)}</span>
+            <TotalsRow $bold style={{ backgroundColor: '#e3f2fd', padding: '10px', borderRadius: '4px', border: '1px solid #90caf9' }}>
+              <span><FaMoneyBillWave /> Efectivo Esperado TOTAL:</span>
+              <span style={{ fontSize: '1.2rem' }}>C${efectivoEsperado.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
             </TotalsRow>
 
-            <label style={{ display: 'block', marginTop: 12, fontWeight: 600 }}>Monto Contado Físico (C$)</label>
+            <div style={{ marginTop: 8, padding: '10px', backgroundColor: '#f8f9fa', borderRadius: 4, border: '1px dashed #ced4da' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: 5, color: '#495057' }}>Desglose de Efectivo a Tener:</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span>Córdobas (C$):</span>
+                <span style={{ fontWeight: 'bold', color: '#198754' }}>C$ {Number(efectivoEsperadoCordobas).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Dólares ($):</span>
+                <span style={{ fontWeight: 'bold', color: '#198754' }}>$ {Number(efectivoEsperadoDolares).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+
+            <label style={{ display: 'block', marginTop: 15, fontWeight: 600 }}>Monto Contado Físico (C$)</label>
             <SearchInput
               type="number"
               step="0.01"
-              placeholder="Ingrese el total contado"
+              placeholder="Total en C$ (Billetes + Monedas)"
               value={montoContado}
               onChange={e => setMontoContado(e.target.value)}
             />
