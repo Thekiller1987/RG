@@ -160,10 +160,28 @@ router.post('/session/close', async (req, res) => {
   }
 
   const db = readDB();
-  const s = db.sessions.find(
+  // 1. Buscar sesión (incluso si ya está cerrada, para manejar idempotencia o reintentos)
+  let s = db.sessions.find(
     s => String(s.openedBy?.id) === String(userId) && !s.closedAt
   );
-  if (!s) return res.status(404).json({ message: 'No hay sesión abierta para cerrar.' });
+
+  // Si no encuentra abierta, buscar la última cerrada del usuario HOY (para evitar error 404 en doble click)
+  if (!s) {
+    const lastClosed = db.sessions
+      .filter(s => String(s.openedBy?.id) === String(userId) && s.closedAt)
+      .sort((a, b) => new Date(b.closedAt) - new Date(a.closedAt))[0];
+
+    if (lastClosed) {
+      // Verificar si se cerró hace menos de 1 minuto (probable doble submit)
+      const diff = Date.now() - new Date(lastClosed.closedAt).getTime();
+      if (diff < 60000) { // 1 minuto de tolerancia
+        return res.json({ success: true, message: 'Sesión ya cerrada previamente (Idempotente)', id: lastClosed.sqlId, ...lastClosed });
+      }
+    }
+    // FALLBACK FINAL: Autocorrección para desbloquear frontend
+    // Si el servidor se reinició y perdió el JSON, permitimos al frontend 'cerrar' para limpiar su estado.
+    return res.json({ success: true, message: 'Sesión no encontrada (Autocorrección)', id: null });
+  }
 
   try {
     // 1. Calcular totales basados en la sesión actual (JSON) y/o verificar con SQL
