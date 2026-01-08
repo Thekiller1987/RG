@@ -99,12 +99,14 @@ app.use((err, req, res, next) => {
 });
 
 // 7. Configuración de Socket.IO
-const http = require('http');
 const { Server } = require('socket.io');
+const http = require('http');
 
+// Crear servidor HTTP explícito para soportar Socket.IO + Express
 const httpServer = http.createServer(app);
+
 const io = new Server(httpServer, {
-  cors: corsOptions // Reutilizamos la misma config
+  cors: corsOptions
 });
 
 io.on('connection', (socket) => {
@@ -114,10 +116,10 @@ io.on('connection', (socket) => {
   });
 });
 
-// Guardar io en la app para usarlo en controladores
 app.set('io', io);
 
-// 8. Poner el servidor a escuchar (usando httpServer)
-httpServer.listen(PORT, '0.0.0.0', () => {
+// 8. Iniciar Servidor
+// Importante: Usamos httpServer.listen en lugar de app.listen para que WS funcione
+httpServer.listen(PORT, () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
