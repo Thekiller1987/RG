@@ -168,7 +168,8 @@ router.post('/session/open', async (req, res) => {
 
   } catch (error) {
     console.error('Error POST /session/open:', error);
-    res.status(500).json({ message: 'Error abriendo sesión: ' + error.message });
+    // CRITICAL DEBUG: Return the exact SQL error message to the frontend
+    res.status(500).json({ message: 'Error SQL: ' + error.message, sqlError: error.code });
   }
 });
 
