@@ -1018,12 +1018,72 @@
           }
         }
       ],
+      "closedAt": "2026-01-08T15:16:04.383Z",
+      "closedBy": {
+        "id": "3",
+        "name": "Usuario 3"
+      },
+      "countedAmount": 123,
+      "difference": 0,
+      "notes": "",
+      "tasaDolar": 36.6,
+      "sqlId": 21
+    },
+    {
+      "id": "caja-9-1767363103747",
+      "openedAt": "2026-01-02T14:11:43.539Z",
+      "openedBy": {
+        "id": "9",
+        "name": "multirepuestorg"
+      },
+      "initialAmount": 1000,
+      "transactions": [
+        {
+          "id": "abono-1767643591639",
+          "type": "abono",
+          "amount": 370,
+          "note": "Abono Cliente #9 (Efectivo)",
+          "at": "2026-01-05T20:06:31.639Z",
+          "pagoDetalles": {
+            "ingresoCaja": 370,
+            "tarjeta": 0,
+            "transferencia": 0,
+            "credito": 0
+          }
+        },
+        {
+          "id": "abono-1767648225370",
+          "type": "abono",
+          "amount": 2388,
+          "note": "Abono Cliente #3 (Efectivo)",
+          "at": "2026-01-05T21:23:45.370Z",
+          "pagoDetalles": {
+            "ingresoCaja": 2388,
+            "tarjeta": 0,
+            "transferencia": 0,
+            "credito": 0
+          }
+        },
+        {
+          "id": "abono-1767648596566",
+          "type": "abono",
+          "amount": 620,
+          "note": "Abono Cliente #9 (Efectivo)",
+          "at": "2026-01-05T21:29:56.566Z",
+          "pagoDetalles": {
+            "ingresoCaja": 620,
+            "tarjeta": 0,
+            "transferencia": 0,
+            "credito": 0
+          }
+        }
+      ],
       "closedAt": null,
       "closedBy": null,
       "countedAmount": null,
       "difference": null,
       "notes": "",
-      "tasaDolar": 36.6
+      "tasaDolar": 36.55
     }
   ]
 }
