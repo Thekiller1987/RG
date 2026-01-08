@@ -442,4 +442,46 @@ router.get('/abiertas/activas', async (req, res) => {
   }
 });
 
+// ───────── Active Carts (Persistence) ─────────
+// GET /api/caja/cart?userId=123
+router.get('/cart', async (req, res) => {
+  const userId = req.query.userId;
+  if (!userId) return res.status(400).json({ message: 'Missing userId' });
+
+  try {
+    const [rows] = await pool.query('SELECT carts_json FROM active_carts WHERE user_id = ?', [userId]);
+    if (rows.length > 0) {
+      let data = rows[0].carts_json;
+      if (typeof data === 'string') {
+        try { data = JSON.parse(data); } catch (e) { }
+      }
+      return res.json(data);
+    }
+    return res.json([]);
+  } catch (error) {
+    console.error('Error fetching cart:', error);
+    // Return empty if table doesn't exist yet to avoid crashing app
+    res.json([]);
+  }
+});
+
+// POST /api/caja/cart
+router.post('/cart', async (req, res) => {
+  const { userId, carts } = req.body;
+  if (!userId || !carts) return res.status(400).json({ message: 'Missing data' });
+
+  try {
+    const jsonStr = JSON.stringify(carts);
+    await pool.query(`
+      INSERT INTO active_carts (user_id, carts_json) VALUES (?, ?)
+      ON DUPLICATE KEY UPDATE carts_json = VALUES(carts_json)
+    `, [userId, jsonStr]);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error saving cart:', error);
+    res.status(500).json({ message: 'Error saving cart' });
+  }
+});
+
 module.exports = router;

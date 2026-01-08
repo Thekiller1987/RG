@@ -435,3 +435,15 @@ const fetchActiveBoxes = async (token) => {
         return [];
     }
 };
+
+// ===================================================================
+// === SECCIÓN DE CARRITO PERSISTENTE ===
+// ===================================================================
+
+export const getCart = async (userId, token) => {
+    return await request('get', '/caja/cart', token, null, { params: { userId } });
+};
+
+export const saveCart = async (userId, carts, token) => {
+    return await request('post', '/caja/cart', token, { userId, carts });
+};

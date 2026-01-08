@@ -18,28 +18,40 @@ export const OrdersProvider = ({ children }) => {
     const loadOrdersFromDB = useCallback(async (userId) => {
         if (!userId) return;
         setCurrentUserId(userId);
-        const saved = localStorage.getItem(`orders_${userId}`);
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    setOrders(parsed);
-                    // Si no hay activo o el activo no existe, setear el primero
-                    setActiveOrderId(parsed[0].id);
-                    return;
-                }
-            } catch (e) { console.error("Error loading orders", e); }
+
+        try {
+            // 1. Try to fetch from API first (Source of Truth)
+            // Need token? useAuth usually provides it, but here we might need to rely on localStorage token if not passed.
+            const token = localStorage.getItem('token');
+            const serverCarts = await api.getCart(userId, token);
+
+            if (serverCarts && Array.isArray(serverCarts) && serverCarts.length > 0) {
+                setOrders(serverCarts);
+                setActiveOrderId(serverCarts[0].id);
+                return;
+            }
+        } catch (e) {
+            console.error("Error loading carts from DB, falling back to local:", e);
         }
-        // Fallback or init
+
+        // 2. Fallback to localStorage if API fails or is empty (and we want to preserve local?)
+        // Actually, if API is empty, it means empty. But let's check local just in case?
+        // No, if migration happens, we want DB.
+
         const initial = [{ id: Date.now(), name: 'Ticket 1', items: [] }];
         setOrders(initial);
         setActiveOrderId(initial[0].id);
     }, []);
 
-    // Persistencia Automática
+    // Persistencia Automática (Debounced)
     useEffect(() => {
         if (currentUserId && orders.length > 0) {
-            localStorage.setItem(`orders_${currentUserId}`, JSON.stringify(orders));
+            // Debounce save to avoid spamming API on every keystroke
+            const timer = setTimeout(() => {
+                const token = localStorage.getItem('token');
+                api.saveCart(currentUserId, orders, token).catch(e => console.error("Error saving cart:", e));
+            }, 1000);
+            return () => clearTimeout(timer);
         }
     }, [orders, currentUserId]);
 

@@ -451,7 +451,7 @@ const POS = () => {
                 const newSession = await api.openCajaSession({
                   userId,
                   openedAt: new Date().toISOString(),
-                  openedBy: { id: userId, name: currentUser?.nombre_usuario },
+                  openedBy: { id: userId, name: currentUser?.nombre || currentUser?.nombre_usuario },
                   initialAmount: montoInicial,
                   tasaDolar: tasa
                 }, token);
@@ -469,7 +469,7 @@ const POS = () => {
                 const closed = await api.closeCajaSession({
                   userId,
                   closedAt: new Date().toISOString(),
-                  closedBy: { id: userId, name: currentUser?.nombre_usuario },
+                  closedBy: { id: userId, name: currentUser?.nombre || currentUser?.nombre_usuario },
                   countedAmount: montoCounted,
                   notes: 'Cierre desde POS'
                 }, token);
