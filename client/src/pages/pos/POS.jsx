@@ -27,7 +27,7 @@ const fmt = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigit
 const POS = () => {
   // Contextos
   const { user, products: initialProducts, token, refreshProducts, clients } = useAuth();
-  const { isCajaOpen, setIsCajaOpen, cajaSession, setCajaSession, tasaDolar, setTasaDolar } = useCaja();
+  const { isCajaOpen, setIsCajaOpen, cajaSession, setCajaSession, tasaDolar, setTasaDolar, closeCajaSession } = useCaja();
   const {
     orders, activeOrderId, setActiveOrderId, activeOrder,
     handleNewOrder, handleRemoveOrder, updateActiveOrder, loadOrdersFromDB
