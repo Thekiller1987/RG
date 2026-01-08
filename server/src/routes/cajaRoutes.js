@@ -1,37 +1,10 @@
 // CommonJS
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
 const pool = require('../config/db'); // MySQL Pool
 
 const router = express.Router();
-const DB_FILE = path.join(process.cwd(), 'data', 'caja-sessions.json');
 
-// ───────── Helpers de archivo JSON (Mantener para sesión activa) ─────────
-function ensureDB() {
-  const dir = path.dirname(DB_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify({ sessions: [] }, null, 2));
-  }
-}
-function readDB() {
-  ensureDB();
-  try {
-    const raw = fs.readFileSync(DB_FILE, 'utf8') || '{"sessions":[]}';
-    const json = JSON.parse(raw);
-    if (!json.sessions) json.sessions = [];
-    return json;
-  } catch {
-    return { sessions: [] };
-  }
-}
-function writeDB(data) {
-  ensureDB();
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-}
-
-/* ───────── Utils AÑADIDOS ───────── */
+/* ───────── Utils ───────── */
 function displayName(u) {
   if (!u) return '—';
   if (typeof u === 'string') return u;
@@ -75,9 +48,7 @@ function localDayKey(isoOrDate) {
   return `${y}-${m}-${dd}`;
 }
 
-// ───────── Sesiones de Caja ─────────
-
-// ───────── Sesiones de Caja (MIGRADO A SQL COMPLETAMENTE) ─────────
+// ───────── Sesiones de Caja (SQL ONLY) ─────────
 
 // Helper: Reconstruir objeto de sesión desde fila SQL
 function mapRowToSession(row) {
@@ -139,7 +110,7 @@ router.get('/session', async (req, res) => {
 
   } catch (error) {
     console.error('Error GET /session:', error);
-    res.status(500).json({ message: 'Error recuperando sesión' });
+    res.status(500).json({ message: 'Error recuperando sesión: ' + error.message });
   }
 });
 
@@ -172,11 +143,11 @@ router.post('/session/open', async (req, res) => {
 
     const [result] = await pool.query(`
       INSERT INTO cierres_caja (
-        fecha_apertura, usuario_id, usuario_nombre, 
+        fecha_apertura, fecha_cierre, usuario_id, usuario_nombre, 
         monto_inicial, final_esperado, final_real, diferencia,
         total_ventas_efectivo, total_ventas_tarjeta, total_ventas_transferencia, total_ventas_credito,
         total_entradas, total_salidas, detalles_json
-      ) VALUES (?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?)
+      ) VALUES (?, NULL, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?)
     `, [
       new Date(openedAt), userId, usuarioNombre,
       initialAmount, initialJson
@@ -197,7 +168,7 @@ router.post('/session/open', async (req, res) => {
 
   } catch (error) {
     console.error('Error POST /session/open:', error);
-    res.status(500).json({ message: 'Error abriendo sesión' });
+    res.status(500).json({ message: 'Error abriendo sesión: ' + error.message });
   }
 });
 
@@ -250,7 +221,7 @@ router.post('/session/tx', async (req, res) => {
 
   } catch (error) {
     console.error('Error POST /session/tx:', error);
-    res.status(500).json({ message: 'Error guardando transacción' });
+    res.status(500).json({ message: 'Error guardando transacción: ' + error.message });
   }
 });
 
@@ -373,7 +344,7 @@ router.post('/session/close', async (req, res) => {
 
   } catch (error) {
     console.error('Error POST /session/close:', error);
-    res.status(500).json({ message: 'Error cerrando sesión' });
+    res.status(500).json({ message: 'Error cerrando sesión: ' + error.message });
   }
 });
 
@@ -385,23 +356,6 @@ router.get('/reporte', async (req, res) => {
 
   try {
     // 1. Obtener Cierres Completados desde SQL
-    // Filtramos por fecha de APERTURA o CIERRE? Usualmente Cierre.
-    // Aunque el usuario selecciona "Ver reporte del día X". Si cerró a las 00:05 del día siguiente,
-    // técnicamente pertenece a la venta del día anterior.
-    // Por simplicidad, buscaremos por fecha de APERTURA que coincida con el día, 
-    // O fecha de cierre que coincida.
-    // Vamos a buscar por fecha de APERTURA que inicie en ese día (00:00 a 23:59)
-    // CORRECCIÓN ZONA HORARIA (MANAGUA UTC-6)
-    // Las fechas en BD están en UTC (o hora servidor).
-    // Si el usuario pide el dia '2023-10-12', quiere todo lo que ocurrió en ese dia LOCAL.
-    // Una venta a las 10pm del 12 (Managua) es las 4am del 13 (UTC).
-    // Solución: Restamos 6 horas a la fecha de la base de datos antes de comparar.
-
-    // Opción A (Index Friendly): Calcular rangos en JS.
-    // Start: YYYY-MM-DD 06:00:00 UTC
-    // End:   YYYY-MM-DD+1 05:59:59 UTC
-    // Pero MySQL DATE_SUB es más legible y el volumen de datos no es masivo.
-
     const [rows] = await pool.query(`
       SELECT * FROM cierres_caja 
       WHERE DATE(DATE_SUB(fecha_apertura, INTERVAL 6 HOUR)) = ?
@@ -412,90 +366,79 @@ router.get('/reporte', async (req, res) => {
       id: r.id,
       sql: true,
       abierta_por: r.usuario_nombre,
-      cerrada_por: r.usuario_nombre, // Asumimos mismo usuario por ahora o nulo
+      cerrada_por: r.usuario_nombre,
       hora_apertura: r.fecha_apertura,
       hora_cierre: r.fecha_cierre,
       monto_inicial: Number(r.monto_inicial),
       esperado: Number(r.final_esperado),
       contado: Number(r.final_real),
       diferencia: Number(r.diferencia),
-      // Campos extra para el frontend nuevo
       total_efectivo: Number(r.total_ventas_efectivo),
       total_tarjeta: Number(r.total_ventas_tarjeta),
       total_transferencia: Number(r.total_ventas_transferencia),
       total_credito: Number(r.total_ventas_credito),
       total_gastos: Number(r.total_salidas),
       total_ingresos: Number(r.total_entradas),
-      detalles_json: r.detalles_json // Snapshot completo con productos
+      detalles_json: r.detalles_json
     }));
 
-    // 2. Obtener Sesiones ABIERTAS desde JSON (ya que esas no están en SQL todavía)
-    const dbJSON = readDB();
-    const abiertas = dbJSON.sessions
-      .filter(s => !s.closedAt && localDayKey(s.openedAt) === dateStr)
-      .map(s => ({
-        id: s.id,
-        abierta_por: displayName(s.openedBy),
-        hora_apertura: s.openedAt,
-        monto_inicial: Number(s.initialAmount || 0)
-      }));
+    // 2. Obtener Sesiones ABIERTAS desde SQL
+    const [activeRows] = await pool.query(`
+      SELECT * FROM cierres_caja 
+      WHERE fecha_cierre IS NULL
+      AND DATE(DATE_SUB(fecha_apertura, INTERVAL 6 HOUR)) = ?
+    `, [dateStr]);
 
-    // 3. Fusionar compatibilidad con cierres viejos en JSON (opcional)
-    // Para no perder el historial anterior a hoy, podemos leer también del JSON si lo desean.
-    // Pero el usuario pidió "crear tabla... guardar info". Asumimos que desde HOY usa SQL.
-    // Si quiere ver lo viejo, podríamos mezclar.
-    // Mezcla simple: Traer del JSON los que NO tengan sqlId (legacy).
-    const legacyClosed = dbJSON.sessions
-      .filter(s => s.closedAt && localDayKey(s.openedAt) === dateStr && !s.sqlId)
-      .map(s => {
-        // Recalcular esperado legacy
-        const calcEsperado = (sess) => {
-          const net = (sess.transactions || []).reduce((t, tx) => {
-            if (tx.type === 'venta_credito') return t;
-            const ing = Number(tx.pagoDetalles?.ingresoCaja || tx.amount || 0);
-            if (tx.type === 'entrada') return t + ing;
-            if (tx.type === 'salida') return t - ing;
-            return t + ing;
-          }, 0);
-          return Number(sess.initialAmount || 0) + net;
-        };
-        const esp = calcEsperado(s);
-        return {
-          id: s.id,
-          abierta_por: displayName(s.openedBy),
-          cerrada_por: displayName(s.closedBy),
-          hora_apertura: s.openedAt,
-          hora_cierre: s.closedAt,
-          monto_inicial: Number(s.initialAmount),
-          esperado: esp,
-          contado: Number(s.countedAmount),
-          diferencia: Number(s.countedAmount) - esp
-        };
-      });
+    const abiertas = activeRows.map(r => ({
+      id: r.id,
+      abierta_por: r.usuario_nombre,
+      hora_apertura: r.fecha_apertura,
+      monto_inicial: Number(r.monto_inicial || 0)
+    }));
 
-    res.json({ abiertas, cerradas: [...cerradas, ...legacyClosed] });
+    // Retorno limpio, SIN legacy JSON merging.
+    res.json({ abiertas, cerradas });
 
   } catch (error) {
     console.error('Error fetching reports:', error);
-    res.status(500).json({ message: 'Error cargando reportes' });
+    res.status(500).json({ message: 'Error cargando reportes: ' + error.message });
   }
 });
 
 // GET /api/caja/abiertas/activas (Para CashReport: mostrar quién está trabajando)
-router.get('/abiertas/activas', (req, res) => {
-  const db = readDB();
-  const abiertas = (db.sessions || [])
-    .filter(s => !s.closedAt)
-    .map(s => ({
-      id: s.id,
-      openedAt: s.openedAt,
-      openedBy: s.openedBy,
-      monto_inicial: Number(s.initialAmount || 0),
-      tasaDolar: Number(s.tasaDolar || 0),
-      abierta_por: displayName(s.openedBy),
-    }));
-  abiertas.sort((a, b) => new Date(b.openedAt) - new Date(a.openedAt));
-  res.json({ abiertas });
+router.get('/abiertas/activas', async (req, res) => {
+  try {
+    // Consulta SQL directa
+    const [rows] = await pool.query(`
+      SELECT * FROM cierres_caja 
+      WHERE fecha_cierre IS NULL
+    `);
+
+    const abiertas = rows.map(row => {
+      let details = {};
+      try {
+        details = (typeof row.detalles_json === 'string')
+          ? JSON.parse(row.detalles_json)
+          : (row.detalles_json || {});
+      } catch { details = {}; }
+
+      return {
+        id: row.id,
+        openedAt: row.fecha_apertura,
+        openedBy: { id: row.usuario_id, name: row.usuario_nombre },
+        monto_inicial: Number(row.monto_inicial || 0),
+        tasaDolar: Number(details.tasaDolar || 0),
+        abierta_por: row.usuario_nombre,
+      };
+    });
+
+    abiertas.sort((a, b) => new Date(b.openedAt) - new Date(a.openedAt));
+    res.json({ abiertas });
+
+  } catch (error) {
+    console.error('Error getting active sessions:', error);
+    res.status(500).json({ message: 'Error obteniendo sesiones activas', abiertas: [] });
+  }
 });
 
 module.exports = router;
