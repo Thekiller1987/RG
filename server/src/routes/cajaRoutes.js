@@ -345,7 +345,7 @@ router.post('/session/close', async (req, res) => {
 
   } catch (error) {
     console.error('Error POST /session/close:', error);
-    res.status(500).json({ message: 'Error cerrando sesión: ' + error.message });
+    res.status(500).json({ message: 'Error SQL: ' + error.message, sqlError: error.code });
   }
 });
 
