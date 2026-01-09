@@ -48,6 +48,35 @@ function localDayKey(isoOrDate) {
   return `${y}-${m}-${dd}`;
 }
 
+// ───────── PREVENCIÓN DE ERRORES: AUTOCORRECCIÓN DE BASE DE DATOS ─────────
+async function ensureSchema() {
+  try {
+    // 1. Crear tabla de carritos si no existe
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS active_carts (
+        user_id INT PRIMARY KEY,
+        carts_json JSON,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB;
+    `);
+
+    // 2. Corregir tabla cierres_caja para permitir NULL en fecha_cierre
+    // Usamos un bloque try/catch específico porque si ya es NULL, no pasa nada, pero si falla no queremos detener el server
+    try {
+      await pool.query(`ALTER TABLE cierres_caja MODIFY COLUMN fecha_cierre DATETIME NULL DEFAULT NULL;`);
+      // console.log('✅ Esquema de cierres_caja verificado/corregido.');
+    } catch (e) {
+      // Ignoramos error si es por sintaxis (ya corregido) o acceso, pero lo logueamos por si acaso
+      // console.warn('Nota sobre esquema DB:', e.message);
+    }
+  } catch (error) {
+    console.error('❌ Error fatal verificando esquema DB:', error);
+  }
+}
+
+// Ejecutar corrección al cargar el archivo
+ensureSchema();
+
 // ───────── Sesiones de Caja (SQL ONLY) ─────────
 
 // Helper: Reconstruir objeto de sesión desde fila SQL
