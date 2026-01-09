@@ -180,10 +180,10 @@ const ProformaEmpleadoModal = ({
     };
     const closeAlert = () => {
         setAlertState(prev => ({ ...prev, isOpen: false }));
-        // If success sending ticket, close main modal too
-        if (alertState.title.includes('enviado exitosamente')) {
-            setTicketData();
-            onClose && onClose();
+        // If success sending ticket (type is success), close main modal too and clear data
+        if (alertState.type === 'success') {
+            setTicketData(); // This clears the cart in parent
+            onClose && onClose(); // This closes ProformaModal
         }
     };
 
