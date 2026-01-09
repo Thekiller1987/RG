@@ -47,6 +47,82 @@ const TotalsRow = styled.div`
 const FaSpinnerAnimated = styled(FaSpinner)`animation: ${LoadingSpinner} 1s linear infinite;`;
 
 /* =================================================================
+ * DATOS DE TU NEGOCIO 
+ * ================================================================= */
+const COMPANY = {
+    NAME: 'Multirepuestos RG',
+    RUC: '1211812770001E',
+    PHONE: '84031936 / 84058142',
+    ADDRESS: 'Del portón de la normal 75 varas al este. Juigalpa, Chontales.',
+    SLOGAN: 'Tu mejor opción en repuestos de moto y carro',
+    LOGO_URL: '/icons/logo.png',
+};
+
+/* =================================================================
+ * ESTILOS ESPECÍFICOS DE PROFORMA (Adaptados para Mobile/PWA)
+ * ================================================================= */
+const ProformaWrapper = styled.div`
+    width: 100%; max-width: 650px; padding: 1.5rem; background: #fff; border-radius: 8px; display: flex; flex-direction: column; gap: 1.5rem;
+
+    /* Estilo CLAVE para ocultar los botones al generar el PDF */
+    &.proforma-to-print .footer-actions {
+        display: none;
+    }
+    @media (max-width: 768px) { padding: 1rem; gap: 1rem; }
+`;
+
+const ProformaHeader = styled.div`
+    text-align: center; border-bottom: 2px solid #ccc; padding-bottom: 1rem;
+    display: flex; flex-direction: column; align-items: center;
+
+    .logo {
+        max-width: 120px; max-height: 80px; object-fit: contain; margin-bottom: 8px;
+    }
+    h2 { margin: 0; font-size: 1.5rem; color: #0b72b9; }
+    p { margin: 0.25rem 0; font-size: 0.9rem; }
+`;
+
+const CompanyDetails = styled.div`
+    font-size: 0.9rem; color: #555; border-bottom: 1px solid #eee; padding-bottom: 1rem;
+    strong { color: #333; }
+    @media (max-width: 768px) { font-size: 0.8rem; }
+`;
+
+const ClientDetails = styled.div`
+    display: flex; justify-content: space-between; padding: 0.5rem 1rem; border: 1px solid #ddd; border-radius: 4px; background-color: #f9f9f9; gap: 0.5rem; flex-wrap: wrap;
+    @media (max-width: 768px) { flex-direction: column; padding: 0.5rem; gap: 0.25rem; }
+`;
+
+const ClientDetailItem = styled.div`
+    flex: 1 1 45%; 
+    p { margin: 3px 0; font-size: 0.9rem; } 
+    span { font-weight: bold; color: #000; }
+    @media (max-width: 768px) { flex-basis: 100%; p { font-size: 0.85rem; } }
+`;
+
+const ProformaTable = styled.table`
+    width: 100%; border-collapse: collapse;
+    th, td { padding: 8px 12px; text-align: left; font-size: 0.95rem; border-bottom: 1px dashed #eee; }
+    th { background-color: #f7f7f7; font-weight: bold; color: #333; }
+    .text-right { text-align: right; }
+    @media (max-width: 768px) {
+        th, td { padding: 6px 8px; font-size: 0.8rem; }
+        th:nth-child(2), td:nth-child(2) { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    }
+`;
+
+const FooterDetails = styled.div`
+    display: flex; justify-content: space-between; align-items: flex-start; padding-top: 1rem; gap: 1rem; flex-wrap: wrap;
+    @media (max-width: 768px) { flex-direction: column; }
+`;
+
+const TotalsArea = styled.div`
+    width: 260px; max-width: 100%;
+    ${TotalsRow} { padding: 4px 0; }
+    ${TotalsRow}.grand-total { border-top: 2px solid #333; font-size: 1.1rem; }
+`;
+
+/* =================================================================
  * COMPONENTE PRINCIPAL: ProformaEmpleadoModal
  * ================================================================= */
 const ProformaEmpleadoModal = ({
