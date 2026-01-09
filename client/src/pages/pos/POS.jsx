@@ -30,7 +30,7 @@ const POS = () => {
   const { isCajaOpen, setIsCajaOpen, cajaSession, setCajaSession, tasaDolar, setTasaDolar, closeCajaSession } = useCaja();
   const {
     orders, activeOrderId, setActiveOrderId, activeOrder,
-    handleNewOrder, handleRemoveOrder, updateActiveOrder, loadOrdersFromDB
+    handleNewOrder, handleRemoveOrder, updateActiveOrder, loadOrdersFromDB, checkForNewOrders
   } = useOrders();
 
   const userId = user?.id_usuario || user?.id;
