@@ -241,8 +241,9 @@ router.post('/session/close', async (req, res) => {
       LIMIT 1
     `, [userId]);
 
-    // Manejo de Idempotencia: Si no hay abierta, buscar reciente cerrada
     if (rows.length === 0) {
+      console.warn(`[Cierre] No se encontró sesión abierta para usuario ${userId}. Buscando recientes...`);
+      // check if it was just closed?
       const [lastClosed] = await pool.query(`
         SELECT * FROM cierres_caja 
         WHERE usuario_id = ? AND fecha_cierre IS NOT NULL 
@@ -252,10 +253,12 @@ router.post('/session/close', async (req, res) => {
       if (lastClosed.length > 0) {
         const diff = Date.now() - new Date(lastClosed[0].fecha_cierre).getTime();
         if (diff < 60000) {
+          console.log('[Cierre] Sesión ya estaba cerrada hace < 1min. Retornando éxito.');
           return res.json({ success: true, message: 'Sesión ya cerrada (Idempotente)', ...mapRowToSession(lastClosed[0]) });
         }
       }
-      return res.json({ success: true, message: 'Sesión no encontrada (Autocorrección)', id: null });
+      // CRITICAL CHANGE: Return 404 to alert frontend instead of silent "success"
+      return res.status(404).json({ message: 'No se encontró una sesión abierta para cerrar. Refresca la página.' });
     }
 
     const row = rows[0];
