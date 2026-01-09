@@ -482,7 +482,15 @@ const POS = () => {
                 showAlert({ title: 'Caja Cerrada', message: 'La sesión se ha cerrado y guardado correctamente.' });
               } catch (e) {
                 console.error(e);
-                showAlert({ title: 'Error', message: 'Error cerrando caja en servidor.' });
+                // Zombie Session Recovery: If server says 404 (Not Found), it means it's already closed.
+                if (e.status === 404 || e.response?.status === 404 || e.message?.includes('404')) {
+                  setCajaSession(null);
+                  setIsCajaOpen(false);
+                  closeModal();
+                  showAlert({ title: 'Sincronizado', message: 'La caja ya estaba cerrada en el servidor. Se ha actualizado tu estado local.' });
+                  return;
+                }
+                showAlert({ title: 'Error', message: 'Error cerrando caja en servidor: ' + (e.message || 'Desconocido') });
               }
             }}
           />
