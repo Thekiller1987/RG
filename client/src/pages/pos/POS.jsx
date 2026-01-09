@@ -666,6 +666,17 @@ const POS = () => {
             </div>
           </div>
         </S.CartPanel>
+
+        <S.MobileCartToggle onClick={() => setIsMobileCartOpen(true)}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ background: '#3b82f6', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>
+              {cart.reduce((a, c) => a + (c.quantity || 0), 0)}
+            </div>
+            <span>Ver Venta</span>
+          </div>
+          <span>C$ {fmt(total)}</span>
+        </S.MobileCartToggle>
+
       </S.PageContentWrapper>
 
       {/* Modales y Alertas */}

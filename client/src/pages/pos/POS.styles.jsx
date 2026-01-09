@@ -82,14 +82,19 @@ export const CartPanel = styled.div`
   display: flex;
   flex-direction: column;
   box-shadow: -4px 0 15px rgba(0,0,0,0.02);
+  z-index: 40; /* Ensure it stays above main content if needed */
   
   @media (max-width: 960px) {
+    position: fixed;
+    inset: 0;
     width: 100%;
+    height: 100%;
     border-left: none;
-    border-top: 1px solid #e2e8f0;
+    border-top: none;
     flex: none;
-    height: auto;
-    min-height: 400px;
+    transform: translateY(${props => props.isOpen ? '0' : '100%'});
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 2000; /* Highest z-index for modal-like behavior on mobile */
   }
 `;
 
@@ -98,10 +103,12 @@ export const MobileCartToggle = styled.button`
   @media (max-width: 960px) {
     display: flex; align-items: center; justify-content: space-between;
     position: fixed; bottom: 20px; left: 20px; right: 20px;
-    background: #2563eb; color: white;
-    padding: 16px 24px; border-radius: 12px; border: none;
-    box-shadow: 0 10px 25px rgba(37, 99, 235, 0.4);
-    z-index: 1000; font-weight: 700;
+    background: #0f172a; color: white;
+    padding: 16px 24px; border-radius: 16px; border: none;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.4);
+    z-index: 1000; font-weight: 700; font-size: 1rem; cursor: pointer;
+    transition: transform 0.2s;
+    &:active { transform: scale(0.98); }
   }
 `;
 
