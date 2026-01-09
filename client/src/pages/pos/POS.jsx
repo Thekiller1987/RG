@@ -65,8 +65,20 @@ const POS = () => {
   }, [initialProducts]);
 
   useEffect(() => {
-    if (userId) loadOrdersFromDB(userId);
-  }, [userId, loadOrdersFromDB]);
+    if (userId) {
+      // 1. Initial Load: Get everything
+      loadOrdersFromDB(userId);
+
+      // 2. Poll for NEW orders safely without overwriting current work
+      const intervalId = setInterval(() => {
+        if (!document.hidden) {
+          checkForNewOrders(userId);
+        }
+      }, 5000);
+
+      return () => clearInterval(intervalId);
+    }
+  }, [userId, loadOrdersFromDB, checkForNewOrders]);
 
   /* -----------------------------------------------------------------
    * ACCIONES Y MANEJADORES
@@ -162,7 +174,10 @@ const POS = () => {
     try {
       const response = await api.createSale(saleData, token);
       handleRemoveOrder(orderToCloseId);
-      await refreshData();
+
+      // Update inventory but DO NOT reload orders immediately to prevent race condition 
+      // where the just-deleted ticket is re-fetched from DB before the debounce save occurs.
+      await refreshProducts();
 
       // If sale creation returns the sale object, use it. Otherwise, construct a local representation for the ticket.
       const savedSale = response?.data || response || saleData;

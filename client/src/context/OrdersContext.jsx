@@ -80,6 +80,15 @@ export const OrdersProvider = ({ children }) => {
 
     // Wrapper para remove que maneje el ID
     const removeOrderWrapper = (id) => {
+        // Mark as deleted so polling doesn't resurrect it immediately
+        if (recentlyDeletedIds.current) {
+            recentlyDeletedIds.current.add(id);
+            // Clean up memory after safe margin (e.g., 10 seconds)
+            setTimeout(() => {
+                if (recentlyDeletedIds.current) recentlyDeletedIds.current.delete(id);
+            }, 10000);
+        }
+
         let nextOrders = [];
         let nextActiveId = activeOrderId;
 
@@ -144,10 +153,42 @@ export const OrdersProvider = ({ children }) => {
         } catch (e) { console.error("Error loading pending orders", e); }
     };
 
+    // Track deleted IDs to prevent "Zombie" resurrection during polling race conditions
+    const recentlyDeletedIds = React.useRef(new Set());
+
+    // SAFE SYNC: Only append NEW tickets from other users (e.g., Proforma)
+    // Does NOT overwrite local changes to existing tickets.
+    const checkForNewOrders = useCallback(async (userId) => {
+        if (!userId) return;
+        try {
+            const token = localStorage.getItem('token');
+            const serverCarts = await api.getCart(userId, token);
+
+            if (serverCarts && Array.isArray(serverCarts)) {
+                setOrders(prev => {
+                    const existingIds = new Set(prev.map(o => o.id));
+                    // Find tickets in server that we don't have locally
+                    // AND that we haven't recently deleted explicitly
+                    const newTickets = serverCarts.filter(t =>
+                        !existingIds.has(t.id) &&
+                        !recentlyDeletedIds.current.has(t.id)
+                    );
+
+                    if (newTickets.length > 0) {
+                        return [...prev, ...newTickets];
+                    }
+                    return prev;
+                });
+            }
+        } catch (e) {
+            // silent fail for polling
+        }
+    }, []);
+
     const value = {
         orders, setOrders, activeOrderId, setActiveOrderId, activeOrder,
         handleNewOrder, handleRemoveOrder: removeOrderWrapper, updateActiveOrder, loadOrdersFromDB,
-        loadPendingOrdersFromServer
+        loadPendingOrdersFromServer, checkForNewOrders
     };
 
     return <OrdersContext.Provider value={value}>{children}</OrdersContext.Provider>;
