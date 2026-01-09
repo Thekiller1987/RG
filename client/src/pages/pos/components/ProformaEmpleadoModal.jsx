@@ -1,9 +1,50 @@
+import React, { useRef } from 'react';
+import { FaFileInvoice, FaDownload, FaWindowClose, FaSpinner } from 'react-icons/fa';
+import styled, { keyframes } from 'styled-components';
+
 // IMPORTAR LIBRERÍAS NECESARIAS
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { fetchActiveCajaSessions, getCart, saveCart } from '../../../service/api'; // Import API functions
 
-// ... (Existing styles remain the same) ...
+// --- ESTILOS DE BASE (Requeridos para el funcionamiento del Modal) ---
+const fadeIn = keyframes`from { opacity: 0; } to { opacity: 1; }`;
+const scaleIn = keyframes`from { transform: scale(0.95); } to { transform: scale(1); }`;
+const LoadingSpinner = keyframes`0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); }`;
+
+const ModalOverlay = styled.div`
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px);
+    display: flex; justify-content: center; align-items: center; z-index: 1100;
+    animation: ${fadeIn} 0.2s;
+`;
+const ModalContent = styled.div`
+    background: white; padding: 2.5rem; border-radius: 24px;
+    width: 95%; max-width: 680px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    animation: ${scaleIn} 0.3s;
+    max-height: 90vh; overflow-y: auto;
+
+    @media (max-width: 768px) {
+        padding: 1rem;
+        border-radius: 12px;
+    }
+`;
+const Button = styled.button`
+    padding: 1rem 1.5rem; border: none; border-radius: 8px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s;
+    background: ${props => props.$cancel ? '#e2e8f0' : '#2563eb'};
+    color: ${props => props.$cancel ? '#475569' : 'white'};
+    &:hover { background: ${props => props.$cancel ? '#cbd5e1' : '#1d4ed8'}; }
+    &:disabled { opacity: 0.6; cursor: not-allowed; }
+`;
+const TotalsRow = styled.div`
+    display: flex; justify-content: space-between; padding: 8px 0; font-size: 0.95rem;
+    font-weight: ${props => props.$bold ? 'bold' : 'normal'};
+    &.grand-total { border-top: 2px solid #333; font-size: 1.1rem; margin-top: 8px; padding-top: 10px; }
+    .text-right { text-align: right; }
+`;
+const FaSpinnerAnimated = styled(FaSpinner)`animation: ${LoadingSpinner} 1s linear infinite;`;
 
 /* =================================================================
  * COMPONENTE PRINCIPAL: ProformaEmpleadoModal
