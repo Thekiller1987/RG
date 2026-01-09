@@ -44,7 +44,10 @@ const updateUser = async (req, res) => {
     res.json({ msg: 'Usuario actualizado correctamente' });
   } catch (error) {
     console.error(error);
-    res.status(500).send('Error en el servidor');
+    if (error.code === 'ER_DUP_ENTRY' || error.errno === 1062) {
+      return res.status(400).json({ msg: 'El nombre de usuario ya está en uso.' });
+    }
+    res.status(500).send('Error en el servidor: ' + error.message);
   }
 };
 
@@ -61,7 +64,10 @@ const deleteUser = async (req, res) => {
     res.json({ msg: 'Usuario eliminado correctamente' });
   } catch (error) {
     console.error(error);
-    res.status(500).send('Error en el servidor');
+    if (error.code === 'ER_ROW_IS_REFERENCED' || error.errno === 1451) {
+      return res.status(400).json({ msg: 'No se puede eliminar: El usuario tiene ventas o historial registrado. Intente cambiar su rol o contraseña.' });
+    }
+    res.status(500).send('Error en el servidor: ' + error.message);
   }
 };
 
