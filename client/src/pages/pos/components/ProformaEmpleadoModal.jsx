@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { FaFileInvoice, FaDownload, FaWindowClose, FaSpinner } from 'react-icons/fa';
+import { FaFileInvoice, FaDownload, FaWindowClose, FaSpinner, FaExclamationTriangle, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 import styled, { keyframes } from 'styled-components';
 
 // IMPORTAR LIBRERÍAS NECESARIAS
@@ -122,6 +122,31 @@ const TotalsArea = styled.div`
     ${TotalsRow}.grand-total { border-top: 2px solid #333; font-size: 1.1rem; }
 `;
 
+// --- CUSTOM ALERT COMPONENT ---
+const AlertModal = ({ title, message, type = 'info', onClose }) => {
+    const getColor = () => {
+        if (type === 'error') return '#ef4444';
+        if (type === 'success') return '#10b981';
+        return '#3b82f6';
+    };
+    const getIcon = () => {
+        if (type === 'error') return <FaTimesCircle size={40} color={getColor()} />;
+        if (type === 'success') return <FaCheckCircle size={40} color={getColor()} />;
+        return <FaExclamationTriangle size={40} color={getColor()} />;
+    };
+
+    return (
+        <ModalOverlay style={{ zIndex: 2000 }}>
+            <ModalContent style={{ maxWidth: '350px', textAlign: 'center', padding: '2rem' }}>
+                <div style={{ marginBottom: '1rem' }}>{getIcon()}</div>
+                <h3 style={{ color: '#1e293b', margin: '0 0 10px 0' }}>{title}</h3>
+                <p style={{ color: '#64748b', fontSize: '0.95rem', margin: '0 0 20px 0' }}>{message}</p>
+                <Button onClick={onClose} style={{ width: '100%', padding: '12px' }}>Entendido</Button>
+            </ModalContent>
+        </ModalOverlay>
+    );
+};
+
 /* =================================================================
  * COMPONENTE PRINCIPAL: ProformaEmpleadoModal
  * ================================================================= */
@@ -146,6 +171,21 @@ const ProformaEmpleadoModal = ({
     const [activeSessions, setActiveSessions] = React.useState([]);
     const [ticketName, setTicketName] = React.useState('');
     const [selectedSessionId, setSelectedSessionId] = React.useState(null);
+
+    // --- CUSTOM ALERT STATE ---
+    const [alertState, setAlertState] = React.useState({ isOpen: false, title: '', message: '', type: 'info' });
+
+    const showAlert = (title, message, type = 'info') => {
+        setAlertState({ isOpen: true, title, message, type });
+    };
+    const closeAlert = () => {
+        setAlertState(prev => ({ ...prev, isOpen: false }));
+        // If success sending ticket, close main modal too
+        if (alertState.title.includes('enviado exitosamente')) {
+            setTicketData();
+            onClose && onClose();
+        }
+    };
 
     const fmt = (n) =>
         new Intl.NumberFormat('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -201,7 +241,7 @@ const ProformaEmpleadoModal = ({
 
         } catch (error) {
             console.error("Error al generar PDF:", error);
-            alert("❌ Error al generar y descargar el PDF. Verifique la consola (F12) para detalles.");
+            showAlert("Error", "❌ Error al generar y descargar el PDF.", "error");
         } finally {
             if (document.body.contains(elementToCapture)) {
                 document.body.removeChild(elementToCapture);
@@ -220,7 +260,7 @@ const ProformaEmpleadoModal = ({
             const sessions = response?.abiertas || [];
 
             if (sessions.length === 0) {
-                alert("⚠️ No hay cajas abiertas en este momento. No se puede enviar el pedido.");
+                showAlert("Atención", "⚠️ No hay cajas abiertas en este momento. No se puede enviar el pedido.", "warning");
                 setIsSending(false);
                 return;
             }
@@ -239,14 +279,14 @@ const ProformaEmpleadoModal = ({
 
         } catch (error) {
             console.error("Error fetching sessions:", error);
-            alert("❌ Error al buscar cajas activas.");
+            showAlert("Error", "❌ Error al buscar cajas activas.", "error");
             setIsSending(false);
         }
     };
 
     const confirmSendToCashier = async () => {
-        if (!selectedSessionId) return alert("Seleccione una caja.");
-        if (!ticketName.trim()) return alert("Ingrese un nombre para el ticket.");
+        if (!selectedSessionId) return showAlert("Atención", "Seleccione una caja.", "warning");
+        if (!ticketName.trim()) return showAlert("Atención", "Ingrese un nombre para el ticket.", "warning");
 
         setIsSending(true);
         try {
@@ -269,15 +309,14 @@ const ProformaEmpleadoModal = ({
 
             await saveCart(selectedSessionId, updatedCart);
 
-            alert(`✅ Ticket "${ticketName}" enviado exitosamente a la caja.`);
+            setShowSessionSelector(false); // Close selector first
+            showAlert("Éxito", `✅ Ticket "${ticketName}" enviado exitosamente a la caja.`, "success");
 
-            setShowSessionSelector(false);
-            setTicketData(); // Clear local cart
-            onClose && onClose();
+            // Note: Data clearing happens in closeAlert now for better UX
 
         } catch (error) {
             console.error("Error sending ticket:", error);
-            alert("❌ Error al enviar el ticket a la caja. Intente de nuevo.");
+            showAlert("Error", "❌ Error al enviar el ticket a la caja. Intente de nuevo.", "error");
         } finally {
             setIsSending(false);
         }
@@ -285,7 +324,7 @@ const ProformaEmpleadoModal = ({
 
     return (
         <React.Fragment>
-            <ModalOverlay style={{ zIndex: showSessionSelector ? 1099 : 1100 }}>
+            <ModalOverlay style={{ zIndex: (showSessionSelector || alertState.isOpen) ? 1099 : 1100 }}>
                 <ModalContent>
                     {/* Asignar la referencia al wrapper que queremos capturar */}
                     <ProformaWrapper ref={proformaRef}>
@@ -420,6 +459,16 @@ const ProformaEmpleadoModal = ({
                         </div>
                     </ModalContent>
                 </ModalOverlay>
+            )}
+
+            {/* --- CUSTOM ALERT MODAL --- */}
+            {alertState.isOpen && (
+                <AlertModal
+                    title={alertState.title}
+                    message={alertState.message}
+                    type={alertState.type}
+                    onClose={closeAlert}
+                />
             )}
         </React.Fragment>
     );
