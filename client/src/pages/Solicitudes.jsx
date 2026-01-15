@@ -1,37 +1,51 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
-import { FaCheck, FaPlus, FaTrash, FaUser, FaClock, FaCheckCircle, FaRegCircle } from 'react-icons/fa';
+import { Link } from 'react-router-dom';
+import { FaCheck, FaPlus, FaTrash, FaUser, FaClock, FaCheckCircle, FaRegCircle, FaArrowLeft, FaClipboardList, FaSpinner } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../service/api';
 
 /* ─────────────────────────────────────────────────────────────────
-   STYLES
+   PREMIUM STYLES (Matching Inventory & Dashboard)
    ───────────────────────────────────────────────────────────────── */
-const Container = styled.div`
-  padding: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
-  font-family: 'Inter', system-ui, sans-serif;
-
-  @media (max-width: 768px) {
-    padding: 1rem;
+const PageWrapper = styled.div`
+  padding: 20px;
+  background-color: #f8fafc;
+  min-height: 100vh;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  
+  @media(max-width: 640px) {
+    padding: 10px;
   }
 `;
 
-const Header = styled.div`
-  margin-bottom: 2rem;
-  text-align: center;
+const HeaderContainer = styled.div`
+  display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem;
+  background: white;
+  padding: 1.5rem 2rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+
+  @media(min-width: 768px) { 
+    flex-direction: row; justify-content: space-between; align-items: center; 
+  }
 `;
 
-const Title = styled.h1`
-  color: #1e293b;
-  font-size: 2rem;
-  margin-bottom: 0.5rem;
+const HeaderTitle = styled.h1`
+  font-size: 1.8rem; color: #1e293b; display: flex; align-items: center; gap: 0.75rem; margin: 0; font-weight: 800;
+  svg { color: #f59e0b; }
 `;
 
-const Subtitle = styled.p`
-  color: #64748b;
-  font-size: 1rem;
+const BackButton = styled(Link)`
+  display: inline-flex; align-items: center; gap: 8px;
+  color: #64748b; text-decoration: none; font-weight: 600; font-size: 0.95rem;
+  padding: 8px 16px; margin-bottom: 1rem; border-radius: 99px;
+  background: white; border: 1px solid #cbd5e1;
+  transition: all 0.2s;
+  width: fit-content;
+  
+  &:hover { color: #3b82f6; background: #eff6ff; border-color: #bfdbfe; transform: translateX(-2px); }
 `;
 
 const InputSection = styled.div`
@@ -40,8 +54,9 @@ const InputSection = styled.div`
   margin-bottom: 2rem;
   padding: 1.5rem;
   background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  border-radius: 16px;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+  border: 1px solid #e2e8f0;
 
   @media (max-width: 600px) {
     flex-direction: column;
@@ -50,88 +65,104 @@ const InputSection = styled.div`
 
 const Input = styled.input`
   flex: 1;
-  padding: 0.8rem 1rem;
+  padding: 1rem 1.25rem;
   border: 2px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 1rem;
   outline: none;
-  transition: border-color 0.2s;
+  transition: all 0.2s;
+  background: #f8fafc;
 
   &:focus {
     border-color: #3b82f6;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 `;
 
 const AddBtn = styled.button`
-  background: #3b82f6;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: white;
   border: none;
-  padding: 0.8rem 1.5rem;
-  border-radius: 8px;
+  padding: 0 2rem;
+  height: 54px;
+  border-radius: 12px;
   font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   transition: all 0.2s;
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
 
   &:hover {
-    background: #2563eb;
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
   }
   
-  &:active {
-    transform: translateY(0);
-  }
+  &:active { transform: translateY(0); }
+  &:disabled { opacity: 0.7; cursor: not-allowed; }
 `;
 
 const Grid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1.5rem;
 `;
 
+// Tarjeta con efecto "Glass" sutil para completadas
 const Card = styled.div`
   background: white;
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 1.5rem;
-  box-shadow: 0 2px 4px -1px rgb(0 0 0 / 0.06);
-  border: 1px solid #f1f5f9;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
-  transition: all 0.2s;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
-  opacity: ${props => props.completed ? 0.7 : 1};
-  background: ${props => props.completed ? '#f8fafc' : 'white'};
+  
+  /* Estado Completado */
+  ${props => props.completed && `
+    background: #f1f5f9;
+    opacity: 0.85;
+    border-color: #cbd5e1;
+    &:hover { opacity: 1; }
+  `}
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    border-color: #cbd5e1;
   }
 
+  /* Borde lateral de estado */
   &::before {
     content: '';
     position: absolute;
     left: 0;
     top: 0;
     bottom: 0;
-    width: 4px;
+    width: 6px;
     background: ${props => props.completed ? '#10b981' : '#f59e0b'};
   }
 `;
 
 const CardContent = styled.div`
   flex: 1;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  padding-right: 2rem; /* Espacio para el check button */
 `;
 
 const CardText = styled.p`
-  font-size: 1.1rem;
-  color: ${props => props.completed ? '#94a3b8' : '#334155'};
+  font-size: 1.15rem;
+  color: ${props => props.completed ? '#64748b' : '#1e293b'};
   text-decoration: ${props => props.completed ? 'line-through' : 'none'};
   margin: 0;
   line-height: 1.5;
+  font-weight: 500;
 `;
 
 const CardFooter = styled.div`
@@ -144,32 +175,58 @@ const CardFooter = styled.div`
   color: #64748b;
 `;
 
-const UserInfo = styled.div`
-  display: flex;
+const UserBadge = styled.div`
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  background: #f8fafc;
+  padding: 4px 10px;
+  border-radius: 99px;
+  border: 1px solid #e2e8f0;
+  font-weight: 600;
+  color: #475569;
 `;
 
 const TimeInfo = styled.div`
   display: flex;
   align-items: center;
   gap: 6px;
+  color: #94a3b8;
 `;
 
 const CheckBtn = styled.button`
   position: absolute;
-  top: 1rem;
-  right: 1rem;
-  background: transparent;
-  border: none;
+  top: 1.25rem;
+  right: 1.25rem;
+  background: white;
+  border: 2px solid ${props => props.completed ? '#10b981' : '#cbd5e1'};
   color: ${props => props.completed ? '#10b981' : '#cbd5e1'};
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
   cursor: pointer;
-  font-size: 1.5rem;
-  transition: color 0.2s;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem;
+  transition: all 0.2s;
 
   &:hover {
-    color: ${props => props.completed ? '#059669' : '#94a3b8'};
+    border-color: ${props => props.completed ? '#059669' : '#3b82f6'};
+    color: ${props => props.completed ? '#059669' : '#3b82f6'};
+    transform: scale(1.1);
   }
+`;
+
+const EmptyState = styled.div`
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #94a3b8;
+  background: white;
+  border-radius: 16px;
+  border: 2px dashed #e2e8f0;
+  
+  svg { font-size: 3rem; margin-bottom: 1rem; opacity: 0.5; }
+  p { font-size: 1.1rem; margin: 0; }
 `;
 
 const Solicitudes = () => {
@@ -177,6 +234,7 @@ const Solicitudes = () => {
   const [requests, setRequests] = useState([]);
   const [newDesc, setNewDesc] = useState('');
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const fetchRequestsData = useCallback(async () => {
     try {
@@ -184,6 +242,8 @@ const Solicitudes = () => {
       if (res) setRequests(res);
     } catch (e) {
       console.error("Error loading requests", e);
+    } finally {
+      setInitialLoading(false);
     }
   }, [token]);
 
@@ -232,65 +292,82 @@ const Solicitudes = () => {
   const fmtDate = (dateStr) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
-    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString('es-NI', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   return (
-    <Container>
-      <Header>
-        <Title>Solicitudes de Productos</Title>
-        <Subtitle>Gestiona los pedidos y requerimientos del equipo</Subtitle>
-      </Header>
+    <PageWrapper>
+      <BackButton to="/dashboard">
+        <FaArrowLeft /> Regresar al Dashboard
+      </BackButton>
+
+      <HeaderContainer>
+        <HeaderTitle>
+          <FaClipboardList /> Solicitudes de Productos
+        </HeaderTitle>
+        <div style={{ color: '#64748b', fontWeight: '500' }}>
+          Gestiona los pedidos y requerimientos del equipo
+        </div>
+      </HeaderContainer>
 
       <form onSubmit={handleAdd}>
         <InputSection>
           <Input
-            placeholder="Escribe qué producto necesitas pedir..."
+            placeholder="¿Qué producto necesitas pedir? Escribe aquí..."
             value={newDesc}
             onChange={e => setNewDesc(e.target.value)}
             disabled={loading}
           />
           <AddBtn type="submit" disabled={loading}>
-            <FaPlus /> {loading ? 'Agregando...' : 'Agregar Solicitud'}
+            {loading ? <FaSpinner className="fa-spin" /> : <><FaPlus /> Agregar Solicitud</>}
           </AddBtn>
         </InputSection>
       </form>
 
-      <Grid>
-        {requests.map(req => (
-          <Card key={req.id} completed={Boolean(req.check_mark)}>
-            <CheckBtn
-              completed={Boolean(req.check_mark)}
-              onClick={() => toggleStatus(req)}
-              title={req.check_mark ? "Marcar como pendiente" : "Marcar como completado"}
-            >
-              {req.check_mark ? <FaCheckCircle /> : <FaRegCircle />}
-            </CheckBtn>
+      {initialLoading ? (
+        <EmptyState>
+          <FaSpinner className="fa-spin" />
+          <p>Cargando solicitudes...</p>
+        </EmptyState>
+      ) : (
+        <Grid>
+          {requests.map(req => (
+            <Card key={req.id} completed={Boolean(req.check_mark)}>
+              <CheckBtn
+                completed={Boolean(req.check_mark)}
+                onClick={() => toggleStatus(req)}
+                title={req.check_mark ? "Marcar como pendiente" : "Completar solicitud"}
+              >
+                {req.check_mark ? <FaCheck /> : null}
+              </CheckBtn>
 
-            <CardContent>
-              <CardText completed={Boolean(req.check_mark)}>
-                {req.descripcion}
-              </CardText>
-            </CardContent>
+              <CardContent>
+                <CardText completed={Boolean(req.check_mark)}>
+                  {req.descripcion}
+                </CardText>
+              </CardContent>
 
-            <CardFooter>
-              <UserInfo title={`ID: ${req.usuario_id}`}>
-                <FaUser size={12} /> {req.usuario_nombre || 'Desconocido'}
-              </UserInfo>
-              <TimeInfo>
-                <FaClock size={12} /> {fmtDate(req.fecha_creacion)}
-              </TimeInfo>
-            </CardFooter>
-          </Card>
-        ))}
+              <CardFooter>
+                <UserBadge title={`ID: ${req.usuario_id}`}>
+                  <FaUser size={11} /> {req.usuario_nombre || 'Desconocido'}
+                </UserBadge>
+                <TimeInfo>
+                  <FaClock size={11} /> {fmtDate(req.fecha_creacion)}
+                </TimeInfo>
+              </CardFooter>
+            </Card>
+          ))}
 
-        {requests.length === 0 && (
-          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
-            No hay solicitudes pendientes.
-          </div>
-        )}
-      </Grid>
-    </Container>
+          {requests.length === 0 && (
+            <EmptyState>
+              <FaClipboardList />
+              <p>No hay solicitudes pendientes.</p>
+              <small>¡Agrega una nueva solicitud arriba!</small>
+            </EmptyState>
+          )}
+        </Grid>
+      )}
+    </PageWrapper>
   );
 };
 
