@@ -18,7 +18,8 @@ import Unauthorized from './components/Unauthorized.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import InventoryUpload from './pages/InventoryUpload.jsx';
 import CashReport from './pages/CashReport.jsx';
-import FacturasProveedores from './pages/FacturasProveedores.jsx'; // <--- NUEVA IMPORTACIÓN
+import FacturasProveedores from './pages/FacturasProveedores.jsx';
+import Solicitudes from './pages/Solicitudes.jsx'; // <--- NUEVA PÁGINA
 
 // Mapa de roles
 const ROLES = {
@@ -142,6 +143,16 @@ function App() {
         element={
           <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS]}>
             <FacturasProveedores />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Solicitudes (Nueva Ruta) */}
+      <Route
+        path="/solicitudes"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.INVENTARIO, ROLES.FINANZAS, ROLES.GERENTE]}>
+            <Solicitudes />
           </ProtectedRoute>
         }
       />

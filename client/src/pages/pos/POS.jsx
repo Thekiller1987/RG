@@ -73,6 +73,7 @@ const POS = () => {
       const intervalId = setInterval(() => {
         if (!document.hidden) {
           checkForNewOrders(userId);
+          refreshProducts(); // Recarga productos e inventario en segundo plano
         }
       }, 5000);
 

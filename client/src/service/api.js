@@ -447,3 +447,19 @@ export const getCart = async (userId, token) => {
 export const saveCart = async (userId, carts, token) => {
     return await request('post', '/caja/cart', token, { userId, carts });
 };
+
+// ===================================================================
+// === SECCIÓN DE SOLICITUDES (NUEVO) ===
+// ===================================================================
+
+export const fetchRequests = async (token) => {
+    return await request('get', '/requests', token);
+};
+
+export const createRequest = async (data, token) => {
+    return await request('post', '/requests', token, data);
+};
+
+export const toggleRequestStatus = async (id, completed, token) => {
+    return await request('put', `/requests/${id}/toggle`, token, { completed });
+};

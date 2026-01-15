@@ -21,6 +21,7 @@ const uploadRoutes = require('./src/routes/uploadRouter.js');
 const cajaRoutes = require('./src/routes/cajaRoutes.js');
 // NUEVA RUTA AGREGADA
 const providerInvoiceRoutes = require('./src/routes/providerInvoiceRoutes.js');
+const requestRoutes = require('./src/routes/requestRoutes.js');
 
 // 2. Crear una instancia de Express
 const app = express();
@@ -83,6 +84,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/caja', cajaRoutes);
 // NUEVA RUTA AGREGADA
 app.use('/api/facturas-proveedores', providerInvoiceRoutes);
+app.use('/api/requests', requestRoutes);
 
 app.get('/api', (_req, res) => {
   res.send('¡API MultirepuestosRG funcionando! 🚀');
