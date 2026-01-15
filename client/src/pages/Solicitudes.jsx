@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
-import { FaCheck, FaPlus, FaTrash, FaUser, FaClock, FaCheckCircle, FaRegCircle, FaArrowLeft, FaClipboardList, FaSpinner } from 'react-icons/fa';
+import { FaCheck, FaPlus, FaTrash, FaUser, FaClock, FaCheckCircle, FaRegCircle, FaArrowLeft, FaClipboardList, FaSpinner, FaEdit } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../service/api';
 
@@ -236,6 +236,10 @@ const Solicitudes = () => {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
+  // Edit State
+  const [editingId, setEditingId] = useState(null);
+  const [editValue, setEditValue] = useState('');
+
   const fetchRequestsData = useCallback(async () => {
     try {
       const res = await api.fetchRequests(token);
@@ -250,10 +254,10 @@ const Solicitudes = () => {
   useEffect(() => {
     fetchRequestsData();
     const interval = setInterval(() => {
-      if (!document.hidden) fetchRequestsData();
+      if (!document.hidden && !editingId) fetchRequestsData(); // Don't refresh while editing
     }, 5000);
     return () => clearInterval(interval);
-  }, [fetchRequestsData]);
+  }, [fetchRequestsData, editingId]);
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -286,6 +290,39 @@ const Solicitudes = () => {
     } catch (error) {
       console.error("Error toggling", error);
       fetchRequestsData(); // Revert on error
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("¿Seguro que deseas eliminar esta solicitud?")) return;
+    try {
+      await api.deleteRequest(id, token);
+      setRequests(prev => prev.filter(r => r.id !== id));
+    } catch (error) {
+      console.error("Error deleting", error);
+      alert("Error al eliminar");
+    }
+  };
+
+  const startEdit = (req) => {
+    setEditingId(req.id);
+    setEditValue(req.descripcion);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditValue('');
+  };
+
+  const saveEdit = async (id) => {
+    if (!editValue.trim()) return;
+    try {
+      await api.updateRequest(id, editValue, token);
+      setRequests(prev => prev.map(r => r.id === id ? { ...r, descripcion: editValue } : r));
+      setEditingId(null);
+    } catch (error) {
+      console.error("Error updating", error);
+      alert("Error al actualizar");
     }
   };
 
@@ -342,18 +379,64 @@ const Solicitudes = () => {
               </CheckBtn>
 
               <CardContent>
-                <CardText completed={Boolean(req.check_mark)}>
-                  {req.descripcion}
-                </CardText>
+                {editingId === req.id ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <Input
+                      autoFocus
+                      value={editValue}
+                      onChange={e => setEditValue(e.target.value)}
+                      style={{ padding: '8px', fontSize: '0.95rem' }}
+                    />
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
+                      <AddBtn onClick={() => saveEdit(req.id)} style={{ height: '36px', fontSize: '0.9rem', padding: '0 1rem' }}>Guardar</AddBtn>
+                      <button
+                        onClick={cancelEdit}
+                        style={{
+                          background: 'white', border: '1px solid #cbd5e1',
+                          borderRadius: '8px', padding: '0 1rem', cursor: 'pointer',
+                          color: '#64748b', fontWeight: 600
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <CardText completed={Boolean(req.check_mark)}>
+                    {req.descripcion}
+                  </CardText>
+                )}
               </CardContent>
 
               <CardFooter>
-                <UserBadge title={`ID: ${req.usuario_id}`}>
-                  <FaUser size={11} /> {req.usuario_nombre || 'Desconocido'}
-                </UserBadge>
-                <TimeInfo>
-                  <FaClock size={11} /> {fmtDate(req.fecha_creacion)}
-                </TimeInfo>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <UserBadge title={`ID: ${req.usuario_id}`}>
+                    <FaUser size={11} /> {req.usuario_nombre || 'Desconocido'}
+                  </UserBadge>
+                  <TimeInfo>
+                    <FaClock size={11} /> {fmtDate(req.fecha_creacion)}
+                  </TimeInfo>
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {!req.check_mark && editingId !== req.id && ( // Only show edit if not completed
+                    <button
+                      onClick={() => startEdit(req)}
+                      style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#3b82f6', fontSize: '1.1rem' }}
+                      title="Editar"
+                    >
+                      <FaEdit />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDelete(req.id)}
+                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#ef4444', fontSize: '1rem' }}
+                    title="Eliminar"
+                  >
+                    <FaTrash />
+                  </button>
+                </div>
               </CardFooter>
             </Card>
           ))}

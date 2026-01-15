@@ -463,3 +463,11 @@ export const createRequest = async (data, token) => {
 export const toggleRequestStatus = async (id, completed, token) => {
     return await request('put', `/requests/${id}/toggle`, token, { completed });
 };
+
+export const updateRequest = async (id, descripcion, token) => {
+    return await request('put', `/requests/${id}`, token, { descripcion });
+};
+
+export const deleteRequest = async (id, token) => {
+    return await request('delete', `/requests/${id}`, token);
+};

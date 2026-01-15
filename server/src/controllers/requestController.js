@@ -69,3 +69,26 @@ exports.toggleRequestStatus = async (req, res) => {
         res.status(500).json({ message: 'Error actualizando solicitud' });
     }
 };
+
+exports.updateRequest = async (req, res) => {
+    const { id } = req.params;
+    const { descripcion } = req.body;
+    try {
+        await pool.query('UPDATE solicitudes SET descripcion = ? WHERE id = ?', [descripcion, id]);
+        res.json({ success: true, id, descripcion });
+    } catch (error) {
+        console.error('Error updating request:', error);
+        res.status(500).json({ message: 'Error actualizando solicitud' });
+    }
+};
+
+exports.deleteRequest = async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM solicitudes WHERE id = ?', [id]);
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('Error deleting request:', error);
+        res.status(500).json({ message: 'Error eliminando solicitud' });
+    }
+};
