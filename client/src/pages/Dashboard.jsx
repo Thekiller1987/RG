@@ -4,7 +4,6 @@ import styled from 'styled-components';
 import {
     FaSignOutAlt, FaShoppingCart, FaBoxOpen, FaFileInvoice,
     FaCreditCard, FaCloudUploadAlt, FaChartBar, FaBriefcase, FaUsers,
-    FaCreditCard, FaCloudUploadAlt, FaChartBar, FaBriefcase, FaUsers,
     FaFileInvoiceDollar, FaClipboardList // <--- NUEVO ICONO
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext.jsx';
