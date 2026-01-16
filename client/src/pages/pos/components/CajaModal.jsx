@@ -27,33 +27,34 @@ const GlobalPrintStyle = React.memo(() => (
 
 const PrintWrapper = styled.div`
   font-family: 'Consolas','Courier New',monospace; color: #000; background: #fff;
-  width: 310px; margin: 0 auto; padding: 12px 10px;
+  width: 310px; margin: 0 auto; padding: 12px 6px;
   box-shadow: 0 0 10px rgba(0,0,0,.08); border: 1px solid #eee; border-radius: 8px;
 
   /* Encabezado */
-  .brand { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 15px; }
-  .brand h2 { margin: 0 0 5px; font-size: 1.1rem; font-weight: 900; text-transform: uppercase; }
-  .brand p { margin: 2px 0; font-size: 0.85rem; }
+  .brand { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 12px; margin-bottom: 15px; }
+  .brand h2 { margin: 0 0 6px; font-size: 1.4rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+  .brand p { margin: 3px 0; font-size: 0.95rem; font-weight: 600; }
 
   /* Secciones y Filas */
-  .section { margin-bottom: 15px; border-bottom: 1px dashed #444; padding-bottom: 10px; }
+  .section { margin-bottom: 18px; border-bottom: 1px dashed #444; padding-bottom: 12px; }
   .section:last-child { border-bottom: none; }
-  .section-title { font-weight: 900; text-align: center; text-transform: uppercase; font-size: 0.9rem; margin-bottom: 8px; text-decoration: underline; }
+  .section-title { font-weight: 900; text-align: center; text-transform: uppercase; font-size: 1.1rem; margin-bottom: 10px; text-decoration: underline; letter-spacing: 0.5px; }
   
-  .row { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px; }
-  .row.big { font-size: 1.1rem; font-weight: 900; margin-top: 8px; border-top: 2px solid #000; padding-top: 6px; }
-  .row.sub { font-size: 0.75rem; color: #444; font-style: italic; padding-left: 10px; }
-  .row.alert { background: #eee; padding: 6px; font-weight: 900; text-align: center; justify-content: center; gap: 10px; border: 2px solid #000; margin-top: 8px; }
+  .row { display: flex; justify-content: space-between; font-size: 1rem; margin-bottom: 6px; align-items: baseline; }
+  .row.big { font-size: 1.3rem; font-weight: 900; margin-top: 12px; border-top: 2px solid #000; padding-top: 8px; }
+  .row.sub { font-size: 0.85rem; color: #333; font-style: italic; padding-left: 10px; margin-bottom: 4px; }
+  .row.alert { background: #eee; padding: 8px; font-weight: 900; text-align: center; justify-content: center; gap: 10px; border: 2px solid #000; margin-top: 12px; font-size: 1.2rem; }
 
   /* Tablas simples */
-  table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 6px; }
-  th { border-bottom: 2px solid #000; text-align: left; font-weight: 900; padding: 2px; }
-  td { border-bottom: 1px dashed #ccc; padding: 2px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 8px; }
+  th { border-bottom: 2px solid #000; text-align: left; font-weight: 900; padding: 4px 2px; }
+  td { border-bottom: 1px dashed #ccc; padding: 4px 2px; }
   .text-right { text-align: right; }
 
   /* Firma */
-  .signature { margin-top: 40px; text-align: center; page-break-inside: avoid; }
-  .signature-line { border-top: 2px solid #000; width: 80%; margin: 0 auto 5px; }
+  .signature { margin-top: 50px; text-align: center; page-break-inside: avoid; }
+  .signature-line { border-top: 2px solid #000; width: 80%; margin: 0 auto 8px; }
+  .signature p { font-size: 1rem; font-weight: 700; }
 
   @media print {
     &.print-80 {
@@ -180,31 +181,34 @@ const CajaModal = ({
     if (!node) return;
     const htmlToPrint = node.outerHTML;
 
-    // Estilos críticos para impresora térmica: Negro, Negrita, 80mm
+    /* Estilos críticos para impresora térmica: Negro, Negrita, 80mm */
     const printStyles = `
-      @charset "UTF-8";
-      @page { size: 80mm auto; margin: 0; }
-      html, body {
-        background: #fff; margin: 0 !important; padding: 0 !important;
-        -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
-        color: #000 !important; font-family: Consolas, 'Courier New', monospace !important;
-      }
-      #print-wrapper-caja, #print-wrapper-caja * {
-        color: #000 !important; font-weight: 700 !important;
-        text-shadow: none !important; box-shadow: none !important;
-        visibility: visible !important;
-      }
-      #print-wrapper-caja {
-        width: 80mm !important; padding: 5px !important; border: none !important;
-      }
-      .brand h2 { font-size: 14pt !important; }
-      .row.big { font-size: 11pt !important; border-top: 2px solid #000 !important; }
-      .text-right { text-align: right !important; }
-      
-      @media print {
-        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-      }
-    `;
+        @charset "UTF-8";
+        @page { size: 80mm auto; margin: 0; }
+        html, body {
+          background: #fff; margin: 0 !important; padding: 0 !important;
+          -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+          color: #000 !important; font-family: Consolas, 'Courier New', monospace !important;
+        }
+        #print-wrapper-caja, #print-wrapper-caja * {
+          color: #000 !important; font-weight: 700 !important;
+          text-shadow: none !important; box-shadow: none !important;
+          visibility: visible !important;
+        }
+        #print-wrapper-caja {
+          width: 80mm !important; padding: 5px !important; border: none !important;
+        }
+        .brand h2 { font-size: 18pt !important; letter-spacing: 2px !important; }
+        .section-title { font-size: 12pt !important; margin-bottom: 12px !important; }
+        .row { font-size: 11pt !important; margin-bottom: 6px !important; }
+        .row.big { font-size: 14pt !important; margin-top: 15px !important; border-top: 3px solid #000 !important; }
+        .row.alert { font-size: 16pt !important; padding: 10px !important; border: 3px solid #000 !important; }
+        .text-right { text-align: right !important; }
+        
+        @media print {
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+      `;
 
     const w = window.open('', '_blank', 'width=500,height=600');
     if (!w) return;
