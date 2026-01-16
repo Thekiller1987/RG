@@ -595,221 +595,227 @@ function SalesHistoryModal({
             )}
           </LeftPanel>
 
-          selectedSale.estado === 'ABONO_CREDITO' ? (
-          <RightPanel>
-            <div style={{ borderBottom: '2px dashed #ccc', paddingBottom: 15, marginBottom: 15 }}>
-              <h3 style={{ margin: 0, fontSize: '1.4rem', color: '#17a2b8', textAlign: 'center' }}>
-                <FaHandHoldingUsd /> Recibo de Abono
-              </h3>
-              <p style={{ textAlign: 'center', color: '#555', margin: '5px 0' }}>#{selectedSale.id}</p>
-            </div>
+          {selectedSale ? (
+            selectedSale.estado === 'ABONO_CREDITO' ? (
+              <RightPanel>
+                <div style={{ borderBottom: '2px dashed #ccc', paddingBottom: 15, marginBottom: 15 }}>
+                  <h3 style={{ margin: 0, fontSize: '1.4rem', color: '#17a2b8', textAlign: 'center' }}>
+                    <FaHandHoldingUsd /> Recibo de Abono
+                  </h3>
+                  <p style={{ textAlign: 'center', color: '#555', margin: '5px 0' }}>#{selectedSale.id}</p>
+                </div>
 
-            <InfoBox>
-              <div style={{ display: 'grid', gap: 10 }}>
-                <TotalsRow>
-                  <span>Fecha:</span>
-                  <strong>{new Date(selectedSale.fecha).toLocaleString('es-NI')}</strong>
-                </TotalsRow>
-                <TotalsRow>
-                  <span>Cliente:</span>
-                  <strong style={{ fontSize: '1.1rem' }}>
-                    {safeClients.find(c => c.id_cliente === (selectedSale.clientId || selectedSale.idCliente))?.nombre || 'Desconocido'}
-                  </strong>
-                </TotalsRow>
-                <TotalsRow>
-                  <span>Cajero:</span>
-                  <strong>
-                    {safeUsers.find(u => (u.id_usuario ?? u.id) == selectedSale.userId)?.nombre_usuario || selectedSale.usuarioNombre || 'Sistema'}
-                  </strong>
-                </TotalsRow>
-              </div>
-            </InfoBox>
+                <InfoBox>
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    <TotalsRow>
+                      <span>Fecha:</span>
+                      <strong>{new Date(selectedSale.fecha).toLocaleString('es-NI')}</strong>
+                    </TotalsRow>
+                    <TotalsRow>
+                      <span>Cliente:</span>
+                      <strong style={{ fontSize: '1.1rem' }}>
+                        {safeClients.find(c => c.id_cliente === (selectedSale.clientId || selectedSale.idCliente))?.nombre || 'Desconocido'}
+                      </strong>
+                    </TotalsRow>
+                    <TotalsRow>
+                      <span>Cajero:</span>
+                      <strong>
+                        {safeUsers.find(u => (u.id_usuario ?? u.id) == selectedSale.userId)?.nombre_usuario || selectedSale.usuarioNombre || 'Sistema'}
+                      </strong>
+                    </TotalsRow>
+                  </div>
+                </InfoBox>
 
-            <div style={{ margin: '20px 0', border: '1px solid #ddd', padding: 15, borderRadius: 8, background: '#f8f9fa' }}>
-              <TotalsRow style={{ fontSize: '1.2rem', color: '#28a745' }}>
-                <span>Monto Abonado:</span>
-                <strong>C$ {money(selectedSale.totalVenta)}</strong>
-              </TotalsRow>
-            </div>
+                <div style={{ margin: '20px 0', border: '1px solid #ddd', padding: 15, borderRadius: 8, background: '#f8f9fa' }}>
+                  <TotalsRow style={{ fontSize: '1.2rem', color: '#28a745' }}>
+                    <span>Monto Abonado:</span>
+                    <strong>C$ {money(selectedSale.totalVenta)}</strong>
+                  </TotalsRow>
+                </div>
 
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 20 }}>
-              <OriginalButton onClick={handleReprint} style={{ fontSize: '1.1rem', padding: '10px 20px' }}>
-                <FaPrint /> Imprimir Comprobante
-              </OriginalButton>
-            </div>
-          </RightPanel>
-          ) : selectedSale.estado === 'DEVOLUCION' ? (
-          <RightPanel>
-            <h3 style={{ marginTop: 0 }}>
-              Detalle de Transacción #{selectedSale.id}
-            </h3>
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 20 }}>
+                  <OriginalButton onClick={handleReprint} style={{ fontSize: '1.1rem', padding: '10px 20px' }}>
+                    <FaPrint /> Imprimir Comprobante
+                  </OriginalButton>
+                </div>
+              </RightPanel>
+            ) : selectedSale.estado === 'DEVOLUCION' ? (
+              <RightPanel>
+                <h3 style={{ marginTop: 0 }}>
+                  Detalle de Transacción #{selectedSale.id}
+                </h3>
 
-            <div className="box" style={{ marginTop: 10 }}>
-              <p>
-                <strong>Cliente:</strong>{' '}
-                {safeClients.find(
-                  (c) =>
-                    c.id_cliente ===
-                    (selectedSale.clientId || selectedSale.idCliente)
-                )?.nombre || 'Consumidor Final'}
-              </p>
-              <p>
-                <strong>Fecha:</strong>{' '}
-                {new Date(selectedSale.fecha).toLocaleString('es-NI')}
-              </p>
-              <p>
-                <strong>Estado:</strong>{' '}
-                <span
-                  style={{
-                    background: '#fff3cd',
-                    color: '#856404',
-                    padding: '2px 8px',
-                    borderRadius: 8,
-                    fontWeight: 700,
-                  }}
-                >
-                  DEVOLUCIÓN
-                </span>
-              </p>
-            </div>
+                <div className="box" style={{ marginTop: 10 }}>
+                  <p>
+                    <strong>Cliente:</strong>{' '}
+                    {safeClients.find(
+                      (c) =>
+                        c.id_cliente ===
+                        (selectedSale.clientId || selectedSale.idCliente)
+                    )?.nombre || 'Consumidor Final'}
+                  </p>
+                  <p>
+                    <strong>Fecha:</strong>{' '}
+                    {new Date(selectedSale.fecha).toLocaleString('es-NI')}
+                  </p>
+                  <p>
+                    <strong>Estado:</strong>{' '}
+                    <span
+                      style={{
+                        background: '#fff3cd',
+                        color: '#856404',
+                        padding: '2px 8px',
+                        borderRadius: 8,
+                        fontWeight: 700,
+                      }}
+                    >
+                      DEVOLUCIÓN
+                    </span>
+                  </p>
+                </div>
 
-            <div className="box" style={{ marginTop: 10 }}>
-              <h4 style={{ marginTop: 0 }}>Detalle de Devolución</h4>
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {(selectedSale.items || []).map((it, i) => (
-                  <li key={`${it.id || it.id_producto}-${i}`}>
+                <div className="box" style={{ marginTop: 10 }}>
+                  <h4 style={{ marginTop: 0 }}>Detalle de Devolución</h4>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {(selectedSale.items || []).map((it, i) => (
+                      <li key={`${it.id || it.id_producto}-${i}`}>
+                        <strong>
+                          {safeItemName(it, i)}
+                        </strong>{' '}
+                        — {Number(it.quantity || it.cantidad || 0)} u. @ C$
+                        {Number(it.precio || it.precio_unitario || 0).toFixed(2)}
+                      </li>
+                    ))}
+                  </ul>
+                  <p style={{ marginTop: 8 }}>
+                    Importe devuelto:{' '}
                     <strong>
-                      {safeItemName(it, i)}
-                    </strong>{' '}
-                    — {Number(it.quantity || it.cantidad || 0)} u. @ C$
-                    {Number(it.precio || it.precio_unitario || 0).toFixed(2)}
-                  </li>
-                ))}
-              </ul>
-              <p style={{ marginTop: 8 }}>
-                Importe devuelto:{' '}
-                <strong>
-                  C$
-                  {(() => {
-                    const totalNorm = Number(
-                      (selectedSale.totalVenta ?? selectedSale.total_venta ?? selectedSale.total ?? 0)
-                    );
-                    return Math.abs(totalNorm).toFixed(2);
-                  })()}
-                </strong>
-              </p>
-            </div>
+                      C$
+                      {(() => {
+                        const totalNorm = Number(
+                          (selectedSale.totalVenta ?? selectedSale.total_venta ?? selectedSale.total ?? 0)
+                        );
+                        return Math.abs(totalNorm).toFixed(2);
+                      })()}
+                    </strong>
+                  </p>
+                </div>
 
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-start',
-                gap: 10,
-                marginTop: 12,
-              }}
-            >
-              <OriginalButton onClick={handleReprint}>
-                Reimprimir Ticket
-              </OriginalButton>
-            </div>
-          </RightPanel>
-          ) : selectedSale.estado === 'CANCELADA' ? (
-          // ───────────────────────── VISTA NUEVA PARA CANCELADAS ─────────────────────────
-          <RightPanel>
-            <h3 style={{ marginTop: 0, color: '#dc3545' }}>
-              Detalle de Venta Cancelada #{selectedSale.id}
-            </h3>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'flex-start',
+                    gap: 10,
+                    marginTop: 12,
+                  }}
+                >
+                  <OriginalButton onClick={handleReprint}>
+                    Reimprimir Ticket
+                  </OriginalButton>
+                </div>
+              </RightPanel>
+            ) : selectedSale.estado === 'CANCELADA' ? (
+              // ───────────────────────── VISTA NUEVA PARA CANCELADAS ─────────────────────────
+              <RightPanel>
+                <h3 style={{ marginTop: 0, color: '#dc3545' }}>
+                  Detalle de Venta Cancelada #{selectedSale.id}
+                </h3>
 
-            <div className="box" style={{ marginTop: 10 }}>
-              <p>
-                <strong>Cliente:</strong>{' '}
-                {safeClients.find(
+                <div className="box" style={{ marginTop: 10 }}>
+                  <p>
+                    <strong>Cliente:</strong>{' '}
+                    {safeClients.find(
+                      (c) =>
+                        c.id_cliente ===
+                        (selectedSale.clientId || selectedSale.idCliente)
+                    )?.nombre || 'Consumidor Final'}
+                  </p>
+                  <p>
+                    <strong>Fecha:</strong>{' '}
+                    {new Date(selectedSale.fecha).toLocaleString('es-NI')}
+                  </p>
+                  <p>
+                    <strong>Estado:</strong>{' '}
+                    <span
+                      style={{
+                        background: '#f8d7da',
+                        color: '#721c24',
+                        padding: '2px 8px',
+                        borderRadius: 8,
+                        fontWeight: 700,
+                      }}
+                    >
+                      CANCELADA
+                    </span>
+                  </p>
+                </div>
+
+                <div className="box" style={{ marginTop: 10 }}>
+                  <h4 style={{ marginTop: 0 }}>Productos Cancelados</h4>
+                  {(!selectedSale.items || selectedSale.items.length === 0) ? (
+                    <p style={{ color: '#6c757d', fontStyle: 'italic' }}>
+                      No hay detalles de productos disponibles.
+                    </p>
+                  ) : (
+                    <ul style={{ margin: 0, paddingLeft: 18, color: '#6c757d' }}>
+                      {selectedSale.items.map((it, i) => (
+                        <li key={`${it.id || it.id_producto}-${i}`}>
+                          <strong>{safeItemName(it, i)}</strong>
+                          {' '}— {Number(it.quantity || it.cantidad || 0)} u.
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p style={{ marginTop: 8, color: '#dc3545', textDecoration: 'line-through' }}>
+                    Total Anulado: <strong>C$ {money(selectedSale.totalVenta)}</strong>
+                  </p>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'flex-start',
+                    gap: 10,
+                    marginTop: 12,
+                  }}
+                >
+                  <OriginalButton onClick={handleReprint}>
+                    Reimprimir Comprobante
+                  </OriginalButton>
+                </div>
+              </RightPanel>
+              // ───────────────────────────────────────────────────────────────────────────────
+            ) : (
+              <SaleDetailView
+                sale={selectedSale}
+                client={safeClients.find(
                   (c) =>
                     c.id_cliente ===
                     (selectedSale.clientId || selectedSale.idCliente)
-                )?.nombre || 'Consumidor Final'}
-              </p>
-              <p>
-                <strong>Fecha:</strong>{' '}
-                {new Date(selectedSale.fecha).toLocaleString('es-NI')}
-              </p>
-              <p>
-                <strong>Estado:</strong>{' '}
-                <span
-                  style={{
-                    background: '#f8d7da',
-                    color: '#721c24',
-                    padding: '2px 8px',
-                    borderRadius: 8,
-                    fontWeight: 700,
-                  }}
-                >
-                  CANCELADA
-                </span>
-              </p>
-            </div>
-
-            <div className="box" style={{ marginTop: 10 }}>
-              <h4 style={{ marginTop: 0 }}>Productos Cancelados</h4>
-              {(!selectedSale.items || selectedSale.items.length === 0) ? (
-                <p style={{ color: '#6c757d', fontStyle: 'italic' }}>
-                  No hay detalles de productos disponibles.
-                </p>
-              ) : (
-                <ul style={{ margin: 0, paddingLeft: 18, color: '#6c757d' }}>
-                  {selectedSale.items.map((it, i) => (
-                    <li key={`${it.id || it.id_producto}-${i}`}>
-                      <strong>{safeItemName(it, i)}</strong>
-                      {' '}— {Number(it.quantity || it.cantidad || 0)} u.
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p style={{ marginTop: 8, color: '#dc3545', textDecoration: 'line-through' }}>
-                Total Anulado: <strong>C$ {money(selectedSale.totalVenta)}</strong>
-              </p>
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-start',
-                gap: 10,
-                marginTop: 12,
-              }}
-            >
-              <OriginalButton onClick={handleReprint}>
-                Reimprimir Comprobante
-              </OriginalButton>
-            </div>
-          </RightPanel>
-              // ───────────────────────────────────────────────────────────────────────────────
+                )}
+                creditStatus={null}
+                dailySales={salesData}
+                isAdmin={isAdmin}
+                onOpenAbonoModal={() => setShowAbonoModal(true)}
+                onCancelSale={(saleId) => handleCancel(saleId)}
+                onReturnItem={(item, index) => handleReturn(item, index)}
+                onReprintTicket={handleReprint}
+                showConfirmation={({ onConfirm }) =>
+                  openConfirm('Confirmación', '¿Confirmar acción?', onConfirm)
+                }
+                showPrompt={({ title, message, defaultValue, onConfirm }) =>
+                  openPrompt(title, message, defaultValue, onConfirm)
+                }
+                showAlert={({ title, message }) => openAlert(title, message)}
+              />
+            )
           ) : (
-          <SaleDetailView
-            sale={selectedSale}
-            client={safeClients.find(
-              (c) =>
-                c.id_cliente ===
-                (selectedSale.clientId || selectedSale.idCliente)
-            )}
-            creditStatus={null}
-            dailySales={salesData}
-            isAdmin={isAdmin}
-            onOpenAbonoModal={() => setShowAbonoModal(true)}
-            onCancelSale={(saleId) => handleCancel(saleId)}
-            onReturnItem={(item, index) => handleReturn(item, index)}
-            onReprintTicket={handleReprint}
-            showConfirmation={({ onConfirm }) =>
-              openConfirm('Confirmación', '¿Confirmar acción?', onConfirm)
-            }
-            showPrompt={({ title, message, defaultValue, onConfirm }) =>
-              openPrompt(title, message, defaultValue, onConfirm)
-            }
-            showAlert={({ title, message }) => openAlert(title, message)}
-          />
-          )
-          ) : (
-          <RightPanel />
+            <RightPanel>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#aaa', fontStyle: 'italic', flexDirection: 'column' }}>
+                <FaHistory size={40} style={{ marginBottom: 10, opacity: 0.5 }} />
+                <p>Seleccione una transacción para ver detalles</p>
+              </div>
+            </RightPanel>
           )}
         </Main>
 

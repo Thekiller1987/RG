@@ -314,7 +314,7 @@ const CajaModal = ({
                   <div className="section-title">2. DESGLOSE INGRESOS</div>
                   <div className="row"><span>(+) Efec. C$:</span><span>{money(netCordobas)}</span></div>
                   <div className="row"><span>(+) Efec. USD:</span><span>{usd(netDolares)}</span></div>
-                  <div className="row sub">-> Equiv: {money(netDolares * tasaRef)}</div>
+                  <div className="row sub">&rarr; Equiv: {money(netDolares * tasaRef)}</div>
                   {totalTarjeta > 0 && <div className="row" style={{ marginTop: 6 }}><span>(+) Tarjetas:</span><span>{money(totalTarjeta)}</span></div>}
                   {totalTransferencia > 0 && <div className="row"><span>(+) Transf.:</span><span>{money(totalTransferencia)}</span></div>}
                   {totalCredito > 0 && <div className="row"><span>(+) Créditos:</span><span>{money(totalCredito)}</span></div>}
@@ -378,18 +378,18 @@ const CajaModal = ({
               <TotalsRow style={{ fontSize: '1.1rem' }}><span><FaUserClock /> Abrió:</span><strong>{openedByName}</strong></TotalsRow>
             </div>
 
-            <div style={{ marginTop: 8, padding: '10px', backgroundColor: '#f8f9fa', borderRadius: 4, border: '1px dashed #ced4da' }}>
-              <div style={{ fontWeight: 'bold', marginBottom: 5 }}>Efectivo a Tener:</div>
-              <TotalsRow><span>Córdobas:</span><strong style={{ color: '#198754' }}>C$ {Number(efectivoEsperadoCordobas).toLocaleString()}</strong></TotalsRow>
-              <TotalsRow><span>Dólares:</span><strong style={{ color: '#198754' }}>$ {Number(efectivoEsperadoDolares).toLocaleString()}</strong></TotalsRow>
-              <TotalsRow $bold style={{ marginTop: 5, borderTop: '1px solid #ccc', paddingTop: 5 }}><span>TOTAL (C$):</span><span>{money(efectivoEsperado)}</span></TotalsRow>
+            <div style={{ marginTop: 8, padding: '15px', backgroundColor: '#f8f9fa', borderRadius: 6, border: '1px dashed #ced4da' }}>
+              <div style={{ fontWeight: '800', marginBottom: 10, fontSize: '1.2rem', color: '#495057' }}>Efectivo a Tener:</div>
+              <TotalsRow style={{ fontSize: '1.3rem' }}><span>Córdobas:</span><strong style={{ color: '#198754' }}>C$ {Number(efectivoEsperadoCordobas).toLocaleString()}</strong></TotalsRow>
+              <TotalsRow style={{ fontSize: '1.3rem' }}><span>Dólares:</span><strong style={{ color: '#198754' }}>$ {Number(efectivoEsperadoDolares).toLocaleString()}</strong></TotalsRow>
+              <TotalsRow $bold style={{ marginTop: 10, borderTop: '2px solid #ccc', paddingTop: 10, fontSize: '1.5rem' }}><span>TOTAL (C$):</span><span>{money(efectivoEsperado)}</span></TotalsRow>
             </div>
 
-            <label style={{ display: 'block', marginTop: 15, fontWeight: 700 }}>Monto Contado Físico (C$)</label>
-            <SearchInput type="number" step="0.01" value={montoContado} onChange={e => setMontoContado(e.target.value)} autoFocus placeholder="Total Billetes + Monedas" />
+            <label style={{ display: 'block', marginTop: 20, fontWeight: 800, fontSize: '1.3rem' }}>Monto Contado Físico (C$)</label>
+            <SearchInput type="number" step="0.01" value={montoContado} onChange={e => setMontoContado(e.target.value)} autoFocus placeholder="Total Billetes + Monedas" style={{ fontSize: '1.5rem', padding: '12px', height: 'auto' }} />
 
             {montoContado && (
-              <TotalsRow $bold style={{ marginTop: 10, color: diferencia !== 0 ? '#dc3545' : '#28a745', fontSize: '1.1rem' }}>
+              <TotalsRow $bold style={{ marginTop: 15, color: diferencia !== 0 ? '#dc3545' : '#28a745', fontSize: '1.8rem', padding: '10px', background: diferencia !== 0 ? '#fff5f5' : '#f0fff4', borderRadius: 8, border: `2px solid ${diferencia !== 0 ? '#dc3545' : '#28a745'}` }}>
                 <span>Diferencia:</span><span>{money(diferencia)}</span>
               </TotalsRow>
             )}
