@@ -174,6 +174,16 @@ const SaleDetailView = ({
                     )}
                   </>
                 )}
+                {sale.pagoDetalles.transferencia > 0 && (
+                  <>
+                    <TotalsRow><span><FaExchangeAlt /> Transferencia:</span><span>C${money(sale.pagoDetalles.transferencia)}</span></TotalsRow>
+                    {sale.pagoDetalles.referenciaTransferencia && (
+                      <TotalsRow style={{ fontSize: '0.85rem', color: '#666', paddingLeft: '1.5rem' }}>
+                        <span>↳ Ref:</span><span>{sale.pagoDetalles.referenciaTransferencia}</span>
+                      </TotalsRow>
+                    )}
+                  </>
+                )}
                 {sale.pagoDetalles.credito > 0 && <TotalsRow><span><FaUser /> Crédito Otorgado:</span><span style={{ color: '#dc3545' }}>C${money(sale.pagoDetalles.credito)}</span></TotalsRow>}
                 {sale.pagoDetalles.vuelto > 0 && <TotalsRow><span>Vuelto Entregado:</span><span>- C${money(sale.pagoDetalles.vuelto)}</span></TotalsRow>}
               </div>

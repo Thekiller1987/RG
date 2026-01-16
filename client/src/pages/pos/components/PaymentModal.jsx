@@ -42,6 +42,7 @@ const PaymentModal = ({
   const [dolares, setDolares] = useState('0.00');
   const [transferencia, setTransferencia] = useState('0.00');
   const [referenciaTarjeta, setReferenciaTarjeta] = useState('');
+  const [referenciaTransferencia, setReferenciaTransferencia] = useState('');
   const [tipoPagoPrincipal, setTipoPagoPrincipal] = useState('contado');
   const [clienteSeleccionado, setClienteSeleccionado] = useState(initialClientId ?? '0');
   const [saving, setSaving] = useState(false);
@@ -114,8 +115,9 @@ const PaymentModal = ({
     saving ||
     saldoPendienteDePago > 0.01 ||
     ((tipoVentaFinal === 'mixto' || tipoVentaFinal === 'credito_total') && !isClientValid) ||
-    (needsReference && !referenciaTarjeta.trim())
-  ), [saving, saldoPendienteDePago, tipoVentaFinal, isClientValid, needsReference, referenciaTarjeta]);
+    (needsReference && !referenciaTarjeta.trim()) ||
+    (numTransferencia > 0.01 && !referenciaTransferencia.trim())
+  ), [saving, saldoPendienteDePago, tipoVentaFinal, isClientValid, needsReference, referenciaTarjeta, numTransferencia, referenciaTransferencia]);
 
   /* ---- Carrito local (para coherencia de totales) ---- */
   const normalizedItems = useMemo(() => {
@@ -185,6 +187,7 @@ const PaymentModal = ({
     setDolares('0.00');
     setTransferencia('0.00');
     setReferenciaTarjeta('');
+    setReferenciaTransferencia('');
   }, [isClientValid, showAlert]);
 
   const handlePayFullCash = useCallback(() => {
@@ -193,6 +196,7 @@ const PaymentModal = ({
     setDolares('0.00');
     setTransferencia('0.00');
     setReferenciaTarjeta('');
+    setReferenciaTransferencia('');
     setTipoPagoPrincipal('contado');
   }, [total]);
 
@@ -227,6 +231,10 @@ const PaymentModal = ({
       showAlert?.({ title: 'Dato Requerido', message: 'Ingrese el número de referencia para el pago con tarjeta.', type: 'warning' });
       return;
     }
+    if (numTransferencia > 0.01 && !referenciaTransferencia.trim()) {
+      showAlert?.({ title: 'Dato Requerido', message: 'Ingrese el número de referencia para la transferencia.', type: 'warning' });
+      return;
+    }
     if (saving) return;
     setSaving(true);
 
@@ -239,8 +247,8 @@ const PaymentModal = ({
       transferencia: numTransferencia,
       dolares: numDolares,
       tasaDolarAlMomento: Number(tasaDolar),
-      referenciaTarjeta: referenciaTarjeta.trim(), // Agregamos la referencia explícitamente
-      referenciaTransferencia: '', // Si hubiera campo para esto
+      referenciaTarjeta: referenciaTarjeta.trim(),
+      referenciaTransferencia: referenciaTransferencia.trim(),
       credito,                           // shorthand
       clienteId: finalClienteId,
       tipoVenta: computeTipoVenta({
@@ -435,9 +443,18 @@ const PaymentModal = ({
               {needsReference && (
                 <div style={{ marginTop: 15, padding: 12, border: '1px solid #fcd34d', borderRadius: 8, backgroundColor: '#fffbeb' }}>
                   <label style={{ display: 'block', fontWeight: '700', fontSize: '0.85rem', color: '#b45309', marginBottom: 6 }}>
-                    <FaHashtag /> Nº Referencia Tarjeta
+                    <FaHashtag /> Nº Referencia Tarjeta <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <SearchInput type="text" placeholder="Ej: 1234" value={referenciaTarjeta} onChange={e => setReferenciaTarjeta(e.target.value)} style={{ width: '100%', height: 36, fontSize: '0.95rem' }} />
+                </div>
+              )}
+
+              {numTransferencia > 0.01 && (
+                <div style={{ marginTop: 15, padding: 12, border: '1px solid #bae6fd', borderRadius: 8, backgroundColor: '#f0f9ff' }}>
+                  <label style={{ display: 'block', fontWeight: '700', fontSize: '0.85rem', color: '#0369a1', marginBottom: 6 }}>
+                    <FaHashtag /> Nº Referencia Transferencia <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <SearchInput type="text" placeholder="Ej: REF-5678" value={referenciaTransferencia} onChange={e => setReferenciaTransferencia(e.target.value)} style={{ width: '100%', height: 36, fontSize: '0.95rem' }} />
                 </div>
               )}
 

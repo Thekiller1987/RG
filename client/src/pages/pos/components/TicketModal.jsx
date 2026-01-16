@@ -655,6 +655,18 @@ const TicketModal = ({
                   {!isProforma && (
                     <>
                       <TotalsRow><span>Tipo de Pago:</span><span>{metodo}</span></TotalsRow>
+
+                      {pd.referenciaTarjeta && (
+                        <TotalsRow style={{ fontSize: '0.8rem', color: '#666' }}>
+                          <span># Ref Tarjeta:</span><span>{pd.referenciaTarjeta}</span>
+                        </TotalsRow>
+                      )}
+                      {pd.referenciaTransferencia && (
+                        <TotalsRow style={{ fontSize: '0.8rem', color: '#666' }}>
+                          <span># Ref Transferencia:</span><span>{pd.referenciaTransferencia}</span>
+                        </TotalsRow>
+                      )}
+
                       <TotalsRow><span>Monto Pagado:</span><span>C${fmt(pagado)}</span></TotalsRow>
                       {cambio > 0 && (
                         <TotalsRow $bold style={{ color: '#dc3545' }}>
