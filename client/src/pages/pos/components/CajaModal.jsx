@@ -345,13 +345,49 @@ const CajaModal = ({
                   </div>
                 </div>
 
-                {(entradas.length > 0 || salidas.length > 0) && (
-                  <div className="section">
-                    <div className="section-title" style={{ fontSize: '0.8rem' }}>DETALLE MOVIMIENTOS</div>
-                    {entradas.map((x, i) => <div className="row" key={'e' + i}><span>(+) {x.note || 'Entrada'}</span><span>{money(x.amount)}</span></div>)}
-                    {salidas.map((x, i) => <div className="row" key={'s' + i}><span>(-) {x.note || 'Salida'}</span><span>{money(x.amount)}</span></div>)}
-                  </div>
-                )}
+                <div className="section">
+                  <div className="section-title">5. DETALLE DE MOVIMIENTOS</div>
+                  <table style={{ marginTop: 0 }}>
+                    <tbody>
+                      {abonos.length > 0 && (
+                        <>
+                          <tr><td colSpan="2" style={{ fontWeight: '900', background: '#f8f9fa', fontSize: '0.9rem' }}>--- ABONOS Y CREDITOS ---</td></tr>
+                          {abonos.map((x, i) => (
+                            <tr key={'a' + i}>
+                              <td style={{ fontSize: '0.9rem' }}>{x.note || 'Abono'} <br /><span style={{ fontSize: '0.75rem', color: '#555' }}>#{x.id}</span></td>
+                              <td className="text-right" style={{ fontSize: '0.9rem' }}>{money(x.amount)}</td>
+                            </tr>
+                          ))}
+                        </>
+                      )}
+                      {salidas.length > 0 && (
+                        <>
+                          <tr><td colSpan="2" style={{ fontWeight: '900', background: '#f8f9fa', fontSize: '0.9rem', paddingTop: 8 }}>--- SALIDAS DE EFECTIVO ---</td></tr>
+                          {salidas.map((x, i) => (
+                            <tr key={'s' + i}>
+                              <td style={{ fontSize: '0.9rem' }}>{x.note || 'Salida Varia'}</td>
+                              <td className="text-right" style={{ fontSize: '0.9rem' }}>{money(Math.abs(x.amount))}</td>
+                            </tr>
+                          ))}
+                        </>
+                      )}
+                      {entradas.length > 0 && (
+                        <>
+                          <tr><td colSpan="2" style={{ fontWeight: '900', background: '#f8f9fa', fontSize: '0.9rem', paddingTop: 8 }}>--- ENTRADAS DE EFECTIVO ---</td></tr>
+                          {entradas.map((x, i) => (
+                            <tr key={'e' + i}>
+                              <td style={{ fontSize: '0.9rem' }}>{x.note || 'Entrada Varia'}</td>
+                              <td className="text-right" style={{ fontSize: '0.9rem' }}>{money(x.amount)}</td>
+                            </tr>
+                          ))}
+                        </>
+                      )}
+                    </tbody>
+                  </table>
+                  {(abonos.length === 0 && salidas.length === 0 && entradas.length === 0) && (
+                    <div style={{ textAlign: 'center', fontStyle: 'italic', fontSize: '0.8rem', padding: 5 }}>Sin movimientos extra</div>
+                  )}
+                </div>
 
                 <div className="signature">
                   <div className="signature-line"></div>
