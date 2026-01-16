@@ -13,7 +13,8 @@ import {
   Button as OriginalButton,
   SearchInput,
   InfoBox,
-  Button
+  Button,
+  TotalsRow
 } from '../POS.styles.jsx';
 
 import AlertModal from './AlertModal';

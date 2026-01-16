@@ -82,10 +82,10 @@ export const OrdersProvider = ({ children }) => {
     const removeOrderWrapper = (id) => {
         // Mark as deleted so polling doesn't resurrect it immediately
         if (recentlyDeletedIds.current) {
-            recentlyDeletedIds.current.add(id);
+            recentlyDeletedIds.current.add(String(id));
             // Clean up memory after safe margin (e.g., 10 seconds)
             setTimeout(() => {
-                if (recentlyDeletedIds.current) recentlyDeletedIds.current.delete(id);
+                if (recentlyDeletedIds.current) recentlyDeletedIds.current.delete(String(id));
             }, 10000);
         }
 
@@ -171,7 +171,7 @@ export const OrdersProvider = ({ children }) => {
                     // AND that we haven't recently deleted explicitly
                     const newTickets = serverCarts.filter(t =>
                         !existingIds.has(t.id) &&
-                        !recentlyDeletedIds.current.has(t.id)
+                        !recentlyDeletedIds.current.has(String(t.id))
                     );
 
                     if (newTickets.length > 0) {
