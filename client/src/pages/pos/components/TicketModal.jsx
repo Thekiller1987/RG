@@ -208,7 +208,7 @@ const extractName = (u) =>
 function normalizeItems(itemsRaw = []) {
   return itemsRaw.map((it, idx) => {
     const quantity = Number(coalesce(it.quantity, it.cantidad, it.qty, 0));
-    const nombre = coalesce(it.nombre, it.descripcion, it.description, it.producto, `Item ${idx+1}`);
+    const nombre = coalesce(it.nombre, it.descripcion, it.description, it.producto, `Item ${idx + 1}`);
     const unit = Number(coalesce(it.precio_unitario, it.precio_venta, it.precio, it.unitPrice, 0));
     const id = coalesce(it.id_producto, it.id, `it-${idx}`);
     return { id, nombre, quantity, unit, total: quantity * unit };
@@ -233,10 +233,24 @@ function labelMetodoPago(pd = {}) {
 }
 
 function montoPagado(pd = {}, fallback = 0) {
-  const sum = ['efectivo', 'tarjeta', 'transferencia', 'otro', 'dolares']
-    .map(k => Number(pd[k] || 0))
-    .reduce((a, b) => a + b, 0);
-  return sum > 0 ? sum : Number(pd.montoRecibido || fallback || 0);
+  // Sumar todos los métodos de pago
+  // IMPORTANTE: 'dolares' viene en monto USD, hay que convertirlo si existe tasa
+  const efectivo = Number(pd.efectivo || 0);
+  const tarjeta = Number(pd.tarjeta || 0);
+  const transferencia = Number(pd.transferencia || 0);
+  const otro = Number(pd.otro || 0);
+
+  const dolaresMonto = Number(pd.dolares || 0);
+  const tasa = Number(pd.tasaDolarAlMomento || pd.tasaObtenida || 1); // Fallback a 1 si no hay tasa (no debería pasar si hay dólares)
+
+  const dolaresConvertido = dolaresMonto * (tasa > 1 ? tasa : 1); // Si tasa es 1 o 0, asumo que ya está convertido o es error, pero mejor multiplicar si > 1
+
+  // NOTA: Si tasaDolarAlMomento no existe en pd, y hay dolares, podríamos tener un problema de cálculo en tickets viejos.
+  // Sin embargo, el POS siempre manda tasaDolarAlMomento.
+
+  const totalCalculado = efectivo + tarjeta + transferencia + otro + dolaresConvertido;
+
+  return totalCalculado > 0 ? totalCalculado : Number(pd.montoRecibido || fallback || 0);
 }
 
 function toDateString(maybeDate) {
@@ -251,8 +265,8 @@ function ensureProformaId(tx) {
   const n = coalesce(tx.proformaId, tx.proformaNumero, tx.numeroProforma, tx.id);
   if (n) return n;
   const now = new Date();
-  const fecha = now.toISOString().slice(2,10).replace(/-/g, ''); // 251019
-  const hora = now.toTimeString().slice(0,8).replace(/:/g, '');   // 070127
+  const fecha = now.toISOString().slice(2, 10).replace(/-/g, ''); // 251019
+  const hora = now.toTimeString().slice(0, 8).replace(/:/g, '');   // 070127
   return `PF-${fecha}-${hora}`;
 }
 
@@ -417,9 +431,9 @@ const TicketModal = ({
         border: none !important;
         margin: 0 !important;
         ${mode === 'A4'
-          ? `width: 190mm !important; max-height: 277mm !important; overflow: hidden !important; font-family: Arial, Helvetica, sans-serif !important; font-size: 10pt !important;`
-          : `width: 80mm !important; padding: 6px 4px !important; font-family: Consolas, 'Courier New', monospace !important; font-size: 8pt !important;`
-        }
+        ? `width: 190mm !important; max-height: 277mm !important; overflow: hidden !important; font-family: Arial, Helvetica, sans-serif !important; font-size: 10pt !important;`
+        : `width: 80mm !important; padding: 6px 4px !important; font-family: Consolas, 'Courier New', monospace !important; font-size: 8pt !important;`
+      }
       }
       .print-a4 {
         width: 190mm !important;
@@ -495,25 +509,25 @@ const TicketModal = ({
     w.document.close();
     w.focus();
 
-    w.onload = function() {
+    w.onload = function () {
       setTimeout(async () => {
-        try { await persistPrintedMeta(mode); } catch {}
+        try { await persistPrintedMeta(mode); } catch { }
         w.print();
       }, 250);
     };
 
     w.onafterprint = () => {
-      try { w.close(); } catch {}
-      try { if (typeof onClose === 'function') onClose(); } catch {}
+      try { w.close(); } catch { }
+      try { if (typeof onClose === 'function') onClose(); } catch { }
     };
 
     setTimeout(async () => {
       if (!w.closed) {
-        try { await persistPrintedMeta(mode); } catch {}
+        try { await persistPrintedMeta(mode); } catch { }
         w.print();
         setTimeout(() => {
-          try { w.close(); } catch {}
-          try { if (typeof onClose === 'function') onClose(); } catch {}
+          try { w.close(); } catch { }
+          try { if (typeof onClose === 'function') onClose(); } catch { }
         }, 2000);
       }
     }, 1200);
@@ -538,7 +552,7 @@ const TicketModal = ({
       <GlobalPrintStyle />
       <ModalContent className="no-print" style={{ maxWidth: 520, width: '96%', padding: '1.2rem', background: '#fff' }}>
         <HeaderBar>
-          <h2 style={{ display:'flex', alignItems:'center', gap:8, margin:0 }}>
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
             <FaReceipt /> Vista de Impresión ({printMode.toUpperCase()})
           </h2>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -559,7 +573,7 @@ const TicketModal = ({
               <TicketLogo
                 src={getLogoPath()}
                 alt="Logo"
-                onError={(e)=>{ e.currentTarget.style.display='none'; }}
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
               />
               <h1>{COMPANY.NAME}</h1>
               <small>{COMPANY.SLOGAN}</small>
@@ -594,8 +608,8 @@ const TicketModal = ({
                 <p className="badge">Resumen de Crédito</p>
                 <div>
                   <TotalsRow><span>Saldo Anterior:</span><span>C${fmt(saldoAnterior)}</span></TotalsRow>
-                  <TotalsRow $bold style={{ color:'#1c7d3a' }}><span>Su Abono:</span><span>C${fmt(abonoMonto)}</span></TotalsRow>
-                  <TotalsRow $bold style={{ borderTop:'1px solid #333', paddingTop:'5px', marginTop:'5px' }}>
+                  <TotalsRow $bold style={{ color: '#1c7d3a' }}><span>Su Abono:</span><span>C${fmt(abonoMonto)}</span></TotalsRow>
+                  <TotalsRow $bold style={{ borderTop: '1px solid #333', paddingTop: '5px', marginTop: '5px' }}>
                     <span>Nuevo Saldo:</span><span>C${fmt(nuevoSaldo)}</span>
                   </TotalsRow>
                 </div>
@@ -613,7 +627,7 @@ const TicketModal = ({
                   </thead>
                   <tbody>
                     {items.length === 0 ? (
-                      <tr><td colSpan="4" style={{ textAlign:'center', color:'#777' }}>Sin ítems</td></tr>
+                      <tr><td colSpan="4" style={{ textAlign: 'center', color: '#777' }}>Sin ítems</td></tr>
                     ) : (
                       items.map(it => (
                         <tr key={it.id}>
@@ -630,7 +644,7 @@ const TicketModal = ({
                 <div className="totals">
                   <TotalsRow><span>Subtotal:</span><span>C${fmt(subtotal)}</span></TotalsRow>
                   {descuento > 0 && (
-                    <TotalsRow style={{ color:'#dc3545' }}>
+                    <TotalsRow style={{ color: '#dc3545' }}>
                       <span>Descuento:</span><span>- C${fmt(descuento)}</span>
                     </TotalsRow>
                   )}
@@ -643,7 +657,7 @@ const TicketModal = ({
                       <TotalsRow><span>Tipo de Pago:</span><span>{metodo}</span></TotalsRow>
                       <TotalsRow><span>Monto Pagado:</span><span>C${fmt(pagado)}</span></TotalsRow>
                       {cambio > 0 && (
-                        <TotalsRow $bold style={{ color:'#dc3545' }}>
+                        <TotalsRow $bold style={{ color: '#dc3545' }}>
                           <span>Su Cambio:</span><span>C${fmt(cambio)}</span>
                         </TotalsRow>
                       )}
