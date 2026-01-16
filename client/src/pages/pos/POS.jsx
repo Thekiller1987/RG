@@ -26,7 +26,7 @@ const fmt = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigit
 
 const POS = () => {
   // Contextos
-  const { user, products: initialProducts, token, refreshProducts, clients } = useAuth();
+  const { user, products: initialProducts, token, refreshProducts, clients, allUsers } = useAuth();
   const { isCajaOpen, setIsCajaOpen, cajaSession, setCajaSession, tasaDolar, setTasaDolar, closeCajaSession } = useCaja();
   const {
     orders, activeOrderId, setActiveOrderId, activeOrder,
@@ -73,7 +73,8 @@ const POS = () => {
       const intervalId = setInterval(() => {
         if (!document.hidden) {
           checkForNewOrders(userId);
-          refreshProducts(); // Recarga productos e inventario en segundo plano
+          checkForNewOrders(userId);
+          // refreshProducts(); // REMOVED: Intrusive polling. Relying on Sockets now.
         }
       }, 5000);
 
@@ -799,7 +800,8 @@ const POS = () => {
               }
             }}
             isAdmin={isAdmin}
-            users={[user]}
+            isAdmin={isAdmin}
+            users={allUsers} // Fixed: Pass ALL users so history shows seller names
             clients={clients || []} // Pass clients from auth context
             onReprintTicket={(sale) => {
               setTicketData(sale); // Open TicketModal for reprint

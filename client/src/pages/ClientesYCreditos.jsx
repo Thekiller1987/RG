@@ -7,6 +7,7 @@ import * as api from '../service/api';
 import ClientFormModal from './pos/components/ClientFormModal';
 import AbonoCreditoModal from './pos/components/AbonoCreditoModal';
 import HistorialCreditoModal from './pos/components/HistorialCreditoModal';
+import SalesHistoryModal from './pos/components/SalesHistoryModal'; // Importar Historial Ventas
 import AlertModal from './pos/components/AlertModal';
 
 const PageWrapper = styled.div`
@@ -108,7 +109,7 @@ const Table = styled.table`
 `;
 
 export default function ClientesYCreditos() {
-    const { clients, user, token, isLoading, refreshClients, cajaSession } = useAuth();
+    const { clients, user, token, isLoading, refreshClients, cajaSession, allUsers } = useAuth(); // Extract allUsers via context if needed, or pass empty. SalesHistory needs it.
     const [modal, setModal] = useState({ name: null, data: null });
     const [alert, setAlert] = useState({ isOpen: false, title: '', message: '' });
 
@@ -173,18 +174,47 @@ export default function ClientesYCreditos() {
                                     <Button $abono disabled={!isCajaOpen || c.saldo_pendiente <= 0} onClick={() => handleOpenModal('abono', c)}><FaMoneyBillWave /> Abono</Button>
                                     <Button onClick={() => handleOpenModal('client', c)}><FaEdit /> Editar</Button>
                                     <Button $delete onClick={() => handleDelete(c)}><FaTrashAlt /> Eliminar</Button>
-                                    <Button primary onClick={() => handleOpenModal('historial', c)}><FaHistory /> Historial</Button>
+                                    <Button $delete onClick={() => handleDelete(c)}><FaTrashAlt /> Eliminar</Button>
+                                    <Button primary onClick={() => handleOpenModal('historial', c)}><FaHistory /> Créditos</Button>
+                                    <Button $refresh style={{ background: '#6f42c1' }} onClick={() => handleOpenModal('tickets', c)}><FaMoneyBillWave /> Ver Tickets</Button>
                                 </ButtonGroup>
                             </td>
                         </tr>
                     ))}
                 </tbody>
             </Table>
-            
+
             {modal.name === 'client' && <ClientFormModal client={modal.data} onClose={handleCloseModal} onSave={refreshClients} />}
             {modal.name === 'abono' && <AbonoCreditoModal client={modal.data} onClose={handleCloseModal} onAbonoSuccess={refreshClients} showAlert={showAlert} />}
             {modal.name === 'historial' && <HistorialCreditoModal client={modal.data} onClose={handleCloseModal} token={token} />}
-            
+
+            {/* Modal de Tickets (SalesHistoryModal) Integrado */}
+            {modal.name === 'tickets' && (
+                <SalesHistoryModal
+                    onClose={handleCloseModal}
+                    initialClientId={modal.data?.id_cliente} // Pass client ID to filter
+                    clients={clients}
+                    users={allUsers} // Pass users for seller name resolution
+                    loadSales={async (date) => {
+                        try {
+                            // Reuse the fetchSales from api service
+                            return await api.fetchSales(token, date);
+                        } catch (e) { console.error(e); return []; }
+                    }}
+                    onReprintTicket={(sale) => {
+                        // We can't easily open the TicketModal from here without TicketModal state.
+                        // But SalesHistoryModal calls onReprintTicket. 
+                        // We need to implement a simple reprint logic or ignore if complex.
+                        // For now, let's alert or try to mount TicketModal inside here, 
+                        // but ClientesYCreditos doesn't have TicketModal logic.
+                        // Simplest: Pass a prop to SalesHistoryModal to handle it internally? 
+                        // No, SalesHistoryModal delegates it.
+                        // Let's just alert for now or try to quickly add TicketModal support.
+                        alert("Para reimprimir, utilice el módulo de Ventas (POS). Desde aquí es solo consulta.");
+                    }}
+                />
+            )}
+
             <AlertModal isOpen={alert.isOpen} onClose={closeAlert} title={alert.title} message={alert.message} />
         </PageWrapper>
     );
