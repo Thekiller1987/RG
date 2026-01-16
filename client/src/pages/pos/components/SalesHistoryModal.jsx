@@ -4,7 +4,7 @@ import styled, { css } from 'styled-components';
 import {
   FaHistory, FaWindowClose, FaRegClock, FaUsers, FaFilter, FaSearch,
   FaAngleLeft, FaAngleRight, FaHandHoldingUsd, FaMoneyBillWave,
-  FaRegCreditCard, FaExchangeAlt
+  FaRegCreditCard, FaExchangeAlt, FaPrint
 } from 'react-icons/fa';
 
 import {
