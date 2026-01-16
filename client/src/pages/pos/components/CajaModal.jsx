@@ -159,7 +159,13 @@ const CajaModal = ({
 
       // 4. TOTAL VENTAS DEL DIA
       if (t.startsWith('venta')) {
-        tVentasDia += (Math.abs(rawAmount) + txCredito);
+        // Corrección: Usar el Total Venta guardado si existe, o sumar todos los componentes
+        if (pd.totalVenta) {
+          tVentasDia += Number(pd.totalVenta);
+        } else {
+          // Fallback para datos viejos: Sumar Cash + Tarjeta + Transf + Credito
+          tVentasDia += (Math.abs(rawAmount) + txTarjeta + txTransf + txCredito);
+        }
       }
 
       // --- Clasificación en Listas ---
@@ -259,119 +265,150 @@ const CajaModal = ({
     }
   };
 
+  /* -----------------------------------------------------------------------------------------------
+   * REPORTE DE CIERRE (DISEÑO MEJORADO)
+   * ----------------------------------------------------------------------------------------------- */
   const printReport = () => {
     const win = window.open('', '_blank');
     if (!win) return;
-    const fmt = (n) => `C$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const fmtUsd = (n) => `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-    // Filtramos SOLO lo que fue efectivo real para mostrarlo claro
-    const cls = {
-      ventasContado: ventasContado || [],
-      abonos: abonos || [],
-      salidas: salidas || []
-    };
+    // Helpers formato
+    const money = (n) => `C$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const usd = (n) => `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-    const css = `
-      body { font-family: 'Courier New', Courier, monospace; padding: 20px; max-width: 800px; margin: 0 auto; color: #000; font-weight: 600; }
-      h2, h3 { text-align: center; margin: 5px 0; text-transform: uppercase; font-weight: 900; }
-      .header { text-align: center; border-bottom: 3px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-      .box { border: 2px solid #000; padding: 15px; border-radius: 4px; margin-bottom: 15px; }
-      .row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; }
-      .row.bold { font-weight: 900; font-size: 16px; margin-top: 5px; border-top: 2px solid #000; padding-top: 5px; }
-      .big-total { font-size: 26px; font-weight: 900; text-align: center; margin: 10px 0; background: #eee; padding: 15px; border: 2px solid #000; }
-      table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; border: 1px solid #000; }
-      th { border-bottom: 2px solid #000; text-align: left; padding: 5px; font-weight: 900; }
-      td { border-bottom: 1px solid #000; padding: 5px; font-weight: 600; }
-      .text-right { text-align: right; }
-      .diff-negative { color: #000; font-weight: 900; text-decoration: underline; } 
-      .diff-positive { color: #000; font-weight: 900; }
-      .sub-row { margin-left: 20px; font-size: 0.9em; font-style: italic; color: #000; }
-    `;
+    // Totales calculados (asegurarnos de que totalVentasDia incluye todo)
+    // Nota: El useMemo ya calcula totalVentasDia sumando (rawAmount + credito) para todas las 'venta%'. 
+    // Debería ser correcto, pero lo mostraremos desglosado para claridad total.
 
-    const rows = (arr) => arr.map(tx => `
-      <tr>
-        <td>${tx.at ? new Date(tx.at).toLocaleTimeString() : ''}</td>
-        <td>${tx.note || tx.type || ''}</td>
-        <td class="text-right">${fmt(tx.displayAmount)}</td>
-      </tr>`).join('');
-
-    win.document.write(`
+    // Preparar HTML
+    const reportHTML = `
+      <!DOCTYPE html>
       <html>
       <head>
-        <title>Arqueo de Caja - ${new Date().toLocaleDateString()}</title>
-        <style>${css}</style>
+        <title>CORTE DE CAJA - ${new Date().toLocaleDateString()}</title>
+        <style>
+          @page { size: 80mm auto; margin: 0; }
+          body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; padding: 10px; 
+            width: 78mm; /* Ajuste para impresora térmica */
+            color: #000;
+          }
+          * { box-sizing: border-box; }
+          h1, h2, h3, h4 { margin: 0; text-align: center; text-transform: uppercase; }
+          h2 { font-size: 14pt; font-weight: 900; margin-bottom: 5px; }
+          h3 { font-size: 11pt; font-weight: 700; margin-bottom: 5px; border-bottom: 2px solid #000; padding-bottom: 2px; }
+          p { margin: 2px 0; font-size: 9pt; }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .text-bold { font-weight: 800; }
+          
+          .section { margin-bottom: 12px; border-bottom: 1px dashed #444; padding-bottom: 8px; }
+          .section:last-child { border-bottom: none; }
+          
+          .row { display: flex; justify-content: space-between; font-size: 9pt; margin-bottom: 3px; }
+          .row.big { font-size: 11pt; font-weight: 800; margin-top: 5px; }
+          .row.sub { font-size: 8.5pt; color: #333; font-style: italic; padding-left: 10px; }
+          
+          .box { border: 1px solid #000; padding: 6px; margin: 8px 0; border-radius: 4px; background: #fdfdfd; }
+          .box-title { font-weight: 900; text-align: center; margin-bottom: 4px; font-size: 10pt; text-decoration: underline; }
+          
+          table { width: 100%; border-collapse: collapse; font-size: 8.5pt; margin-top: 5px; }
+          th { border-bottom: 1px solid #000; text-align: left; font-weight: 800; }
+          td { padding: 2px 0; }
+          tr:nth-child(even) { background-color: #f8f8f8; }
+          
+          .alert { color: #000; font-weight: bold; }
+        </style>
       </head>
       <body>
-        <div class="header">
-          <h2>Arqueo de Caja</h2>
-          <p><strong>${new Date().toLocaleString('es-NI')}</strong></p>
-          <p>Cierra: <strong>${currentUser?.nombre_usuario || 'Usuario'}</strong></p>
+        <!-- ENCABEZADO -->
+        <div class="section text-center">
+          <h2>CIERRE DE CAJA</h2>
+          <p><strong>Multirepuestos RG</strong></p>
+          <p>Fecha: ${new Date().toLocaleDateString('es-NI')} - Hora: ${new Date().toLocaleTimeString('es-NI')}</p>
+          <p>Cajero: ${currentUser?.nombre_usuario || 'Sistema'}</p>
         </div>
 
-        <div class="box">
-          <div class="big-total">
-             <div>TOTAL VENTAS DÍA:</div>
-             <div>${fmt(totalVentasDia)}</div>
+        <!-- 1. TOTAL VENTAS GLOBAL -->
+        <div class="section">
+          <h3>1. TOTAL VENTAS DEL DÍA</h3>
+          <div class="row big">
+             <span>TOTAL GLOBAL VENTAS:</span>
+             <span>${money(totalVentasDia)}</span>
           </div>
-          
-          <div class="row"><div>Fondo Inicial:</div><div>${fmt(cajaInicial)}</div></div>
-
-          <div style="margin: 15px 0; border-top: 2px dashed #000; border-bottom: 2px dashed #000; padding: 10px 0;">
-             <div class="row bold"><span>MOVIMIENTOS DE CAJA (DESGLOSE)</span></div>
-             <div class="row"><span>(+) Efectivo C$:</span><span>${fmt(netCordobas)}</span></div>
-             <div class="row"><span>(+) Efectivo USD:</span><span>${fmtUsd(netDolares)}</span></div>
-             <div class="row"><span>(Tasa: ${tasaRef})</span><span>= ${fmt(netDolares * tasaRef)}</span></div>
+          <div class="row sub">
+             (Suma de Contado, Tarjeta, Transf. y Crédito)
           </div>
+        </div>
+
+        <!-- 2. DESGLOSE DE INGRESOS (VENTAS) -->
+        <div class="section">
+          <h3>2. DESGLOSE POR MÉTODO</h3>
+          <div class="row"><span>(+) Efectivo (Córdobas):</span> <span>${money(netCordobas)}</span></div>
+          <div class="row"><span>(+) Efectivo (Dólares):</span> <span>${usd(netDolares)}</span></div>
+             <div class="row sub"> -> Conv. a C$: ${money(netDolares * tasaRef)}</div>
           
-          <div class="row"><div>(-) Devoluciones/Cancelaciones:</div><div>${fmt(sumDevolucionesCancelaciones)}</div></div>
+          <div class="row" style="margin-top:5px"><span>(+) Tarjetas:</span> <span>${money(totalTarjeta)}</span></div>
+          <div class="row"><span>(+) Transferencias:</span> <span>${money(totalTransferencia)}</span></div>
+          <div class="row"><span>(+) Créditos Otorgados:</span> <span>${money(totalCredito)}</span></div>
+        </div>
 
-          <div class="sep"></div>
-          <div class="row bold" style="font-size: 18px;"><div>EFECTIVO ESPERADO:</div><div>${fmt(efectivoEsperado)}</div></div>
-          <div class="sub-row"> (C$${Number(efectivoEsperadoCordobas).toLocaleString()} + ${fmtUsd(efectivoEsperadoDolares)}) </div>
+        <!-- 3. FLUJO DE CAJA (ENTRADAS/SALIDAS) -->
+        <div class="section">
+          <h3>3. MOVIMIENTOS DE CAJA</h3>
+          <div class="row"><span>Fondo Inicial (Apertura):</span> <span>${money(cajaInicial)}</span></div>
+          ${abonos.length > 0 ? `<div class="row"><span>(+) Abonos Recibidos:</span> <span>${money(abonos.reduce((s, t) => s + (t.amount || 0), 0))}</span></div>` : ''}
+          ${entradas.length > 0 ? `<div class="row"><span>(+) Entradas Manuales:</span> <span>${money(entradas.reduce((s, t) => s + (t.amount || 0), 0))}</span></div>` : ''}
+          <div class="row"><span>(-) Salidas/Gastos:</span> <span>-${money(Math.abs(salidas.reduce((s, t) => s + (t.amount || 0), 0)))}</span></div>
+          <div class="row"><span>(-) Devoluciones (Efec):</span> <span>-${money(Math.abs(sumDevolucionesCancelaciones))}</span></div>
+        </div>
+
+        <!-- 4. ARQUEO FINAL (LO IMPORTANTE) -->
+        <div class="box">
+          <div class="box-title">ARQUEO DE EFECTIVO</div>
           
-          <div class="row" style="margin-top:10px; font-size: 16px;"><div>Monto Físico Contado:</div><div>${fmt(montoContado)}</div></div>
-          <div class="row bold ${diferencia < 0 ? 'diff-negative' : 'diff-positive'}"><div>DIFERENCIA:</div><div>${fmt(diferencia)}</div></div>
+          <div class="row big">
+            <span>EFECTIVO ESPERADO:</span>
+            <span>${money(efectivoEsperado)}</span>
+          </div>
+          <div class="row text-center" style="font-size:8pt; margin-bottom:5px;">
+             (Debe haber: C$${Number(efectivoEsperadoCordobas).toFixed(2)} + $${Number(efectivoEsperadoDolares).toFixed(2)})
+          </div>
+
+          <div class="row" style="border-top:1px dashed #000; padding-top:4px;">
+            <span>Efectivo Contado (Real):</span>
+            <span>${money(montoContado)}</span>
+          </div>
+
+          <div class="row big alert">
+            <span>DIFERENCIA:</span>
+            <span>${diferencia > 0 ? '+' : ''}${money(diferencia)}</span>
+          </div>
+          <div class="text-center" style="font-size:8pt; font-weight:bold;">
+             ${Math.abs(diferencia) < 0.5 ? '(CAJA CUADRADA)' : (diferencia > 0 ? '(SOBRANTE)' : '(FALTANTE)')}
+          </div>
         </div>
 
-        <div class="box">
-          <div class="bold" style="margin-bottom:6px;">INGRESOS NO EFECTIVO</div>
-          <div class="row"><div>Tarjeta:</div><div>${fmt(totalTarjeta)}</div></div>
-          <div class="row"><div>Transferencia:</div><div>${fmt(totalTransferencia)}</div></div>
-          <div class="row"><div>Crédito:</div><div>${fmt(totalCredito)}</div></div>
-          <div class="row bold"><div>TOTAL NO EFECTIVO:</div><div>${fmt(totalNoEfectivo)}</div></div>
+        <!-- FIRMA -->
+        <div style="margin-top: 30px; text-align: center;">
+          <div style="border-top: 1px solid #000; width: 80%; margin: 0 auto 5px;"></div>
+          <p>Firma Cajero / Responsable</p>
         </div>
-
-        <div class="box">
-          <h3>Entradas</h3>
-          <table>
-            <thead><tr><th>Hora</th><th>Nota</th><th class="text-right">Monto</th></tr></thead>
-            <tbody>${rows(entradas)}</tbody>
-          </table>
-
-          <h3>Salidas</h3>
-          <table>
-            <thead><tr><th>Hora</th><th>Nota</th><th class="text-right">Monto</th></tr></thead>
-            <tbody>${rows(salidas)}</tbody>
-          </table>
-
-          <h3>Cancelaciones / Devoluciones</h3>
-          <table>
-            <thead><tr><th>Hora</th><th>Nota</th><th class="text-right">Monto</th></tr></thead>
-            <tbody>
-               ${rows(cancelaciones)}
-               ${rows(devoluciones)}
-            </tbody>
-          </table>
-        </div>
-
-        <script>
-          window.onload = () => { window.print(); setTimeout(() => window.close(), 300); }
-        </script>
       </body>
       </html>
-    `);
+    `;
+
+    win.document.write(reportHTML);
     win.document.close();
+
+    // Auto print
+    setTimeout(() => {
+      win.focus();
+      win.print();
+      // Opcional: Cerrar después de imprimir si el usuario lo prefiere
+      // setTimeout(() => win.close(), 100); 
+    }, 500);
   };
 
   // --------- UI ----------
