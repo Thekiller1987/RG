@@ -158,17 +158,19 @@ const SaleListItem = React.memo(function SaleListItem({
 
   const userName = useMemo(
     () => {
-      const fromList = safeUsers.find(u => (u.id_usuario ?? u.id) == sale.userId)?.nombre_usuario;
+      // FIX: Check if safeUsers is valid and sale.userId exists before find
+      const fromList = (safeUsers || []).find(u => (u?.id_usuario ?? u?.id) == sale?.userId)?.nombre_usuario;
       // Fallback to properties that might be on the sale object from backend join
-      return fromList || sale.usuario?.nombre_usuario || sale.userName || sale.vendedor || 'N/A';
+      return fromList || sale?.usuario?.nombre_usuario || sale?.userName || sale?.vendedor || 'N/A';
     },
     [safeUsers, sale]
   );
   const clientName = useMemo(
     () => {
-      const fromList = safeClients.find(c => c.id_cliente === (sale.clientId || sale.idCliente))?.nombre;
+      // FIX: Check if safeClients is valid
+      const fromList = (safeClients || []).find(c => c?.id_cliente === (sale?.clientId || sale?.idCliente))?.nombre;
       // Fallback: sale might have client object populate 
-      return fromList || sale.cliente?.nombre || sale.clientName || 'Consumidor Final';
+      return fromList || sale?.cliente?.nombre || sale?.clientName || 'Consumidor Final';
     },
     [safeClients, sale]
   );

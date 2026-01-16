@@ -12,6 +12,9 @@ import { useNavigate } from 'react-router-dom';
  * ================================================================= */
 const GlobalPrintStyle = React.memo(() => (
   <style>{`
+  /* Importar League Spartan */
+  @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;600;800;900&display=swap');
+
   @media print {
     body { visibility: hidden; margin: 0; padding: 0; }
     .print-area, .print-area * { visibility: visible !important; }
@@ -26,39 +29,42 @@ const GlobalPrintStyle = React.memo(() => (
 ));
 
 const PrintWrapper = styled.div`
-  font-family: 'Consolas','Courier New',monospace; color: #000; background: #fff;
+  font-family: 'League Spartan', 'Consolas', sans-serif; color: #000; background: #fff;
   width: 310px; margin: 0 auto; padding: 12px 6px;
   box-shadow: 0 0 10px rgba(0,0,0,.08); border: 1px solid #eee; border-radius: 8px;
 
   /* Encabezado */
-  .brand { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 12px; margin-bottom: 15px; }
-  .brand h2 { margin: 0 0 6px; font-size: 1.4rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
-  .brand p { margin: 3px 0; font-size: 0.95rem; font-weight: 600; }
+  .brand { text-align: center; border-bottom: 3px solid #000; padding-bottom: 12px; margin-bottom: 15px; }
+  .brand img { max-width: 120px; display: block; margin: 0 auto 10px; }
+  .brand h2 { margin: 0 0 6px; font-size: 1.6rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+  .brand p { margin: 3px 0; font-size: 1rem; font-weight: 700; }
 
   /* Secciones y Filas */
-  .section { margin-bottom: 18px; border-bottom: 1px dashed #444; padding-bottom: 12px; }
+  .section { margin-bottom: 18px; border-bottom: 1px dashed #000; padding-bottom: 12px; }
   .section:last-child { border-bottom: none; }
-  .section-title { font-weight: 900; text-align: center; text-transform: uppercase; font-size: 1.1rem; margin-bottom: 10px; text-decoration: underline; letter-spacing: 0.5px; }
+  .section-title { font-weight: 900; text-align: center; text-transform: uppercase; font-size: 1.2rem; margin-bottom: 10px; text-decoration: underline; letter-spacing: 0.5px; }
   
-  .row { display: flex; justify-content: space-between; font-size: 1rem; margin-bottom: 6px; align-items: baseline; }
-  .row.big { font-size: 1.3rem; font-weight: 900; margin-top: 12px; border-top: 2px solid #000; padding-top: 8px; }
-  .row.sub { font-size: 0.85rem; color: #333; font-style: italic; padding-left: 10px; margin-bottom: 4px; }
-  .row.alert { background: #eee; padding: 8px; font-weight: 900; text-align: center; justify-content: center; gap: 10px; border: 2px solid #000; margin-top: 12px; font-size: 1.2rem; }
+  .row { display: flex; justify-content: space-between; font-size: 1.1rem; margin-bottom: 6px; align-items: baseline; font-weight: 600; }
+  .row.big { font-size: 1.5rem; font-weight: 900; margin-top: 12px; border-top: 3px solid #000; padding-top: 8px; }
+  .row.sub { font-size: 0.9rem; color: #333; font-style: italic; padding-left: 10px; margin-bottom: 4px; font-weight: 400; }
+  .row.alert { background: #eee; padding: 8px; font-weight: 900; text-align: center; justify-content: center; gap: 10px; border: 2px solid #000; margin-top: 12px; font-size: 1.4rem; }
 
   /* Tablas simples */
-  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 1rem; margin-top: 8px; }
   th { border-bottom: 2px solid #000; text-align: left; font-weight: 900; padding: 4px 2px; }
   td { border-bottom: 1px dashed #ccc; padding: 4px 2px; }
   .text-right { text-align: right; }
 
   /* Firma */
-  .signature { margin-top: 50px; text-align: center; page-break-inside: avoid; }
+  .signature { margin-top: 60px; text-align: center; page-break-inside: avoid; }
   .signature-line { border-top: 2px solid #000; width: 80%; margin: 0 auto 8px; }
-  .signature p { font-size: 1rem; font-weight: 700; }
+  .signature p { font-size: 1.1rem; font-weight: 700; }
 
   @media print {
     &.print-80 {
-      width: 80mm !important; font-family: 'Consolas', monospace !important; padding: 5px !important; border: none !important; box-shadow: none !important;
+      width: 80mm !important; 
+      font-family: 'League Spartan', sans-serif !important; 
+      padding: 0px !important; border: none !important; box-shadow: none !important;
     }
   }
 `;
@@ -78,8 +84,14 @@ const CajaModal = ({
   const navigate = useNavigate();
 
   const userId = currentUser?.id_usuario || currentUser?.id;
-  const openedById = session?.openedBy?.id || session?.openedBy;
-  const canClose = isAdmin || (String(userId) === String(openedById));
+
+  // LOGIC FIX: Prioritize openedBy.name BUT if missing (legacy), try currentUser (if id matches) or fallback
+  let openedByName = session?.openedBy?.name;
+  if (!openedByName && session?.openedBy && typeof session.openedBy === 'string') openedByName = session.openedBy; // Old string format
+  if (!openedByName) openedByName = (session?.userId === userId) ? (currentUser?.nombre_usuario || currentUser?.username) : 'Usuario';
+  if (!openedByName) openedByName = 'Caja General';
+
+  const canClose = isAdmin || (session?.userId === userId) || (session?.openedBy?.id === userId);
 
   const transactions = useMemo(() => Array.isArray(session?.transactions) ? session.transactions : [], [session]);
 
@@ -161,7 +173,6 @@ const CajaModal = ({
 
   const diferencia = (Number(montoContado || 0) - efectivoEsperado);
   const openedAt = session?.openedAt ? new Date(session.openedAt) : null;
-  const openedByName = session?.openedBy?.name || '—';
 
   // --------- HANDLERS ----------
   const handleOpen = () => {
@@ -184,11 +195,12 @@ const CajaModal = ({
     /* Estilos críticos para impresora térmica: Negro, Negrita, 80mm */
     const printStyles = `
         @charset "UTF-8";
+        @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;600;800;900&display=swap');
         @page { size: 80mm auto; margin: 0; }
         html, body {
           background: #fff; margin: 0 !important; padding: 0 !important;
           -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
-          color: #000 !important; font-family: Consolas, 'Courier New', monospace !important;
+          color: #000 !important; font-family: 'League Spartan', sans-serif !important;
         }
         #print-wrapper-caja, #print-wrapper-caja * {
           color: #000 !important; font-weight: 700 !important;
@@ -196,13 +208,13 @@ const CajaModal = ({
           visibility: visible !important;
         }
         #print-wrapper-caja {
-          width: 80mm !important; padding: 5px !important; border: none !important;
+          width: 80mm !important; padding: 0 !important; border: none !important;
         }
-        .brand h2 { font-size: 18pt !important; letter-spacing: 2px !important; }
-        .section-title { font-size: 12pt !important; margin-bottom: 12px !important; }
-        .row { font-size: 11pt !important; margin-bottom: 6px !important; }
-        .row.big { font-size: 14pt !important; margin-top: 15px !important; border-top: 3px solid #000 !important; }
-        .row.alert { font-size: 16pt !important; padding: 10px !important; border: 3px solid #000 !important; }
+        .brand h2 { font-size: 20pt !important; letter-spacing: 2px !important; margin-bottom: 5px !important; }
+        .section-title { font-size: 14pt !important; margin-bottom: 12px !important; border-bottom: 2px solid #000 !important; }
+        .row { font-size: 12pt !important; margin-bottom: 6px !important; font-weight: 900 !important; }
+        .row.big { font-size: 16pt !important; margin-top: 15px !important; border-top: 4px solid #000 !important; }
+        .row.alert { font-size: 18pt !important; padding: 10px !important; border: 4px solid #000 !important; }
         .text-right { text-align: right !important; }
         
         @media print {
@@ -285,10 +297,11 @@ const CajaModal = ({
               {/* ESTE ES EL COMPONENTE QUE SE IMPRIME */}
               <PrintWrapper id="print-wrapper-caja" className="print-80">
                 <div className="brand">
+                  <img src="/icons/logo.png" alt="Logo" style={{ filter: 'grayscale(100%) contrast(150%)' }} />
                   <h2>CIERRE DE CAJA</h2>
                   <p>Multirepuestos RG</p>
                   <p>{new Date().toLocaleString('es-NI')}</p>
-                  <p>Cajero: {currentUser?.nombre_usuario || 'Uso General'}</p>
+                  <p>Cajero: {openedByName}</p>
                 </div>
 
                 <div className="section">
@@ -302,9 +315,9 @@ const CajaModal = ({
                   <div className="row"><span>(+) Efec. C$:</span><span>{money(netCordobas)}</span></div>
                   <div className="row"><span>(+) Efec. USD:</span><span>{usd(netDolares)}</span></div>
                   <div className="row sub">-> Equiv: {money(netDolares * tasaRef)}</div>
-                  <div className="row" style={{ marginTop: 6 }}><span>(+) Tarjetas:</span><span>{money(totalTarjeta)}</span></div>
-                  <div className="row"><span>(+) Transf.:</span><span>{money(totalTransferencia)}</span></div>
-                  <div className="row"><span>(+) Créditos:</span><span>{money(totalCredito)}</span></div>
+                  {totalTarjeta > 0 && <div className="row" style={{ marginTop: 6 }}><span>(+) Tarjetas:</span><span>{money(totalTarjeta)}</span></div>}
+                  {totalTransferencia > 0 && <div className="row"><span>(+) Transf.:</span><span>{money(totalTransferencia)}</span></div>}
+                  {totalCredito > 0 && <div className="row"><span>(+) Créditos:</span><span>{money(totalCredito)}</span></div>}
                 </div>
 
                 <div className="section">

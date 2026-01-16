@@ -56,17 +56,25 @@ export const AuthProvider = ({ children }) => {
     }, [token]);
 
     useEffect(() => {
-        // Usar la URL de producción correcta (sin /api)
-        // Dado que api.js usa https://multirepuestosrg.com/api, el host es https://multirepuestosrg.com
-        // MEJORA: Usar window.location.origin si estamos en el mismo dominio, o extraer de API_URL
-        const socketUrl = 'https://multirepuestosrg.com'; // Ojo: Si API_URL cambia, esto debería ser dinámico.
+        // CORRECTION: Dynamic URL based on API configuration
+        let socketUrl = 'https://multirepuestosrg.com';
+        try {
+            if (api.API_URL) {
+                // Remove /api suffix if present to get base origin
+                socketUrl = new URL(api.API_URL).origin;
+            }
+        } catch (e) {
+            console.error("Error determining Socket URL:", e);
+        }
 
-        // Configuración para Producción (Nginx path /socket.io/)
+        console.log("Connecting Socket.io to:", socketUrl);
+
+        // Configuración para Producción/Local
         const socketIo = io(socketUrl, {
             path: '/socket.io/',
-            transports: ['polling', 'websocket'],
+            transports: ['polling', 'websocket'], // Try polling first for robustness
             reconnection: true,
-            reconnectionAttempts: 5
+            reconnectionAttempts: 10
         });
 
         socketIo.on('connect', () => {

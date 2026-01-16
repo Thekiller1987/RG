@@ -8,6 +8,7 @@ import ClientFormModal from './pos/components/ClientFormModal';
 import AbonoCreditoModal from './pos/components/AbonoCreditoModal';
 import HistorialCreditoModal from './pos/components/HistorialCreditoModal';
 import SalesHistoryModal from './pos/components/SalesHistoryModal'; // Importar Historial Ventas
+import TicketModal from './pos/components/TicketModal'; // Importar TicketModal para reimpresión
 import AlertModal from './pos/components/AlertModal';
 
 const PageWrapper = styled.div`
@@ -111,6 +112,7 @@ const Table = styled.table`
 export default function ClientesYCreditos() {
     const { clients, user, token, isLoading, refreshClients, cajaSession, allUsers } = useAuth(); // Extract allUsers via context if needed, or pass empty. SalesHistory needs it.
     const [modal, setModal] = useState({ name: null, data: null });
+    const [ticketToPrint, setTicketToPrint] = useState(null); // State for reprinting
     const [alert, setAlert] = useState({ isOpen: false, title: '', message: '' });
 
     const showAlert = ({ title, message }) => setAlert({ isOpen: true, title, message });
@@ -202,16 +204,20 @@ export default function ClientesYCreditos() {
                         } catch (e) { console.error(e); return []; }
                     }}
                     onReprintTicket={(sale) => {
-                        // We can't easily open the TicketModal from here without TicketModal state.
-                        // But SalesHistoryModal calls onReprintTicket. 
-                        // We need to implement a simple reprint logic or ignore if complex.
-                        // For now, let's alert or try to mount TicketModal inside here, 
-                        // but ClientesYCreditos doesn't have TicketModal logic.
-                        // Simplest: Pass a prop to SalesHistoryModal to handle it internally? 
-                        // No, SalesHistoryModal delegates it.
-                        // Let's just alert for now or try to quickly add TicketModal support.
-                        alert("Para reimprimir, utilice el módulo de Ventas (POS). Desde aquí es solo consulta.");
+                        setTicketToPrint(sale); // Set ticket to print
                     }}
+                />
+            )}
+
+            {/* Modal para Reimprimir Ticket */}
+            {ticketToPrint && (
+                <TicketModal
+                    isOpen={true}
+                    transaction={ticketToPrint}
+                    onClose={() => setTicketToPrint(null)}
+                    clients={clients}
+                    users={allUsers}
+                    currentUser={user}
                 />
             )}
 
