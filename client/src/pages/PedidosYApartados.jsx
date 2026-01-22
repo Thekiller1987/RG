@@ -165,52 +165,116 @@ const ImageViewModal = ({ isOpen, imageSrc, onClose }) => {
 // COMPONENTE PRINCIPAL
 // =================================================================
 
-// --- BARCODE SCANNER MODAL COMPONENT ---
-// Uses html5-qrcode for camera scanning
-import { Html5QrcodeScanner } from 'html5-qrcode';
+// --- BARCODE SCANNER MODAL COMPONENT (CUSTOM UI) ---
+import { Html5Qrcode } from 'html5-qrcode';
+
+// Styled components specifically for the Scanner
+const ScannerContainer = styled.div`
+  width: 100%;
+  height: 350px;
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+`;
+
+const ScannerOverlay = styled.div`
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border: 40px solid rgba(0, 0, 0, 0.5); /* Semi-transparent border simulates viewport */
+  border-radius: 12px;
+  z-index: 10;
+  pointer-events: none; /* Let clicks pass through if needed */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 0; right: 0;
+    height: 2px;
+    background: #ef4444;
+    box-shadow: 0 0 4px #ef4444;
+    animation: scanAnimation 2s infinite ease-in-out;
+  }
+  @keyframes scanAnimation {
+    0% { top: 10%; opacity: 0; }
+    50% { opacity: 1; }
+    100% { top: 90%; opacity: 0; }
+  }
+`;
 
 const BarcodeScannerModal = ({ onClose, onScan }) => {
+    const scannerRef = useRef(null);
+
     // Effect to initialize scanner
     React.useEffect(() => {
-        const scannerId = "reader";
+        const scannerId = "reader-custom";
+        const html5QrCode = new Html5Qrcode(scannerId);
+        scannerRef.current = html5QrCode;
 
-        // Prevent duplicate initialization if ref exists? Library handles it usually but we need cleanup.
-        // We defer slightly to ensure DOM is ready
-        const timer = setTimeout(() => {
-            const scanner = new Html5QrcodeScanner(
-                scannerId,
-                {
-                    fps: 10,
-                    qrbox: 250,
-                    aspectRatio: 1.0
-                },
-                /* verbose= */ false
-            );
+        const startCamera = async () => {
+            try {
+                // Auto-start with "environment" (back camera)
+                await html5QrCode.start(
+                    { facingMode: "environment" },
+                    {
+                        fps: 10,
+                        qrbox: { width: 250, height: 250 },
+                        aspectRatio: 1.0
+                    },
+                    (decodedText) => {
+                        // Success
+                        // Stop scanning and return result
+                        html5QrCode.stop().then(() => {
+                            html5QrCode.clear();
+                            onScan(decodedText);
+                        }).catch(err => {
+                            console.error("Failed to stop scanner", err);
+                            onScan(decodedText); // Return anyway
+                        });
+                    },
+                    (errorMessage) => {
+                        // Parse error, ignore
+                    }
+                );
+            } catch (err) {
+                console.error("Error starting camera", err);
+                alert("No se pudo iniciar la cámara. Verifique permisos.");
+                onClose();
+            }
+        };
 
-            scanner.render((decodedText) => {
-                // Success callback
-                onScan(decodedText);
-                scanner.clear().catch(err => console.error("Failed to clear scanner", err));
-            }, (error) => {
-                // Error callback (scanning...) - ignore usually
-                // console.warn(error);
-            });
+        // Little delay to ensure DOM is clear
+        setTimeout(() => startCamera(), 100);
 
-            // Cleanup function
-            return () => {
-                try { scanner.clear(); } catch (e) {/* ignore if already cleared */ }
-            };
-        }, 100);
-
-        return () => clearTimeout(timer);
-    }, [onScan]);
+        // Cleanup
+        return () => {
+            if (html5QrCode.isScanning) {
+                html5QrCode.stop().then(() => html5QrCode.clear()).catch(console.error);
+            } else {
+                html5QrCode.clear();
+            }
+        };
+    }, [onScan, onClose]);
 
     return (
-        <ModalOverlay style={{ zIndex: 6000 }}>
-            <ModalContent style={{ padding: '1rem', width: '90%', maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <h3 style={{ margin: '0 0 10px', textAlign: 'center' }}>Escanear Código</h3>
-                <div id="reader" style={{ width: '100%', minHeight: '300px', background: '#000' }}></div>
-                <ActionButton bg="#ef4444" onClick={onClose} style={{ marginTop: '10px' }}>Cerrar Cámara</ActionButton>
+        <ModalOverlay style={{ zIndex: 6000 }} onClick={onClose}>
+            <ModalContent onClick={e => e.stopPropagation()} style={{ padding: '0', width: '90%', maxWidth: '380px', background: 'transparent', boxShadow: 'none', border: 'none' }}>
+                <div style={{ background: 'white', borderRadius: '16px', padding: '16px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+                    <h3 style={{ margin: '0 0 12px', textAlign: 'center', fontSize: '1.2rem' }}>Escanear Producto</h3>
+
+                    <ScannerContainer>
+                        <div id="reader-custom" style={{ width: '100%', height: '100%' }}></div>
+                        <ScannerOverlay />
+                    </ScannerContainer>
+
+                    <p style={{ textAlign: 'center', fontSize: '0.85rem', color: '#64748b', marginTop: '12px' }}>
+                        Apunta la cámara al código de barras
+                    </p>
+
+                    <ActionButton bg="#ef4444" onClick={onClose} style={{ marginTop: '15px' }}>
+                        Cancelar
+                    </ActionButton>
+                </div>
             </ModalContent>
         </ModalOverlay>
     );
