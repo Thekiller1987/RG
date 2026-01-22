@@ -1,16 +1,12 @@
 // client/src/context/CajaContext.jsx
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { getCajaSession } from '../service/api';
-import {
-    loadCajaSession,
-    saveCajaSession,
-    clearCajaSession,
-    subscribeCajaChanges,
-    loadTasaDolar,
-    saveTasaDolar,
-    isSessionOpen
-} from '../utils/caja';
+// REMOVED: All local storage utils imports to ensure strict server compliance
+/* import {
+    loadCajaSession, saveCajaSession, clearCajaSession,
+    subscribeCajaChanges, loadTasaDolar, saveTasaDolar, isSessionOpen
+} from '../utils/caja'; */
 
 const CajaContext = createContext(null);
 
@@ -22,90 +18,49 @@ export const CajaProvider = ({ children }) => {
     const [cajaSession, setCajaSession] = useState(null);
     const [tasaDolar, setTasaDolar] = useState(36.60);
 
-    // Cargar sesión desde utils O DESDE SERVIDOR al montar o cuando cambia el usuario
+    // CRITICAL: Function to force re-fetch from server (Single Source of Truth)
+    const refreshSession = useCallback(async () => {
+        if (!userId) return;
+        try {
+            console.log("🔄 Syncing Caja Session from Server...");
+            const serverSession = await getCajaSession(userId);
+
+            if (serverSession && !serverSession.closedAt) {
+                setCajaSession(serverSession);
+                setIsCajaOpen(true);
+                // Respect server's tasa if present, else keep default
+                if (serverSession.tasaDolar) setTasaDolar(Number(serverSession.tasaDolar));
+            } else {
+                setCajaSession(null);
+                setIsCajaOpen(false);
+            }
+        } catch (error) {
+            console.error("❌ Error syncing caja (Server Error):", error);
+            // ON ERROR: Do NOT fallback to local. Fail safe -> closed.
+            // This prevents "zombie" states where local thinks it's open but server died.
+            setCajaSession(null);
+            setIsCajaOpen(false);
+        }
+    }, [userId]);
+
+    // Initial load
     useEffect(() => {
         if (!userId) {
             setIsCajaOpen(false);
             setCajaSession(null);
             return;
         }
+        refreshSession();
+        // Polling (Optional but recommended for multi-tab sync without local storage events)
+        const interval = setInterval(refreshSession, 10000); // Check every 10s
+        return () => clearInterval(interval);
+    }, [userId, refreshSession]);
 
-        const fetchSession = async () => {
-            try {
-                // 1. Intentar cargar del servidor primero (SSOT)
-                const serverSession = await getCajaSession(userId);
-
-                if (serverSession && !serverSession.closedAt) {
-                    // Si hay sesión activa en servidor, usarla y actualizar local
-                    setCajaSession(serverSession);
-                    setIsCajaOpen(true);
-                    saveCajaSession(userId, serverSession); // Sync local
-
-                    const tasa = loadTasaDolar(userId, serverSession.tasaDolar || 36.60);
-                    setTasaDolar(tasa);
-                } else {
-                    // 2. Fallback a local si el servidor no devuelve nada activo
-                    // (O si queremos soportar offline, pero la prioridad es la seguridad)
-                    const localSession = loadCajaSession(userId);
-                    if (localSession && isSessionOpen(localSession)) {
-                        // PRECAUCIÓN: Aquí podría haber desincronización si el servidor cerró.
-                        // Idealmente confiamos en el servidor.
-                        // Pero dejaremos el fallback por robustez momentánea.
-                        setCajaSession(localSession);
-                        setIsCajaOpen(true);
-                    } else {
-                        setIsCajaOpen(false);
-                        setCajaSession(null);
-                    }
-                }
-            } catch (error) {
-                console.error("Error al sincronizar caja con servidor:", error);
-                // Fallback a local en error de red
-                const localSession = loadCajaSession(userId);
-                if (localSession && isSessionOpen(localSession)) {
-                    setCajaSession(localSession);
-                    setIsCajaOpen(true);
-                }
-            }
-        };
-
-        fetchSession();
-    }, [userId]);
-
-    // Suscribirse a cambios entre pestañas
-    useEffect(() => {
-        if (!userId) return;
-
-        const unsubscribe = subscribeCajaChanges(userId, (session) => {
-            if (session && isSessionOpen(session)) {
-                setCajaSession(session);
-                setIsCajaOpen(true);
-            } else {
-                setCajaSession(null);
-                setIsCajaOpen(false);
-            }
-        });
-
-        return unsubscribe;
-    }, [userId]);
-
-    // Guardar sesión cuando cambia
-    useEffect(() => {
-        if (!userId) return;
-        if (cajaSession) {
-            saveCajaSession(userId, cajaSession);
-        }
-    }, [cajaSession, userId]);
-
-    // Guardar tasa del dólar cuando cambia
-    useEffect(() => {
-        if (!userId) return;
-        saveTasaDolar(userId, tasaDolar);
-    }, [tasaDolar, userId]);
+    // NO local storage saving effects (removed)
 
     const closeCajaSession = () => {
         if (!userId) return;
-        clearCajaSession(userId);
+        // Just clear state, the API call happens in the component
         setCajaSession(null);
         setIsCajaOpen(false);
     };
@@ -118,6 +73,7 @@ export const CajaProvider = ({ children }) => {
         tasaDolar,
         setTasaDolar,
         closeCajaSession,
+        refreshSession // Exported so POS can call it manually
     };
 
     return <CajaContext.Provider value={value}>{children}</CajaContext.Provider>;

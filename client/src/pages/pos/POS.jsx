@@ -27,7 +27,7 @@ const fmt = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigit
 const POS = () => {
   // Contextos
   const { user, products: initialProducts, token, refreshProducts, clients, allUsers } = useAuth();
-  const { isCajaOpen, setIsCajaOpen, cajaSession, setCajaSession, tasaDolar, setTasaDolar, closeCajaSession } = useCaja();
+  const { isCajaOpen, setIsCajaOpen, cajaSession, setCajaSession, tasaDolar, setTasaDolar, closeCajaSession, refreshSession } = useCaja();
   const {
     orders, activeOrderId, setActiveOrderId, activeOrder,
     handleNewOrder, handleRemoveOrder, updateActiveOrder, loadOrdersFromDB, checkForNewOrders
@@ -195,49 +195,12 @@ const POS = () => {
         showAlert({ title: "¡Éxito!", message: "Venta registrada sin impresión." });
       }
 
-      // --- CRITICAL UPDATE: Add transaction to local session so 'Caja' updates in real-time ---
-      if (isCajaOpen && cajaSession) {
-        // Ensure pagoDetalles has explicit 'efectivo' field
-        const details = { ...pagoDetalles };
-        const isCash = !details.tarjeta && !details.transferencia && !details.credito;
-        if (isCash && details.efectivo === undefined) {
-          details.efectivo = saleData.totalVenta;
-        }
-
-        const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
-        const totalSale = Number(saleData.totalVenta || 0);
-
-        // ... (Logica de mixed payment igual que antes)
-        // Ensure numeric fields
-        const d_efectivo = Number(details.efectivo || 0);
-        // ... preserved logic if needed, but simplifying for API call
-        if (isCash) details.ingresoCaja = Number(details.ingresoCaja || totalSale);
-
-        const newTransaction = {
-          type: 'venta',
-          amount: totalSale,
-          at: new Date().toISOString(),
-          userId, // Backend needs this
-          note: `Venta #${savedSale.id} - ${clientNameFound}`, // Useful note
-          pagoDetalles: details,
-          id: savedSale.id || 'TEMP-' + Date.now()
-        };
-
-        // 1. SEND TO BACKEND
-        try {
-          await api.addCajaTx({ userId, tx: newTransaction }, token);
-        } catch (e) {
-          console.error("Error syncing caixa tx API:", e);
-          // Fallback? We continue to update local state so UI looks correct
-        }
-
-        // 2. UPDATE LOCAL STATE
-        const updatedSession = {
-          ...cajaSession,
-          transactions: [newTransaction, ...(cajaSession.transactions || [])]
-        };
-        setCajaSession(updatedSession);
+      // --- STRICT SERVER SYNC: No optimistic updates ---
+      if (isCajaOpen) {
+        // Force re-fetch from server to ensure transaction is officially logged
+        await refreshSession();
       }
+      // --------------------------------------------------------------------------------------
       // --------------------------------------------------------------------------------------
 
       return true;
@@ -278,13 +241,8 @@ const POS = () => {
       showAlert({ title: "Error Servidor", message: "No se guardó en el servidor, pero se actualizará localmente." });
     }
 
-    // Update caja session with new transaction
-    const updatedSession = {
-      ...cajaSession,
-      transactions: [...(cajaSession?.transactions || []), transaction]
-    };
-
-    setCajaSession(updatedSession);
+    // Strict Sync: Refresh from server
+    await refreshSession();
     closeModal();
     showAlert({
       title: "Éxito",
@@ -473,9 +431,8 @@ const POS = () => {
                   tasaDolar: tasa
                 }, token);
 
-                setCajaSession(newSession); // Server response has ID
-                setTasaDolar(tasa);
-                setIsCajaOpen(true);
+                // Strict Sync:
+                await refreshSession(); // Gets the new session with ID and Tasa
                 closeModal();
               } catch (e) {
                 showAlert({ title: 'Error', message: 'No se pudo abrir la caja en el servidor.' });
@@ -491,22 +448,13 @@ const POS = () => {
                   notes: 'Cierre desde POS'
                 }, token);
 
-                // Update local with closed info if we wanted to show summary, 
-                // but here we just clear/close.
-                setCajaSession(null);
-                setIsCajaOpen(false);
+                // Strict Sync:
+                await refreshSession(); // Should return null/closed
                 closeModal();
                 showAlert({ title: 'Caja Cerrada', message: 'La sesión se ha cerrado y guardado correctamente.' });
               } catch (e) {
                 console.error(e);
-                // Zombie Session Recovery: If server says 404 (Not Found), it means it's already closed.
-                if (e.status === 404 || e.response?.status === 404 || e.message?.includes('404')) {
-                  setCajaSession(null);
-                  setIsCajaOpen(false);
-                  closeModal();
-                  showAlert({ title: 'Sincronizado', message: 'La caja ya estaba cerrada en el servidor. Se ha actualizado tu estado local.' });
-                  return;
-                }
+                // NO ZOMBIE RECOVERY. Server error is displayed.
                 showAlert({ title: 'Error', message: 'Error cerrando caja en servidor: ' + (e.message || 'Desconocido') });
               }
             }}
@@ -741,6 +689,7 @@ const POS = () => {
             isCajaOpen={isCajaOpen}
             session={cajaSession}
             isAdmin={isAdmin}
+            clients={clients || []} // Pass clients for name resolution
             showAlert={showAlert}
             showConfirmation={showConfirmation}
             initialTasaDolar={tasaDolar}
@@ -754,9 +703,8 @@ const POS = () => {
                   tasaDolar: tasa
                 }, token);
 
-                setCajaSession(newSession);
-                setTasaDolar(tasa);
-                setIsCajaOpen(true);
+                // Strict Sync:
+                await refreshSession();
                 closeModal();
               } catch (e) {
                 showAlert({ title: 'Error', message: 'No se pudo abrir la caja en el servidor.' });
@@ -772,8 +720,8 @@ const POS = () => {
                   notes: 'Cierre desde POS'
                 }, token);
 
-                setCajaSession(null);
-                setIsCajaOpen(false);
+                // Strict Sync:
+                await refreshSession();
                 closeModal();
                 showAlert({ title: 'Caja Cerrada', message: 'La sesión se ha cerrado y guardado correctamente.' });
               } catch (e) {
@@ -799,7 +747,6 @@ const POS = () => {
                 return [];
               }
             }}
-            isAdmin={isAdmin}
             isAdmin={isAdmin}
             users={allUsers} // Fixed: Pass ALL users so history shows seller names
             clients={clients || []} // Pass clients from auth context

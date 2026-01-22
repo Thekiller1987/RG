@@ -73,9 +73,24 @@ const PrintWrapper = styled.div`
  * Props esperadas:
  * - currentUser, isCajaOpen, session, onOpenCaja, onCloseCaja, onClose, isAdmin, etc.
  */
+// Helper para buscar nombre de cliente
+const resolveClientName = (tx, clients) => {
+  if (!tx) return 'N/A';
+  // Check if we have explicit client info in note or payment details
+  if (tx.pagoDetalles?.clienteNombre) return tx.pagoDetalles.clienteNombre;
+
+  // Try to find by ID
+  const cid = tx.pagoDetalles?.clienteId || tx.clientId;
+  if (cid && clients?.length > 0) {
+    const found = clients.find(c => String(c.id_cliente) === String(cid));
+    if (found) return found.nombre;
+  }
+  return null;
+};
+
 const CajaModal = ({
   currentUser, isCajaOpen, session, onOpenCaja, onCloseCaja,
-  onClose, isAdmin, showConfirmation, showAlert, initialTasaDolar
+  onClose, isAdmin, showConfirmation, showAlert, initialTasaDolar, clients = []
 }) => {
   const [montoApertura, setMontoApertura] = useState('');
   const [tasaDolar, setTasaDolar] = useState(initialTasaDolar || 36.60);
@@ -118,6 +133,12 @@ const CajaModal = ({
       if (t === 'salida' || t.includes('devolucion')) rawAmount = -Math.abs(rawAmount); // Salidas son negativas para caja
       const montoBase = rawAmount;
       const normalizedTx = { ...tx, pagoDetalles: pd, displayAmount: rawAmount };
+
+      // Resolve Client Name for Abonos!
+      if (t.includes('abono')) {
+        const cName = resolveClientName(normalizedTx, clients);
+        if (cName) normalizedTx.resolvedClientName = cName;
+      }
 
       const txTarjeta = Number(pd.tarjeta || 0);
       const txTransf = Number(pd.transferencia || 0);
@@ -169,7 +190,7 @@ const CajaModal = ({
       totalTarjeta: tTarjeta, totalTransferencia: tTransf, totalCredito: tCredito, totalNoEfectivo: tTarjeta + tTransf + tCredito,
       sumDevolucionesCancelaciones: sumDevsCancels, totalVentasDia: tVentasDia, tasaRef
     };
-  }, [transactions, session, initialTasaDolar]);
+  }, [transactions, session, initialTasaDolar, clients]); // Add clients dependency
 
   const diferencia = (Number(montoContado || 0) - efectivoEsperado);
   const openedAt = session?.openedAt ? new Date(session.openedAt) : null;
@@ -284,17 +305,88 @@ const CajaModal = ({
             </div>
           </div>
         ) : viewingReport ? (
-          /* --- REPORTE (PREVIEW + IMPRESIÓN) --- */
+          /* --- REPORTE (SPLIT: PREVIEW WEB ESTÉTICA + IMPRESIÓN OCULTA) --- */
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '90vh' }}>
-            {/* Header del Preview */}
-            <div style={{ padding: '10px 15px', background: '#e9ecef', borderBottom: '1px solid #dee2e6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '1rem', color: '#495057' }}>Vista Previa de Cierre</h3>
-              <Button $cancel onClick={() => setViewingReport(false)} style={{ padding: '5px 10px', fontSize: '0.85rem' }}>Volver / Editar</Button>
+            {/* Header del Modal Web */}
+            <div style={{ padding: '15px 20px', background: '#343a40', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '8px 8px 0 0' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800', letterSpacing: '0.5px' }}>REPORTAR CIERRE DE CAJA</h3>
+                <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.8 }}>{new Date().toLocaleString('es-NI')}</p>
+              </div>
+              <Button $cancel onClick={() => setViewingReport(false)} style={{ padding: '8px 15px', fontSize: '0.9rem', background: 'rgba(255,255,255,0.2)', border: 'none' }}>
+                <FaExchangeAlt /> Volver / Editar
+              </Button>
             </div>
 
-            {/* Contenedor Scrollable del Ticket */}
-            <div style={{ flex: 1, overflowY: 'auto', background: '#555', padding: '1rem', display: 'flex', justifyContent: 'center' }}>
-              {/* ESTE ES EL COMPONENTE QUE SE IMPRIME */}
+            {/* Contenedor Web Scrollable */}
+            <div style={{ flex: 1, overflowY: 'auto', background: '#f8f9fa', padding: '20px' }}>
+
+              {/* Resumen Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 15, marginBottom: 20 }}>
+                <div style={{ background: '#fff', padding: 15, borderRadius: 8, boxShadow: '0 2px 5px rgba(0,0,0,0.05)', borderLeft: '4px solid #007bff' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#666', textTransform: 'uppercase' }}>Ventas Totales</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#333' }}>{money(totalVentasDia)}</div>
+                </div>
+                <div style={{ background: '#fff', padding: 15, borderRadius: 8, boxShadow: '0 2px 5px rgba(0,0,0,0.05)', borderLeft: '4px solid #28a745' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#666', textTransform: 'uppercase' }}>Efectivo Real</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#28a745' }}>{money(montoContado)}</div>
+                </div>
+                <div style={{ background: '#fff', padding: 15, borderRadius: 8, boxShadow: '0 2px 5px rgba(0,0,0,0.05)', borderLeft: `4px solid ${diferencia < 0 ? '#dc3545' : '#ffc107'}` }}>
+                  <div style={{ fontSize: '0.8rem', color: '#666', textTransform: 'uppercase' }}>Diferencia</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '800', color: diferencia !== 0 ? (diferencia < 0 ? '#dc3545' : '#e0a800') : '#28a745' }}>{diferencia > 0 ? '+' : ''}{money(diferencia)}</div>
+                </div>
+              </div>
+
+              {/* Tabla de Arqueo Web */}
+              <div style={{ background: '#fff', padding: 20, borderRadius: 8, boxShadow: '0 2px 10px rgba(0,0,0,0.05)', marginBottom: 20 }}>
+                <h4 style={{ margin: '0 0 15px', borderBottom: '1px solid #eee', paddingBottom: 10 }}>Arqueo Detallado</h4>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #f1f1f1' }}><td style={{ padding: 10 }}>Fondo Inicial</td><td className="text-right" style={{ padding: 10, fontWeight: 'bold' }}>{money(cajaInicial)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #f1f1f1' }}><td style={{ padding: 10 }}>Entradas Efectivo</td><td className="text-right" style={{ padding: 10, color: '#28a745' }}>+ {money(netCordobas - cajaInicial + Math.abs(sumDevolucionesCancelaciones) /* approx logic fix if needed, using calc vars */)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #f1f1f1', background: '#fcfcfc' }}><td style={{ padding: 10, fontWeight: 'bold' }}>Esperado en Caja</td><td className="text-right" style={{ padding: 10, fontWeight: 'bold' }}>{money(efectivoEsperado)}</td></tr>
+                    <tr><td style={{ padding: 10 }}>Tarjeta/Transf/Crédito</td><td className="text-right" style={{ padding: 10, color: '#666' }}>{money(totalNoEfectivo)}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Movimientos Web */}
+              {(abonos.length > 0 || salidas.length > 0) && (
+                <div style={{ background: '#fff', padding: 20, borderRadius: 8, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
+                  <h4 style={{ margin: '0 0 15px', borderBottom: '1px solid #eee', paddingBottom: 10 }}>Detalle de Movimientos</h4>
+
+                  {abonos.length > 0 && (
+                    <div style={{ marginBottom: 15 }}>
+                      <h5 style={{ color: '#007bff', margin: '0 0 5px' }}>Abonos Recibidos</h5>
+                      {abonos.map((x, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #eee' }}>
+                          <div>
+                            <strong>{x.resolvedClientName || 'Cliente General'}</strong>
+                            <div style={{ fontSize: '0.8rem', color: '#666' }}>{x.note || 'Abono de cuenta'}</div>
+                          </div>
+                          <div style={{ fontWeight: 'bold', color: '#28a745' }}>+ {money(x.amount)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {salidas.length > 0 && (
+                    <div>
+                      <h5 style={{ color: '#dc3545', margin: '0 0 5px' }}>Salidas de Caja</h5>
+                      {salidas.map((x, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #eee' }}>
+                          <div>{x.note || 'Salida Varia'}</div>
+                          <div style={{ fontWeight: 'bold', color: '#dc3545' }}>{money(Math.abs(x.amount))}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ELEMENTO OCULTO PARA IMPRESIÓN */}
+            <div style={{ display: 'none' }}>
               <PrintWrapper id="print-wrapper-caja" className="print-80">
                 <div className="brand">
                   <img src="/icons/logo.png" alt="Logo" style={{ filter: 'grayscale(100%) contrast(150%)' }} />
@@ -354,7 +446,7 @@ const CajaModal = ({
                           <tr><td colSpan="2" style={{ fontWeight: '900', background: '#f8f9fa', fontSize: '0.9rem' }}>--- ABONOS Y CREDITOS ---</td></tr>
                           {abonos.map((x, i) => (
                             <tr key={'a' + i}>
-                              <td style={{ fontSize: '0.9rem' }}>{x.note || 'Abono'} <br /><span style={{ fontSize: '0.75rem', color: '#555' }}>#{x.id}</span></td>
+                              <td style={{ fontSize: '0.9rem' }}>{x.resolvedClientName || x.note || 'Abono'} <br /><span style={{ fontSize: '0.75rem', color: '#555' }}>#{x.id}</span></td>
                               <td className="text-right" style={{ fontSize: '0.9rem' }}>{money(x.amount)}</td>
                             </tr>
                           ))}
@@ -396,10 +488,12 @@ const CajaModal = ({
               </PrintWrapper>
             </div>
 
+
             {/* Footer con Botones de Acción */}
-            <div style={{ padding: '15px', background: '#fff', borderTop: '1px solid #ccc', display: 'flex', gap: 10 }}>
-              <Button primary style={{ flex: 1, padding: '14px', fontSize: '1rem', display: 'flex', justifyContent: 'center', gap: 8 }} onClick={handleConfirmClose} disabled={!canClose}>
-                <FaPrint /> CONFIRMAR Y CERRAR
+            <div style={{ padding: '20px', background: '#fff', borderTop: '1px solid #ccc', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <Button $cancel onClick={() => setViewingReport(false)}>Seguir Editando</Button>
+              <Button primary style={{ padding: '12px 24px', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 8 }} onClick={handleConfirmClose} disabled={!canClose}>
+                <FaPrint /> IMPRIMIR Y CERRAR CAJA
               </Button>
             </div>
             {!canClose && <div style={{ padding: 5, textAlign: 'center', color: 'red', fontSize: '0.8rem' }}>Solo el Admin o quien abrió puede cerrar.</div>}

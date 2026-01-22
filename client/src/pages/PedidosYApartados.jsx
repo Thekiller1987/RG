@@ -234,6 +234,41 @@ const ProformaGenerator = () => {
 
     const total = useMemo(() => cart.reduce((acc, item) => acc + (parseFloat(item.precio_venta) * item.quantity), 0), [cart]);
 
+    // --- BARCODE SCANNER LISTENER ---
+    useEffect(() => {
+        const handleGlobalKeyDown = (e) => {
+            // 1. Ignore if modal is open
+            if (isProformaModalOpen || viewImage.isOpen || isMobileCartOpen) return;
+
+            // 2. Ignore if user is already typing in an input
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+
+            // 3. Ignore control keys, F-keys, etc. (Allow only printable characters)
+            if (e.key.length > 1 || e.ctrlKey || e.altKey || e.metaKey) return;
+
+            // 4. ACTION: Switch to code search and input character
+            // Prevent default to avoid double-entry if the focus happens too fast or event bubbles
+            e.preventDefault();
+
+            // If we were not in 'codigo' mode, clear previous search cleanly
+            // If we were already in 'codigo', we append (effectively provided by the logic below)
+            if (searchType !== 'codigo') {
+                setSearchType('codigo');
+                setSearchTerm(e.key); // Start fresh with this char
+            } else {
+                setSearchTerm(prev => prev + e.key); // Append
+            }
+
+            // 5. Focus the input so subsequent characters (remainder of the barcode) flow naturally
+            if (searchInputRef.current) {
+                searchInputRef.current.focus();
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }, [isProformaModalOpen, viewImage, isMobileCartOpen, searchType]);
+
     const handleGenerateProforma = () => {
         if (!clientName.trim()) return alert("El nombre del cliente es obligatorio.");
         setProformaDetails({ cart, total, subtotal: total, discount: 0, proformaNumber, client: { nombre: clientName, telefono: clientPhone || 'N/D' } });
