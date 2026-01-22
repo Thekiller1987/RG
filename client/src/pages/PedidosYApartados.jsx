@@ -160,6 +160,57 @@ const ImageViewModal = ({ isOpen, imageSrc, onClose }) => {
 // COMPONENTE PRINCIPAL
 // =================================================================
 
+// --- BARCODE SCANNER MODAL COMPONENT ---
+// Uses html5-qrcode for camera scanning
+import { Html5QrcodeScanner } from 'html5-qrcode';
+
+const BarcodeScannerModal = ({ onClose, onScan }) => {
+    // Effect to initialize scanner
+    React.useEffect(() => {
+        const scannerId = "reader";
+
+        // Prevent duplicate initialization if ref exists? Library handles it usually but we need cleanup.
+        // We defer slightly to ensure DOM is ready
+        const timer = setTimeout(() => {
+            const scanner = new Html5QrcodeScanner(
+                scannerId,
+                {
+                    fps: 10,
+                    qrbox: 250,
+                    aspectRatio: 1.0
+                },
+                /* verbose= */ false
+            );
+
+            scanner.render((decodedText) => {
+                // Success callback
+                onScan(decodedText);
+                scanner.clear().catch(err => console.error("Failed to clear scanner", err));
+            }, (error) => {
+                // Error callback (scanning...) - ignore usually
+                // console.warn(error);
+            });
+
+            // Cleanup function
+            return () => {
+                try { scanner.clear(); } catch (e) {/* ignore if already cleared */ }
+            };
+        }, 100);
+
+        return () => clearTimeout(timer);
+    }, [onScan]);
+
+    return (
+        <ModalOverlay style={{ zIndex: 6000 }}>
+            <ModalContent style={{ padding: '1rem', width: '90%', maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <h3 style={{ margin: '0 0 10px', textAlign: 'center' }}>Escanear Código</h3>
+                <div id="reader" style={{ width: '100%', minHeight: '300px', background: '#000' }}></div>
+                <ActionButton bg="#ef4444" onClick={onClose} style={{ marginTop: '10px' }}>Cerrar Cámara</ActionButton>
+            </ModalContent>
+        </ModalOverlay>
+    );
+};
+
 const ProformaGenerator = () => {
     const { user, products: authProducts } = useAuth();
     const token = localStorage.getItem('token');
@@ -180,6 +231,7 @@ const ProformaGenerator = () => {
 
     // MOBILE STATES
     const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+    const [isScannerOpen, setIsScannerOpen] = useState(false); // <--- NEW STATE FOR CAMERA
 
     const searchInputRef = useRef(null);
 
@@ -238,7 +290,7 @@ const ProformaGenerator = () => {
     useEffect(() => {
         const handleGlobalKeyDown = (e) => {
             // 1. Ignore if modal is open
-            if (isProformaModalOpen || viewImage.isOpen || isMobileCartOpen) return;
+            if (isProformaModalOpen || viewImage.isOpen || isMobileCartOpen || isScannerOpen) return;
 
             // 2. Ignore if user is already typing in an input
             if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
@@ -267,12 +319,20 @@ const ProformaGenerator = () => {
 
         window.addEventListener('keydown', handleGlobalKeyDown);
         return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-    }, [isProformaModalOpen, viewImage, isMobileCartOpen, searchType]);
+    }, [isProformaModalOpen, viewImage, isMobileCartOpen, searchType, isScannerOpen]);
 
     const handleGenerateProforma = () => {
         if (!clientName.trim()) return alert("El nombre del cliente es obligatorio.");
         setProformaDetails({ cart, total, subtotal: total, discount: 0, proformaNumber, client: { nombre: clientName, telefono: clientPhone || 'N/D' } });
         setIsProformaModalOpen(true);
+    };
+
+    // --- CAMERA SCAN HANDLER ---
+    const handleCameraScan = (code) => {
+        if (!code) return;
+        setSearchType('codigo');
+        setSearchTerm(code);
+        setIsScannerOpen(false);
     };
 
     return (
@@ -293,7 +353,20 @@ const ProformaGenerator = () => {
                     </SearchTypeToggle>
                     <SearchInputWrapper>
                         <FaSearch color="#94a3b8" />
-                        <Input ref={searchInputRef} placeholder="Escribe para buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} autoFocus />
+                        <Input ref={searchInputRef} placeholder={searchType === 'codigo' ? "Escanea o escribe código..." : "Escribe para buscar..."} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} autoFocus />
+                        {/* CAMERA BUTTON: Visible mainly in code mode or mobile */}
+                        <div
+                            onClick={() => setIsScannerOpen(true)}
+                            style={{
+                                padding: '8px', cursor: 'pointer', color: '#64748b',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                borderLeft: '1px solid #e2e8f0', marginLeft: '5px'
+                            }}
+                            title="Usar Cámara"
+                        >
+                            <FaBarcode size={18} />
+                            <FaSearch size={10} style={{ marginLeft: -6, marginTop: -8 }} /> {/* Composite icon look */}
+                        </div>
                     </SearchInputWrapper>
                 </SearchContainer>
 
@@ -419,6 +492,14 @@ const ProformaGenerator = () => {
 
             <AnimatePresence>{viewImage.isOpen && <ImageViewModal isOpen={true} imageSrc={viewImage.imageUrl} onClose={() => setViewImage({ isOpen: false, imageUrl: null })} />}</AnimatePresence>
             {isProformaModalOpen && <ProformaEmpleadoModal {...proformaDetails} onClose={() => setIsProformaModalOpen(false)} setTicketData={() => setCart([])} currentUser={user} client={proformaDetails.client} />}
+
+            {/* SCANNER MODAL */}
+            {isScannerOpen && (
+                <BarcodeScannerModal
+                    onClose={() => setIsScannerOpen(false)}
+                    onScan={handleCameraScan}
+                />
+            )}
         </Container>
     );
 };
