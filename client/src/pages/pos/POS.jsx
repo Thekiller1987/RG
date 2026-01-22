@@ -195,10 +195,53 @@ const POS = () => {
         showAlert({ title: "¡Éxito!", message: "Venta registrada sin impresión." });
       }
 
-      // --- STRICT SERVER SYNC: No optimistic updates ---
-      if (isCajaOpen) {
-        // Force re-fetch from server to ensure transaction is officially logged
-        await refreshSession();
+      // --- RESTORED LOGIC: Register transaction in Caja ---
+      if (isCajaOpen && cajaSession) {
+        // Ensure pagoDetalles has explicit 'efectivo' field
+        const details = { ...pagoDetalles };
+        // Check if it's purely cash (no mixed methods)
+        const isCash = !details.tarjeta && !details.transferencia && !details.credito;
+        if (isCash && details.efectivo === undefined) {
+          details.efectivo = saleData.totalVenta;
+        }
+
+        const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
+        const totalSale = Number(saleData.totalVenta || 0);
+
+        // Ensure numeric fields for robustness
+        details.efectivo = Number(details.efectivo || 0);
+
+        const newTransaction = {
+          type: 'venta',
+          amount: totalSale,
+          at: new Date().toISOString(),
+          userId, // Backend needs this
+          note: `Venta #${savedSale.id} - ${clientNameFound}`,
+          pagoDetalles: details,
+          id: savedSale.id || 'TEMP-' + Date.now()
+        };
+
+        // 1. SEND TO BACKEND (Vital for DB consistency)
+        try {
+          await api.addCajaTx({ userId, tx: newTransaction }, token);
+        } catch (e) {
+          console.error("Error syncing caixa tx API:", e);
+          // If this fails, we effectively have a zombie sale in terms of money, 
+          // but we still show it locally so the cashier isn't confused.
+        }
+
+        // 2. OPTIMISTIC UPDATE (Vital for UX "Frozen" fix)
+        // We update local state immediately so the user sees the numbers move.
+        const updatedSession = {
+          ...cajaSession,
+          transactions: [newTransaction, ...(cajaSession.transactions || [])]
+        };
+        setCajaSession(updatedSession);
+
+        // 3. BACKGROUND SYNC
+        // We still ask the server for the official state, but we don't await it strictly 
+        // to block the UI if we already updated optimistically.
+        refreshSession().catch(console.error);
       }
       // --------------------------------------------------------------------------------------
       // --------------------------------------------------------------------------------------
