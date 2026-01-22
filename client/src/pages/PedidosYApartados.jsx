@@ -131,6 +131,11 @@ const ModalOverlay = styled.div`
   position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 5000;
 `;
 
+const ModalContent = styled.div`
+  background: white; padding: 20px; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; position: relative;
+`;
+
 // NEW MOBILE FAB (Floating Action Button)
 const MobileCartFAB = styled(motion.button)`
     display: none;
