@@ -57,10 +57,17 @@ export const AuthProvider = ({ children }) => {
 
 
 
-    useEffect(() => {
-        // --- REAL TIME LISTENERS ---
-        const socket = getSocket(); // LAZY INIT
+    const socketRef = React.useRef(null);
 
+    useEffect(() => {
+        // Initialize socket only once, only after component mount
+        if (!socketRef.current) {
+            socketRef.current = getSocket();
+        }
+
+        const socket = socketRef.current;
+
+        // --- REAL TIME LISTENERS ---
         const onInventoryUpdate = () => {
             console.log("⚡ Socket: inventory_update");
             refreshProducts();
