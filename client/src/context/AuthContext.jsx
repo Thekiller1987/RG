@@ -1,12 +1,11 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as api from '../service/api.js';
 import { loadCajaSession, saveCajaSession } from '../utils/caja.js';
-// No imports from SocketContext - using Prop Injection
 
 const AuthContext = createContext(null);
 
-export const AuthProvider = ({ children, socket }) => { // Accept socket as prop
+export const AuthProvider = ({ children, socket }) => {
     const [user, setUser] = useState(null);
     const [allUsers, setAllUsers] = useState([]);
     const [products, setProducts] = useState([]);
@@ -15,6 +14,9 @@ export const AuthProvider = ({ children, socket }) => { // Accept socket as prop
     const navigate = useNavigate();
     const [token, setToken] = useState(() => localStorage.getItem('token'));
     const [cajaSession, setCajaSession] = useState(null);
+
+    // Ref for Debouncing
+    const refreshTimeoutRef = useRef(null);
 
     const logout = useCallback(() => {
         localStorage.removeItem('token');
@@ -43,14 +45,27 @@ export const AuthProvider = ({ children, socket }) => { // Accept socket as prop
     const refreshProducts = useCallback(async () => {
         if (!token) return;
         try {
-            console.log("🔄 [AuthContext] Refreshing products from API...");
+            // console.log("🔄 [AuthContext] Refreshing products...");
             const data = await api.fetchProducts(token);
             setProducts(data || []);
-            console.log("✅ [AuthContext] Products updated:", data?.length);
+            // console.log("✅ [AuthContext] Products updated");
         } catch (e) {
-            console.error("Error actualizando inventario socket:", e);
+            // Suppress network errors from duplicate requests (abort controller would be better but this is simpler)
+            if (e.name !== 'CanceledError') {
+                console.error("Error updating inventory:", e.message);
+            }
         }
     }, [token]);
+
+    // DEBOUNCED REFRESH: Prevents "Network Error" double-fetch race conditions
+    const refreshProductsDebounced = useCallback(() => {
+        if (refreshTimeoutRef.current) {
+            clearTimeout(refreshTimeoutRef.current);
+        }
+        refreshTimeoutRef.current = setTimeout(() => {
+            refreshProducts();
+        }, 300); // Wait 300ms for other events to settle
+    }, [refreshProducts]);
 
     const refreshClients = useCallback(async () => {
         const currentToken = localStorage.getItem('token');
@@ -59,56 +74,41 @@ export const AuthProvider = ({ children, socket }) => { // Accept socket as prop
                 const clientsData = await api.fetchClients(currentToken);
                 setClients(clientsData || []);
             } catch (error) {
-                console.error("Error al refrescar clientes:", error);
+                // console.error("Error al refrescar clientes:", error);
             }
         }
     }, []);
 
-    // Socket Logic using PROP - VERBOSE LOGGING
+    // Socket Listeners
     useEffect(() => {
-        if (!socket) {
-            console.log("🔌 [AuthContext] Waiting for socket prop...");
-            return;
-        }
-
-        console.log("🔌 [AuthContext] Socket prop received, attaching listeners...");
+        if (!socket) return;
 
         const onInventoryUpdate = () => {
-            console.log("🔥 [SOCKET] inventory_update received!");
-            refreshProducts();
+            // Use Debounced version!
+            refreshProductsDebounced();
         };
-        const onClientsUpdate = () => {
-            console.log("🔥 [SOCKET] clients_update received!");
-            refreshClients();
-        };
-        const onUsersUpdate = async () => {
-            console.log("🔥 [SOCKET] users_update received!");
+
+        socket.on('inventory_update', onInventoryUpdate);
+        socket.on('products:update', onInventoryUpdate);
+        socket.on('clients:update', refreshClients); // Clients usually don't spam, direct call is fine
+        socket.on('users:update', async () => {
             const token = localStorage.getItem('token');
             if (token) {
                 try {
                     const users = await api.fetchUsers(token);
                     setAllUsers(users || []);
-                } catch (e) { console.error("Error socket users:", e); }
+                } catch (e) { }
             }
-        };
-
-        socket.on('inventory_update', onInventoryUpdate);
-        socket.on('products:update', onInventoryUpdate);
-        socket.on('clients:update', onClientsUpdate);
-        socket.on('users:update', onUsersUpdate);
-
-        // Listener for connection debug
-        socket.on('connect', () => console.log("✅ [AuthContext] Socket connected event confirmed"));
+        });
 
         return () => {
-            console.log("🔌 [AuthContext] Detaching listeners");
+            if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
             socket.off('inventory_update', onInventoryUpdate);
             socket.off('products:update', onInventoryUpdate);
-            socket.off('clients:update', onClientsUpdate);
-            socket.off('users:update', onUsersUpdate);
-            socket.off('connect');
+            socket.off('clients:update', refreshClients);
+            socket.off('users:update');
         };
-    }, [socket, refreshProducts, refreshClients]);
+    }, [socket, refreshProductsDebounced, refreshClients]);
 
     useEffect(() => {
         const initializeAuth = async () => {
