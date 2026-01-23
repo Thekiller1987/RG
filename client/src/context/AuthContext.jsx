@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import * as api from '../service/api.js';
 import { loadCajaSession, saveCajaSession } from '../utils/caja.js';
 
-import { io } from 'socket.io-client';
+import { socket } from '../service/socket';
 
 const AuthContext = createContext(null);
 
@@ -55,56 +55,20 @@ export const AuthProvider = ({ children }) => {
         }
     }, [token]);
 
+    // ... cleaned ...
+
     useEffect(() => {
-        // CORRECTION: Dynamic URL based on API configuration
-        let socketUrl = 'https://multirepuestosrg.com';
-        /*
-        try {
-            if (api.API_URL) {
-                // Remove /api suffix if present to get base origin
-                socketUrl = new URL(api.API_URL).origin;
-            }
-        } catch (e) {
-            console.error("Error determining Socket URL:", e);
-        }
-        */
-
-        console.log("Connecting Socket.io to:", socketUrl);
-
-        // Configuración para Producción/Local
-        const socketIo = io(socketUrl, {
-            path: '/socket.io/',
-            transports: ['polling', 'websocket'], // Try polling first for robustness
-            reconnection: true,
-            reconnectionAttempts: 10
-        });
-
-        socketIo.on('connect', () => {
-            console.log('Cliente Socket conectado a:', socketUrl);
-        });
-
-        socketIo.on('connect_error', (err) => {
-            console.error('Error conexión Socket:', err.message);
-        });
-
         // --- REAL TIME LISTENERS ---
-        socketIo.on('inventory_update', () => {
+        const onInventoryUpdate = () => {
             console.log("⚡ Socket: inventory_update");
             refreshProducts();
-        });
-
-        socketIo.on('products:update', () => { // Alias for robustness
-            console.log("⚡ Socket: products:update");
-            refreshProducts();
-        });
-
-        socketIo.on('clients:update', () => {
-            console.log("⚡ Socket: clients:update");
+        };
+        const onClientsUpdate = () => {
+            console.log("⚡ Socket: clients_update");
             refreshClients();
-        });
-
-        socketIo.on('users:update', async () => {
-            console.log("⚡ Socket: users:update");
+        };
+        const onUsersUpdate = async () => {
+            console.log("⚡ Socket: users_update");
             const token = localStorage.getItem('token');
             if (token) {
                 try {
@@ -112,10 +76,18 @@ export const AuthProvider = ({ children }) => {
                     setAllUsers(users || []);
                 } catch (e) { console.error("Error socket users:", e); }
             }
-        });
+        };
+
+        socket.on('inventory_update', onInventoryUpdate);
+        socket.on('products:update', onInventoryUpdate);
+        socket.on('clients:update', onClientsUpdate);
+        socket.on('users:update', onUsersUpdate);
 
         return () => {
-            socketIo.disconnect();
+            socket.off('inventory_update', onInventoryUpdate);
+            socket.off('products:update', onInventoryUpdate);
+            socket.off('clients:update', onClientsUpdate);
+            socket.off('users:update', onUsersUpdate);
         };
     }, [refreshProducts, refreshClients]);
     // --------------------------
