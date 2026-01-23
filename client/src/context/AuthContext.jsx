@@ -85,15 +85,37 @@ export const AuthProvider = ({ children }) => {
             console.error('Error conexión Socket:', err.message);
         });
 
+        // --- REAL TIME LISTENERS ---
         socketIo.on('inventory_update', () => {
-            console.log("Evento recibido: inventory_update");
+            console.log("⚡ Socket: inventory_update");
             refreshProducts();
+        });
+
+        socketIo.on('products:update', () => { // Alias for robustness
+            console.log("⚡ Socket: products:update");
+            refreshProducts();
+        });
+
+        socketIo.on('clients:update', () => {
+            console.log("⚡ Socket: clients:update");
+            refreshClients();
+        });
+
+        socketIo.on('users:update', async () => {
+            console.log("⚡ Socket: users:update");
+            const token = localStorage.getItem('token');
+            if (token) {
+                try {
+                    const users = await api.fetchUsers(token);
+                    setAllUsers(users || []);
+                } catch (e) { console.error("Error socket users:", e); }
+            }
         });
 
         return () => {
             socketIo.disconnect();
         };
-    }, [refreshProducts]);
+    }, [refreshProducts, refreshClients]);
     // --------------------------
 
     useEffect(() => {

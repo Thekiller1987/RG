@@ -911,7 +911,7 @@ const InventoryManagement = () => {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const { filtered, totalFilteredCount } = useMemo(() => {
-    const q = (deferredSearch || '').toLowerCase().trim(); // raw deferred query
+    const q = (deferredSearch || '').toLowerCase().trim();
     const cat = String(filterCategory || '');
     const prov = String(filterProvider || '');
 
@@ -920,19 +920,40 @@ const InventoryManagement = () => {
     if (cat) matched = matched.filter(p => String(p.id_categoria) === cat);
     if (prov) matched = matched.filter(p => String(p.id_proveedor) === prov);
 
+    // Filter Logic
     const results = matched.filter(p => {
       if (searchType === 'code') {
         const codigo = String(p.codigo || '').toLowerCase();
         const barras = String(p.codigo_barras || '').toLowerCase();
-        return codigo.startsWith(q) || barras.startsWith(q);
+        return codigo.includes(q) || barras.includes(q);
       } else {
         const nombre = (p.nombre || '').toLowerCase();
         const desc = (p.descripcion || '').toLowerCase();
-        return nombre.includes(q) || desc.includes(q);
+        const codigo = String(p.codigo || '').toLowerCase();
+        return nombre.includes(q) || desc.includes(q) || codigo.includes(q);
       }
     });
 
-    // --- NUEVA LÓGICA DE PAGINACIÓN ---
+    // SORTING: StartsWith Priority
+    results.sort((a, b) => {
+      if (!q) return 0;
+
+      // 1. Starts with Name
+      const aNameStart = (a.nombre || '').toLowerCase().startsWith(q);
+      const bNameStart = (b.nombre || '').toLowerCase().startsWith(q);
+      if (aNameStart && !bNameStart) return -1;
+      if (!aNameStart && bNameStart) return 1;
+
+      // 2. Starts with Code
+      const aCodeStart = (a.codigo || '').toLowerCase().startsWith(q);
+      const bCodeStart = (b.codigo || '').toLowerCase().startsWith(q);
+      if (aCodeStart && !bCodeStart) return -1;
+      if (!aCodeStart && bCodeStart) return 1;
+
+      return 0; // standard order
+    });
+
+    // Pagination
     const totalCount = results.length;
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const paginatedResults = results.slice(startIndex, startIndex + ITEMS_PER_PAGE);

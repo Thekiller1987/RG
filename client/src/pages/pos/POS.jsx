@@ -177,17 +177,18 @@ const POS = () => {
       const response = await api.createSale(saleData, token);
       handleRemoveOrder(orderToCloseId);
 
-      // Update inventory but DO NOT reload orders immediately to prevent race condition 
-      // where the just-deleted ticket is re-fetched from DB before the debounce save occurs.
+      // FORCE REFRESH: Immediate inventory update locally (Socket handles others)
       await refreshProducts();
 
-      // If sale creation returns the sale object, use it. Otherwise, construct a local representation for the ticket.
-      const savedSale = response?.data || response || saleData;
-      // Ensure specific fields for printing
+      // FIXED: ID Extraction
+      const responseData = response.data || response || {};
+      const savedSale = { ...saleData, ...responseData };
+
+      // Critical: Ensure ID is present for printing
+      savedSale.id = responseData.id || responseData.saleId || responseData._id || 'N/A';
       savedSale.items = payloadItems;
       savedSale.pagoDetalles = pagoDetalles;
       savedSale.fecha = new Date().toISOString();
-      savedSale.id = savedSale.id || 'N/A'; // Backend should ideally return the real ID
 
       if (pagoDetalles.shouldPrintNow) {
         setTicketData(savedSale); // Open TicketModal
