@@ -2,8 +2,7 @@ import React, { createContext, useState, useContext, useEffect, useCallback } fr
 import { useNavigate } from 'react-router-dom';
 import * as api from '../service/api.js';
 import { loadCajaSession, saveCajaSession } from '../utils/caja.js';
-
-import { getSocket } from '../service/socket';
+import { useSocket } from './SocketContext';
 
 const AuthContext = createContext(null);
 
@@ -26,8 +25,6 @@ export const AuthProvider = ({ children }) => {
     }, [navigate]);
 
     const loadMasterData = useCallback(async (token) => {
-        // isLoading is false here usually, so we don't block UI if refreshing
-        // But initial load handles that via useEffect
         try {
             const [usersData, productsData, clientsData] = await Promise.all([
                 api.fetchUsers(token),
@@ -43,31 +40,21 @@ export const AuthProvider = ({ children }) => {
         }
     }, [logout]);
 
-    // --- SOCKET.IO LISTENER ---
     const refreshProducts = useCallback(async () => {
         if (!token) return;
         try {
             const data = await api.fetchProducts(token);
             setProducts(data || []);
-            // console.log("Inventario actualizado en tiempo real");
         } catch (e) {
             console.error("Error actualizando inventario socket:", e);
         }
     }, [token]);
 
-
-
-    const socketRef = React.useRef(null);
+    const socket = useSocket();
 
     useEffect(() => {
-        // Initialize socket only once, only after component mount
-        if (!socketRef.current) {
-            socketRef.current = getSocket();
-        }
+        if (!socket) return;
 
-        const socket = socketRef.current;
-
-        // --- REAL TIME LISTENERS ---
         const onInventoryUpdate = () => {
             console.log("⚡ Socket: inventory_update");
             refreshProducts();
@@ -98,12 +85,11 @@ export const AuthProvider = ({ children }) => {
             socket.off('clients:update', onClientsUpdate);
             socket.off('users:update', onUsersUpdate);
         };
-    }, [refreshProducts, refreshClients]);
-    // --------------------------
+    }, [socket, refreshProducts, refreshClients]);
 
     useEffect(() => {
         const initializeAuth = async () => {
-            setIsLoading(true); // Bloqueo solo inicial
+            setIsLoading(true);
             try {
                 const tokenInStorage = localStorage.getItem('token');
                 const storedUser = localStorage.getItem('user');
@@ -147,7 +133,6 @@ export const AuthProvider = ({ children }) => {
         }
     }, []);
 
-    // Tu lógica de caja se mantiene
     useEffect(() => {
         if (user) {
             const userId = user.id_usuario || user.id;
@@ -178,7 +163,7 @@ export const AuthProvider = ({ children }) => {
         login,
         logout,
         loadMasterData,
-        refreshProducts, // Exportar para uso manual si se requiere
+        refreshProducts,
         refreshClients,
         cajaSession,
         setCajaSession,
@@ -192,8 +177,7 @@ export const AuthProvider = ({ children }) => {
     return (
         <AuthContext.Provider value={value}>
             {children}
-        </AuthContext.Provider> // <-- CORRECCIÓN AQUÍ
-
+        </AuthContext.Provider>
     );
 };
 

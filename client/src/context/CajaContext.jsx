@@ -1,7 +1,7 @@
 // client/src/context/CajaContext.jsx
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { getCajaSession } from '../service/api';
-import { getSocket } from '../service/socket';
+import { useSocket } from './SocketContext';
 
 const CajaContext = createContext(null);
 
@@ -37,7 +37,7 @@ export const CajaProvider = ({ children, user }) => {
         }
     }, [userId]);
 
-    const socketRef = React.useRef(null);
+    const socket = useSocket();
 
     // Initial load & Socket Sync
     useEffect(() => {
@@ -50,40 +50,38 @@ export const CajaProvider = ({ children, user }) => {
         // 1. Initial Load
         refreshSession();
 
-        // 2. Socket Listeners (Using shared lazy instance)
-        if (!socketRef.current) {
-            socketRef.current = getSocket();
+        // 2. Socket Listeners (Now via Context)
+        if (socket) {
+            const onSessionUpdate = (data) => {
+                if (!data || !data.userId || data.userId === userId) {
+                    console.log("⚡ Socket: caja session update");
+                    refreshSession();
+                }
+            };
+
+            const onNewTx = (data) => {
+                if (!data || !data.userId || data.userId === userId) {
+                    console.log("⚡ Socket: New Tx");
+                    refreshSession();
+                }
+            };
+
+            socket.on('caja:session_update', onSessionUpdate);
+            socket.on('caja:transaction_new', onNewTx);
+
+            return () => {
+                socket.off('caja:session_update', onSessionUpdate);
+                socket.off('caja:transaction_new', onNewTx);
+            };
         }
-        const socket = socketRef.current;
-
-        const onSessionUpdate = (data) => {
-            if (!data || !data.userId || data.userId === userId) {
-                console.log("⚡ Socket: caja session update");
-                refreshSession();
-            }
-        };
-
-        const onNewTx = (data) => {
-            if (!data || !data.userId || data.userId === userId) {
-                console.log("⚡ Socket: New Tx");
-                refreshSession();
-            }
-        };
-
-        socket.on('caja:session_update', onSessionUpdate);
-        socket.on('caja:transaction_new', onNewTx);
 
         // 3. Backup Polling (Relaxed to 60s)
         const interval = setInterval(refreshSession, 60000);
 
         return () => {
             clearInterval(interval);
-            socket.off('caja:session_update', onSessionUpdate);
-            socket.off('caja:transaction_new', onNewTx);
         };
-    }, [userId, refreshSession]);
-
-    // NO local storage saving effects (removed)
+    }, [userId, refreshSession, socket]);
 
     const closeCajaSession = () => {
         if (!userId) return;
