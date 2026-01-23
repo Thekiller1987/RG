@@ -58,6 +58,7 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         // CORRECTION: Dynamic URL based on API configuration
         let socketUrl = 'https://multirepuestosrg.com';
+        /*
         try {
             if (api.API_URL) {
                 // Remove /api suffix if present to get base origin
@@ -66,6 +67,7 @@ export const AuthProvider = ({ children }) => {
         } catch (e) {
             console.error("Error determining Socket URL:", e);
         }
+        */
 
         console.log("Connecting Socket.io to:", socketUrl);
 
