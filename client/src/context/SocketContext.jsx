@@ -1,6 +1,6 @@
 // client/src/context/SocketContext.jsx
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
-import { io } from 'socket.io-client';
+// Note: io is loaded via CDN in index.html to prevent ReferenceError initialization crashes
 
 const SocketContext = createContext(null);
 const URL = 'https://multirepuestosrg.com';
@@ -11,7 +11,15 @@ export function SocketProvider({ children }) {
 
     useEffect(() => {
         // Connection Logic - Executed strictly AFTER Mount
-        console.log("🔌 SocketProvider: Connecting...");
+        console.log("🔌 SocketProvider: Connecting via Global IO (CDN)...");
+
+        // Use global 'io' from CDN
+        const io = window.io;
+
+        if (!io) {
+            console.error("❌ CRITICAL: Socket.io CDN failed to load from index.html!");
+            return;
+        }
 
         const newSocket = io(URL, {
             path: '/socket.io/',
