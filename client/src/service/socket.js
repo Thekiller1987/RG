@@ -1,22 +1,20 @@
-import { io } from 'socket.io-client';
+// TEMPORARY: Socket stub for debugging
+// This removes all socket.io functionality to isolate the circular dependency error
 
-const URL = 'https://multirepuestosrg.com';
-
-let socket;
+let socket = null;
 
 export const getSocket = () => {
     if (!socket) {
-        console.log("🔌 Initializing Socket Lazy...");
-        socket = io(URL, {
-            path: '/socket.io/',
-            transports: ['polling', 'websocket'],
-            reconnection: true,
-            reconnectionAttempts: 10,
-            autoConnect: true
-        });
-
-        socket.on('connect', () => console.log('✅ Socket Global Connected:', socket.id));
-        socket.on('disconnect', () => console.log('❌ Socket Global Disconnected'));
+        console.log("🔌 Socket DISABLED for debugging");
+        // Return a mock socket object with no-op methods
+        socket = {
+            on: () => { },
+            off: () => { },
+            emit: () => { },
+            connect: () => { },
+            disconnect: () => { },
+            id: null
+        };
     }
     return socket;
 };
