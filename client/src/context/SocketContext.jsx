@@ -1,57 +1,40 @@
 // client/src/context/SocketContext.jsx
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { io } from 'socket.io-client';
 
 const SocketContext = createContext(null);
 const URL = 'https://multirepuestosrg.com';
 
-export const SocketProvider = ({ children }) => {
+export function SocketProvider({ children }) {
     const [socket, setSocket] = useState(null);
     const socketRef = useRef(null);
 
     useEffect(() => {
-        let isMounted = true;
+        // Connection Logic - Executed strictly AFTER Mount
+        console.log("🔌 SocketProvider: Connecting...");
 
-        const initSocket = async () => {
-            if (socketRef.current) return; // Already initialized
+        const newSocket = io(URL, {
+            path: '/socket.io/',
+            transports: ['polling', 'websocket'],
+            reconnection: true,
+            reconnectionAttempts: 20,
+            autoConnect: true
+        });
 
-            try {
-                console.log("🔌 SocketProvider: Dynamically importing socket.io-client...");
-                // DYNAMIC IMPORT: The magic fix for initialization errors
-                const { io } = await import('socket.io-client');
+        newSocket.on('connect', () => {
+            console.log('✅ Socket Global Connected:', newSocket.id);
+        });
 
-                if (!isMounted) return;
+        newSocket.on('disconnect', () => {
+            console.log('❌ Socket Global Disconnected');
+        });
 
-                console.log("🔌 SocketProvider: Connecting...");
-                const newSocket = io(URL, {
-                    path: '/socket.io/',
-                    transports: ['polling', 'websocket'],
-                    reconnection: true,
-                    reconnectionAttempts: 20,
-                    autoConnect: true
-                });
-
-                newSocket.on('connect', () => {
-                    console.log('✅ Socket Global Connected:', newSocket.id);
-                });
-
-                newSocket.on('disconnect', () => {
-                    console.log('❌ Socket Global Disconnected');
-                });
-
-                socketRef.current = newSocket;
-                setSocket(newSocket);
-
-            } catch (error) {
-                console.error("CRITICAL: Failed to load socket.io-client", error);
-            }
-        };
-
-        initSocket();
+        socketRef.current = newSocket;
+        setSocket(newSocket);
 
         return () => {
-            isMounted = false;
+            console.log("🔌 SocketProvider: Cleanup");
             if (socketRef.current) {
-                console.log("🔌 SocketProvider: Cleaning up");
                 socketRef.current.disconnect();
                 socketRef.current = null;
             }
@@ -63,6 +46,8 @@ export const SocketProvider = ({ children }) => {
             {children}
         </SocketContext.Provider>
     );
-};
+}
 
-export const useSocket = () => useContext(SocketContext);
+export function useSocket() {
+    return useContext(SocketContext);
+}
