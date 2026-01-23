@@ -1,7 +1,7 @@
 // client/src/context/CajaContext.jsx
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { getCajaSession } from '../service/api';
+import { getCajaSession, API_URL } from '../service/api';
 import { io } from 'socket.io-client';
 // REMOVED: All local storage utils imports to ensure strict server compliance
 /* import {
