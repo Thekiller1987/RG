@@ -2,6 +2,7 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { getCajaSession } from '../service/api';
+import { io } from 'socket.io-client';
 // REMOVED: All local storage utils imports to ensure strict server compliance
 /* import {
     loadCajaSession, saveCajaSession, clearCajaSession,
@@ -69,7 +70,7 @@ export const CajaProvider = ({ children }) => {
             // Reuse API config
             if (api.API_URL) socketUrl = new URL(api.API_URL).origin;
 
-            socket = require('socket.io-client').io(socketUrl, {
+            socket = io(socketUrl, {
                 path: '/socket.io/',
                 transports: ['polling', 'websocket']
             });
