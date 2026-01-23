@@ -2,7 +2,7 @@ import React, { createContext, useState, useContext, useEffect, useCallback } fr
 import { useNavigate } from 'react-router-dom';
 import * as api from '../service/api.js';
 import { loadCajaSession, saveCajaSession } from '../utils/caja.js';
-// No imports from SocketContext
+// No imports from SocketContext - using Prop Injection
 
 const AuthContext = createContext(null);
 
@@ -43,8 +43,10 @@ export const AuthProvider = ({ children, socket }) => { // Accept socket as prop
     const refreshProducts = useCallback(async () => {
         if (!token) return;
         try {
+            console.log("🔄 [AuthContext] Refreshing products from API...");
             const data = await api.fetchProducts(token);
             setProducts(data || []);
+            console.log("✅ [AuthContext] Products updated:", data?.length);
         } catch (e) {
             console.error("Error actualizando inventario socket:", e);
         }
@@ -62,20 +64,25 @@ export const AuthProvider = ({ children, socket }) => { // Accept socket as prop
         }
     }, []);
 
-    // Socket Logic using PROP
+    // Socket Logic using PROP - VERBOSE LOGGING
     useEffect(() => {
-        if (!socket) return;
+        if (!socket) {
+            console.log("🔌 [AuthContext] Waiting for socket prop...");
+            return;
+        }
+
+        console.log("🔌 [AuthContext] Socket prop received, attaching listeners...");
 
         const onInventoryUpdate = () => {
-            console.log("⚡ Socket: inventory_update");
+            console.log("🔥 [SOCKET] inventory_update received!");
             refreshProducts();
         };
         const onClientsUpdate = () => {
-            console.log("⚡ Socket: clients_update");
+            console.log("🔥 [SOCKET] clients_update received!");
             refreshClients();
         };
         const onUsersUpdate = async () => {
-            console.log("⚡ Socket: users_update");
+            console.log("🔥 [SOCKET] users_update received!");
             const token = localStorage.getItem('token');
             if (token) {
                 try {
@@ -90,11 +97,16 @@ export const AuthProvider = ({ children, socket }) => { // Accept socket as prop
         socket.on('clients:update', onClientsUpdate);
         socket.on('users:update', onUsersUpdate);
 
+        // Listener for connection debug
+        socket.on('connect', () => console.log("✅ [AuthContext] Socket connected event confirmed"));
+
         return () => {
+            console.log("🔌 [AuthContext] Detaching listeners");
             socket.off('inventory_update', onInventoryUpdate);
             socket.off('products:update', onInventoryUpdate);
             socket.off('clients:update', onClientsUpdate);
             socket.off('users:update', onUsersUpdate);
+            socket.off('connect');
         };
     }, [socket, refreshProducts, refreshClients]);
 
