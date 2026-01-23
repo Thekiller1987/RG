@@ -44,6 +44,8 @@ export const CajaProvider = ({ children }) => {
         }
     }, [userId]);
 
+    const socketRef = React.useRef(null);
+
     // Initial load & Socket Sync
     useEffect(() => {
         if (!userId) {
@@ -56,7 +58,10 @@ export const CajaProvider = ({ children }) => {
         refreshSession();
 
         // 2. Socket Listeners (Using shared lazy instance)
-        const socket = getSocket();
+        if (!socketRef.current) {
+            socketRef.current = getSocket();
+        }
+        const socket = socketRef.current;
 
         const onSessionUpdate = (data) => {
             if (!data || !data.userId || data.userId === userId) {
