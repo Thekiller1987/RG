@@ -55,52 +55,33 @@ export const CajaProvider = ({ children }) => {
         // 1. Initial Load
         refreshSession();
 
-        // 2. Socket Setup for Real-time Caja
-        let socket = null;
-        try {
-            // Re-determine URL (same logic as AuthContext)
-            let socketUrl = 'https://multirepuestosrg.com';
-            // Note: In a real app, use a shared socket instance from AuthContext or a separate service to avoid multiple connections.
-            // For now, creating a dedicated one for Caja to ensure isolation if AuthContext changes.
-            // Ideally we should import the socket instance, but context structure limits us here without refactor.
-            // We will try to rely on the side-effect of `refreshSession` if triggered by AuthContext? 
-            // No, CajaContext needs its own listener or access the socket.
-            // Let's create a lightweight connection or just accept 2 connections for now (robustness).
+        // 2. Socket Listeners (Using shared lazy instance)
+        const socket = getSocket();
 
-            // Reuse API config
-            if (api.API_URL) socketUrl = new URL(api.API_URL).origin;
+        const onSessionUpdate = (data) => {
+            if (!data || !data.userId || data.userId === userId) {
+                console.log("⚡ Socket: caja session update");
+                refreshSession();
+            }
+        };
 
-            socket = io(socketUrl, {
-                path: '/socket.io/',
-                transports: ['polling', 'websocket']
-            });
+        const onNewTx = (data) => {
+            if (!data || !data.userId || data.userId === userId) {
+                console.log("⚡ Socket: New Tx");
+                refreshSession();
+            }
+        };
 
-            socket.on('connect', () => console.log('✅ Caja Socket Connected'));
+        socket.on('caja:session_update', onSessionUpdate);
+        socket.on('caja:transaction_new', onNewTx);
 
-            socket.on('caja:session_update', (data) => {
-                // Check if update is for this user? usually events are room-based or general
-                // If data contains userId and it matches, or if it's a general broadcast
-                if (!data || !data.userId || data.userId === userId) {
-                    console.log("⚡ Socket: caja session update");
-                    refreshSession();
-                }
-            });
-
-            socket.on('caja:transaction_new', (data) => {
-                if (!data || !data.userId || data.userId === userId) {
-                    console.log("⚡ Socket: New Tx");
-                    refreshSession();
-                }
-            });
-
-        } catch (e) { console.error("Socket Caja Error:", e); }
-
-        // 3. Backup Polling (Relaxed to 60s since we have sockets)
+        // 3. Backup Polling (Relaxed to 60s)
         const interval = setInterval(refreshSession, 60000);
 
         return () => {
             clearInterval(interval);
-            if (socket) socket.disconnect();
+            socket.off('caja:session_update', onSessionUpdate);
+            socket.off('caja:transaction_new', onNewTx);
         };
     }, [userId, refreshSession]);
 
