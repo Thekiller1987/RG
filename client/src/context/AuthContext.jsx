@@ -55,11 +55,7 @@ export const AuthProvider = ({ children }) => {
         }
     }, [token]);
 
-    // ... cleaned ...
 
-    import { getSocket } from '../service/socket';
-
-    // ...
 
     useEffect(() => {
         // --- REAL TIME LISTENERS ---
