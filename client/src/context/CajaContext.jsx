@@ -1,18 +1,11 @@
 // client/src/context/CajaContext.jsx
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
-import { useAuth } from './AuthContext';
 import { getCajaSession } from '../service/api';
 import { getSocket } from '../service/socket';
-// REMOVED: All local storage utils imports to ensure strict server compliance
-/* import {
-    loadCajaSession, saveCajaSession, clearCajaSession,
-    subscribeCajaChanges, loadTasaDolar, saveTasaDolar, isSessionOpen
-} from '../utils/caja'; */
 
 const CajaContext = createContext(null);
 
-export const CajaProvider = ({ children }) => {
-    const { user } = useAuth();
+export const CajaProvider = ({ children, user }) => {
     const userId = user?.id_usuario || user?.id;
 
     const [isCajaOpen, setIsCajaOpen] = useState(false);
