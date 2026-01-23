@@ -50,6 +50,13 @@ const createProduct = async (req, res) => {
     );
 
     await connection.commit();
+
+    // SOCKET EMIT
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('inventory_update', { action: 'create', id: id_producto });
+    }
+
     res.status(201).json({ id: id_producto, ...productData });
   } catch (error) {
     if (connection) await connection.rollback();
@@ -226,6 +233,12 @@ const updateProduct = async (req, res) => {
 
     await connection.commit();
 
+    // SOCKET EMIT
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('inventory_update', { action: 'update', id });
+    }
+
     // Devuelve el objeto actualizado pero con la existencia que ya estaba en la BD.
     res.json({ id, ...productData, existencia: producto[0].existencia });
 
@@ -339,6 +352,14 @@ const adjustStock = async (req, res) => {
     );
 
     await connection.commit();
+
+    // SOCKET EMIT
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('inventory_update', { action: 'adjust', id });
+      io.emit('products:update', { action: 'adjust', id }); // Redundancy for safety
+    }
+
     res.json({ msg: 'Stock ajustado correctamente.', newStock });
   } catch (error) {
     if (connection) await connection.rollback();
