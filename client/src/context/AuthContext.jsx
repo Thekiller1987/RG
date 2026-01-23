@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import * as api from '../service/api.js';
 import { loadCajaSession, saveCajaSession } from '../utils/caja.js';
 
-import { socket } from '../service/socket';
+import { getSocket } from '../service/socket';
 
 const AuthContext = createContext(null);
 
@@ -57,8 +57,14 @@ export const AuthProvider = ({ children }) => {
 
     // ... cleaned ...
 
+    import { getSocket } from '../service/socket';
+
+    // ...
+
     useEffect(() => {
         // --- REAL TIME LISTENERS ---
+        const socket = getSocket(); // LAZY INIT
+
         const onInventoryUpdate = () => {
             console.log("⚡ Socket: inventory_update");
             refreshProducts();
