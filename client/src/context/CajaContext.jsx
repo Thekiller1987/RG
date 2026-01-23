@@ -1,18 +1,17 @@
 // client/src/context/CajaContext.jsx
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { getCajaSession } from '../service/api';
-import { useSocket } from './SocketContext';
+// No imports from SocketContext
 
 const CajaContext = createContext(null);
 
-export const CajaProvider = ({ children, user }) => {
+export const CajaProvider = ({ children, user, socket }) => { // Accept socket as prop
     const userId = user?.id_usuario || user?.id;
 
     const [isCajaOpen, setIsCajaOpen] = useState(false);
     const [cajaSession, setCajaSession] = useState(null);
     const [tasaDolar, setTasaDolar] = useState(36.60);
 
-    // CRITICAL: Function to force re-fetch from server (Single Source of Truth)
     const refreshSession = useCallback(async () => {
         if (!userId) return;
         try {
@@ -22,7 +21,6 @@ export const CajaProvider = ({ children, user }) => {
             if (serverSession && !serverSession.closedAt) {
                 setCajaSession(serverSession);
                 setIsCajaOpen(true);
-                // Respect server's tasa if present, else keep default
                 if (serverSession.tasaDolar) setTasaDolar(Number(serverSession.tasaDolar));
             } else {
                 setCajaSession(null);
@@ -30,16 +28,12 @@ export const CajaProvider = ({ children, user }) => {
             }
         } catch (error) {
             console.error("❌ Error syncing caja (Server Error):", error);
-            // ON ERROR: Do NOT fallback to local. Fail safe -> closed.
-            // This prevents "zombie" states where local thinks it's open but server died.
             setCajaSession(null);
             setIsCajaOpen(false);
         }
     }, [userId]);
 
-    const socket = useSocket();
-
-    // Initial load & Socket Sync
+    // Initial load & Socket Sync using PROP
     useEffect(() => {
         if (!userId) {
             setIsCajaOpen(false);
@@ -47,10 +41,8 @@ export const CajaProvider = ({ children, user }) => {
             return;
         }
 
-        // 1. Initial Load
         refreshSession();
 
-        // 2. Socket Listeners (Now via Context)
         if (socket) {
             const onSessionUpdate = (data) => {
                 if (!data || !data.userId || data.userId === userId) {
@@ -75,7 +67,6 @@ export const CajaProvider = ({ children, user }) => {
             };
         }
 
-        // 3. Backup Polling (Relaxed to 60s)
         const interval = setInterval(refreshSession, 60000);
 
         return () => {
@@ -85,7 +76,6 @@ export const CajaProvider = ({ children, user }) => {
 
     const closeCajaSession = () => {
         if (!userId) return;
-        // Just clear state, the API call happens in the component
         setCajaSession(null);
         setIsCajaOpen(false);
     };
@@ -98,7 +88,7 @@ export const CajaProvider = ({ children, user }) => {
         tasaDolar,
         setTasaDolar,
         closeCajaSession,
-        refreshSession // Exported so POS can call it manually
+        refreshSession
     };
 
     return <CajaContext.Provider value={value}>{children}</CajaContext.Provider>;

@@ -2,11 +2,11 @@ import React, { createContext, useState, useContext, useEffect, useCallback } fr
 import { useNavigate } from 'react-router-dom';
 import * as api from '../service/api.js';
 import { loadCajaSession, saveCajaSession } from '../utils/caja.js';
-import { useSocket } from './SocketContext';
+// No imports from SocketContext
 
 const AuthContext = createContext(null);
 
-export const AuthProvider = ({ children }) => {
+export const AuthProvider = ({ children, socket }) => { // Accept socket as prop
     const [user, setUser] = useState(null);
     const [allUsers, setAllUsers] = useState([]);
     const [products, setProducts] = useState([]);
@@ -50,8 +50,19 @@ export const AuthProvider = ({ children }) => {
         }
     }, [token]);
 
-    const socket = useSocket();
+    const refreshClients = useCallback(async () => {
+        const currentToken = localStorage.getItem('token');
+        if (currentToken) {
+            try {
+                const clientsData = await api.fetchClients(currentToken);
+                setClients(clientsData || []);
+            } catch (error) {
+                console.error("Error al refrescar clientes:", error);
+            }
+        }
+    }, []);
 
+    // Socket Logic using PROP
     useEffect(() => {
         if (!socket) return;
 
@@ -120,18 +131,6 @@ export const AuthProvider = ({ children }) => {
         setIsLoading(false);
         navigate('/dashboard');
     };
-
-    const refreshClients = useCallback(async () => {
-        const currentToken = localStorage.getItem('token');
-        if (currentToken) {
-            try {
-                const clientsData = await api.fetchClients(currentToken);
-                setClients(clientsData || []);
-            } catch (error) {
-                console.error("Error al refrescar clientes:", error);
-            }
-        }
-    }, []);
 
     useEffect(() => {
         if (user) {
