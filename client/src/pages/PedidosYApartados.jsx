@@ -304,7 +304,9 @@ const ProformaGenerator = () => {
 
     const searchInputRef = useRef(null);
 
-    useEffect(() => { if (authProducts?.length) setProducts(authProducts); }, [authProducts]);
+    useEffect(() => {
+        if (authProducts) setProducts(authProducts);
+    }, [authProducts]);
 
     const fetchProducts = useCallback(async () => {
         setLoading(true);

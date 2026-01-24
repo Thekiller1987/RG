@@ -28,6 +28,7 @@ const ROLES = {
   INVENTARIO: 'Encargado de Inventario',
   FINANZAS: 'Encargado de Finanzas',
   GERENTE: 'Gerente',
+  EMPLEADO: 'Empleado',
 };
 
 function App() {
@@ -73,7 +74,7 @@ function App() {
       <Route
         path="/orders"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR]}>
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.EMPLEADO]}>
             <PedidosYApartados />
           </ProtectedRoute>
         }
