@@ -318,6 +318,11 @@ const ProformaGenerator = () => {
         } finally { setLoading(false); }
     }, [token]);
 
+    // Cargar productos al iniciar la vista
+    useEffect(() => {
+        fetchProducts();
+    }, [fetchProducts]);
+
     const goToDashboard = () => { window.location.href = '/dashboard'; };
 
     const addToCart = (product) => {
