@@ -343,9 +343,16 @@ const CajaModal = ({
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
                     <tr style={{ borderBottom: '1px solid #f1f1f1' }}><td style={{ padding: 10 }}>Fondo Inicial</td><td className="text-right" style={{ padding: 10, fontWeight: 'bold' }}>{money(cajaInicial)}</td></tr>
-                    <tr style={{ borderBottom: '1px solid #f1f1f1' }}><td style={{ padding: 10 }}>Entradas Efectivo</td><td className="text-right" style={{ padding: 10, color: '#28a745' }}>+ {money(netCordobas - cajaInicial + Math.abs(sumDevolucionesCancelaciones) /* approx logic fix if needed, using calc vars */)}</td></tr>
-                    <tr style={{ borderBottom: '1px solid #f1f1f1', background: '#fcfcfc' }}><td style={{ padding: 10, fontWeight: 'bold' }}>Esperado en Caja</td><td className="text-right" style={{ padding: 10, fontWeight: 'bold' }}>{money(efectivoEsperado)}</td></tr>
-                    <tr><td style={{ padding: 10 }}>Tarjeta/Transf/Crédito</td><td className="text-right" style={{ padding: 10, color: '#666' }}>{money(totalNoEfectivo)}</td></tr>
+
+                    {/* Sección Detallada de Ventas */}
+                    <tr style={{ background: '#f8f9fa' }}><td colSpan="2" style={{ padding: '8px 10px', fontSize: '0.85rem', fontWeight: 'bold', color: '#007bff' }}>RESUMEN DE VENTAS</td></tr>
+                    <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem' }}>(+) Ventas Totales</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem' }}>{money(totalVentasDia)}</td></tr>
+                    <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem', color: '#dc3545' }}>(-) Tarjetas / Transf / Crédito</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem', color: '#dc3545' }}>- {money(totalNoEfectivo)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #f1f1f1' }}><td style={{ padding: '4px 10px 10px 20px', fontSize: '0.9rem', fontWeight: 'bold' }}>(=) Efectivo de Ventas</td><td className="text-right" style={{ padding: '4px 10px 10px', fontWeight: 'bold' }}>{money(totalVentasDia - totalNoEfectivo)}</td></tr>
+
+                    <tr style={{ borderBottom: '1px solid #f1f1f1' }}><td style={{ padding: 10 }}>Otras Entradas Efectivo</td><td className="text-right" style={{ padding: 10, color: '#28a745' }}>+ {money(netCordobas - cajaInicial - (totalVentasDia - totalNoEfectivo) + Math.abs(sumDevolucionesCancelaciones))}</td></tr>
+
+                    <tr style={{ borderBottom: '1px solid #f1f1f1', background: '#e8f5e9' }}><td style={{ padding: 10, fontWeight: 'bold', fontSize: '1.1rem' }}>Esperado en Caja</td><td className="text-right" style={{ padding: 10, fontWeight: 'bold', fontSize: '1.1rem', color: '#146c43' }}>{money(efectivoEsperado)}</td></tr>
                   </tbody>
                 </table>
               </div>

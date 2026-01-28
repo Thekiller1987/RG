@@ -715,11 +715,14 @@ const CashReport = () => {
           </div>
 
           <div style="margin: 10px 0; border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 10px 0;">
-             <div class="row bold"><span>MOVIMIENTOS DE CAJA</span></div>
-             
-             <div class="row"><span>(+) Efectivo C$:</span><span>${fmtMoney(stats.netCordobas)}</span></div>
-             <div class="row"><span>(+) Efectivo USD:</span><span>$${Number(stats.netDolares).toFixed(2)}</span></div>
-             <div class="row"><span>(Tasa: ${stats.tasaRef})</span><span>= ${fmtMoney(stats.netDolares * stats.tasaRef)}</span></div>
+             <div class="row bold" style="color: #007bff; border-bottom: 1px solid #eee; margin-bottom: 5px;"><span>RESUMEN DE VENTAS</span></div>
+             <div class="row"><span>(+) Ventas Totales:</span><span>${fmtMoney(stats.totalVentasDia)}</span></div>
+             <div class="row" style="color: #dc3545;"><span>(-) No Efectivo:</span><span>- ${fmtMoney(stats.totalNoEfectivo)}</span></div>
+             <div class="row bold" style="margin-bottom: 10px;"><span>(=) Efectivo Ventas:</span><span>${fmtMoney(stats.totalVentasDia - stats.totalNoEfectivo)}</span></div>
+
+             <div class="row bold"><span>OTROS MOVIMIENTOS</span></div>
+             <div class="row"><span>(+) Fondo Inicial:</span><span>${fmtMoney(session.monto_inicial || session.initialAmount)}</span></div>
+             <div class="row"><span>(+) Otros Ingresos:</span><span>${fmtMoney(stats.netCordobas - (session.monto_inicial || 0) - (stats.totalVentasDia - stats.totalNoEfectivo) + Math.abs(stats.sumDevolucionesCancelaciones))}</span></div>
           </div>
 
           <div class="row bold">
@@ -876,33 +879,35 @@ const CashReport = () => {
                 </div>
 
                 {/* RESUMEN FINANCIERO DETALLADO */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                  <div>
-                    <h5 style={{ margin: '0 0 0.5rem 0', color: theme.secondary, fontSize: '0.85rem' }}>💵 Arqueo Físico (Efectivo)</h5>
-                    <StatRow><span>Monto Inicial:</span><strong>{fmtMoney(session.monto_inicial || session.initialAmount)}</strong></StatRow>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div style={{ background: '#fff', padding: '10px', borderRadius: 8, border: '1px solid #eee' }}>
+                    <h5 style={{ margin: '0 0 0.5rem 0', color: theme.secondary, fontSize: '0.85rem', borderBottom: '1px solid #eee', paddingBottom: 5 }}>📊 Desglose de Efectivo</h5>
 
-                    <div style={{ margin: '4px 0', padding: '4px 0', borderTop: '1px dashed #eee', borderBottom: '1px dashed #eee' }}>
-                      <StatRow><span>(+) C$ Netos:</span><strong>{fmtMoney(stats.netCordobas)}</strong></StatRow>
-                      <StatRow><span>(+) USD Netos:</span><strong>${Number(stats.netDolares).toFixed(2)}</strong></StatRow>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                      <span>(+) Ventas Totales:</span>
+                      <strong>{fmtMoney(totalVendido)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#dc3545' }}>
+                      <span>(-) Tarjetas/Transf:</span>
+                      <strong>- {fmtMoney(stats.totalNoEfectivo)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 'bold', borderTop: '1px dashed #ccc', marginTop: 4, paddingTop: 4 }}>
+                      <span>(=) Efectivo de Ventas:</span>
+                      <span>{fmtMoney(totalVendido - stats.totalNoEfectivo)}</span>
                     </div>
 
-                    <StatRow className="highlight">
-                      <span>Total Esperado:</span>
-                      <strong>{fmtMoney(stats.efectivoEsperado)}</strong>
-                    </StatRow>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'right', marginTop: '-4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginTop: 8 }}>
+                      <span>(+) Fondo Inicial:</span>
+                      <strong>{fmtMoney(session.monto_inicial || session.initialAmount)}</strong>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginTop: 4, background: '#f8fafc', padding: 4, borderRadius: 4 }}>
+                      <span style={{ fontWeight: 'bold', color: theme.primary }}>Total Esperado:</span>
+                      <strong style={{ color: theme.primary }}>{fmtMoney(stats.efectivoEsperado)}</strong>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'right' }}>
                       (C${stats.efectivoEsperadoCordobas.toFixed(2)} + ${stats.efectivoEsperadoDolares.toFixed(2)})
                     </div>
-                  </div>
-
-                  <div>
-                    <h5 style={{ margin: '0 0 0.5rem 0', color: theme.secondary, fontSize: '0.85rem' }}>💳 No Efectivo</h5>
-                    <StatRow><span>Tarjeta:</span><span style={{ fontFamily: 'Roboto Mono' }}>{fmtMoney(stats.totalTarjeta)}</span></StatRow>
-                    <StatRow><span>Transferencia:</span><span style={{ fontFamily: 'Roboto Mono' }}>{fmtMoney(stats.totalTransferencia)}</span></StatRow>
-                    <StatRow><span>Crédito:</span><span style={{ fontFamily: 'Roboto Mono' }}>{fmtMoney(stats.totalCredito)}</span></StatRow>
-                    {stats.sumDevolucionesCancelaciones > 0 && (
-                      <StatRow style={{ color: theme.danger }}><span>Dev/Cancel:</span><span>-{fmtMoney(stats.sumDevolucionesCancelaciones)}</span></StatRow>
-                    )}
                   </div>
                 </div>
 

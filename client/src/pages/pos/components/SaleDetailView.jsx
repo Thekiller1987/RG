@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import styled from 'styled-components';
-import { FaUser, FaRegClock, FaDollarSign, FaCreditCard, FaPrint, FaTrashAlt, FaUndo, FaInfoCircle } from 'react-icons/fa';
+import { FaUser, FaRegClock, FaDollarSign, FaCreditCard, FaPrint, FaTrashAlt, FaUndo, FaInfoCircle, FaExchangeAlt } from 'react-icons/fa';
 import { Button as OriginalButton, InfoBox } from '../POS.styles.jsx';
 
 const money = (n) => Number(n || 0).toFixed(2);
