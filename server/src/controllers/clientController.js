@@ -15,7 +15,7 @@ const getAllClients = async (req, res) => {
         FROM clientes c
         ORDER BY c.nombre ASC;
         `;
-        
+
         const [clients] = await pool.query(query);
         const clientsWithBalance = clients.map(client => ({
             ...client,
@@ -89,26 +89,28 @@ const addCreditPayment = async (req, res) => {
 
     try {
         await connection.beginTransaction();
-        
+
         await connection.query(
             "INSERT INTO ventas (fecha, total_venta, estado, id_usuario, id_cliente, pago_detalles, tipo_venta) VALUES (NOW(), ?, 'ABONO_CREDITO', ?, ?, ?, 'CREDITO')",
             [monto * -1, userId, id, JSON.stringify(pagoDetalles)]
         );
-        
+
         await connection.query(
             'UPDATE clientes SET saldo_pendiente = GREATEST(0, saldo_pendiente - ?) WHERE id_cliente = ?',
             [monto, id]
         );
-        
+
         await connection.commit();
         res.status(200).json({ message: 'Abono a crédito registrado exitosamente.' });
 
     } catch (error) {
         await connection.rollback();
-        console.error("Error al registrar abono a crédito:", error);
-        res.status(500).json({ message: 'Error al registrar el abono' });
+        console.error("ERROR CRÍTICO en addCreditPayment:", error);
+        console.error("Detalles del error SQL:", error.sqlMessage || error.message);
+        console.error("Parametros recibidos -> ID:", id, "Monto:", monto, "User:", userId);
+        res.status(500).json({ message: 'Error al registrar el abono. Consulte logs del servidor.', error: error.message });
     } finally {
-        if(connection) connection.release();
+        if (connection) connection.release();
     }
 };
 

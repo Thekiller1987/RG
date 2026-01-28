@@ -112,7 +112,7 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     const montoNum = parseFloat(monto);
-    const token = localStorage.getItem('token'); // Se obtiene justo cuando se necesita
+    const token = localStorage.getItem('token');
 
     if (errorMonto || !montoNum || montoNum <= 0) {
       showAlert({ title: "Monto Inválido", message: errorMonto || "Revise el monto ingresado." });
@@ -127,7 +127,8 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
         pagoDetalles: { metodo: metodoPago, usuario: user?.nombre_usuario || 'Desconocido' }
       }, token);
 
-      // 2. Registrar la transacción en la caja local (si es un ingreso)
+      // 2. Registrar la transacción en la caja (si es un ingreso)
+      // Nota: addCajaTransaction ahora sincroniza automáticamente con el servidor
       const esIngresoEnCaja = metodoPago === 'Efectivo';
       const txCaja = {
         id: `abono-${Date.now()}`,
@@ -143,19 +144,9 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
         }
       };
 
-      addCajaTransaction(txCaja);
-
-      // PERSISTIR EN SERVIDOR (Crucial)
-      if (token) {
-        try {
-          await api.addCajaTx({ userId: user?.id_usuario || user?.id, tx: txCaja }, token);
-        } catch (e) { console.error("Error persistiendo caja", e); }
-      }
+      await addCajaTransaction(txCaja);
 
       onAbonoSuccess?.(txCaja);
-      onClose?.();
-
-      onAbonoSuccess?.();
       onClose?.();
 
     } catch (err) {
@@ -164,7 +155,7 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [monto, metodoPago, errorMonto, saldoPendiente, client, user, addCajaTransaction, onAbonoSuccess, onClose, showAlert]);
+  }, [monto, metodoPago, errorMonto, client, user, addCajaTransaction, onAbonoSuccess, onClose, showAlert]);
 
   const isSubmitDisabled = isLoading || saldoPendiente <= 0 || !!errorMonto || !monto;
 

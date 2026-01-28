@@ -153,16 +153,26 @@ export const AuthProvider = ({ children, socket }) => {
         }
     }, [user]);
 
-    const addCajaTransaction = useCallback((transaction) => {
+    const addCajaTransaction = useCallback(async (transaction) => {
         if (!user) return;
         const userId = user.id_usuario || user.id;
+
+        // 1. Actualización Local (Optimista)
         const session = loadCajaSession(userId);
         if (session && !session.closedAt) {
             session.transactions = [...(session.transactions || []), transaction];
             saveCajaSession(userId, session);
             setCajaSession(session);
         }
-    }, [user]);
+
+        // 2. Sincronización con Servidor
+        try {
+            await api.addCajaTx({ userId, tx: transaction }, token);
+            // console.log("✅ Transacción de caja sincronizada con servidor");
+        } catch (error) {
+            console.error("❌ Error sincronizando transacción de caja:", error);
+        }
+    }, [user, token]);
 
     const value = {
         user,
