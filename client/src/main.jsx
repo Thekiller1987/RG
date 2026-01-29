@@ -7,25 +7,36 @@ import { OrdersProvider } from './context/OrdersContext.jsx';
 import App from './App.jsx';
 import './index.css';
 
-// Initialize Socket Singleton (CDN)
-const URL = 'https://multirepuestosrg.com';
-let socket = null;
+// Initialize Socket with robust reconnection
+import { io } from 'socket.io-client';
 
-try {
-  if (window.io) {
-    socket = window.io(URL, {
-      path: '/socket.io/',
-      transports: ['polling', 'websocket'],
-      reconnection: true,
-      autoConnect: true
-    });
-    console.log("✅ Main: Socket Initialized via CDN");
-  } else {
-    console.error("❌ Main: Socket.io CDN missing! Real-time disabled.");
+const URL = 'https://multirepuestosrg.com';
+
+const socket = io(URL, {
+  path: '/socket.io/',
+  transports: ['websocket', 'polling'], // Prefer websocket, fallback to polling
+  reconnection: true,
+  reconnectionAttempts: Infinity, // Keep trying forever
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  timeout: 20000,
+  autoConnect: true
+});
+
+socket.on('connect', () => {
+  console.log("✅ Socket Connected:", socket.id);
+});
+
+socket.on('connect_error', (err) => {
+  console.warn("⚠️ Socket Connection Error (retrying...):", err.message);
+});
+
+socket.on('disconnect', (reason) => {
+  console.warn("❌ Socket Disconnected:", reason);
+  if (reason === 'io server disconnect') {
+    socket.connect(); // Explicitly reconnect if server closed it
   }
-} catch (e) {
-  console.error("❌ Main: Socket init error:", e);
-}
+});
 
 // Wrapper to pass user AND socket
 const AppProviders = ({ socket }) => {
