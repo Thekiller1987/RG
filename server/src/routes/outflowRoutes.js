@@ -1,13 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { processOutflow, getOutflowHistory } = require('../controllers/outflowController');
-const { protect, adminOnly } = require('../middleware/authMiddleware');
+const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
 
 // Validar que el usuario sea admin o encargado de inventario (si aplica, pero el usuario pidió Admin)
-// Usaremos adminOnly o una lógica similar.
-// Asumiendo que 'protect' decodifica el usuario.
+// Usaremos isAdmin o una lógica similar.
 
-router.post('/', protect, processOutflow); // POST /api/outflow
-router.get('/history', protect, getOutflowHistory); // GET /api/outflow/history
+router.post('/', verifyToken, processOutflow); // POST /api/outflow
+router.get('/history', verifyToken, getOutflowHistory); // GET /api/outflow/history
 
 module.exports = router;
