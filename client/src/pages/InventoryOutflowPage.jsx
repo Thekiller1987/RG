@@ -284,7 +284,7 @@ const InventoryOutflowPage = () => {
                                     <span style={{ color: p.existencia > 0 ? '#10b981' : '#ef4444', fontWeight: 'bold' }}>Stock: {p.existencia}</span>
                                 </div>
                                 <div style={{ marginTop: 'auto', textAlign: 'right', fontWeight: 'bold', fontSize: '0.9rem' }}>
-                                    C$ {Number(p.venta).toFixed(2)}
+                                    C$ {Number(p.precio).toFixed(2)}
                                 </div>
                             </ProductCard>
                         ))}
