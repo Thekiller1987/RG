@@ -110,7 +110,10 @@ const InventoryOutflowPage = () => {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const res = await axios.get('/api/products');
+                const token = localStorage.getItem('token');
+                const res = await axios.get('/api/products', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
                 setProducts(res.data);
                 setResults(res.data.slice(0, 20)); // Initial items
             } catch (err) {
