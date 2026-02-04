@@ -4,7 +4,7 @@ import { FaTruck, FaSearch, FaBarcode, FaTimes, FaSave, FaHistory, FaArrowLeft, 
 import { useNavigate, Link } from 'react-router-dom';
 import * as api from '../service/api';
 import { useAuth } from '../context/AuthContext';
-import TicketModal from './pos/components/TicketModal';
+import OutflowTicketModal from './pos/components/OutflowTicketModal';
 
 /* ================== STYLES COPIED/ADAPTED FROM POS/INVENTORY ================== */
 const PageContainer = styled.div`
@@ -379,11 +379,10 @@ const InventoryOutflowPage = () => {
 
             {/* TICKET MODAL */}
             {ticketData && (
-                <TicketModal
+                <OutflowTicketModal
                     isOpen={!!ticketData}
                     transaction={ticketData}
                     onClose={() => setTicketData(null)}
-                    printMode="80"
                 />
             )}
         </PageContainer>

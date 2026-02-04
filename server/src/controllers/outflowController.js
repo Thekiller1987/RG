@@ -33,7 +33,7 @@ const processOutflow = async (req, res) => {
 
             // Lock row
             const [rows] = await connection.query(
-                'SELECT existencia, nombre, costo, venta FROM productos WHERE id_producto = ? FOR UPDATE',
+                'SELECT existencia, nombre, costo, venta, codigo FROM productos WHERE id_producto = ? FOR UPDATE',
                 [pid]
             );
 
@@ -60,6 +60,7 @@ const processOutflow = async (req, res) => {
 
             processedItems.push({
                 id: pid,
+                codigo: product.codigo, // Added code
                 nombre: product.nombre,
                 quantity: qty,
                 unit: Number(product.venta), // For ticket display
