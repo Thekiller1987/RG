@@ -471,3 +471,15 @@ export const updateRequest = async (id, descripcion, token) => {
 export const deleteRequest = async (id, token) => {
     return await request('delete', `/requests/${id}`, token);
 };
+
+// ===================================================================
+// === SECCIÓN DE TRASLADOS / SALIDAS ===
+// ===================================================================
+
+export const createOutflow = async (data, token) => {
+    return await request('post', '/outflow', token, data);
+};
+
+export const fetchOutflowHistory = async (token) => {
+    return await request('get', '/outflow/history', token);
+};

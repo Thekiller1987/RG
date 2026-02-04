@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { FaTruck, FaSearch, FaBarcode, FaTimes, FaSave, FaHistory, FaArrowLeft, FaPrint, FaTrash } from 'react-icons/fa';
-import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { useNavigate, Link } from 'react-router-dom';
+import * as api from '../service/api';
 import { useAuth } from '../context/AuthContext';
 import TicketModal from './pos/components/TicketModal';
 
@@ -111,11 +111,10 @@ const InventoryOutflowPage = () => {
         const fetchProducts = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const res = await axios.get('/api/products', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                setProducts(res.data);
-                setResults(res.data.slice(0, 20)); // Initial items
+                if (!token) return;
+                const data = await api.fetchProducts(token);
+                setProducts(data);
+                setResults(data.slice(0, 20));
             } catch (err) {
                 console.error("Error loading products", err);
             }
@@ -187,17 +186,15 @@ const InventoryOutflowPage = () => {
         setIsLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post('/api/outflow', {
+            const res = await api.createOutflow({
                 motivo: reason,
                 items: cart
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            }, token);
 
             // Success
             setCart([]);
             setReason('');
-            setTicketData(res.data.ticket); // Trigger print modal
+            setTicketData(res.ticket); // Trigger print modal
 
             // Refresh products (simple way: fetch again or decrement local)
             // Let's reload page data or just decrement locally for speed
@@ -220,10 +217,8 @@ const InventoryOutflowPage = () => {
     const fetchHistory = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get('/api/outflow/history', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setHistory(res.data);
+            const data = await api.fetchOutflowHistory(token);
+            setHistory(data);
         } catch (err) {
             console.error(err);
         }
