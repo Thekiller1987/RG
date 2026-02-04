@@ -167,28 +167,41 @@ const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
     const printStyles = `
       @page {
         size: ${mode === 'A4' ? 'A4 portrait' : '80mm auto'};
-        margin: ${mode === 'A4' ? '10mm' : '0'};
+        margin: ${mode === 'A4' ? '15mm' : '0'};
       }
-      body { margin: 0; padding: 0; font-family: 'Consolas', monospace; }
+      body { margin: 0; padding: 0; font-family: ${mode === 'A4' ? "'Inter', Helvetica, Arial, sans-serif" : "'Consolas', monospace"}; }
+      
       #print-wrapper-outflow {
         width: ${mode === 'A4' ? '100%' : '80mm'} !important;
-        max-width: ${mode === 'A4' ? '190mm' : '80mm'} !important;
+        max-width: ${mode === 'A4' ? 'none' : '80mm'} !important;
         margin: 0 auto !important;
         border: none !important;
         box-shadow: none !important;
-        font-size: ${mode === 'A4' ? '11pt' : '8pt'} !important;
+        font-size: ${mode === 'A4' ? '10pt' : '8pt'} !important;
         padding: ${mode === 'A4' ? '0' : '5px'} !important;
       }
-      .brand h1 { font-size: ${mode === 'A4' ? '18pt' : '12pt'} !important; }
-      .brand img { width: ${mode === 'A4' ? '250px' : '150px'} !important; }
-      table.items { font-size: ${mode === 'A4' ? '10pt' : '8pt'} !important; }
-      .grand-total { font-size: ${mode === 'A4' ? '16pt' : '12pt'} !important; }
+
+      /* A4 Grid / Cuadrícula Styling */
+      ${mode === 'A4' ? `
+        #print-wrapper-outflow .brand { text-align: left !important; border-bottom: 2px solid #333 !important; padding-bottom: 20px !important; margin-bottom: 20px !important; display: flex; justify-content: space-between; align-items: flex-start; }
+        #print-wrapper-outflow .brand-info { flex: 1; margin-left: 20px; }
+        #print-wrapper-outflow .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border: 1px solid #333; padding: 10px; margin-bottom: 20px; border-radius: 4px; }
+        #print-wrapper-outflow table.items { border-collapse: collapse; width: 100%; border: 1px solid #333; }
+        #print-wrapper-outflow table.items th { background: #f0f0f0; border: 1px solid #333; padding: 8px; text-align: center; font-weight: bold; }
+        #print-wrapper-outflow table.items td { border: 1px solid #333; padding: 6px; }
+        #print-wrapper-outflow .col-qty { text-align: center; }
+        #print-wrapper-outflow .text-right { text-align: right; }
+        #print-wrapper-outflow .grand-total-box { border: 2px solid #333; padding: 10px; margin-top: 20px; width: 40%; margin-left: auto; }
+      ` : ''}
+
+      .brand h1 { font-size: ${mode === 'A4' ? '22pt' : '12pt'} !important; margin: 0; }
+      .brand img { width: ${mode === 'A4' ? '180px' : '150px'} !important; }
       
       /* Ocultar scrollbars */
       ::-webkit-scrollbar { display: none; }
     `;
 
-    const w = window.open('', '_blank', `width=${mode === 'A4' ? 900 : 400},height=700`);
+    const w = window.open('', '_blank', `width=${mode === 'A4' ? 1000 : 400},height=700`);
     if (!w) return;
 
     w.document.write(`
@@ -255,21 +268,25 @@ const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
               <PrintWrapper id="print-wrapper-outflow">
                 <div className="brand">
                   <TicketLogo src={getLogoPath()} alt="Logo" onError={(e) => e.target.style.display = 'none'} />
-                  <h1>{COMPANY.NAME}</h1>
-                  <small>{COMPANY.SLOGAN}</small>
-                  <small>RUC: {COMPANY.RUC}</small>
-                  <small>{COMPANY.ADDRESS}</small>
-                  <div className="tag">COMPROBANTE DE SALIDA</div>
+
+                  <div className="brand-info">
+                    <h1>{COMPANY.NAME}</h1>
+                    <small>{COMPANY.SLOGAN}</small>
+                    <small>RUC: {COMPANY.RUC}</small>
+                    <small>{COMPANY.ADDRESS}</small>
+                    <div className="tag">COMPROBANTE DE SALIDA</div>
+                  </div>
                 </div>
 
                 <div className="meta">
-                  <p><span className="meta-label">Fecha:</span> <span className="meta-value">{new Date(transaction.fecha).toLocaleString()}</span></p>
-                  <p><span className="meta-label">N° Comprobante:</span> <span className="meta-value">{transaction.id}</span></p>
-
-                  {/* Muestra MOTIVO que viene en clienteNombre por el truco del controlador, o directo de motivo */}
-                  <p><span className="meta-label">Motivo/Ref:</span> <span className="meta-value">{transaction.clienteNombre?.replace('MOTIVO: ', '') || transaction.motivo}</span></p>
-
-                  <p><span className="meta-label">Autorizado por:</span> <span className="meta-value">{transaction.usuarioNombre}</span></p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '4px' }}>
+                    <p><span className="meta-label">Fecha:</span> <span className="meta-value">{new Date(transaction.fecha).toLocaleString()}</span></p>
+                    <p><span className="meta-label">N° Comprobante:</span> <span className="meta-value">{transaction.id}</span></p>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '4px' }}>
+                    <p><span className="meta-label">Motivo/Ref:</span> <span className="meta-value">{transaction.clienteNombre?.replace('MOTIVO: ', '') || transaction.motivo}</span></p>
+                    <p><span className="meta-label">Autorizado por:</span> <span className="meta-value">{transaction.usuarioNombre}</span></p>
+                  </div>
                 </div>
 
                 <table className="items">
@@ -303,22 +320,31 @@ const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
                     <span>{transaction.totalItems}</span>
                   </div>
 
-                  {/* Mostrar Costo Total (Interno) */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#666', fontStyle: 'italic', marginTop: '4px' }}>
-                    <span>Costo Total (Interno):</span>
-                    <span>C$ {fmt(transaction.totalCosto)}</span>
-                  </div>
+                  <div className="grand-total-box">
+                    {/* Costo Total (Interno) - Destacado */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '8px' }}>
+                      <span> COSTO TOTAL:</span>
+                      <span>C$ {fmt(transaction.totalCosto)}</span>
+                    </div>
 
-                  <div className="grand-total">
-                    <span>TOTAL VALORIZADO:</span>
-                    <span>C$ {fmt(transaction.totalVenta)}</span>
+                    <div className="grand-total" style={{ borderTop: '1px dashed #333' }}>
+                      <span>TOTAL VALORIZADO:</span>
+                      <span>C$ {fmt(transaction.totalVenta)}</span>
+                    </div>
                   </div>
                 </div>
 
                 <div className="thanks">
-                  <p>Registro Interno de Inventario</p>
-                  <p>__________________________</p>
-                  <p>Firma Responsable</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '30px' }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <p>__________________________</p>
+                      <p>Entregado Por</p>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <p>__________________________</p>
+                      <p>Recibido Por</p>
+                    </div>
+                  </div>
                 </div>
               </PrintWrapper>
 
