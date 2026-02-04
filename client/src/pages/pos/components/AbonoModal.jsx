@@ -164,11 +164,24 @@ export default function AbonoCreditoModal({ client, onClose, onAbonoSuccess, sho
         <HistorialList>
           {historial.length === 0
             ? <li>No hay abonos registrados.</li>
-            : historial.map(abono => (
+            : historial.map(abono => {
+              let detalles = abono.pagoDetalles || {};
+              if (typeof detalles === 'string') {
+                try { detalles = JSON.parse(detalles); } catch (e) { }
+              }
+              const metodo = detalles.metodo || 'Efectivo';
+              const ref = detalles.referencia ? `(Ref: ${detalles.referencia})` : '';
+
+              return (
                 <li key={abono.id}>
-                  {abono.fecha} - {formatCurrency(abono.monto)} por {abono.pagoDetalles.usuario}
+                  {abono.fecha ? new Date(abono.fecha).toLocaleDateString() : ''} - {formatCurrency(abono.monto)}
+                  <span style={{ marginLeft: 5, color: '#555', fontStyle: 'italic' }}>
+                    [{metodo} {ref}]
+                  </span>
+                  - por {detalles.usuario || abono.usuario}
                 </li>
-              ))
+              )
+            })
           }
         </HistorialList>
       </ModalContainer>

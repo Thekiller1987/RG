@@ -86,6 +86,7 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
 
   const [monto, setMonto] = useState('');
   const [metodoPago, setMetodoPago] = useState('Efectivo');
+  const [referencia, setReferencia] = useState(''); // NEW: State for reference
   const [isLoading, setIsLoading] = useState(false);
   const [errorMonto, setErrorMonto] = useState('');
 
@@ -119,25 +120,44 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
       return;
     }
 
+    if (metodoPago !== 'Efectivo' && !referencia.trim()) {
+      showAlert({ title: "Referencia Requerida", message: "Por favor ingrese el número de referencia, transferencia o voucher." });
+      return;
+    }
+
     setIsLoading(true);
     try {
       // 1. Registrar el pago en el backend
+      // Include referencia in pagoDetalles
       await api.addCreditPayment(client.id_cliente, {
         monto: montoNum,
-        pagoDetalles: { metodo: metodoPago, usuario: user?.nombre_usuario || 'Desconocido' }
+        pagoDetalles: {
+          metodo: metodoPago,
+          usuario: user?.nombre_usuario || 'Desconocido',
+          referencia: referencia || '' // Save reference
+        }
       }, token);
 
-      // 2. Registrar la transacción en la caja (si es un ingreso)
-      // Nota: addCajaTransaction ahora sincroniza automáticamente con el servidor
-      const esIngresoEnCaja = metodoPago === 'Efectivo';
+      // 2. Registrar la transacción en la caja
+      const esIngresoEnCaja = metodoPago === 'Efectivo'; // CRITICAL: Only Cash affects physical box
+
       const txCaja = {
         id: `abono-${Date.now()}`,
         type: 'abono',
-        amount: montoNum,
-        note: `Abono Cliente #${client.id_cliente} (${metodoPago})`,
+        amount: montoNum, // Total amount of transaction
+        note: `Abono Cliente: ${client.nombre} (${metodoPago}) ${referencia ? '- Ref: ' + referencia : ''}`,
         at: new Date().toISOString(),
         pagoDetalles: {
+          clienteId: client.id_cliente,
+          clienteNombre: client.nombre,
+          metodo: metodoPago,
+          referencia: referencia,
+          // CRITICAL: ingresoCaja tells the report how much PHYSICAL CASH was added.
+          // If transfer/card, this must be 0.
           ingresoCaja: esIngresoEnCaja ? montoNum : 0,
+
+          // Auxiliary fields for reporting breakdown
+          efectivo: esIngresoEnCaja ? montoNum : 0,
           tarjeta: metodoPago === 'Tarjeta' ? montoNum : 0,
           transferencia: metodoPago === 'Transferencia' ? montoNum : 0,
           credito: 0
@@ -155,7 +175,7 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [monto, metodoPago, errorMonto, client, user, addCajaTransaction, onAbonoSuccess, onClose, showAlert]);
+  }, [monto, metodoPago, referencia, errorMonto, client, user, addCajaTransaction, onAbonoSuccess, onClose, showAlert]);
 
   const isSubmitDisabled = isLoading || saldoPendiente <= 0 || !!errorMonto || !monto;
 
@@ -203,6 +223,21 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
               <option value="Transferencia">Transferencia</option>
             </Select>
           </InputGroup>
+
+          {/* New Reference Input */}
+          {metodoPago !== 'Efectivo' && (
+            <InputGroup>
+              <Label htmlFor="referencia">Referencia / Voucher / N° Transferencia</Label>
+              <Input
+                id="referencia"
+                type="text"
+                value={referencia}
+                onChange={e => setReferencia(e.target.value)}
+                placeholder="Ej: BAC-123456"
+                required
+              />
+            </InputGroup>
+          )}
 
           {errorMonto && <ErrorText>{errorMonto}</ErrorText>}
 

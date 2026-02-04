@@ -141,7 +141,7 @@ const getAbonosByClient = async (req, res) => {
     try {
         // --- CORRECCIÓN AQUÍ: Se cambió "u.nombre" por "u.nombre_usuario" que es el nombre correcto de la columna ---
         const query = `
-            SELECT v.id_venta AS id_abono, v.fecha, ABS(v.total_venta) AS monto, u.nombre_usuario AS usuario
+            SELECT v.id_venta AS id_abono, v.fecha, ABS(v.total_venta) AS monto, u.nombre_usuario AS usuario, v.pago_detalles AS pagoDetalles
             FROM ventas v
             LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
             WHERE v.id_cliente = ? AND v.estado = 'ABONO_CREDITO'
