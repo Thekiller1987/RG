@@ -22,6 +22,7 @@ const cajaRoutes = require('./src/routes/cajaRoutes.js');
 // NUEVA RUTA AGREGADA
 const providerInvoiceRoutes = require('./src/routes/providerInvoiceRoutes.js');
 const requestRoutes = require('./src/routes/requestRoutes.js');
+const outflowRoutes = require('./src/routes/outflowRoutes.js'); // FIXED: Missing import
 
 // 2. Crear una instancia de Express
 const app = express();
