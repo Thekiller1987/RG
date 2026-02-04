@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import {
     FaSignOutAlt, FaShoppingCart, FaBoxOpen, FaFileInvoice,
     FaCreditCard, FaCloudUploadAlt, FaChartBar, FaBriefcase, FaUsers,
-    FaFileInvoiceDollar, FaClipboardList // <--- NUEVO ICONO
+    FaFileInvoiceDollar, FaClipboardList, FaTruck // <--- NUEVO ICONO
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -236,6 +236,15 @@ const Dashboard = () => {
                             <CardIcon color="#6f42c1"><FaCloudUploadAlt /></CardIcon>
                             <h2>Carga Masiva</h2>
                             <p>Actualiza inventario desde archivos CSV.</p>
+                        </Card>
+                    )}
+
+                    {/* NUEVO: TRASLADOS / SALIDAS (Admin Only) */}
+                    {canAccessInventory && (
+                        <Card to="/traslados" color="#ef4444">
+                            <CardIcon color="#ef4444"><FaTruck /></CardIcon>
+                            <h2>Traslados / Salidas</h2>
+                            <p>Descontar mercancía por traslados o merma.</p>
                         </Card>
                     )}
 

@@ -19,7 +19,8 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 import InventoryUpload from './pages/InventoryUpload.jsx';
 import CashReport from './pages/CashReport.jsx';
 import FacturasProveedores from './pages/FacturasProveedores.jsx';
-import Solicitudes from './pages/Solicitudes.jsx'; // <--- NUEVA PÁGINA
+import Solicitudes from './pages/Solicitudes.jsx';
+import InventoryOutflowPage from './pages/InventoryOutflowPage.jsx'; // <--- NUEVA PAGINA
 
 // Mapa de roles
 const ROLES = {
@@ -134,6 +135,16 @@ function App() {
         element={
           <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
             <CashReport />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Traslados / Salidas (NUEVA RUTA) */}
+      <Route
+        path="/traslados"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.INVENTARIO]}>
+            <InventoryOutflowPage />
           </ProtectedRoute>
         }
       />

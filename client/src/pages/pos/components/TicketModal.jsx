@@ -316,6 +316,7 @@ const TicketModal = ({
   const tx = resolved;
   const isAbono = tx.estado === 'ABONO_CREDITO';
   const isProforma = Boolean(tx.isProforma || tx.proformaFor || tx.proformaNombre);
+  const isOutflow = Boolean(tx.isOutflow); // NEW FLAG
   const isDevol = tx.estado === 'DEVOLUCION';
 
   const ticketId = isProforma ? ensureProformaId(tx) : coalesce(tx.id, tx.saleId, tx.numero, '-');
@@ -361,9 +362,9 @@ const TicketModal = ({
   const total = Number(coalesce(tx.totalVenta, tx.total_venta, subtotal - descuento, 0));
 
   const pd = tx.pagoDetalles || {};
-  const metodo = isProforma ? 'N/A' : coalesce(tx.metodoPago, labelMetodoPago(pd));
-  const pagado = isProforma ? 0 : montoPagado(pd, total);
-  const cambio = isProforma ? 0 : Math.max(0, pagado - total);
+  const metodo = (isProforma || isOutflow) ? 'N/A' : coalesce(tx.metodoPago, labelMetodoPago(pd));
+  const pagado = (isProforma || isOutflow) ? 0 : montoPagado(pd, total);
+  const cambio = (isProforma || isOutflow) ? 0 : Math.max(0, pagado - total);
 
   const abonoMonto = Math.abs(Number(coalesce(tx.totalVenta, tx.montoAbono, 0)));
   const nuevoSaldo = Number(clienteObj?.saldo_pendiente || 0);
@@ -379,7 +380,7 @@ const TicketModal = ({
     const meta = {
       ticketId,
       mode,
-      type: isProforma ? 'PROFORMA' : isAbono ? 'ABONO' : (isDevol ? 'VENTA_DEV' : 'VENTA'),
+      type: isProforma ? 'PROFORMA' : isAbono ? 'ABONO' : isOutflow ? 'SALIDA' : (isDevol ? 'VENTA_DEV' : 'VENTA'),
       printedBy,
       printedByName: printedByName,
       printedAt: new Date().toISOString(),
@@ -396,7 +397,7 @@ const TicketModal = ({
     } catch (e) {
       console.warn('No se pudo persistir el historial de impresión:', e);
     }
-  }, [currentUser, authUser, userId, ticketId, isProforma, isAbono, isDevol, printedByName, onPersistPrint]);
+  }, [currentUser, authUser, userId, ticketId, isProforma, isAbono, isOutflow, isDevol, printedByName, onPersistPrint]);
 
   // ====== Impresión centralizada (A4/80 mm) ======
   const doPrint = React.useCallback((mode = '80') => {
@@ -585,6 +586,8 @@ const TicketModal = ({
                   <Tag $type="proforma"><FaFileInvoice /> PROFORMA</Tag>
                 ) : isAbono ? (
                   <Tag $type="abono">RECIBO DE ABONO</Tag>
+                ) : isOutflow ? (
+                  <Tag $type="outflow">COMPROBANTE DE SALIDA</Tag>
                 ) : (
                   <Tag $type="venta">{isDevol ? 'FACTURA (Devolución)' : 'FACTURA DE VENTA'}</Tag>
                 )}
@@ -594,10 +597,13 @@ const TicketModal = ({
             {/* Metadatos */}
             <div className="meta">
               <p><span className="meta-label">Fecha:</span><span className="meta-value">{fechaStr}</span></p>
-              <p><span className="meta-label">{isProforma ? 'Proforma' : isAbono ? 'Recibo' : 'Factura'} #:</span><span className="meta-value">{ticketId}</span></p>
-              <p><span className="meta-label">{isProforma ? 'A nombre de' : 'Cliente'}:</span><span className="meta-value">{clientName}</span></p>
-              <p><span className="meta-label">Atendido por:</span><span className="meta-value">{printedByName}</span></p>
-              {!isProforma && (
+              <p><span className="meta-label">{isProforma ? 'Proforma' : isAbono ? 'Recibo' : isOutflow ? 'Comprobante' : 'Factura'} #:</span><span className="meta-value">{ticketId}</span></p>
+
+              {/* Reuse Client Name for Outflow Reason/Motivo if passed in that field */}
+              <p><span className="meta-label">{isProforma ? 'A nombre de' : isOutflow ? 'Ref/Motivo' : 'Cliente'}:</span><span className="meta-value">{clientName}</span></p>
+
+              <p><span className="meta-label">{isOutflow ? 'Autorizado por' : 'Atendido por'}:</span><span className="meta-value">{printedByName}</span></p>
+              {!isProforma && !isOutflow && (
                 <p><span className="meta-label">Tipo de pago:</span><span className="meta-value">{metodo}</span></p>
               )}
             </div>

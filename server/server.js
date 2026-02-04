@@ -85,6 +85,7 @@ app.use('/api/caja', cajaRoutes);
 // NUEVA RUTA AGREGADA
 app.use('/api/facturas-proveedores', providerInvoiceRoutes);
 app.use('/api/requests', requestRoutes);
+app.use('/api/outflow', outflowRoutes); // <--- REGISTRAR RUTA TRASLADOS
 
 app.get('/api', (_req, res) => {
   res.send('¡API MultirepuestosRG funcionando! 🚀');
