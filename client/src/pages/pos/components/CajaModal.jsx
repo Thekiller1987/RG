@@ -175,6 +175,8 @@ const CajaModal = ({
       if (t.startsWith('venta')) {
         if (pd.totalVenta) tVentasDia += Number(pd.totalVenta);
         else tVentasDia += (Math.abs(rawAmount) + txTarjeta + txTransf + txCredito);
+      } else if (t === 'ajuste') {
+        tVentasDia += Number(tx.amount || 0);
       }
 
       // Clasificar
