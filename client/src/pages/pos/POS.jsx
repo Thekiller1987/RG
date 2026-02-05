@@ -1113,7 +1113,7 @@ const POS = () => {
             title="Acceso Restringido"
             fields={[{ name: 'pin', label: 'PIN de Seguridad', type: 'password', autoFocus: true }]}
             onSubmit={(values) => {
-              if (values.pin === '2004') {
+              if (values.pin === '111987') {
                 closeModal();
                 modal.data?.action?.();
               } else {
