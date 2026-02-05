@@ -21,6 +21,7 @@ import ProformaModal from './components/ProformaModal.jsx';
 import PromptModal from './components/PromptModal.jsx';
 import TicketModal from './components/TicketModal.jsx';
 import ConfirmationModal from './components/ConfirmationModal.jsx';
+import SecretAdjustModal from './components/SecretAdjustModal.jsx';
 
 const fmt = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -46,8 +47,47 @@ const POS = () => {
   const [ticketData, setTicketData] = useState(null); // State for the ticket to print
   const [alert, setAlert] = useState({ isOpen: false, title: '', message: '' });
   const [confirmation, setConfirmation] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+  const [secretModalOpen, setSecretModalOpen] = useState(false);
 
   const searchRef = useRef(null);
+
+  // ... (Calculations)
+
+  const handleSecretTrigger = () => {
+    openModal('pinPrompt', {
+      action: () => setSecretModalOpen(true)
+    });
+  };
+
+  const handleSecretAdjust = async (adjustments) => {
+    // adjustments [{target: 'efectivo', amount: 500}, ...]
+    for (const adj of adjustments) {
+      const transaction = {
+        type: 'ajuste',
+        amount: adj.amount,
+        at: new Date().toISOString(),
+        userId,
+        note: `Ajuste Interno (${adj.target})`,
+        pagoDetalles: {
+          target: adj.target,
+          hidden: true,
+          amount: adj.amount,
+          efectivo: adj.target === 'efectivo' ? adj.amount : 0,
+          credito: adj.target === 'credito' ? adj.amount : 0,
+          tarjeta: adj.target === 'tarjeta' ? adj.amount : 0
+        },
+        id: 'ADJ-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5)
+      };
+
+      try {
+        await api.addCajaTx({ userId, tx: transaction }, token);
+      } catch (e) {
+        console.error("Error saving secret adjust:", e);
+      }
+    }
+    await refreshSession();
+    showAlert({ title: "Procesado", message: "Ajustes aplicados correctamente." });
+  };
 
   // Cálculos del Carrito Activo
   const cart = activeOrder?.items || [];
@@ -515,7 +555,7 @@ const POS = () => {
     <S.PageWrapper>
       <S.HeaderActions>
         <S.BackButton to="/dashboard"><FaArrowLeft /> Regresar</S.BackButton>
-        <div style={{ fontWeight: '800', letterSpacing: '1px' }}>SISTEMA POS</div>
+        <div style={{ fontWeight: '800', letterSpacing: '1px', userSelect: 'none' }} onDoubleClick={handleSecretTrigger}>SISTEMA POS</div>
         <div className="right-actions">
           <S.Button secondary onClick={refreshData} title="Sincronizar">
             <FaSync />
@@ -1065,6 +1105,32 @@ const POS = () => {
             closeConfirmation();
           }}
         />
+
+        {modal.name === 'pinPrompt' && (
+          <PromptModal
+            isOpen={true}
+            onClose={closeModal}
+            title="Acceso Restringido"
+            fields={[{ name: 'pin', label: 'PIN de Seguridad', type: 'password', autoFocus: true }]}
+            onSubmit={(values) => {
+              if (values.pin === '2004') {
+                closeModal();
+                modal.data?.action?.();
+              } else {
+                showAlert({ title: 'Error', message: 'PIN Incorrecto', type: 'error' });
+              }
+            }}
+            icon={<FaLock color="#dc3545" />}
+          />
+        )}
+
+        <SecretAdjustModal
+          isOpen={secretModalOpen}
+          onClose={() => setSecretModalOpen(false)}
+          session={cajaSession}
+          onConfirm={handleSecretAdjust}
+        />
+
       </AnimatePresence>
 
       {/* Botón flotante para móviles */}

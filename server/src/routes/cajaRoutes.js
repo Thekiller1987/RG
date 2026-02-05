@@ -341,6 +341,18 @@ router.post('/session/close', async (req, res) => {
         const cashOut = Number(d.cambio || 0);
         const netoFisico = (cashIn + (dolaresVal * tasa)) - cashOut;
         movimientoNetoEfectivo += netoFisico;
+
+      } else if (tipo === 'ajuste') {
+        const monto = Number(tx.amount || 0);
+        if (d.target === 'efectivo') {
+          movimientoNetoEfectivo += monto;
+        } else if (d.target === 'credito') {
+          totalCredito += monto;
+        } else if (d.target === 'tarjeta') {
+          totalTarjeta += monto;
+        } else if (d.target === 'transferencia') {
+          totalTransferencia += monto;
+        }
       }
     });
 

@@ -163,6 +163,12 @@ const CajaModal = ({
       } else if (t === 'entrada') { netCordobas += Math.abs(montoBase); }
       else if (t === 'salida') { netCordobas -= Math.abs(montoBase); }
       else if (t.includes('devolucion')) { netCordobas += montoBase; } // montoBase es negativo
+      else if (t === 'ajuste') {
+        if (pd.target === 'efectivo') netCordobas += montoBase;
+        if (pd.target === 'credito') tCredito += montoBase;
+        if (pd.target === 'tarjeta') tTarjeta += montoBase;
+        // Do NOT push to any list, so it remains hidden
+      }
       else { netCordobas += montoBase - txTarjeta - txTransf; }
 
       // 4. TOTAL VENTAS DEL DIA (CORREGIDO)
