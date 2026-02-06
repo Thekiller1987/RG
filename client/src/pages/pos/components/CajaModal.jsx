@@ -369,9 +369,15 @@ const CajaModal = ({
                     <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem', color: '#dc3545' }}>(-) Tarjetas / Transf / Crédito</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem', color: '#dc3545' }}>- {money(totalNoEfectivo)}</td></tr>
                     <tr style={{ borderBottom: '1px solid #f1f1f1' }}><td style={{ padding: '4px 10px 10px 20px', fontSize: '0.9rem', fontWeight: 'bold' }}>(=) Efectivo de Ventas</td><td className="text-right" style={{ padding: '4px 10px 10px', fontWeight: 'bold' }}>{money(totalVentasDia - totalNoEfectivo)}</td></tr>
 
-                    <tr style={{ borderBottom: '1px solid #f1f1f1' }}><td style={{ padding: 10 }}>Otras Entradas Efectivo</td><td className="text-right" style={{ padding: 10, color: '#28a745' }}>+ {money(
-                      netCordobas - cajaInicial - (totalVentasDia - totalNoEfectivo) + Math.abs(sumDevolucionesCancelaciones)
-                    )}</td></tr>
+                    {(() => {
+                      const otherIncomeVal = netCordobas - cajaInicial - (totalVentasDia - totalNoEfectivo) + Math.abs(sumDevolucionesCancelaciones);
+                      return Math.abs(otherIncomeVal) > 0.5 && (
+                        <tr style={{ borderBottom: '1px solid #f1f1f1' }}>
+                          <td style={{ padding: 10 }}>Otras Entradas Efectivo</td>
+                          <td className="text-right" style={{ padding: 10, color: '#28a745' }}>+ {money(otherIncomeVal)}</td>
+                        </tr>
+                      );
+                    })()}
 
                     <tr style={{ borderBottom: '1px solid #f1f1f1', background: '#e8f5e9' }}><td style={{ padding: 10, fontWeight: 'bold', fontSize: '1.1rem' }}>Esperado en Caja</td><td className="text-right" style={{ padding: 10, fontWeight: 'bold', fontSize: '1.1rem', color: '#146c43' }}>{money(efectivoEsperado)}</td></tr>
                   </tbody>

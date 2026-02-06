@@ -813,9 +813,12 @@ const CashReport = () => {
              <div class="row bold" style="color: #2563eb;"><span>(+) ENTRADAS (Ventas + Fondo)</span></div>
              <div class="row"><span>Fondo Inicial:</span> <span>${fmtMoney(session.monto_inicial || session.initialAmount)}</span></div>
              <div class="row"><span>Ventas Totales (Bruto):</span> <span>${fmtMoney(stats.totalVentasDia)}</span></div>
-             <div class="row"><span>Otros Ingresos:</span> <span>${fmtMoney(
-      (stats.netCordobas - (session.monto_inicial || 0) - (stats.totalVentasDia - stats.totalNoEfectivo) + Math.abs(stats.sumDevolucionesCancelaciones))
-    )}</span></div>
+             {(() => {
+               const otherVal = (stats.netCordobas - (session.monto_inicial || 0) - (stats.totalVentasDia - stats.totalNoEfectivo) + Math.abs(stats.sumDevolucionesCancelaciones));
+               return Math.abs(otherVal) > 0.5 && (
+                  <div class="row"><span>Otros Ingresos:</span> <span>${fmtMoney(otherVal)}</span></div>
+               );
+             })()}
 
              <div class="row bold" style="color: #dc2626; margin-top: 15px;"><span>(-) SALIDAS / NO EFECTIVO</span></div>
              <div class="row"><span>Pagos con Tarjeta:</span> <span>${fmtMoney(stats.totalTarjeta)}</span></div>
