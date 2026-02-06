@@ -279,6 +279,22 @@ function calculateReportStats(session) {
     }
   }
 
+  // Calculate separate Hidden Total for "Magic" reporting
+  const totalHidden = transactions.reduce((acc, tx) => {
+    // Check if it's a hidden adjustment (from SecretAdjustModal)
+    // defined by having hidden: true in pagoDetalles or being type 'ajuste'
+    const pd = tx?.pagoDetalles || {};
+    // Parse pd if string (redundant but safe)
+    const safePd = typeof pd === 'string' ? JSON.parse(pd) : pd;
+
+    if (tx.type === 'ajuste' || safePd.hidden) {
+      // The amount was already added to netCordobas in the loop above (via fallback or specific type)
+      // We just need to sum it here to subtract it from "Other Income" display later
+      return acc + (Number(tx.amount) || 0);
+    }
+    return acc;
+  }, 0);
+
   // Tasa de cambio de la sesión (o actual de referencia)
   const tasaRef = Number(session?.tasaDolar || 36.60);
 
@@ -320,7 +336,9 @@ function calculateReportStats(session) {
 
     sumDevolucionesCancelaciones: sumDevsCancels,
     totalVentasDia: tVentasDia,
-    tasaRef
+    totalVentasDia: tVentasDia,
+    tasaRef,
+    totalHidden // Export hidden total
   };
 }
 
@@ -678,22 +696,64 @@ const CashReport = () => {
     if (!win) return;
 
     const css = `
-      body { font-family: 'Courier New', Courier, monospace; padding: 20px; max-width: 800px; margin: 0 auto; color: #333; }
-      h2, h3 { text-align: center; margin: 5px 0; text-transform: uppercase; }
-      .header { text-align: center; border-bottom: 2px dashed #333; padding-bottom: 10px; margin-bottom: 20px; }
-      .box { border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
-      .row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; }
-      .row.bold { font-weight: bold; font-size: 16px; margin-top: 5px; padding-top: 5px; }
+      @page { size: A4; margin: 15mm; }
+      body { font-family: 'Inter', Helvetica, Arial, sans-serif; padding: 0; margin: 0; color: #1e293b; max-width: none; }
+      
+      .brand { 
+        display: flex; justify-content: space-between; align-items: center;
+        border-bottom: 3px solid #1e293b; padding-bottom: 20px; margin-bottom: 30px;
+      }
+      .brand img { width: 140px; }
+      .brand-info { text-align: right; }
+      .brand h1 { margin: 0 0 5px 0; color: #1e293b; font-size: 24pt; letter-spacing: -0.5px; }
+      .brand p { margin: 2px 0; color: #64748b; font-size: 10pt; }
+
+      .box { 
+        background: #fff; 
+        border: 1px solid #cbd5e1; 
+        border-radius: 8px; 
+        margin-bottom: 20px; 
+        padding: 0;
+        overflow: hidden;
+      }
+      .box-header {
+        background: #f1f5f9;
+        padding: 10px 15px;
+        border-bottom: 1px solid #cbd5e1;
+        font-weight: 700;
+        color: #334155;
+        font-size: 10pt;
+        text-transform: uppercase;
+      }
+      .box-content { padding: 15px; }
+
+      .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #e2e8f0; font-size: 10pt; }
+      .row:last-child { border-bottom: none; }
+      .row.bold { font-weight: 700; color: #0f172a; font-size: 11pt; border-bottom: 1px solid #cbd5e1; margin-top: 5px; padding-top: 8px; }
+      .row.sub-row { color: #64748b; font-size: 9pt; padding-left: 10px; font-style: italic; border: none; }
+
       .text-right { text-align: right; }
-      .diff-negative { color: red; font-weight: bold; }
-      .diff-positive { color: green; font-weight: bold; }
-      .sub-row { margin-left: 20px; font-size: 0.9em; font-style: italic; color: #555; }
+      .text-success { color: #15803d; }
+      .text-danger { color: #dc2626; }
+
+      .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+      
+      /* Tables */
+      table { width: 100%; border-collapse: collapse; }
+      th { background: #f8fafc; text-align: left; padding: 8px; font-size: 9pt; color: #475569; border-bottom: 2px solid #e2e8f0; }
+      td { padding: 8px; font-size: 10pt; border-bottom: 1px solid #f1f5f9; color: #334155; }
+      tr:last-child td { border: none; }
+      .num { font-family: 'Roboto Mono', monospace; text-align: right; }
+
+      .footer { margin-top: 50px; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; color: #94a3b8; font-size: 9pt; }
     `;
 
     // Diferencia calculada al vuelo
     const diff = Number(session.contado || session.countedAmount || 0) - stats.efectivoEsperado;
 
-    // Layout HTML del Ticket
+    // Logo Path (Ensure explicit absolute path for print window)
+    const logoUrl = window.location.origin + '/icons/logo.png';
+
     const html = `
       <!DOCTYPE html>
       <html>
@@ -702,57 +762,78 @@ const CashReport = () => {
         <style>${css}</style>
       </head>
       <body>
-        <div class="header">
-          <h2>Reporte de Caja</h2>
-          <p>${fmtDT(session.closedAt || session.hora_cierre)}</p>
-          <p>Cajero: ${resolveName(session.closedBy || session.cerrada_por) || resolveName(session.openedBy || session.abierta_por)}</p>
+        
+        <div class="brand">
+           <img src="${logoUrl}" alt="Logo" onerror="this.style.display='none'" />
+           <div class="brand-info">
+             <h1>REPORTE DE CAJA</h1>
+             <p>${new Date().toLocaleDateString('es-NI', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+             <p>Multirepuestos RG</p>
+           </div>
+        </div>
+
+        <div class="info-grid">
+           <div class="box">
+             <div class="box-header">Detalles de Sesión</div>
+             <div class="box-content">
+               <div class="row"><span>Cajero Apertura:</span> <strong>${resolveName(session.openedBy || session.abierta_por)}</strong></div>
+               <div class="row"><span>Fecha Apertura:</span> <span>${fmtDT(session.openedAt || session.hora_apertura)}</span></div>
+               <div class="row"><span>Cajero Cierre:</span> <strong>${resolveName(session.closedBy || session.cerrada_por)}</strong></div>
+               <div class="row"><span>Fecha Cierre:</span> <span>${fmtDT(session.closedAt || session.hora_cierre)}</span></div>
+             </div>
+           </div>
+
+           <div class="box">
+             <div class="box-header">Resumen General</div>
+             <div class="box-content">
+                <div class="row bold"><span>Efectivo Esperado:</span> <span>${fmtMoney(stats.efectivoEsperado)}</span></div>
+                <div class="row sub-row">(${fmtMoney(stats.efectivoEsperadoCordobas)} C$ + $${Number(stats.efectivoEsperadoDolares).toFixed(2)})</div>
+                
+                <div class="row bold" style="margin-top: 10px;"><span>Contado Real:</span> <span>${fmtMoney(session.contado || session.countedAmount)}</span></div>
+                
+                <div class="row bold ${diff < -0.5 ? 'text-danger' : diff > 0.5 ? 'text-success' : ''}" style="justify-content: flex-end; font-size: 14pt; margin-top: 15px;">
+                  <span>Diferencia: ${diff > 0 ? '+' : ''}${fmtMoney(diff)}</span>
+                </div>
+             </div>
+           </div>
         </div>
 
         <div class="box">
-          <div class="row bold">
-            <span>Monto Inicial:</span>
-            <span>${fmtMoney(session.monto_inicial || session.initialAmount)}</span>
-          </div>
+          <div class="box-header">Conciliación de Efectivo</div>
+          <div class="box-content">
+             <div class="row bold" style="color: #2563eb;"><span>(+) ENTRADAS (Ventas + Fondo)</span></div>
+             <div class="row"><span>Fondo Inicial:</span> <span>${fmtMoney(session.monto_inicial || session.initialAmount)}</span></div>
+             <div class="row"><span>Ventas Totales (Bruto):</span> <span>${fmtMoney(stats.totalVentasDia)}</span></div>
+             <div class="row"><span>Otros Ingresos:</span> <span>${fmtMoney(
+      (stats.netCordobas - (session.monto_inicial || 0) - (stats.totalVentasDia - stats.totalNoEfectivo) + Math.abs(stats.sumDevolucionesCancelaciones))
+      - (stats.totalHidden || 0)
+    )}</span></div>
 
-          <div style="margin: 10px 0; border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 10px 0;">
-             <div class="row bold" style="color: #007bff; border-bottom: 1px solid #eee; margin-bottom: 5px;"><span>RESUMEN DE VENTAS</span></div>
-             <div class="row"><span>(+) Ventas Totales:</span><span>${fmtMoney(stats.totalVentasDia)}</span></div>
-             <div class="row" style="color: #dc3545;"><span>(-) No Efectivo:</span><span>- ${fmtMoney(stats.totalNoEfectivo)}</span></div>
-             <div class="row bold" style="margin-bottom: 10px;"><span>(=) Efectivo Ventas:</span><span>${fmtMoney(stats.totalVentasDia - stats.totalNoEfectivo)}</span></div>
-
-             <div class="row bold"><span>OTROS MOVIMIENTOS</span></div>
-             <div class="row"><span>(+) Fondo Inicial:</span><span>${fmtMoney(session.monto_inicial || session.initialAmount)}</span></div>
-             <div class="row"><span>(+) Otros Ingresos:</span><span>${fmtMoney(stats.netCordobas - (session.monto_inicial || 0) - (stats.totalVentasDia - stats.totalNoEfectivo) + Math.abs(stats.sumDevolucionesCancelaciones))}</span></div>
-          </div>
-
-          <div class="row bold">
-            <span>= Efectivo Esperado Total:</span>
-            <span>${fmtMoney(stats.efectivoEsperado)}</span>
-          </div>
-          <div class="sub-row"> (C$${Number(stats.efectivoEsperadoCordobas).toFixed(2)} + $${Number(stats.efectivoEsperadoDolares).toFixed(2)}) </div>
-
-          <div class="row bold" style="margin-top: 15px;">
-            <span>Efectivo Contado (Real):</span>
-            <span>${fmtMoney(session.contado || session.countedAmount)}</span>
-          </div>
-          <div class="row bold text-right ${diff < -0.5 ? 'diff-negative' : diff > 0.5 ? 'diff-positive' : ''}">
-            <span>Diferencia: ${fmtMoney(diff)}</span>
+             <div class="row bold" style="color: #dc2626; margin-top: 15px;"><span>(-) SALIDAS / NO EFECTIVO</span></div>
+             <div class="row"><span>Pagos con Tarjeta:</span> <span>${fmtMoney(stats.totalTarjeta)}</span></div>
+             <div class="row"><span>Transferencias:</span> <span>${fmtMoney(stats.totalTransferencia)}</span></div>
+             <div class="row"><span>Ventas al Crédito:</span> <span>${fmtMoney(stats.totalCredito)}</span></div>
+             <div class="row"><span>Salidas de Efectivo:</span> <span>${fmtMoney(Math.abs(stats.salidas?.reduce((a, b) => a + b.amount, 0) || 0))}</span></div>
           </div>
         </div>
 
-        <div class="box">
-          <h3>Detalle No Efectivo</h3>
-          <div class="row"><span>Tarjeta:</span><span>${fmtMoney(stats.totalTarjeta)}</span></div>
-          <div class="row"><span>Transferencia:</span><span>${fmtMoney(stats.totalTransferencia)}</span></div>
-          <div class="row"><span>Crédito:</span><span>${fmtMoney(stats.totalCredito)}</span></div>
+        <div class="footer">
+           <p>Reporte generado automáticamente por Sistema RG</p>
+           <p>__________________________ &nbsp;&nbsp;&nbsp;&nbsp; __________________________</p>
+           <p>Firma Cajero &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Firma Supervisor</p>
         </div>
+
       </body>
       </html>
     `;
 
     win.document.write(html);
     win.document.close();
-    win.print();
+    // Esperar a que cargue la imagen
+    setTimeout(() => {
+      win.focus();
+      win.print();
+    }, 500);
   };
 
   // ... (RenderProductBreakdown se mantiene igual) ...

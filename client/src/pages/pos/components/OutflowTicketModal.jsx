@@ -182,16 +182,82 @@ const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
       }
 
       /* A4 Grid / Cuadrícula Styling */
+      /* A4 Grid / Cuadrícula Styling */
       ${mode === 'A4' ? `
-        #print-wrapper-outflow .brand { text-align: left !important; border-bottom: 2px solid #333 !important; padding-bottom: 20px !important; margin-bottom: 20px !important; display: flex; justify-content: space-between; align-items: flex-start; }
-        #print-wrapper-outflow .brand-info { flex: 1; margin-left: 20px; }
-        #print-wrapper-outflow .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border: 1px solid #333; padding: 10px; margin-bottom: 20px; border-radius: 4px; }
-        #print-wrapper-outflow table.items { border-collapse: collapse; width: 100%; border: 1px solid #333; }
-        #print-wrapper-outflow table.items th { background: #f0f0f0; border: 1px solid #333; padding: 8px; text-align: center; font-weight: bold; }
-        #print-wrapper-outflow table.items td { border: 1px solid #333; padding: 6px; }
-        #print-wrapper-outflow .col-qty { text-align: center; }
+        #print-wrapper-outflow .brand { 
+          text-align: left !important; 
+          border-bottom: 3px solid #1e293b !important; 
+          padding-bottom: 20px !important; 
+          margin-bottom: 30px !important; 
+          display: flex; 
+          align-items: center; 
+          justify-content: space-between; 
+        }
+        #print-wrapper-outflow .brand img { width: 140px !important; margin: 0 !important; }
+        #print-wrapper-outflow .brand-info { text-align: right; }
+        #print-wrapper-outflow .brand h1 { color: #1e293b; font-size: 24pt !important; margin-bottom: 5px; letter-spacing: -0.5px; }
+        #print-wrapper-outflow .brand small { color: #64748b; font-size: 10pt; display: block; margin-bottom: 2px; }
+
+        #print-wrapper-outflow .meta { 
+            display: flex; 
+            justify-content: space-between;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0; 
+            padding: 15px 20px; 
+            margin-bottom: 30px; 
+            border-radius: 6px; 
+        }
+        #print-wrapper-outflow .meta p { margin: 5px 0; font-size: 10pt; color: #334155; }
+        #print-wrapper-outflow .meta-label { font-weight: 600; color: #475569; width: 120px; display: inline-block; }
+        #print-wrapper-outflow .meta-value { font-weight: 500; color: #0f172a; }
+
+        #print-wrapper-outflow table.items { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
+        #print-wrapper-outflow table.items th { 
+            background: #f1f5f9; 
+            color: #334155;
+            border-bottom: 2px solid #cbd5e1; 
+            padding: 12px 8px; 
+            text-align: left; 
+            font-weight: 700; 
+            font-size: 9pt;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        #print-wrapper-outflow table.items td { 
+            border-bottom: 1px solid #e2e8f0; 
+            padding: 10px 8px; 
+            font-size: 10pt;
+            color: #334155;
+        }
+        #print-wrapper-outflow table.items tr:nth-child(even) { background-color: #f8fafc; }
+        #print-wrapper-outflow .col-qty { text-align: center; width: 80px; font-weight: 600; }
+        #print-wrapper-outflow .col-code { width: 120px; font-family: 'Roboto Mono', monospace; font-size: 9pt; }
         #print-wrapper-outflow .text-right { text-align: right; }
-        #print-wrapper-outflow .grand-total-box { border: 2px solid #333; padding: 10px; margin-top: 20px; width: 40%; margin-left: auto; }
+        
+        #print-wrapper-outflow .totals { border-top: 2px solid #e2e8f0; padding-top: 20px; }
+        #print-wrapper-outflow .grand-total-box { 
+            background: #f8fafc; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 8px;
+            padding: 15px 20px; 
+            width: 40%; 
+            margin-left: auto; 
+        }
+        #print-wrapper-outflow .grand-total { 
+            border-top: 2px solid #cbd5e1; 
+            margin-top: 10px; 
+            padding-top: 10px; 
+            font-size: 14pt;
+            color: #0f172a;
+        }
+
+        #print-wrapper-outflow .thanks { 
+            position: fixed; 
+            bottom: 30px; 
+            left: 0; 
+            right: 0; 
+            border: none;
+        }
       ` : ''}
 
       .brand h1 { font-size: ${mode === 'A4' ? '22pt' : '12pt'} !important; margin: 0; }

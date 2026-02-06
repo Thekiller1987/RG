@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import {
     FaSignOutAlt, FaShoppingCart, FaBoxOpen, FaFileInvoice,
     FaCreditCard, FaCloudUploadAlt, FaChartBar, FaBriefcase, FaUsers,
-    FaFileInvoiceDollar, FaClipboardList, FaTruck // <--- NUEVO ICONO
+    FaFileInvoiceDollar, FaClipboardList, FaTruck, FaTags
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -191,6 +191,16 @@ const Dashboard = () => {
                             <CardIcon color="#007bff"><FaShoppingCart /></CardIcon>
                             <h2>Punto de Venta</h2>
                             <p>Registra ventas y gestiona transacciones diarias.</p>
+                        </Card>
+                    )}
+
+                    {/* Venta Mayorista (Próximamente) */}
+                    {canAccessPOS && (
+                        <Card to="#" onClick={(e) => e.preventDefault()} color="#8b5cf6" style={{ opacity: 0.9, cursor: 'not-allowed' }}>
+                            <CardIcon color="#8b5cf6"><FaTags /></CardIcon>
+                            <h2>Venta Mayorista</h2>
+                            <p style={{ fontWeight: 'bold', color: '#8b5cf6', marginBottom: '5px' }}>PRÓXIMAMENTE</p>
+                            <p>Portal exclusivo para ventas al por mayor.</p>
                         </Card>
                     )}
 
