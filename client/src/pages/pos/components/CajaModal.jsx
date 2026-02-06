@@ -186,7 +186,7 @@ const CajaModal = ({
         else tVentasDia += (Math.abs(rawAmount) + txTarjeta + txTransf + txCredito);
       } else if (t === 'ajuste') {
         // Agregamos el ajuste a Ventas Totales (incluso si es hidden, para "disfrazarlo" de venta)
-        tVentasDia += Number(tx.amount || 0);
+        tVentasDia += montoBase;
       }
 
       // Clasificar
