@@ -115,7 +115,7 @@ const CajaModal = ({
     cajaInicial, netCordobas, netDolares, efectivoEsperado, efectivoEsperadoCordobas, efectivoEsperadoDolares,
     ventasContado, devoluciones, cancelaciones, entradas, salidas, abonos,
     totalTarjeta, totalTransferencia, totalCredito, totalNoEfectivo,
-    sumDevolucionesCancelaciones, totalVentasDia, tasaRef
+    sumDevolucionesCancelaciones, totalVentasDia, tasaRef, totalHidden
   } = useMemo(() => {
     const cajaInicialN = Number(session?.initialAmount || 0);
     const tasaRef = Number(session?.tasaDolar || initialTasaDolar || 36.60);
