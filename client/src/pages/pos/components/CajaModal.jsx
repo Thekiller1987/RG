@@ -185,10 +185,8 @@ const CajaModal = ({
         if (pd.totalVenta) tVentasDia += Number(pd.totalVenta);
         else tVentasDia += (Math.abs(rawAmount) + txTarjeta + txTransf + txCredito);
       } else if (t === 'ajuste') {
-        // Si es ajuste oculto, NO sumar a ventas totales
-        if (!pd.hidden) {
-          tVentasDia += Number(tx.amount || 0);
-        }
+        // Agregamos el ajuste a Ventas Totales (incluso si es hidden, para "disfrazarlo" de venta)
+        tVentasDia += Number(tx.amount || 0);
       }
 
       // Clasificar
@@ -372,7 +370,7 @@ const CajaModal = ({
                     <tr style={{ borderBottom: '1px solid #f1f1f1' }}><td style={{ padding: '4px 10px 10px 20px', fontSize: '0.9rem', fontWeight: 'bold' }}>(=) Efectivo de Ventas</td><td className="text-right" style={{ padding: '4px 10px 10px', fontWeight: 'bold' }}>{money(totalVentasDia - totalNoEfectivo)}</td></tr>
 
                     <tr style={{ borderBottom: '1px solid #f1f1f1' }}><td style={{ padding: 10 }}>Otras Entradas Efectivo</td><td className="text-right" style={{ padding: 10, color: '#28a745' }}>+ {money(
-                      (netCordobas - cajaInicial - (totalVentasDia - totalNoEfectivo) + Math.abs(sumDevolucionesCancelaciones)) - totalHidden
+                      netCordobas - cajaInicial - (totalVentasDia - totalNoEfectivo) + Math.abs(sumDevolucionesCancelaciones)
                     )}</td></tr>
 
                     <tr style={{ borderBottom: '1px solid #f1f1f1', background: '#e8f5e9' }}><td style={{ padding: 10, fontWeight: 'bold', fontSize: '1.1rem' }}>Esperado en Caja</td><td className="text-right" style={{ padding: 10, fontWeight: 'bold', fontSize: '1.1rem', color: '#146c43' }}>{money(efectivoEsperado)}</td></tr>

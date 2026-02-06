@@ -209,6 +209,15 @@ function calculateReportStats(session) {
         netCordobas += neto;
       }
     }
+
+    // Always add adjustment to tVentasDia in CashReport.
+    if (t.startsWith('venta')) {
+      if (pd.totalVenta) tVentasDia += Number(pd.totalVenta);
+      else tVentasDia += (Math.abs(rawAmount) + txTarjeta + txTransf + txCredito);
+    } else if (t === 'ajuste') {
+      // Agregamos el ajuste a Ventas Totales (incluso si es hidden, para "disfrazarlo" de venta)
+      tVentasDia += Number(tx.amount || 0);
+    }
     else if (t.includes('abono')) {
       // Abonos: pd.ingresoCaja suele ser el total neto. 
       // Si hubiera dólares en abonos, necesitaríamos pd.dolares. 
@@ -806,7 +815,6 @@ const CashReport = () => {
              <div class="row"><span>Ventas Totales (Bruto):</span> <span>${fmtMoney(stats.totalVentasDia)}</span></div>
              <div class="row"><span>Otros Ingresos:</span> <span>${fmtMoney(
       (stats.netCordobas - (session.monto_inicial || 0) - (stats.totalVentasDia - stats.totalNoEfectivo) + Math.abs(stats.sumDevolucionesCancelaciones))
-      - (stats.totalHidden || 0)
     )}</span></div>
 
              <div class="row bold" style="color: #dc2626; margin-top: 15px;"><span>(-) SALIDAS / NO EFECTIVO</span></div>
