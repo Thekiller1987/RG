@@ -122,6 +122,7 @@ const CajaModal = ({
 
     const cls = { ventasContado: [], devoluciones: [], cancelaciones: [], entradas: [], salidas: [], abonos: [] };
     let netCordobas = 0, netDolares = 0, tTarjeta = 0, tTransf = 0, tCredito = 0, tVentasDia = 0, sumDevsCancels = 0;
+    let totalHidden = 0; // Track hidden adjustments
 
     for (const tx of transactions) {
       const t = (tx?.type || '').toLowerCase();
@@ -164,9 +165,17 @@ const CajaModal = ({
       else if (t === 'salida') { netCordobas -= Math.abs(montoBase); }
       else if (t.includes('devolucion')) { netCordobas += montoBase; } // montoBase es negativo
       else if (t === 'ajuste') {
-        if (pd.target === 'efectivo') netCordobas += montoBase;
-        if (pd.target === 'credito') tCredito += montoBase;
-        if (pd.target === 'tarjeta') tTarjeta += montoBase;
+        if (pd.target === 'efectivo') {
+          netCordobas += montoBase;
+          if (pd.hidden) totalHidden += montoBase; // Add to hidden if effective
+        }
+        if (pd.target === 'credito') {
+          tCredito += montoBase;
+          // If credit adjustment is hidden, we might need to handle it, but main request is cash
+        }
+        if (pd.target === 'tarjeta') {
+          tTarjeta += montoBase;
+        }
         // Do NOT push to any list, so it remains hidden
       }
       else { netCordobas += montoBase - txTarjeta - txTransf; }
@@ -176,7 +185,10 @@ const CajaModal = ({
         if (pd.totalVenta) tVentasDia += Number(pd.totalVenta);
         else tVentasDia += (Math.abs(rawAmount) + txTarjeta + txTransf + txCredito);
       } else if (t === 'ajuste') {
-        tVentasDia += Number(tx.amount || 0);
+        // Si es ajuste oculto, NO sumar a ventas totales
+        if (!pd.hidden) {
+          tVentasDia += Number(tx.amount || 0);
+        }
       }
 
       // Clasificar
@@ -196,7 +208,8 @@ const CajaModal = ({
       efectivoEsperadoDolares: netDolares,
       ventasContado: cls.ventasContado, devoluciones: cls.devoluciones, cancelaciones: cls.cancelaciones, entradas: cls.entradas, salidas: cls.salidas, abonos: cls.abonos,
       totalTarjeta: tTarjeta, totalTransferencia: tTransf, totalCredito: tCredito, totalNoEfectivo: tTarjeta + tTransf + tCredito,
-      sumDevolucionesCancelaciones: sumDevsCancels, totalVentasDia: tVentasDia, tasaRef
+      sumDevolucionesCancelaciones: sumDevsCancels, totalVentasDia: tVentasDia, tasaRef,
+      totalHidden // Export totalHidden
     };
   }, [transactions, session, initialTasaDolar, clients]); // Add clients dependency
 
@@ -358,7 +371,9 @@ const CajaModal = ({
                     <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem', color: '#dc3545' }}>(-) Tarjetas / Transf / Crédito</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem', color: '#dc3545' }}>- {money(totalNoEfectivo)}</td></tr>
                     <tr style={{ borderBottom: '1px solid #f1f1f1' }}><td style={{ padding: '4px 10px 10px 20px', fontSize: '0.9rem', fontWeight: 'bold' }}>(=) Efectivo de Ventas</td><td className="text-right" style={{ padding: '4px 10px 10px', fontWeight: 'bold' }}>{money(totalVentasDia - totalNoEfectivo)}</td></tr>
 
-                    <tr style={{ borderBottom: '1px solid #f1f1f1' }}><td style={{ padding: 10 }}>Otras Entradas Efectivo</td><td className="text-right" style={{ padding: 10, color: '#28a745' }}>+ {money(netCordobas - cajaInicial - (totalVentasDia - totalNoEfectivo) + Math.abs(sumDevolucionesCancelaciones))}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #f1f1f1' }}><td style={{ padding: 10 }}>Otras Entradas Efectivo</td><td className="text-right" style={{ padding: 10, color: '#28a745' }}>+ {money(
+                      (netCordobas - cajaInicial - (totalVentasDia - totalNoEfectivo) + Math.abs(sumDevolucionesCancelaciones)) - totalHidden
+                    )}</td></tr>
 
                     <tr style={{ borderBottom: '1px solid #f1f1f1', background: '#e8f5e9' }}><td style={{ padding: 10, fontWeight: 'bold', fontSize: '1.1rem' }}>Esperado en Caja</td><td className="text-right" style={{ padding: 10, fontWeight: 'bold', fontSize: '1.1rem', color: '#146c43' }}>{money(efectivoEsperado)}</td></tr>
                   </tbody>
