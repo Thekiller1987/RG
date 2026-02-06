@@ -185,7 +185,11 @@ const CajaModal = ({
         if (pd.totalVenta) tVentasDia += Number(pd.totalVenta);
         else tVentasDia += (Math.abs(rawAmount) + txTarjeta + txTransf + txCredito);
       } else if (t === 'ajuste') {
-        // Agregamos el ajuste a Ventas Totales (incluso si es hidden, para "disfrazarlo" de venta)
+        // Agregamos el ajuste a Ventas Totales
+        tVentasDia += montoBase;
+      } else if (t.includes('abono') || t === 'entrada') {
+        // FUSIONAR ABONOS Y ENTRADAS EN "VENTAS TOTALES"
+        // Esto elimina el renglón "Otras Entradas de Efectivo"
         tVentasDia += montoBase;
       }
 

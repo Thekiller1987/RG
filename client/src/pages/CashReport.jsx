@@ -215,7 +215,10 @@ function calculateReportStats(session) {
       if (pd.totalVenta) tVentasDia += Number(pd.totalVenta);
       else tVentasDia += (Math.abs(rawAmount) + txTarjeta + txTransf + txCredito);
     } else if (t === 'ajuste') {
-      // Agregamos el ajuste a Ventas Totales (incluso si es hidden, para "disfrazarlo" de venta)
+      // Agregamos el ajuste a Ventas Totales
+      tVentasDia += montoBase;
+    } else if (t.includes('abono') || t === 'entrada') {
+      // Fusionar Abonos y Entradas en Ventas Totales para eliminar "Otros Ingresos"
       tVentasDia += montoBase;
     }
     else if (t.includes('abono')) {
