@@ -309,40 +309,68 @@ router.post('/session/close', async (req, res) => {
       const tipo = tx.type;
       const d = tx.pagoDetalles || {};
 
+      // 1. ACUMULADORES GLOBALES (Ventas)
       if (tipo.startsWith('venta')) {
         totalEfectivo += Number(d.efectivo || 0);
         totalTarjeta += Number(d.tarjeta || 0);
         totalTransferencia += Number(d.transferencia || 0);
         totalCredito += Number(d.credito || 0);
       }
+      // 2. ACUMULADORES ABONOS (Credit Payments)
+      else if (tipo.includes('abono')) {
+        // Abonos can be Cash, Card, or Transfer
+        if (d.efectivo) totalEfectivo += Number(d.efectivo || 0);
+        // Fallback: If no breakdown but ingresoCaja > 0, assume cash
+        else if (d.ingresoCaja > 0) totalEfectivo += Number(d.ingresoCaja || 0);
 
+        if (d.tarjeta) totalTarjeta += Number(d.tarjeta || 0);
+        if (d.transferencia) totalTransferencia += Number(d.transferencia || 0);
+      }
+
+      // 3. FLUJO DE CAJA (Efectivo Neto)
       if (tipo === 'entrada') {
         const m = Number(tx.amount || 0);
-        totalIngresos += m;
+        totalIngresos += m; // Generic Income
         movimientoNetoEfectivo += m;
       } else if (tipo === 'salida') {
         const m = Number(tx.amount || 0);
-        totalGastos += m;
+        totalGastos += m; // Generic Expense
         movimientoNetoEfectivo -= m;
       } else if (tipo === 'devolucion' || tipo === 'cancelacion') {
+        // Reversal of revenue
         totalEfectivo -= Number(d.efectivo || 0);
         totalTarjeta -= Number(d.tarjeta || 0);
         totalTransferencia -= Number(d.transferencia || 0);
         totalCredito -= Number(d.credito || 0);
 
+        // Physical Cash Impact (Negative)
         let impacto = Number(d.ingresoCaja || tx.amount || 0);
         if (impacto > 0) impacto = -impacto;
         movimientoNetoEfectivo += impacto;
 
-      } else if (tipo === 'venta_contado' || tipo === 'venta') {
+      } else if (tipo === 'venta_contado' || tipo === 'venta' || tipo.startsWith('venta')) {
         const cashIn = Number(d.efectivo || 0);
         const dolaresVal = Number(d.dolares || 0);
         const tasa = Number(d.tasaDolarAlMomento || details.tasaDolar || 1);
         const cashOut = Number(d.cambio || 0);
         const netoFisico = (cashIn + (dolaresVal * tasa)) - cashOut;
-        movimientoNetoEfectivo += netoFisico;
 
-      } else if (tipo === 'ajuste') {
+        // If legacy (no breakdown), use ingresoCaja directly
+        if (!d.efectivo && !d.dolares) {
+          movimientoNetoEfectivo += Number(d.ingresoCaja || 0);
+        } else {
+          movimientoNetoEfectivo += netoFisico;
+        }
+
+      } else if (tipo.includes('abono')) {
+        // Abono Cash Impact
+        if (d.dolares) {
+          movimientoNetoEfectivo += (Number(d.efectivo || 0) + (Number(d.dolares || 0) * Number(details.tasaDolar || 1)));
+        } else {
+          movimientoNetoEfectivo += Number(d.ingresoCaja || 0);
+        }
+      }
+      else if (tipo === 'ajuste') {
         const monto = Number(tx.amount || 0);
         if (d.target === 'efectivo') {
           movimientoNetoEfectivo += monto;

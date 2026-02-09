@@ -130,10 +130,21 @@ const CajaModal = ({
       if (typeof pd === 'string') { try { pd = JSON.parse(pd); } catch { pd = {}; } }
       if (!pd || typeof pd !== 'object') pd = {};
 
+      // 1. CASH IMPACT (Physical Box)
+      // ingresoCaja is the authority on physical money added. If undefined, fallback to tx.amount
       let rawAmount = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
-      if (t === 'salida' || t.includes('devolucion')) rawAmount = -Math.abs(rawAmount); // Salidas son negativas para caja
-      const montoBase = rawAmount;
-      const normalizedTx = { ...tx, pagoDetalles: pd, displayAmount: rawAmount };
+
+      // 2. TOTAL REVENUE IMPACT (Accounting)
+      // totalVenta is the authority on total transaction value. If undefined, fallback to tx.amount.
+      let totalAmount = Number(pd.totalVenta !== undefined ? pd.totalVenta : (tx.amount || 0));
+
+      if (t === 'salida' || t.includes('devolucion')) {
+        rawAmount = -Math.abs(rawAmount); // Physical money leaves
+        totalAmount = -Math.abs(totalAmount); // Revenue reversal
+      }
+
+      const montoBase = rawAmount; // Legacy name for Cash Impact
+      const normalizedTx = { ...tx, pagoDetalles: pd, displayAmount: totalAmount };
 
       // Resolve Client Name for Abonos!
       if (t.includes('abono')) {
@@ -145,75 +156,89 @@ const CajaModal = ({
       const txTransf = Number(pd.transferencia || 0);
       const txCredito = Number(pd.credito || 0);
 
-      // 1. ACUMULAR NO EFECTIVO
+      // --- ACUMULAR NO EFECTIVO (From ANY transaction type that supports it) ---
       if (t.startsWith('venta') || t.includes('abono') || t.includes('pedido')) {
-        tTarjeta += txTarjeta; tTransf += txTransf; tCredito += txCredito;
+        tTarjeta += txTarjeta;
+        tTransf += txTransf;
+        tCredito += txCredito;
+      } else if (t === 'ajuste') {
+        // Ajustes also might have non-cash components
+        if (pd.target === 'tarjeta') tTarjeta += Number(tx.amount || 0);
+        if (pd.target === 'credito') tCredito += Number(tx.amount || 0);
+        if (pd.target === 'transferencia') tTransf += Number(tx.amount || 0);
       }
 
-      // 2. ACUMULAR EFECTIVO FÍSICO
+      // --- ACUMULAR EFECTIVO FÍSICO (Caja) ---
       if (t.startsWith('venta') || t === 'venta_contado' || t === 'venta_mixta' || t === 'venta_credito') {
         if (pd.efectivo !== undefined || pd.dolares !== undefined) {
           netCordobas += (Number(pd.efectivo || 0) - Number(pd.cambio || 0));
           netDolares += Number(pd.dolares || 0);
         } else {
+          // Legacy: if no breakdown, assume rawAmount is net cash
           netCordobas += (montoBase - txTarjeta - txTransf - txCredito);
         }
       } else if (t.includes('abono')) {
-        if (pd.dolares !== undefined) { netDolares += Number(pd.dolares || 0); netCordobas += Number(pd.efectivo || 0); }
-        else { netCordobas += Number(pd.ingresoCaja || 0); }
-      } else if (t === 'entrada') { netCordobas += Math.abs(montoBase); }
-      else if (t === 'salida') { netCordobas -= Math.abs(montoBase); }
-      else if (t.includes('devolucion')) { netCordobas += montoBase; } // montoBase es negativo
+        if (pd.dolares !== undefined) {
+          netDolares += Number(pd.dolares || 0);
+          netCordobas += Number(pd.efectivo || 0);
+        } else {
+          // For Abonos, montoBase (based on ingresoCaja) is the net cash
+          netCordobas += montoBase;
+        }
+      } else if (t === 'entrada') {
+        netCordobas += Math.abs(montoBase);
+      }
+      else if (t === 'salida') {
+        netCordobas -= Math.abs(montoBase);
+      }
+      else if (t.includes('devolucion')) {
+        netCordobas += montoBase; // montoBase is negative
+      }
       else if (t === 'ajuste') {
         if (pd.target === 'efectivo') {
           netCordobas += montoBase;
-          if (pd.hidden) totalHidden += montoBase; // Add to hidden if effective
+          if (pd.hidden) totalHidden += montoBase;
         }
-        if (pd.target === 'credito') {
-          tCredito += montoBase;
-          // If credit adjustment is hidden, we might need to handle it, but main request is cash
-        }
-        if (pd.target === 'tarjeta') {
-          tTarjeta += montoBase;
-        }
-        // Do NOT push to any list, so it remains hidden
       }
-      else { netCordobas += montoBase - txTarjeta - txTransf; }
-
-      // 4. TOTAL VENTAS DEL DIA (CORREGIDO)
-      if (t.startsWith('venta')) {
-        if (pd.totalVenta) tVentasDia += Number(pd.totalVenta);
-        else tVentasDia += (Math.abs(rawAmount) + txTarjeta + txTransf + txCredito);
-      } else if (t === 'ajuste') {
-        // Agregamos el ajuste a Ventas Totales
-        tVentasDia += montoBase;
-      } else if (t.includes('abono') || t === 'entrada') {
-        // FUSIONAR ABONOS Y ENTRADAS EN "VENTAS TOTALES"
-        // Esto elimina el renglón "Otras Entradas de Efectivo"
-        tVentasDia += montoBase;
+      else {
+        // Fallback
+        netCordobas += montoBase - txTarjeta - txTransf;
       }
 
-      // Clasificar
+      // --- TOTAL VENTAS / INGRESOS DEL DIA (Revenue) ---
+      if (t.startsWith('venta') || t.includes('abono') || t === 'entrada') {
+        tVentasDia += Math.abs(totalAmount);
+      }
+      else if (t === 'ajuste') {
+        tVentasDia += totalAmount;
+      }
+
+      // Clasificar Listas
       if (t.startsWith('venta')) cls.ventasContado.push(normalizedTx);
-      else if (t.includes('devolucion')) { cls.devoluciones.push(normalizedTx); sumDevsCancels += Math.abs(montoBase); }
-      else if (t.includes('cancelacion')) { cls.cancelaciones.push(normalizedTx); sumDevsCancels += Math.abs(montoBase); }
+      else if (t.includes('devolucion')) { cls.devoluciones.push(normalizedTx); sumDevsCancels += Math.abs(totalAmount); }
+      else if (t.includes('cancelacion')) { cls.cancelaciones.push(normalizedTx); sumDevsCancels += Math.abs(totalAmount); }
       else if (t === 'entrada') cls.entradas.push(normalizedTx);
       else if (t === 'salida') cls.salidas.push(normalizedTx);
       else if (t.includes('abono')) cls.abonos.push(normalizedTx);
     }
 
+    // Calcular Esperado
+    // Formula: CajaInicial + (VentasTotales - NoEfectivo - Salidas) -> Simplificado: CajaInicial + NetCordobasFisicosCalculados
+    // We already calculated netCordobas strictly based on physical cash movement.
+    const efectivoEsperadoCalc = cajaInicialN + netCordobas + (netDolares * tasaRef);
+
     return {
       cajaInicial: cajaInicialN,
       netCordobas, netDolares,
-      efectivoEsperado: cajaInicialN + netCordobas + (netDolares * tasaRef),
+      efectivoEsperado: efectivoEsperadoCalc,
       efectivoEsperadoCordobas: cajaInicialN + netCordobas,
       efectivoEsperadoDolares: netDolares,
       ventasContado: cls.ventasContado, devoluciones: cls.devoluciones, cancelaciones: cls.cancelaciones, entradas: cls.entradas, salidas: cls.salidas, abonos: cls.abonos,
       totalTarjeta: tTarjeta, totalTransferencia: tTransf, totalCredito: tCredito, totalNoEfectivo: tTarjeta + tTransf + tCredito,
       sumDevolucionesCancelaciones: sumDevsCancels, totalVentasDia: tVentasDia, tasaRef,
-      totalHidden // Export totalHidden
+      totalHidden
     };
-  }, [transactions, session, initialTasaDolar, clients]); // Add clients dependency
+  }, [transactions, session, initialTasaDolar, clients]);
 
   const diferencia = (Number(montoContado || 0) - efectivoEsperado);
   const openedAt = session?.openedAt ? new Date(session.openedAt) : null;
@@ -368,20 +393,11 @@ const CajaModal = ({
                     <tr style={{ borderBottom: '1px solid #f1f1f1' }}><td style={{ padding: 10 }}>Fondo Inicial</td><td className="text-right" style={{ padding: 10, fontWeight: 'bold' }}>{money(cajaInicial)}</td></tr>
 
                     {/* Sección Detallada de Ventas */}
-                    <tr style={{ background: '#f8f9fa' }}><td colSpan="2" style={{ padding: '8px 10px', fontSize: '0.85rem', fontWeight: 'bold', color: '#007bff' }}>RESUMEN DE VENTAS</td></tr>
-                    <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem' }}>(+) Ventas Totales</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem' }}>{money(totalVentasDia)}</td></tr>
+                    {/* Sección Detallada de Ventas */}
+                    <tr style={{ background: '#f8f9fa' }}><td colSpan="2" style={{ padding: '8px 10px', fontSize: '0.85rem', fontWeight: 'bold', color: '#007bff' }}>RESUMEN DE INGRESOS</td></tr>
+                    <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem' }}>(+) Total Ingresos (Ventas + Abonos)</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem' }}>{money(totalVentasDia)}</td></tr>
                     <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem', color: '#dc3545' }}>(-) Tarjetas / Transf / Crédito</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem', color: '#dc3545' }}>- {money(totalNoEfectivo)}</td></tr>
-                    <tr style={{ borderBottom: '1px solid #f1f1f1' }}><td style={{ padding: '4px 10px 10px 20px', fontSize: '0.9rem', fontWeight: 'bold' }}>(=) Efectivo de Ventas</td><td className="text-right" style={{ padding: '4px 10px 10px', fontWeight: 'bold' }}>{money(totalVentasDia - totalNoEfectivo)}</td></tr>
-
-                    {(() => {
-                      const otherIncomeVal = netCordobas - cajaInicial - (totalVentasDia - totalNoEfectivo) + Math.abs(sumDevolucionesCancelaciones);
-                      return Math.abs(otherIncomeVal) > 0.5 && (
-                        <tr style={{ borderBottom: '1px solid #f1f1f1' }}>
-                          <td style={{ padding: 10 }}>Otras Entradas Efectivo</td>
-                          <td className="text-right" style={{ padding: 10, color: '#28a745' }}>+ {money(otherIncomeVal)}</td>
-                        </tr>
-                      );
-                    })()}
+                    <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem', color: '#dc3545' }}>(-) Salidas de Efectivo</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem', color: '#dc3545' }}>- {money(salidas.reduce((a, b) => a + Math.abs(b.displayAmount || 0), 0))}</td></tr>
 
                     <tr style={{ borderBottom: '1px solid #f1f1f1', background: '#e8f5e9' }}><td style={{ padding: 10, fontWeight: 'bold', fontSize: '1.1rem' }}>Esperado en Caja</td><td className="text-right" style={{ padding: 10, fontWeight: 'bold', fontSize: '1.1rem', color: '#146c43' }}>{money(efectivoEsperado)}</td></tr>
                   </tbody>
@@ -435,27 +451,27 @@ const CajaModal = ({
                 </div>
 
                 <div className="section">
-                  <div className="section-title">1. TOTAL VENTAS DÍA</div>
+                  <div className="section-title">1. TOTAL INGRESOS (VENTAS + ABONOS)</div>
                   <div className="row big"><span>TOTAL GLOBAL:</span><span>{money(totalVentasDia)}</span></div>
-                  <div className="row sub">(Efectivo + Tarj. + Transf + Crédito)</div>
+                  <div className="row sub">(Ventas Contado + Crédito + Abonos + Ajustes)</div>
                 </div>
 
                 <div className="section">
-                  <div className="section-title">2. DESGLOSE INGRESOS</div>
-                  <div className="row"><span>(+) Efec. C$:</span><span>{money(netCordobas)}</span></div>
-                  <div className="row"><span>(+) Efec. USD:</span><span>{usd(netDolares)}</span></div>
-                  <div className="row sub">&rarr; Equiv: {money(netDolares * tasaRef)}</div>
-                  {totalTarjeta > 0 && <div className="row" style={{ marginTop: 6 }}><span>(+) Tarjetas:</span><span>{money(totalTarjeta)}</span></div>}
-                  {totalTransferencia > 0 && <div className="row"><span>(+) Transf.:</span><span>{money(totalTransferencia)}</span></div>}
-                  {totalCredito > 0 && <div className="row"><span>(+) Créditos:</span><span>{money(totalCredito)}</span></div>}
+                  <div className="section-title">2. DESGLOSE NO EFECTIVO</div>
+                  {totalTarjeta > 0 && <div className="row"><span>(-) Tarjetas:</span><span>{money(totalTarjeta)}</span></div>}
+                  {totalTransferencia > 0 && <div className="row"><span>(-) Transf.:</span><span>{money(totalTransferencia)}</span></div>}
+                  {totalCredito > 0 && <div className="row"><span>(-) Créditos:</span><span>{money(totalCredito)}</span></div>}
+                  <div className="row" style={{ borderTop: '1px dashed #000' }}><span>TOTAL NO EFECTIVO:</span><span>{money(totalNoEfectivo)}</span></div>
                 </div>
 
                 <div className="section">
-                  <div className="section-title">3. FLUJO CAJA</div>
+                  <div className="section-title">3. FLUJO EFECTIVO (RESUMEN)</div>
                   <div className="row"><span>Fondo Inicial:</span><span>{money(cajaInicial)}</span></div>
-                  {abonos.length > 0 && <div className="row"><span>(+) Abonos:</span><span>{money(abonos.reduce((s, t) => s + (t.amount || 0), 0))}</span></div>}
-                  {entradas.length > 0 && <div className="row"><span>(+) Entradas:</span><span>{money(entradas.reduce((s, t) => s + (t.amount || 0), 0))}</span></div>}
-                  <div className="row"><span>(-) Salidas/Dev:</span><span>{money(sumDevolucionesCancelaciones + Math.abs(salidas.reduce((s, t) => s + (t.amount || 0), 0)))}</span></div>
+                  <div className="row"><span>(+) Ingresos Totales:</span><span>{money(totalVentasDia)}</span></div>
+                  <div className="row"><span>(-) No Efectivo:</span><span>-{money(totalNoEfectivo)}</span></div>
+                  {Math.abs(salidas.reduce((s, t) => s + Math.abs(t.displayAmount || 0), 0)) > 0 && (
+                    <div className="row"><span>(-) Salidas:</span><span>-{money(salidas.reduce((s, t) => s + Math.abs(t.displayAmount || 0), 0))}</span></div>
+                  )}
                 </div>
 
                 <div className="section">
