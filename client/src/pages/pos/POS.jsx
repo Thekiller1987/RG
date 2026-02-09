@@ -1193,6 +1193,7 @@ const POS = () => {
       <S.MobileCartToggle onClick={() => setIsMobileCartOpen(true)}>
         <span>🛒 Carrito ({cart.length})</span>
         <span style={{ fontWeight: 'bold' }}>C$ {fmt(total)}</span>
+      </S.MobileCartToggle>
     </S.PageWrapper>
   );
 };
