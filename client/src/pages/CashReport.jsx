@@ -232,6 +232,9 @@ function calculateReportStats(session) {
         netCordobas += rawAmount;
         if (pd.hidden) totalHidden += rawAmount;
       }
+      if (pd.target === 'dolares') {
+        netDolares += rawAmount;
+      }
     }
     else {
       // Default: Si no es un tipo específico, asumimos que el rawAmount es el impacto en efectivo

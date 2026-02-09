@@ -199,6 +199,11 @@ const CajaModal = ({
           netCordobas += montoBase;
           if (pd.hidden) totalHidden += montoBase;
         }
+        if (pd.target === 'dolares') {
+          netDolares += montoBase; // Add to Net Dollars
+          // We don't track hidden dollars separately yet for "Other Income" derived calc, 
+          // but sticking to C$ for squares is usually enough. 
+        }
       }
       else {
         // Fallback

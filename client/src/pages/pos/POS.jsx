@@ -53,9 +53,62 @@ const POS = () => {
 
   // ... (Calculations)
 
+  // Calculate Current Stats for Secret Modal
+  const currentStats = useMemo(() => {
+    if (!cajaSession?.transactions) return { netCordobas: 0, netDolares: 0 };
+    let netC = 0, netD = 0;
+    const txs = cajaSession.transactions;
+    const initial = Number(cajaSession.initialAmount || 0);
+
+    // Start with initial? Actually expected usually includes initial. 
+    // The user wants to match "What is inside the box". The box includes Initial + Sales.
+    // So yes, include initial.
+    netC += initial;
+
+    for (const tx of txs) {
+      const t = (tx.type || '').toLowerCase();
+      let pd = tx.pagoDetalles || {};
+      if (typeof pd === 'string') { try { pd = JSON.parse(pd); } catch { pd = {}; } }
+
+      let rawAmount = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
+      if (t === 'salida' || t.includes('devolucion')) rawAmount = -Math.abs(rawAmount);
+
+      // Same logic as CajaModal for CASH
+      if (t.startsWith('venta')) {
+        if (pd.efectivo !== undefined || pd.dolares !== undefined) {
+          netC += (Number(pd.efectivo || 0) - Number(pd.cambio || 0));
+          netD += Number(pd.dolares || 0);
+        } else {
+          netC += (rawAmount - Number(pd.tarjeta || 0) - Number(pd.transferencia || 0) - Number(pd.credito || 0));
+        }
+      } else if (t.includes('abono')) {
+        if (pd.dolares !== undefined) {
+          netD += Number(pd.dolares || 0);
+          netC += Number(pd.efectivo || 0);
+        } else {
+          netC += rawAmount;
+        }
+      } else if (t === 'entrada') {
+        netC += Math.abs(rawAmount);
+      } else if (t === 'salida') {
+        netC -= Math.abs(rawAmount);
+      } else if (t === 'ajuste') {
+        if (pd.target === 'efectivo') netC += Number(tx.amount || 0);
+        if (pd.target === 'dolares') netD += Number(tx.amount || 0);
+      } else {
+        netC += rawAmount;
+      }
+    }
+    return { netCordobas: netC, netDolares: netD };
+  }, [cajaSession]);
+
   const handleSecretTrigger = () => {
     openModal('pinPrompt', {
-      action: () => setSecretModalOpen(true)
+      action: () => {
+        setSecretModalOpen(true);
+        // Pass stats via a separate state or just rely on the modal using the prop if I render it conditionally
+        // Actually, SecretAdjustModal is rendered below with explicit props. I just need to pass currentStats there.
+      }
     });
   };
 
@@ -73,6 +126,7 @@ const POS = () => {
           hidden: true,
           amount: adj.amount,
           efectivo: adj.target === 'efectivo' ? adj.amount : 0,
+          dolares: adj.target === 'dolares' ? adj.amount : 0,
           credito: adj.target === 'credito' ? adj.amount : 0,
           tarjeta: adj.target === 'tarjeta' ? adj.amount : 0
         },
@@ -1124,20 +1178,21 @@ const POS = () => {
           />
         )}
 
-        <SecretAdjustModal
-          isOpen={secretModalOpen}
-          onClose={() => setSecretModalOpen(false)}
-          session={cajaSession}
-          onConfirm={handleSecretAdjust}
-        />
-
+        {secretModalOpen && (
+          <SecretAdjustModal
+            isOpen={true}
+            onClose={() => setSecretModalOpen(false)}
+            session={cajaSession}
+            currentStats={currentStats}
+            onConfirm={handleSecretAdjust}
+          />
+        )}
       </AnimatePresence>
 
       {/* Botón flotante para móviles */}
       <S.MobileCartToggle onClick={() => setIsMobileCartOpen(true)}>
         <span>🛒 Carrito ({cart.length})</span>
         <span style={{ fontWeight: 'bold' }}>C$ {fmt(total)}</span>
-      </S.MobileCartToggle>
     </S.PageWrapper>
   );
 };
