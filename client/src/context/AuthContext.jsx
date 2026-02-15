@@ -26,7 +26,9 @@ export const AuthProvider = ({ children, socket }) => {
         navigate('/login');
     }, [navigate]);
 
-    const loadMasterData = useCallback(async (token) => {
+    const CACHE_KEY = 'masterDataCache';
+
+    const loadMasterData = useCallback(async (token, useBackground = false) => {
         try {
             const results = await Promise.allSettled([
                 api.fetchUsers(token),
@@ -35,14 +37,29 @@ export const AuthProvider = ({ children, socket }) => {
             ]);
 
             // Cada uno se procesa individualmente — si uno falla, los demás aún cargan
-            if (results[0].status === 'fulfilled') setAllUsers(results[0].value || []);
+            const newUsers = results[0].status === 'fulfilled' ? (results[0].value || []) : null;
+            const newProducts = results[1].status === 'fulfilled' ? (results[1].value || []) : null;
+            const newClients = results[2].status === 'fulfilled' ? (results[2].value || []) : null;
+
+            if (newUsers) setAllUsers(newUsers);
             else console.warn("⚠️ No se pudieron cargar usuarios:", results[0].reason?.message);
 
-            if (results[1].status === 'fulfilled') setProducts(results[1].value || []);
+            if (newProducts) setProducts(newProducts);
             else console.warn("⚠️ No se pudieron cargar productos:", results[1].reason?.message);
 
-            if (results[2].status === 'fulfilled') setClients(results[2].value || []);
+            if (newClients) setClients(newClients);
             else console.warn("⚠️ No se pudieron cargar clientes:", results[2].reason?.message);
+
+            // Guardar en caché local para carga instantánea futura
+            try {
+                const cacheData = {
+                    users: newUsers || [],
+                    products: newProducts || [],
+                    clients: newClients || [],
+                    timestamp: Date.now()
+                };
+                localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+            } catch (e) { /* localStorage lleno — ignorar */ }
 
             // Si TODOS fallaron con 401, hacer logout
             const allUnauth = results.every(r => r.status === 'rejected' && r.reason?.status === 401);
@@ -52,6 +69,21 @@ export const AuthProvider = ({ children, socket }) => {
             if (err.status === 401) logout();
         }
     }, [logout]);
+
+    // Cargar datos desde caché local (instantáneo)
+    const loadFromCache = useCallback(() => {
+        try {
+            const cached = localStorage.getItem(CACHE_KEY);
+            if (cached) {
+                const data = JSON.parse(cached);
+                if (data.users?.length) setAllUsers(data.users);
+                if (data.products?.length) setProducts(data.products);
+                if (data.clients?.length) setClients(data.clients);
+                return true; // Caché encontrada
+            }
+        } catch (e) { /* caché corrupta */ }
+        return false; // Sin caché
+    }, []);
 
     const refreshProducts = useCallback(async () => {
         if (!token) return;
@@ -132,17 +164,31 @@ export const AuthProvider = ({ children, socket }) => {
                         const parsedUser = JSON.parse(storedUser);
                         setUser(parsedUser);
                         setToken(tokenInStorage);
-                        await loadMasterData(tokenInStorage);
+
+                        // 1. CARGAR DESDE CACHÉ = INSTANTÁNEO (< 10ms)
+                        const hadCache = loadFromCache();
+
+                        if (hadCache) {
+                            // Tenemos datos en caché — mostrar el app INMEDIATAMENTE
+                            setIsLoading(false);
+                            // 2. Refrescar en segundo plano sin bloquear UI
+                            loadMasterData(tokenInStorage, true).catch(console.warn);
+                        } else {
+                            // Sin caché — primera vez, hay que esperar
+                            await loadMasterData(tokenInStorage);
+                            setIsLoading(false);
+                        }
                     } catch (error) {
                         logout();
                     }
                 }
             } finally {
-                setIsLoading(false);
+                // Failsafe: si algo salió mal, asegurar que loading se apague
+                setIsLoading(prev => prev ? false : prev);
             }
         };
         initializeAuth();
-    }, [logout, loadMasterData]);
+    }, [logout, loadMasterData, loadFromCache]);
 
     const login = async (userData, token) => {
         localStorage.setItem('token', token);
