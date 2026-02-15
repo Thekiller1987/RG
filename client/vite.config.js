@@ -56,8 +56,27 @@ export default defineConfig({
             output: {
                 entryFileNames: 'assets/[name].[hash].js',
                 chunkFileNames: 'assets/[name].[hash].js',
-                assetFileNames: 'assets/[name].[hash].[ext]'
+                assetFileNames: 'assets/[name].[hash].[ext]',
+                manualChunks(id) {
+                    if (id.includes('node_modules')) {
+                        // Separar React y React DOM para caché eficiente
+                        if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+                            return 'react-vendor';
+                        }
+                        // Separar librerías de gráficos si son pesadas
+                        if (id.includes('recharts') || id.includes('chart.js')) {
+                            return 'charts-vendor';
+                        }
+                        // Separar iconos si son muchos
+                        if (id.includes('react-icons')) {
+                            return 'icons-vendor';
+                        }
+                        // Resto de node_modules en un chunk separado
+                        return 'vendor';
+                    }
+                }
             }
-        }
+        },
+        chunkSizeWarningLimit: 1000 // Aumentar límite de advertencia a 1MB
     }
 });
