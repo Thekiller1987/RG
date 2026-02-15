@@ -920,7 +920,8 @@ const DetailedSalesReport = () => {
                                                 <td className="num">{fmtMoney(h.precioUnitario)}</td>
                                                 <td className="num" style={{ fontWeight: 700 }}>{fmtMoney(h.cantidad * h.precioUnitario)}</td>
                                             </tr>
-                                        ))}
+                                        ))
+                                    )}
                                 </tbody>
                             </Table>
                         </div>
