@@ -304,6 +304,58 @@ const LoadingOverlay = styled.div`
   font-size: 1rem;
 `;
 
+/* ================== MOBILE STYLES ================== */
+const MobileGrid = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-bottom: 2rem;
+`;
+
+const MobileCard = styled.div`
+  background: white;
+  border-radius: 12px;
+  padding: 1.25rem;
+  border: 1px solid ${theme.border};
+  box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  animation: ${fadeIn} 0.3s ease;
+`;
+
+const MobileRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  
+  .label { font-size: 0.75rem; color: ${theme.textLight}; font-weight: 600; text-transform: uppercase; }
+  .value { font-size: 0.95rem; font-weight: 600; color: ${theme.text}; }
+  .price { font-family: 'Roboto Mono', monospace; font-size: 1.1rem; color: ${theme.primary}; }
+`;
+
+const MobileItems = styled.div`
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  border: 1px dashed ${theme.border};
+`;
+
+const useIsMobile = () => {
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    useEffect(() => {
+        const h = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', h);
+        return () => window.removeEventListener('resize', h);
+    }, []);
+    return isMobile;
+};
+
 // Helper for badge styles
 const getBadgeStyles = (type) => {
     switch (type) {
@@ -332,6 +384,7 @@ const Badge = ({ type, children }) => {
 export default function DetailedSalesReport() {
     const { token, products: allProducts } = useAuth(); // Use products from Context for instant access
     const navigate = useNavigate();
+    const isMobile = useIsMobile();
 
     const [activeTab, setActiveTab] = useState('ventas');
     const [startDate, setStartDate] = useState(todayManagua());
@@ -344,6 +397,7 @@ export default function DetailedSalesReport() {
 
     // Product Mode State
     const [searchTerm, setSearchTerm] = useState('');
+    const [reportKeyword, setReportKeyword] = useState(''); // Global keyword for "Búsqueda por Palabra"
     const [productResult, setProductResult] = useState(null); // Selected product history
     const [productLoading, setProductLoading] = useState(false);
 
@@ -354,11 +408,13 @@ export default function DetailedSalesReport() {
     }, [token]);
 
     // Fetch sales based on tab
-    const fetchSales = useCallback(async (tipo) => {
+    const fetchSales = useCallback(async (tipo, keywordSearch) => {
         setLoading(true);
         try {
             const params = { startDate, endDate };
             if (tipo) params.tipo = tipo;
+            if (keywordSearch) params.keyword = keywordSearch;
+
             const res = await axios.get(`${API_URL}/reports/detailed-sales`, { headers: authHeader, params });
             setSales(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
@@ -373,7 +429,8 @@ export default function DetailedSalesReport() {
     useEffect(() => {
         if (activeTab === 'ventas') fetchSales();
         else if (activeTab === 'devoluciones') fetchSales('DEVOLUCION');
-    }, [activeTab, startDate, endDate, fetchSales]);
+        else if (activeTab === 'busqueda' && reportKeyword.trim().length >= 3) fetchSales(null, reportKeyword);
+    }, [activeTab, startDate, endDate, fetchSales, reportKeyword]);
 
     // Derived state for Product List (filtered)
     const filteredProducts = useMemo(() => {
@@ -554,29 +611,50 @@ export default function DetailedSalesReport() {
                 <Tab active={activeTab === 'ventas'} onClick={() => setActiveTab('ventas')}>
                     <FaShoppingCart /> Ventas Detalladas
                 </Tab>
-                <Tab active={activeTab === 'devoluciones'} onClick={() => setActiveTab('devoluciones')}>
-                    <FaUndoAlt /> Devoluciones
+                <Tab active={activeTab === 'busqueda'} onClick={() => setActiveTab('busqueda')}>
+                    <FaSearch /> Búsqueda por Palabra
                 </Tab>
                 <Tab active={activeTab === 'producto'} onClick={() => setActiveTab('producto')}>
                     <FaBarcode /> Buscar por Producto
                 </Tab>
             </TabBar>
 
-            {(activeTab === 'ventas' || activeTab === 'devoluciones') && (
+            {(activeTab === 'ventas' || activeTab === 'devoluciones' || activeTab === 'busqueda') && (
                 <>
                     <FilterBar>
                         <FaCalendarAlt style={{ color: theme.primary }} />
                         <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
                         <span style={{ color: theme.textLight }}>a</span>
                         <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
-                        <ActionBtn variant="primary" onClick={() => activeTab === 'ventas' ? fetchSales() : fetchSales('DEVOLUCION')}>
-                            <FaSyncAlt /> Buscar
+
+                        {activeTab === 'busqueda' && (
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                <FaSearch style={{ position: 'absolute', left: '10px', color: theme.textLight }} />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar palabra..."
+                                    value={reportKeyword}
+                                    onChange={e => setReportKeyword(e.target.value)}
+                                    style={{ paddingLeft: '35px', minWidth: '180px' }}
+                                />
+                            </div>
+                        )}
+
+                        <ActionBtn variant="primary" onClick={() => {
+                            if (activeTab === 'ventas') fetchSales();
+                            else if (activeTab === 'devoluciones') fetchSales('DEVOLUCION');
+                            else if (activeTab === 'busqueda') fetchSales(null, reportKeyword);
+                        }}>
+                            <FaSyncAlt /> {activeTab === 'busqueda' ? 'Buscar' : 'Actualizar'}
                         </ActionBtn>
                     </FilterBar>
 
                     <SummaryCards>
                         <SummaryCard color={theme.primary}>
-                            <div className="label">Total {activeTab === 'devoluciones' ? 'Devoluciones' : 'Ventas'}</div>
+                            <div className="label">
+                                {activeTab === 'busqueda' ? `Ventas con "${reportKeyword}"` :
+                                    activeTab === 'devoluciones' ? 'Total Devoluciones' : 'Total Ventas'}
+                            </div>
                             <div className="value">{fmtMoney(totalVentas)}</div>
                         </SummaryCard>
                         <SummaryCard color={theme.info}>
@@ -594,9 +672,63 @@ export default function DetailedSalesReport() {
                     ) : sales.length === 0 ? (
                         <EmptyState>
                             <FaFileInvoice />
-                            <p>No se encontraron {activeTab === 'devoluciones' ? 'devoluciones' : 'ventas'} en este rango de fechas.</p>
+                            <p>
+                                {activeTab === 'busqueda'
+                                    ? `No se encontraron resultados para "${reportKeyword}"`
+                                    : `No se encontraron ${activeTab === 'devoluciones' ? 'devoluciones' : 'ventas'} en este rango.`
+                                }
+                            </p>
                         </EmptyState>
+                    ) : isMobile ? (
+                        /* ================== MOBILE VIEW (Ventas/Devoluciones/Busqueda) ================== */
+                        <MobileGrid>
+                            {sales.map(sale => (
+                                <MobileCard key={sale.id}>
+                                    <MobileRow>
+                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                            <span style={{ fontWeight: 700, color: theme.info }}>#{sale.id}</span>
+                                            <Badge type={sale.estado}>{sale.estado}</Badge>
+                                        </div>
+                                        <div className="price">{fmtMoney(sale.totalVenta)}</div>
+                                    </MobileRow>
+
+                                    <MobileRow>
+                                        <div className="label">Fecha</div>
+                                        <div className="value">{fmtDT(sale.fecha)}</div>
+                                    </MobileRow>
+
+                                    <MobileRow>
+                                        <div className="label">Cliente</div>
+                                        <div className="value">{sale.clienteNombre || 'Público General'}</div>
+                                    </MobileRow>
+
+                                    <MobileItems>
+                                        <div className="label" style={{ marginBottom: '4px', display: 'block' }}>Productos</div>
+                                        {sale.items?.map((item, i) => {
+                                            const isMatch = activeTab === 'busqueda' && reportKeyword && item.nombre.toLowerCase().includes(reportKeyword.toLowerCase());
+                                            return (
+                                                <div key={i} style={{
+                                                    display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem',
+                                                    background: isMatch ? '#fef9c3' : 'transparent',
+                                                    padding: isMatch ? '2px 4px' : '0',
+                                                    borderRadius: '4px',
+                                                    border: isMatch ? `1px dashed #facc15` : 'none'
+                                                }}>
+                                                    <span>{item.nombre} (x{item.quantity})</span>
+                                                    <span style={{ fontWeight: 600 }}>{fmtMoney(item.precio * item.quantity)}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </MobileItems>
+
+                                    <div style={{ fontSize: '0.75rem', color: theme.textLight, marginTop: '4px' }}>
+                                        <strong>Vendedor:</strong> {sale.vendedorNombre || '—'} | <strong>Pago:</strong> {getPaymentMethod(sale.pagoDetalles)}
+                                    </div>
+                                </MobileCard>
+                            ))}
+                        </MobileGrid>
                     ) : (
+                        /* ================== DESKTOP VIEW (Ventas/Devoluciones/Busqueda) ================== */
                         <Table>
                             <thead>
                                 <tr>
@@ -604,8 +736,7 @@ export default function DetailedSalesReport() {
                                     <th>Fecha / Hora</th>
                                     <th>Estado</th>
                                     <th>Cliente</th>
-                                    <th>Vendedor</th>
-                                    <th>Productos</th>
+                                    <th style={{ width: '30%' }}>Productos</th>
                                     <th>Forma de Pago</th>
                                     <th className="num">Total</th>
                                 </tr>
@@ -614,41 +745,43 @@ export default function DetailedSalesReport() {
                                 {sales.map(sale => {
                                     const isExpanded = expandedRows[sale.id];
                                     const items = sale.items || [];
-                                    const showItems = isExpanded ? items : items.slice(0, 2);
+                                    const showItems = isExpanded ? items : items.slice(0, 3);
                                     return (
                                         <tr key={sale.id}>
                                             <td style={{ fontWeight: 600, color: theme.info }}>#{sale.id}</td>
                                             <td style={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{fmtDT(sale.fecha)}</td>
                                             <td><Badge type={sale.estado}>{sale.estado}</Badge></td>
                                             <td>
-                                                {sale.clienteNombre ? (
-                                                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                        <FaUser style={{ color: theme.textLight, fontSize: '0.7rem' }} />
-                                                        {sale.clienteNombre}
-                                                    </span>
-                                                ) : <span style={{ color: theme.textLight }}>Público General</span>}
+                                                <div style={{ fontSize: '0.9rem' }}>{sale.clienteNombre || <span style={{ color: theme.textLight }}>Público Gral.</span>}</div>
+                                                <div style={{ fontSize: '0.75rem', color: theme.textLight }}>Vendedor: {sale.vendedorNombre || '—'}</div>
                                             </td>
-                                            <td style={{ fontSize: '0.85rem' }}>{sale.vendedorNombre || '—'}</td>
                                             <td>
                                                 <ItemsList>
-                                                    {showItems.map((item, i) => (
-                                                        <div className="item-row" key={i}>
-                                                            <span className="item-name">{item.nombre || '—'}</span>
-                                                            <span className="item-qty">x{item.quantity}</span>
-                                                            <span className="item-price">{fmtMoney(item.precio * item.quantity)}</span>
-                                                        </div>
-                                                    ))}
-                                                    {items.length > 2 && (
+                                                    {showItems.map((item, i) => {
+                                                        const isMatch = activeTab === 'busqueda' && reportKeyword && item.nombre.toLowerCase().includes(reportKeyword.toLowerCase());
+                                                        return (
+                                                            <div className="item-row" key={i} style={{
+                                                                background: isMatch ? '#fef9c3' : 'transparent',
+                                                                padding: isMatch ? '2px 4px' : '0',
+                                                                borderRadius: '4px'
+                                                            }}>
+                                                                <span className="item-name">{item.nombre || '—'}</span>
+                                                                <span className="item-qty">x{item.quantity}</span>
+                                                                <span className="item-price">{fmtMoney(item.precio * item.quantity)}</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {items.length > 3 && (
                                                         <ExpandBtn onClick={() => toggleExpand(sale.id)}>
-                                                            {isExpanded ? <><FaChevronUp /> Menos</> : <><FaChevronDown /> +{items.length - 2} más</>}
+                                                            {isExpanded ? <><FaChevronUp /> Menos</> : <><FaChevronDown /> +{items.length - 3} más</>}
                                                         </ExpandBtn>
                                                     )}
                                                 </ItemsList>
                                             </td>
-                                            <td style={{ fontSize: '0.82rem', color: theme.secondary, maxWidth: 200 }}>
+                                            <td style={{ fontSize: '0.82rem', color: theme.secondary }}>
                                                 {getPaymentMethod(sale.pagoDetalles)}
                                             </td>
-                                            <td className="num" style={{ fontWeight: 700, fontSize: '1rem' }}>
+                                            <td className="num" style={{ fontWeight: 700, fontSize: '1.1rem' }}>
                                                 {fmtMoney(sale.totalVenta)}
                                             </td>
                                         </tr>
@@ -666,11 +799,11 @@ export default function DetailedSalesReport() {
                         /* ================== PRODUCT LIST VIEW ================== */
                         <>
                             <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '10px' }}>
-                                <div style={{ position: 'relative', flex: 1, maxWidth: '600px' }}>
+                                <div style={{ position: 'relative', flex: 1, maxWidth: isMobile ? '100%' : '600px' }}>
                                     <FaSearch style={{ position: 'absolute', left: '12px', top: '14px', color: theme.textLight }} />
                                     <input
                                         type="text"
-                                        placeholder="Filtrar productos por nombre o código..."
+                                        placeholder="Filtrar por nombre o código..."
                                         value={searchTerm}
                                         onChange={e => setSearchTerm(e.target.value)}
                                         autoFocus
@@ -685,44 +818,70 @@ export default function DetailedSalesReport() {
                                 </div>
                             </div>
 
-                            <Table clickable={true}>
-                                <thead>
-                                    <tr>
-                                        <th>Código</th>
-                                        <th>Nombre</th>
-                                        <th className="center">Existencia</th>
-                                        <th className="num">Precio</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredProducts.slice(0, 100).map(p => (
-                                        <tr key={p.id_producto} onClick={() => fetchProductHistory(p)}>
-                                            <td style={{ fontWeight: 600, color: theme.primary }}>{p.codigo}</td>
-                                            <td>{p.nombre}</td>
-                                            <td className="center">
-                                                <span style={{
-                                                    padding: '2px 8px', borderRadius: '4px', fontWeight: 600, fontSize: '0.8rem',
-                                                    background: p.existencia > 0 ? '#dcfce7' : '#fee2e2',
-                                                    color: p.existencia > 0 ? '#166534' : '#991b1b'
-                                                }}>
-                                                    {p.existencia}
-                                                </span>
-                                            </td>
-                                            <td className="num">{fmtMoney(p.precio)}</td>
-                                        </tr>
+                            {isMobile ? (
+                                <MobileGrid>
+                                    {filteredProducts.slice(0, 50).map(p => (
+                                        <MobileCard key={p.id_producto} onClick={() => fetchProductHistory(p)} style={{ cursor: 'pointer' }}>
+                                            <MobileRow>
+                                                <div className="value" style={{ color: theme.info }}>{p.codigo}</div>
+                                                <div className="price">{fmtMoney(p.precio)}</div>
+                                            </MobileRow>
+                                            <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>{p.nombre}</div>
+                                            <MobileRow>
+                                                <div className="label">Stock</div>
+                                                <div className="value">
+                                                    <span style={{
+                                                        padding: '2px 8px', borderRadius: '4px', fontWeight: 600, fontSize: '0.8rem',
+                                                        background: p.existencia > 0 ? '#dcfce7' : '#fee2e2',
+                                                        color: p.existencia > 0 ? '#166534' : '#991b1b'
+                                                    }}>
+                                                        {p.existencia}
+                                                    </span>
+                                                </div>
+                                            </MobileRow>
+                                        </MobileCard>
                                     ))}
-                                    {filteredProducts.length === 0 && (
+                                </MobileGrid>
+                            ) : (
+                                <Table clickable={true}>
+                                    <thead>
                                         <tr>
-                                            <td colSpan="4" className="center" style={{ padding: '2rem' }}>
-                                                No se encontraron productos.
-                                            </td>
+                                            <th>Código</th>
+                                            <th>Nombre</th>
+                                            <th className="center">Existencia</th>
+                                            <th className="num">Precio</th>
                                         </tr>
-                                    )}
-                                </tbody>
-                            </Table>
-                            {filteredProducts.length > 100 && (
+                                    </thead>
+                                    <tbody>
+                                        {filteredProducts.slice(0, 100).map(p => (
+                                            <tr key={p.id_producto} onClick={() => fetchProductHistory(p)}>
+                                                <td style={{ fontWeight: 600, color: theme.primary }}>{p.codigo}</td>
+                                                <td>{p.nombre}</td>
+                                                <td className="center">
+                                                    <span style={{
+                                                        padding: '2px 8px', borderRadius: '4px', fontWeight: 600, fontSize: '0.8rem',
+                                                        background: p.existencia > 0 ? '#dcfce7' : '#fee2e2',
+                                                        color: p.existencia > 0 ? '#166534' : '#991b1b'
+                                                    }}>
+                                                        {p.existencia}
+                                                    </span>
+                                                </td>
+                                                <td className="num">{fmtMoney(p.precio)}</td>
+                                            </tr>
+                                        ))}
+                                        {filteredProducts.length === 0 && (
+                                            <tr>
+                                                <td colSpan="4" className="center" style={{ padding: '2rem' }}>
+                                                    No se encontraron productos.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </Table>
+                            )}
+                            {filteredProducts.length > (isMobile ? 50 : 100) && (
                                 <div style={{ textAlign: 'center', marginTop: '1rem', color: theme.textLight, fontSize: '0.9rem' }}>
-                                    Mostrando 100 de {filteredProducts.length} productos. Refina tu búsqueda para ver más.
+                                    Mostrando {isMobile ? 50 : 100} de {filteredProducts.length} productos. Refina tu búsqueda.
                                 </div>
                             )}
                         </>
@@ -751,6 +910,33 @@ export default function DetailedSalesReport() {
                                     <FaBoxOpen />
                                     <p>Este producto no tiene historial de ventas reciente.</p>
                                 </EmptyState>
+                            ) : isMobile ? (
+                                <MobileGrid>
+                                    {productResult.history.map((h, i) => (
+                                        <MobileCard key={i}>
+                                            <MobileRow>
+                                                <div className="value" style={{ color: theme.info }}>Doc #{h.idVenta}</div>
+                                                <Badge type={h.tipo_venta}>{h.tipo_venta}</Badge>
+                                            </MobileRow>
+                                            <MobileRow>
+                                                <div className="label">Fecha</div>
+                                                <div className="value">{fmtDT(h.fecha)}</div>
+                                            </MobileRow>
+                                            <MobileRow>
+                                                <div className="label">Cliente</div>
+                                                <div className="value">{h.clienteNombre || 'Público'}</div>
+                                            </MobileRow>
+                                            <MobileRow>
+                                                <div className="label">Cant. x Precio</div>
+                                                <div className="value">{h.cantidad} x {fmtMoney(h.precioUnitario)}</div>
+                                            </MobileRow>
+                                            <MobileRow>
+                                                <div className="label">Subtotal</div>
+                                                <div className="price">{fmtMoney(h.cantidad * h.precioUnitario)}</div>
+                                            </MobileRow>
+                                        </MobileCard>
+                                    ))}
+                                </MobileGrid>
                             ) : (
                                 <Table>
                                     <thead>

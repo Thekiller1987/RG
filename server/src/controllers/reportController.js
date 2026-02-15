@@ -147,7 +147,7 @@ const getSalesChartReport = async (req, res) => {
 
 // --- OBTENER VENTAS DETALLADAS CON PRODUCTOS, CLIENTES, VENDEDORES ---
 const getDetailedSales = async (req, res) => {
-    const { startDate, endDate, tipo } = req.query;
+    const { startDate, endDate, tipo, keyword } = req.query;
     if (!startDate || !endDate) return res.status(400).json({ msg: 'Fechas requeridas.' });
     try {
         const { from, to } = getDateRange(startDate, endDate);
@@ -159,6 +159,19 @@ const getDetailedSales = async (req, res) => {
             tipoFilter = ` AND v.estado = 'COMPLETADA'`;
         } else if (tipo === 'CANCELADA') {
             tipoFilter = ` AND v.estado = 'CANCELADA'`;
+        }
+
+        let keywordFilter = '';
+        const params = [from, to];
+
+        if (keyword && keyword.trim() !== '') {
+            keywordFilter = ` AND EXISTS (
+                SELECT 1 FROM detalle_ventas dv2
+                JOIN productos p2 ON dv2.id_producto = p2.id_producto
+                WHERE dv2.id_venta = v.id_venta
+                AND (p2.nombre LIKE ? OR p2.codigo LIKE ?)
+            )`;
+            params.push(`%${keyword}%`, `%${keyword}%`);
         }
 
         // OPTIMIZACIÓN: Rango directo en 'fecha' usa índice.
@@ -181,9 +194,10 @@ const getDetailedSales = async (req, res) => {
             LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
             WHERE v.fecha >= ? AND v.fecha <= ?
             ${tipoFilter}
+            ${keywordFilter}
             ORDER BY v.fecha DESC
             LIMIT 500
-        `, [from, to]);
+        `, params);
 
         if (!sales.length) return res.json([]);
 
