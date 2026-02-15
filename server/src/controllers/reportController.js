@@ -147,7 +147,7 @@ const getSalesChartReport = async (req, res) => {
 
 // --- OBTENER VENTAS DETALLADAS CON PRODUCTOS, CLIENTES, VENDEDORES ---
 const getDetailedSales = async (req, res) => {
-    const { startDate, endDate, tipo, keyword } = req.query;
+    const { startDate, endDate, tipo, keyword, clientId } = req.query;
     if (!startDate || !endDate) return res.status(400).json({ msg: 'Fechas requeridas.' });
     try {
         const { from, to } = getDateRange(startDate, endDate);
@@ -162,7 +162,13 @@ const getDetailedSales = async (req, res) => {
         }
 
         let keywordFilter = '';
+        let clientFilter = '';
         const params = [from, to];
+
+        if (clientId) {
+            clientFilter = ` AND v.id_cliente = ?`;
+            params.push(clientId);
+        }
 
         if (keyword && keyword.trim() !== '') {
             keywordFilter = ` AND EXISTS (
@@ -194,6 +200,7 @@ const getDetailedSales = async (req, res) => {
             LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
             WHERE v.fecha >= ? AND v.fecha <= ?
             ${tipoFilter}
+            ${clientFilter}
             ${keywordFilter}
             ORDER BY v.fecha DESC
             LIMIT 500

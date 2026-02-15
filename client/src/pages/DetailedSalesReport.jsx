@@ -398,6 +398,9 @@ export default function DetailedSalesReport() {
     // Product Mode State
     const [searchTerm, setSearchTerm] = useState('');
     const [reportKeyword, setReportKeyword] = useState(''); // Global keyword for "Búsqueda por Palabra"
+    const [reportClient, setReportClient] = useState(null);
+    const [showClientList, setShowClientList] = useState(false);
+    const [clientSearch, setClientSearch] = useState('');
     const [productResult, setProductResult] = useState(null); // Selected product history
     const [productLoading, setProductLoading] = useState(false);
 
@@ -408,12 +411,13 @@ export default function DetailedSalesReport() {
     }, [token]);
 
     // Fetch sales based on tab
-    const fetchSales = useCallback(async (tipo, keywordSearch) => {
+    const fetchSales = useCallback(async (tipo, keywordSearch, clientId) => {
         setLoading(true);
         try {
             const params = { startDate, endDate };
             if (tipo) params.tipo = tipo;
             if (keywordSearch) params.keyword = keywordSearch;
+            if (clientId) params.clientId = clientId;
 
             const res = await axios.get(`${API_URL}/reports/detailed-sales`, { headers: authHeader, params });
             setSales(Array.isArray(res.data) ? res.data : []);
@@ -427,10 +431,10 @@ export default function DetailedSalesReport() {
 
     // Auto-fetch sales when tab changes
     useEffect(() => {
-        if (activeTab === 'ventas') fetchSales();
+        if (activeTab === 'ventas') fetchSales(null, null, reportClient?.id_cliente);
         else if (activeTab === 'devoluciones') fetchSales('DEVOLUCION');
         else if (activeTab === 'busqueda' && reportKeyword.trim().length >= 3) fetchSales(null, reportKeyword);
-    }, [activeTab, startDate, endDate, fetchSales, reportKeyword]);
+    }, [activeTab, startDate, endDate, fetchSales, reportKeyword, reportClient]);
 
     // Derived state for Product List (filtered)
     const filteredProducts = useMemo(() => {
@@ -627,6 +631,53 @@ export default function DetailedSalesReport() {
                         <span style={{ color: theme.textLight }}>a</span>
                         <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
 
+                        {activeTab === 'ventas' && (
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                <FaUser style={{ position: 'absolute', left: '10px', color: theme.textLight }} />
+                                <input
+                                    type="text"
+                                    placeholder="Filtrar por cliente..."
+                                    value={reportClient ? reportClient.nombre : clientSearch}
+                                    onChange={e => {
+                                        setClientSearch(e.target.value);
+                                        setReportClient(null);
+                                        setShowClientList(true);
+                                    }}
+                                    onFocus={() => setShowClientList(true)}
+                                    style={{ paddingLeft: '35px', minWidth: '200px' }}
+                                />
+                                {reportClient && (
+                                    <FaTimes
+                                        onClick={() => { setReportClient(null); setClientSearch(''); }}
+                                        style={{ position: 'absolute', right: '10px', color: theme.textLight, cursor: 'pointer' }}
+                                    />
+                                )}
+                                {showClientList && (
+                                    <div style={{
+                                        position: 'absolute', top: '100%', left: 0, width: '100%', background: 'white',
+                                        border: `1px solid ${theme.border}`, borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', zIndex: 100,
+                                        maxHeight: '200px', overflowY: 'auto'
+                                    }}>
+                                        <div
+                                            onClick={() => { setReportClient(null); setClientSearch(''); setShowClientList(false); }}
+                                            style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: `1px solid ${theme.border}`, fontSize: '0.9rem' }}
+                                        >
+                                            -- Todos los clientes --
+                                        </div>
+                                        {clients.filter(c => c.nombre.toLowerCase().includes(clientSearch.toLowerCase())).slice(0, 20).map(c => (
+                                            <div
+                                                key={c.id_cliente}
+                                                onClick={() => { setReportClient(c); setClientSearch(c.nombre); setShowClientList(false); }}
+                                                style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: `1px solid ${theme.border}`, fontSize: '0.9rem' }}
+                                            >
+                                                {c.nombre}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {activeTab === 'busqueda' && (
                             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                                 <FaSearch style={{ position: 'absolute', left: '10px', color: theme.textLight }} />
@@ -641,7 +692,7 @@ export default function DetailedSalesReport() {
                         )}
 
                         <ActionBtn variant="primary" onClick={() => {
-                            if (activeTab === 'ventas') fetchSales();
+                            if (activeTab === 'ventas') fetchSales(null, null, reportClient?.id_cliente);
                             else if (activeTab === 'devoluciones') fetchSales('DEVOLUCION');
                             else if (activeTab === 'busqueda') fetchSales(null, reportKeyword);
                         }}>

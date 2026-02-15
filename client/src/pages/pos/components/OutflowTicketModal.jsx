@@ -325,7 +325,8 @@ const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
           >
             <HeaderBar className="no-print">
               <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FaTruck /> Salida Exitosa
+                {transaction.isQuote ? <FaFileInvoice /> : <FaTruck />}
+                {transaction.isQuote ? 'Cotización Generada' : 'Salida Exitosa'}
               </h3>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <Button onClick={() => doPrint('80')} title="Imprimir Ticket 80mm">
@@ -352,18 +353,18 @@ const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
                     <small>{companyInfo.slogan}</small>
                     <small>RUC: {companyInfo.ruc}</small>
                     <small>{companyInfo.address}</small>
-                    <div className="tag">COMPROBANTE DE SALIDA</div>
+                    <div className="tag">{transaction.isQuote ? 'COTIZACIÓN' : 'COMPROBANTE DE SALIDA'}</div>
                   </div>
                 </div>
 
                 <div className="meta">
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '4px' }}>
                     <p><span className="meta-label">Fecha:</span> <span className="meta-value">{new Date(transaction.fecha).toLocaleString()}</span></p>
-                    <p><span className="meta-label">N° Comprobante:</span> <span className="meta-value">{transaction.id}</span></p>
+                    <p><span className="meta-label">{transaction.isQuote ? 'N° Cotización:' : 'N° Comprobante:'}</span> <span className="meta-value">{transaction.id}</span></p>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '4px' }}>
-                    <p><span className="meta-label">Motivo/Ref:</span> <span className="meta-value">{transaction.clienteNombre?.replace('MOTIVO: ', '') || transaction.motivo}</span></p>
-                    <p><span className="meta-label">Autorizado por:</span> <span className="meta-value">{transaction.usuarioNombre}</span></p>
+                    <p><span className="meta-label">{transaction.isQuote ? 'Cliente:' : 'Motivo/Ref:'}</span> <span className="meta-value">{transaction.clienteNombre?.replace('MOTIVO: ', '') || transaction.motivo}</span></p>
+                    <p><span className="meta-label">{transaction.isQuote ? 'Cotizado por:' : 'Autorizado por:'}</span> <span className="meta-value">{transaction.usuarioNombre}</span></p>
                   </div>
                 </div>
 
@@ -373,7 +374,7 @@ const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
                       <th className="col-qty">Cant</th>
                       <th className="col-code">Cód.</th>
                       <th>Desc.</th>
-                      <th className="text-right">Costo U.</th>
+                      {!transaction.isQuote && <th className="text-right">Costo U.</th>}
                       <th className="text-right">P. Venta</th>
                       <th className="text-right">Total</th>
                     </tr>
@@ -384,7 +385,7 @@ const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
                         <td className="col-qty">{item.quantity}</td>
                         <td className="col-code">{item.codigo || '-'}</td>
                         <td>{item.nombre}</td>
-                        <td className="text-right">{fmt(item.cost)}</td>
+                        {!transaction.isQuote && <td className="text-right">{fmt(item.cost)}</td>}
                         <td className="text-right">{fmt(item.unit)}</td>
                         <td className="text-right">{fmt(item.unit * item.quantity)}</td>
                       </tr>
@@ -399,14 +400,16 @@ const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
                   </div>
 
                   <div className="grand-total-box">
-                    {/* Costo Total (Interno) - Destacado */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '8px' }}>
-                      <span> COSTO TOTAL:</span>
-                      <span>C$ {fmt(transaction.totalCosto)}</span>
-                    </div>
+                    {/* Costo Total (Interno) - Destacado SOLO PARA SALIDAS */}
+                    {!transaction.isQuote && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '8px' }}>
+                        <span> COSTO TOTAL:</span>
+                        <span>C$ {fmt(transaction.totalCosto)}</span>
+                      </div>
+                    )}
 
-                    <div className="grand-total" style={{ borderTop: '1px dashed #333' }}>
-                      <span>TOTAL VALORIZADO:</span>
+                    <div className="grand-total" style={{ borderTop: transaction.isQuote ? 'none' : '1px dashed #333' }}>
+                      <span>{transaction.isQuote ? 'TOTAL COTIZADO:' : 'TOTAL VALORIZADO:'}</span>
                       <span>C$ {fmt(transaction.totalVenta)}</span>
                     </div>
                   </div>

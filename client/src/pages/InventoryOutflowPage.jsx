@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
     FaExclamationTriangle, FaArrowLeft, FaTruck, FaHistory,
-    FaSearch, FaBarcode, FaTrash, FaSave, FaTimes, FaPrint
+    FaSearch, FaBarcode, FaTrash, FaSave, FaTimes, FaPrint, FaFileInvoice, FaUser
 } from 'react-icons/fa';
 import * as api from '../service/api';
 import { useAuth } from '../context/AuthContext';
@@ -118,6 +118,31 @@ const ActionButton = styled.button`
   &:disabled { background: #fee2e2; cursor: not-allowed; }
 `;
 
+const ToggleContainer = styled.div`
+  display: flex; background: #e2e8f0; border-radius: 10px; padding: 4px; margin-bottom: 1rem;
+`;
+
+const ToggleButton = styled.button`
+  flex: 1; padding: 8px; border-radius: 7px; border: none; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s;
+  ${props => props.$active ? `background: white; color: #1e293b; shadow: 0 2px 4px rgba(0,0,0,0.1);` : `background: transparent; color: #64748b;`}
+`;
+
+const ClientSelector = styled.div`
+  background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px; margin-bottom: 1rem; position: relative;
+`;
+
+const ClientSearchInput = styled.input`
+  width: 100%; border: none; outline: none; font-size: 0.9rem; padding: 4px; border-bottom: 1px solid #f1f5f9;
+`;
+
+const ClientDropdown = styled.div`
+  position: absolute; top: 100%; left: 0; width: 100%; background: white; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 20; max-height: 200px; overflow-y: auto;
+`;
+
+const ClientOption = styled.div`
+  padding: 8px 12px; cursor: pointer; &:hover { background: #f8fafc; } border-bottom: 1px solid #f1f5f9;
+`;
+
 const HistoryItem = styled.div`
   padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;
   &:hover { background: #f8fafc; }
@@ -133,11 +158,21 @@ const InventoryOutflowPage = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [cart, setCart] = useState([]);
     const [reason, setReason] = useState('');
+    const [outflowType, setOutflowType] = useState('SALIDA'); // 'SALIDA' or 'COTIZACION'
+    const [selectedClient, setSelectedClient] = useState(null);
+    const [clientSearch, setClientSearch] = useState('');
+    const [showClientDropdown, setShowClientDropdown] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [history, setHistory] = useState([]);
     const [ticketData, setTicketData] = useState(null); // For printing
     const [isLoading, setIsLoading] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
+
+    const { clients = [] } = useAuth();
+    const filteredClients = useMemo(() => {
+        if (!clientSearch.trim()) return clients.slice(0, 10);
+        return clients.filter(c => c.nombre.toLowerCase().includes(clientSearch.toLowerCase())).slice(0, 10);
+    }, [clientSearch, clients]);
 
     // Refs
     const searchInputRef = useRef(null);
@@ -157,8 +192,8 @@ const InventoryOutflowPage = () => {
         setCart(prev => {
             const existing = prev.find(item => item.id_producto === product.id_producto);
             if (existing) {
-                // Check stock
-                if (existing.cantidad >= product.existencia) {
+                // Check stock only for Salida
+                if (outflowType === 'SALIDA' && existing.cantidad >= product.existencia) {
                     toast.error('No hay suficiente stock.');
                     return prev;
                 }
@@ -168,12 +203,12 @@ const InventoryOutflowPage = () => {
                         : item
                 );
             } else {
-                if (product.existencia <= 0) {
+                if (outflowType === 'SALIDA' && product.existencia <= 0) {
                     toast.error('Producto sin existencia.');
                     return prev;
                 }
                 toast.success(`${product.nombre} añadido`);
-                return [...prev, { ...product, cantidad: 1 }];
+                return [...prev, { ...product, cantidad: 1, unit: product.precio, precio_modificado: product.precio }];
             }
         });
         setSearchTerm('');
@@ -186,16 +221,26 @@ const InventoryOutflowPage = () => {
             if (item.id_producto === id) {
                 const newQty = item.cantidad + delta;
                 if (newQty <= 0) return null; // Remove
-                if (newQty > item.existencia) return item; // Limit
+                if (outflowType === 'SALIDA' && newQty > item.existencia) return item; // Limit
                 return { ...item, cantidad: newQty };
             }
             return item;
         }).filter(Boolean));
     };
 
+    const updatePrice = (id, newPrice) => {
+        setCart(prev => prev.map(item => {
+            if (item.id_producto === id) {
+                return { ...item, precio_modificado: newPrice };
+            }
+            return item;
+        }));
+    };
+
     // 5. Submit Outflow
     const handleSubmit = async () => {
-        if (!reason.trim()) return toast.error('Debe ingresar un motivo para la salida.');
+        if (outflowType === 'SALIDA' && !reason.trim()) return toast.error('Debe ingresar un motivo para la salida.');
+        if (outflowType === 'COTIZACION' && !selectedClient) return toast.error('Seleccione un cliente para la cotización.');
         if (cart.length === 0) return toast.error('El carrito está vacío.');
         setShowConfirm(true);
     };
@@ -208,14 +253,19 @@ const InventoryOutflowPage = () => {
             const token = localStorage.getItem('token');
             const res = await api.createOutflow({
                 motivo: reason,
-                items: cart
+                items: cart,
+                tipo: outflowType,
+                id_cliente: selectedClient?.id_cliente,
+                cliente_nombre: selectedClient?.nombre
             }, token);
 
             // Success
             setCart([]);
             setReason('');
+            setSelectedClient(null);
+            setClientSearch('');
             setTicketData(res.ticket); // Trigger print modal
-            toast.success('Salida procesada correctamente');
+            toast.success(outflowType === 'SALIDA' ? 'Salida procesada correctamente' : 'Cotización generada');
 
             // Refresh global products in background
             refreshProducts();
@@ -247,16 +297,18 @@ const InventoryOutflowPage = () => {
     const handleReprint = (tx) => {
         // Construct ticket data from historical record
         const ticket = {
-            id: `TR-${tx.id}`,
+            id: tx.tipo === 'COTIZACION' ? `COT-${tx.id}` : `TR-${tx.id}`,
             outflowId: tx.id,
-            type: 'outflow',
+            type: tx.tipo === 'COTIZACION' ? 'quote' : 'outflow',
+            tipo: tx.tipo,
             fecha: tx.fecha,
             usuarioNombre: tx.usuario_nombre,
-            clienteNombre: `MOTIVO: ${tx.motivo}`,
+            clienteNombre: tx.tipo === 'COTIZACION' ? (tx.cliente_nombre || 'Cliente General') : `MOTIVO: ${tx.motivo}`,
             items: tx.items.map(i => ({ ...i, total: i.quantity * i.unit })), // Ensure structure matches TicketModal
             totalVenta: tx.total_venta,
             totalCosto: tx.total_costo,
-            isOutflow: true
+            isOutflow: true,
+            isQuote: tx.tipo === 'COTIZACION'
         };
         setTicketData(ticket);
     };
@@ -309,7 +361,53 @@ const InventoryOutflowPage = () => {
                 {/* RIGHT: CART */}
                 <CartPanel>
                     <div style={{ padding: '1rem', borderBottom: '1px solid #eee' }}>
-                        <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Carrito de Salida</h2>
+                        <ToggleContainer>
+                            <ToggleButton $active={outflowType === 'SALIDA'} onClick={() => setOutflowType('SALIDA')}>
+                                <FaTruck size={12} style={{ marginRight: 5 }} /> Salida
+                            </ToggleButton>
+                            <ToggleButton $active={outflowType === 'COTIZACION'} onClick={() => setOutflowType('COTIZACION')}>
+                                <FaFileInvoice size={12} style={{ marginRight: 5 }} /> Cotización
+                            </ToggleButton>
+                        </ToggleContainer>
+
+                        {outflowType === 'COTIZACION' && (
+                            <ClientSelector>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                                    <FaUser size={14} color="#64748b" />
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Cliente:</span>
+                                </div>
+                                <ClientSearchInput
+                                    placeholder="Buscar cliente..."
+                                    value={selectedClient ? selectedClient.nombre : clientSearch}
+                                    onChange={e => {
+                                        setClientSearch(e.target.value);
+                                        setSelectedClient(null);
+                                        setShowClientDropdown(true);
+                                    }}
+                                    onFocus={() => setShowClientDropdown(true)}
+                                />
+                                {selectedClient && (
+                                    <button onClick={() => { setSelectedClient(null); setClientSearch(''); }} style={{ position: 'absolute', right: 10, top: 32, background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                                        <FaTimes size={12} />
+                                    </button>
+                                )}
+                                {showClientDropdown && (
+                                    <ClientDropdown>
+                                        {filteredClients.map(c => (
+                                            <ClientOption key={c.id_cliente} onClick={() => {
+                                                setSelectedClient(c);
+                                                setClientSearch(c.nombre);
+                                                setShowClientDropdown(false);
+                                            }}>
+                                                {c.nombre}
+                                            </ClientOption>
+                                        ))}
+                                    </ClientDropdown>
+                                )}
+                            </ClientSelector>
+                        )}
+
+                        <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Carrito de {outflowType === 'SALIDA' ? 'Salida' : 'Cotización'}</h2>
                         <div style={{ fontSize: '0.9rem', color: '#6b7280' }}>{cart.length} items</div>
                     </div>
 
@@ -322,8 +420,19 @@ const InventoryOutflowPage = () => {
                         ) : cart.map(item => (
                             <CartItem key={item.id_producto}>
                                 <div style={{ flex: 1 }}>
-                                    <div style={{ fontWeight: 'bold' }}>{item.nombre}</div>
-                                    <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{item.codigo}</div>
+                                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{item.nombre}</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{item.codigo}</div>
+                                    {outflowType === 'COTIZACION' && (
+                                        <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>C$</span>
+                                            <input
+                                                type="number"
+                                                value={item.precio_modificado}
+                                                onChange={e => updatePrice(item.id_producto, e.target.value)}
+                                                style={{ width: 80, padding: '2px 5px', fontSize: '0.85rem', border: '1px solid #e2e8f0', borderRadius: 4 }}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                     <button
@@ -345,15 +454,19 @@ const InventoryOutflowPage = () => {
                     </CartList>
 
                     <div style={{ padding: '1rem', background: '#f8fafc', borderTop: '1px solid #e5e7eb' }}>
-                        <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#374151' }}>Motivo / Razón:</label>
-                        <ReasonInput
-                            rows="2"
-                            placeholder="Ej: Merma, Uso Interno, Traslado a Bodega B..."
-                            value={reason}
-                            onChange={e => setReason(e.target.value)}
-                        />
+                        {outflowType === 'SALIDA' && (
+                            <>
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#374151' }}>Motivo / Razón:</label>
+                                <ReasonInput
+                                    rows="2"
+                                    placeholder="Ej: Merma, Uso Interno, Traslado a Bodega B..."
+                                    value={reason}
+                                    onChange={e => setReason(e.target.value)}
+                                />
+                            </>
+                        )}
                         <ActionButton disabled={cart.length === 0 || isLoading} onClick={handleSubmit}>
-                            {isLoading ? 'Procesando...' : <><FaSave /> Procesar Salida</>}
+                            {isLoading ? 'Procesando...' : <><FaSave /> {outflowType === 'SALIDA' ? 'Procesar Salida' : 'Generar Cotización'}</>}
                         </ActionButton>
                     </div>
                 </CartPanel>
@@ -375,8 +488,12 @@ const InventoryOutflowPage = () => {
                             {history.map(tx => (
                                 <HistoryItem key={tx.id}>
                                     <div>
-                                        <div style={{ fontWeight: 'bold' }}>#{tx.id} - {new Date(tx.fecha).toLocaleString()}</div>
-                                        <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>Motivo: {tx.motivo}</div>
+                                        <div style={{ fontWeight: 'bold' }}>
+                                            {tx.tipo === 'COTIZACION' ? 'COT' : 'TR'}-#{tx.id} - {new Date(tx.fecha).toLocaleString()}
+                                        </div>
+                                        <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                                            {tx.tipo === 'COTIZACION' ? `Cliente: ${tx.cliente_nombre || 'General'}` : `Motivo: ${tx.motivo}`}
+                                        </div>
                                         <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Por: {tx.usuario_nombre} | {tx.total_items} items</div>
                                     </div>
                                     <button
@@ -407,8 +524,11 @@ const InventoryOutflowPage = () => {
                         open={showConfirm}
                         onCancel={() => setShowConfirm(false)}
                         onConfirm={confirmSubmit}
-                        title="Confirmar Salida"
-                        message="¿Estás seguro de que deseas procesar esta salida? El inventario se descontará inmediatamente."
+                        title={outflowType === 'SALIDA' ? "Confirmar Salida" : "Confirmar Cotización"}
+                        message={outflowType === 'SALIDA'
+                            ? "¿Estás seguro de que deseas procesar esta salida? El inventario se descontará inmediatamente."
+                            : "¿Estás seguro de que deseas generar esta cotización? No afectará el inventario."
+                        }
                     />
                 )}
             </AnimatePresence>
