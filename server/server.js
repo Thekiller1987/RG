@@ -60,6 +60,8 @@ const corsOptions = {
 };
 
 // 3. Configurar Middlewares
+const compression = require('compression');
+app.use(compression()); // Compress all routes
 app.use(cors(corsOptions));
 
 // Evita 413: payload grande

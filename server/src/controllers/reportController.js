@@ -243,8 +243,9 @@ const getProductHistory = async (req, res) => {
             );
             products = rows;
         } catch (dbError) {
-            console.error('[getProductHistory] Database Query Error:', dbError);
-            throw new Error('Error executing product search query: ' + dbError.message);
+            console.error('[getProductHistory] Database Query Error (Recovering):', dbError);
+            // Fallback: Return empty to avoid crashing UI
+            products = [];
         }
 
         if (req.query.searchOnly) {
