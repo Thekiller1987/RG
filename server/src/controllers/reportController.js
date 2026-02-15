@@ -2,6 +2,28 @@
 
 const db = require('../config/db');
 
+/**
+ * Helper para construir rango de fechas optimizado (Business Day 6AM - 6AM)
+ * @param {string} start YYYY-MM-DD
+ * @param {string} end YYYY-MM-DD
+ * @returns {{ from: string, to: string }}
+ */
+const getDateRange = (start, end) => {
+    // Si start=2023-10-25, rango inicia 2023-10-25 06:00:00
+    // Si end=2023-10-25, rango termina 2023-10-26 05:59:59
+    const from = `${start} 06:00:00`;
+
+    // Calcular siguiente día para el end
+    const dateEnd = new Date(end);
+    dateEnd.setDate(dateEnd.getDate() + 1);
+    const year = dateEnd.getFullYear();
+    const month = String(dateEnd.getMonth() + 1).padStart(2, '0');
+    const day = String(dateEnd.getDate()).padStart(2, '0');
+    const to = `${year}-${month}-${day} 05:59:59`;
+
+    return { from, to };
+};
+
 // --- OBTENER RESUMEN DE VENTAS Y GANANCIAS ---
 const getSalesSummaryReport = async (req, res) => {
     const { startDate, endDate } = req.query;
@@ -9,6 +31,7 @@ const getSalesSummaryReport = async (req, res) => {
         return res.status(400).json({ msg: 'Por favor, especifica una fecha de inicio y fin.' });
     }
     try {
+        const { from, to } = getDateRange(startDate, endDate);
         const sql = `
             SELECT
                 COALESCE(SUM(dv.cantidad * dv.precio_unitario), 0) AS ventas_brutas,
@@ -18,10 +41,9 @@ const getSalesSummaryReport = async (req, res) => {
             JOIN productos AS p ON dv.id_producto = p.id_producto
             WHERE 
                 v.estado = 'COMPLETADA' 
-                AND DATE(DATE_SUB(v.fecha, INTERVAL 6 HOUR)) BETWEEN ? AND ?;
+                AND v.fecha >= ? AND v.fecha <= ?;
         `;
-        // Los parámetros son las fechas YYYY-MM-DD, y el backend las compara contra la fecha LOCAL
-        const [results] = await db.query(sql, [startDate, endDate]);
+        const [results] = await db.query(sql, [from, to]);
         res.json(results[0]);
     } catch (error) {
         console.error('Error en reporte de resumen de ventas:', error);
@@ -30,7 +52,6 @@ const getSalesSummaryReport = async (req, res) => {
 };
 
 // --- OBTENER VALOR TOTAL DEL INVENTARIO ---
-// (No requiere ajuste de zona horaria)
 const getInventoryValueReport = async (req, res) => {
     try {
         const sql = `
@@ -50,6 +71,7 @@ const getSalesByUserReport = async (req, res) => {
     const { startDate, endDate } = req.query;
     if (!startDate || !endDate) return res.status(400).json({ msg: 'Fechas requeridas.' });
     try {
+        const { from, to } = getDateRange(startDate, endDate);
         const sql = `
             SELECT 
                 u.nombre_usuario, 
@@ -59,11 +81,11 @@ const getSalesByUserReport = async (req, res) => {
             JOIN usuarios AS u ON v.id_usuario = u.id_usuario
             WHERE 
                 v.estado = 'COMPLETADA' 
-                AND DATE(DATE_SUB(v.fecha, INTERVAL 6 HOUR)) BETWEEN ? AND ?
+                AND v.fecha >= ? AND v.fecha <= ?
             GROUP BY u.nombre_usuario 
             ORDER BY total_vendido DESC;
         `;
-        const [results] = await db.query(sql, [startDate, endDate]);
+        const [results] = await db.query(sql, [from, to]);
         res.json(results);
     } catch (error) {
         console.error('Error en reporte de ventas por usuario:', error);
@@ -76,6 +98,7 @@ const getTopProductsReport = async (req, res) => {
     const { startDate, endDate } = req.query;
     if (!startDate || !endDate) return res.status(400).json({ msg: 'Fechas requeridas.' });
     try {
+        const { from, to } = getDateRange(startDate, endDate);
         const sql = `
             SELECT p.nombre, SUM(dv.cantidad) AS total_unidades_vendidas
             FROM detalle_ventas AS dv
@@ -83,12 +106,12 @@ const getTopProductsReport = async (req, res) => {
             JOIN ventas AS v ON dv.id_venta = v.id_venta
             WHERE 
                 v.estado = 'COMPLETADA' 
-                AND DATE(DATE_SUB(v.fecha, INTERVAL 6 HOUR)) BETWEEN ? AND ?
+                AND v.fecha >= ? AND v.fecha <= ?
             GROUP BY p.nombre 
             ORDER BY total_unidades_vendidas DESC 
             LIMIT 10;
         `;
-        const [results] = await db.query(sql, [startDate, endDate]);
+        const [results] = await db.query(sql, [from, to]);
         res.json(results);
     } catch (error) {
         console.error('Error en reporte de top productos:', error);
@@ -101,6 +124,8 @@ const getSalesChartReport = async (req, res) => {
     const { startDate, endDate } = req.query;
     if (!startDate || !endDate) return res.status(400).json({ msg: 'Fechas requeridas.' });
     try {
+        const { from, to } = getDateRange(startDate, endDate);
+        // Nota: Para agrupar por día, seguimos usando DATE() pero sobre un rango filtrado eficientemente
         const sql = `
             SELECT 
                 DATE(DATE_SUB(fecha, INTERVAL 6 HOUR)) AS dia, 
@@ -108,11 +133,11 @@ const getSalesChartReport = async (req, res) => {
             FROM ventas
             WHERE 
                 estado = 'COMPLETADA' 
-                AND DATE(DATE_SUB(fecha, INTERVAL 6 HOUR)) BETWEEN ? AND ?
+                AND fecha >= ? AND fecha <= ?
             GROUP BY dia 
             ORDER BY dia ASC;
         `;
-        const [results] = await db.query(sql, [startDate, endDate]);
+        const [results] = await db.query(sql, [from, to]);
         res.json(results);
     } catch (error) {
         console.error('Error en reporte para gráfica:', error);
@@ -125,8 +150,9 @@ const getDetailedSales = async (req, res) => {
     const { startDate, endDate, tipo } = req.query;
     if (!startDate || !endDate) return res.status(400).json({ msg: 'Fechas requeridas.' });
     try {
+        const { from, to } = getDateRange(startDate, endDate);
+
         let tipoFilter = '';
-        const params = [startDate, endDate];
         if (tipo === 'DEVOLUCION') {
             tipoFilter = ` AND v.estado = 'DEVOLUCION'`;
         } else if (tipo === 'COMPLETADA') {
@@ -135,6 +161,7 @@ const getDetailedSales = async (req, res) => {
             tipoFilter = ` AND v.estado = 'CANCELADA'`;
         }
 
+        // OPTIMIZACIÓN: Rango directo en 'fecha' usa índice.
         const [sales] = await db.query(`
             SELECT 
                 v.id_venta AS id,
@@ -152,15 +179,17 @@ const getDetailedSales = async (req, res) => {
             FROM ventas v
             LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
             LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
-            WHERE DATE(DATE_SUB(v.fecha, INTERVAL 6 HOUR)) BETWEEN ? AND ?
+            WHERE v.fecha >= ? AND v.fecha <= ?
             ${tipoFilter}
             ORDER BY v.fecha DESC
             LIMIT 500
-        `, params);
+        `, [from, to]);
 
         if (!sales.length) return res.json([]);
 
         const saleIds = sales.map(s => s.id);
+
+        // Optimización: Traer detalles solo de las ventas filtradas
         const [details] = await db.query(`
             SELECT 
                 dv.id_venta,
@@ -174,10 +203,18 @@ const getDetailedSales = async (req, res) => {
             WHERE dv.id_venta IN (?)
         `, [saleIds]);
 
+        // Mapeo en memoria (O(N) en lugar de O(N^2) filter)
+        // Agrupar detalles por venta
+        const detailsMap = {};
+        details.forEach(d => {
+            if (!detailsMap[d.id_venta]) detailsMap[d.id_venta] = [];
+            detailsMap[d.id_venta].push(d);
+        });
+
         const salesWithDetails = sales.map(sale => ({
             ...sale,
             pagoDetalles: typeof sale.pagoDetalles === 'string' ? (() => { try { return JSON.parse(sale.pagoDetalles); } catch { return {}; } })() : (sale.pagoDetalles || {}),
-            items: details.filter(d => d.id_venta === sale.id)
+            items: detailsMap[sale.id] || []
         }));
 
         res.json(salesWithDetails);
@@ -192,18 +229,24 @@ const getProductHistory = async (req, res) => {
     const { code } = req.query;
     if (!code) return res.status(400).json({ msg: 'Código de producto requerido.' });
     try {
-        // Buscar producto por código
+        // MEJORA: Prioridad a coincidencia exacta, luego LIKE
+        // Buscamos productos que coincidan
         const [products] = await db.query(
-            `SELECT id_producto, nombre, codigo, precio, costo, existencia FROM productos WHERE codigo LIKE ? LIMIT 10`,
-            [`%${code}%`]
+            `SELECT id_producto, nombre, codigo, precio, costo, existencia 
+             FROM productos 
+             WHERE codigo = ? OR codigo LIKE ? 
+             ORDER BY (codigo = ?) DESC, nombre ASC 
+             LIMIT 10`,
+            [code, `%${code}%`, code]
         );
 
         if (!products.length) return res.json({ product: null, history: [] });
 
+        // Tomamos el PRIMERO como el "principal" seleccionado (el exact match si existe)
+        const product = products[0];
         const productIds = products.map(p => p.id_producto);
-        const product = products[0]; // Producto principal
 
-        // Obtener historial de ventas de ese producto
+        // Obtener historial de ventas de ESOS productos
         const [history] = await db.query(`
             SELECT 
                 v.id_venta AS idVenta,
@@ -211,12 +254,14 @@ const getProductHistory = async (req, res) => {
                 v.estado,
                 v.tipo_venta,
                 dv.cantidad,
+                p.codigo AS codigoProducto,
                 dv.precio_unitario AS precioUnitario,
                 c.nombre AS clienteNombre,
                 c.id_cliente AS clienteId,
                 u.nombre_usuario AS vendedorNombre
             FROM detalle_ventas dv
             JOIN ventas v ON dv.id_venta = v.id_venta
+            JOIN productos p ON dv.id_producto = p.id_producto
             LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
             LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
             WHERE dv.id_producto IN (?)

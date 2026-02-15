@@ -5,7 +5,7 @@ import axios from 'axios';
 import {
     FaArrowLeft, FaSyncAlt, FaCalendarAlt, FaSearch,
     FaShoppingCart, FaUndoAlt, FaBarcode, FaFileInvoice,
-    FaUser, FaClock, FaChevronDown, FaChevronUp
+    FaUser, FaClock, FaChevronDown, FaChevronUp, FaPrint
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
@@ -419,6 +419,134 @@ const DetailedSalesReport = () => {
         return parts.length ? parts.join(' | ') : 'Efectivo';
     };
 
+    const handlePrint = () => {
+        const win = window.open('', '_blank');
+        if (!win) return;
+
+        const isProduct = activeTab === 'producto';
+        const title = isProduct
+            ? `Historial de Producto: ${productResult?.product?.nombre || ''}`
+            : `Reporte de ${activeTab === 'devoluciones' ? 'Devoluciones' : 'Ventas Detalladas'}`;
+
+        const dateRange = isProduct ? '' : `Del ${fmtDate(startDate)} al ${fmtDate(endDate)}`;
+
+        let content = '';
+
+        const style = `
+            @page { size: A4 landscape; margin: 10mm; }
+            body { font-family: 'Inter', sans-serif; color: #1e293b; padding: 20px; }
+            h1 { font-size: 18pt; margin-bottom: 5px; color: #0f172a; }
+            p { margin: 0 0 20px; color: #64748b; font-size: 10pt; }
+            table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+            th { background: #f1f5f9; text-align: left; padding: 8px; border-bottom: 2px solid #e2e8f0; }
+            td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
+            .num { text-align: right; font-family: 'Roboto Mono', monospace; }
+            .center { text-align: center; }
+            .badge { padding: 2px 6px; border-radius: 4px; font-size: 8pt; font-weight: bold; border: 1px solid #ccc; }
+            .total-row { font-weight: bold; background: #f8fafc; }
+        `;
+
+        if (isProduct) {
+            if (!productResult || !productResult.product) return;
+            const p = productResult.product;
+            content += `
+                <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #cbd5e1; border-radius: 8px;">
+                    <h2 style="margin:0 0 10px;">${p.nombre}</h2>
+                    <div style="display:flex; gap:20px; font-size:10pt;">
+                        <strong>Código: ${p.codigo}</strong>
+                        <strong>Precio: ${fmtMoney(p.precio)}</strong>
+                        <strong>Existencia: ${p.existencia}</strong>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Factura</th>
+                            <th>Cliente</th>
+                            <th>Tipo</th>
+                            <th class="center">Cant.</th>
+                            <th class="num">Precio</th>
+                            <th class="num">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${productResult.history.map(h => `
+                            <tr>
+                                <td>${fmtDT(h.fecha)}</td>
+                                <td>#${h.idVenta}</td>
+                                <td>${h.clienteNombre || 'Público General'}</td>
+                                <td><span class="badge">${h.tipo_venta}</span></td>
+                                <td class="center">${h.cantidad}</td>
+                                <td class="num">${fmtMoney(h.precioUnitario)}</td>
+                                <td class="num">${fmtMoney(h.cantidad * h.precioUnitario)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            // Reporte de Ventas / Devoluciones
+            content += `
+                <div style="margin-bottom:20px; display:flex; gap:20px;">
+                    <div style="padding:10px; background:#f1f5f9; border-radius:6px;">
+                        <strong>Total:</strong> ${fmtMoney(totalVentas)}
+                    </div>
+                    <div style="padding:10px; background:#f1f5f9; border-radius:6px;">
+                        <strong>Transacciones:</strong> ${totalTransacciones}
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Fecha</th>
+                            <th>Estado</th>
+                            <th>Cliente</th>
+                            <th>Vendedor</th>
+                            <th>Pago</th>
+                            <th class="num">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${sales.map(s => `
+                            <tr>
+                                <td>${s.id}</td>
+                                <td>${fmtDT(s.fecha)}</td>
+                                <td>${s.estado}</td>
+                                <td>${s.clienteNombre || 'Público General'}</td>
+                                <td>${s.vendedorNombre || '—'}</td>
+                                <td style="font-size:8pt;">${getPaymentMethod(s.pagoDetalles)}</td>
+                                <td class="num">${fmtMoney(s.totalVenta)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>${title}</title>
+                <style>${style}</style>
+            </head>
+            <body>
+                <h1>${title}</h1>
+                <p>${dateRange} - Generado el ${new Date().toLocaleString()}</p>
+                ${content}
+                <script>
+                    window.onload = () => { window.print(); }
+                </script>
+            </body>
+            </html>
+        `;
+
+        win.document.write(html);
+        win.document.close();
+    };
+
     return (
         <Container>
             <Header>
@@ -435,7 +563,12 @@ const DetailedSalesReport = () => {
                         </p>
                     </div>
                 </div>
-                {loading && <span style={{ color: theme.textLight }}><FaSyncAlt className="icon-spin" /> Cargando...</span>}
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    {loading && <span style={{ color: theme.textLight }}><FaSyncAlt className="icon-spin" /> Cargando...</span>}
+                    <ActionBtn onClick={handlePrint}>
+                        <FaPrint /> Imprimir
+                    </ActionBtn>
+                </div>
             </Header>
 
             {/* TABS */}
