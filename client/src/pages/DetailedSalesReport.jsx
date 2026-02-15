@@ -226,23 +226,29 @@ const Table = styled.table`
   .center { text-align: center; }
 `;
 
-const Badge = styled.span`
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-  ${({ type }) => {
-        switch (type) {
-            case 'COMPLETADA': return 'background: #dcfce7; color: #166534;';
-            case 'DEVOLUCION': return 'background: #fee2e2; color: #991b1b;';
-            case 'CANCELADA': return 'background: #fef3c7; color: #92400e;';
-            default: return 'background: #f1f5f9; color: #475569;';
-        }
-    }}
-`;
+// Helper for badge styles - Inline to avoid hoisting/initialization errors
+const getBadgeStyles = (type) => {
+    switch (type) {
+        case 'COMPLETADA': return { background: '#dcfce7', color: '#166534' };
+        case 'DEVOLUCION': return { background: '#fee2e2', color: '#991b1b' };
+        case 'CANCELADA': return { background: '#fef3c7', color: '#92400e' };
+        default: return { background: '#f1f5f9', color: '#475569' };
+    }
+};
+
+const Badge = ({ type, children }) => {
+    const style = {
+        fontSize: '0.7rem',
+        fontWeight: 700,
+        padding: '3px 8px',
+        borderRadius: '6px',
+        textTransform: 'uppercase',
+        letterSpacing: '0.03em',
+        whiteSpace: 'nowrap',
+        ...getBadgeStyles(type)
+    };
+    return <span style={style}>{children}</span>;
+};
 
 const EmptyState = styled.div`
   text-align: center;
