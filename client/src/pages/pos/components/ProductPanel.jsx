@@ -81,22 +81,29 @@ export default function ProductPanel({
   const filteredProducts = useMemo(() => {
     const term = (searchTerm || '').toLowerCase().trim();
 
-    // Filtrar primero
     const results = products.filter(p => {
-      if (!term) return true;
+      // Optimización: Búsqueda rápida ignorando acentos y mayúsculas
+      const normalize = (str) => str ? String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : '';
+      const termNormalized = normalize(term);
+
+      if (!termNormalized) return true;
+
       if (searchType === 'code') {
-        const codigo = String(p.codigo || '').toLowerCase();
-        const barras = String(p.codigo_barras || '').toLowerCase();
-        return codigo.startsWith(term) || barras.startsWith(term);
+        const codigo = normalize(p.codigo);
+        const barras = normalize(p.codigo_barras);
+        return codigo.startsWith(termNormalized) || barras.startsWith(termNormalized);
       } else {
-        if (term.length < 2) return true; // Mostrar todos si es muy corto el término
-        const nombre = (p.nombre || '').toLowerCase();
-        const desc = (p.descripcion || '').toLowerCase();
-        return nombre.includes(term) || desc.includes(term);
+        // En description, buscamos en nombre Y código para mayor flexibilidad
+        // Si el término es muy corto (1 car) y hay muchos productos, podría ser lento, pero asumimos <2000 items
+        const nombre = normalize(p.nombre);
+        const descripcion = normalize(p.descripcion);
+        const codigo = normalize(p.codigo);
+
+        return nombre.includes(termNormalized) || descripcion.includes(termNormalized) || codigo.includes(termNormalized);
       }
     });
 
-    return results.slice(0, PRODUCTS_PER_PAGE);
+    return results.slice(0, 100); // Límite visual para no saturar el DOM (virtualización sería mejor si crece mucho)
   }, [products, searchTerm, searchType]);
 
   const totalResults = useMemo(() => {

@@ -235,7 +235,7 @@ const getProductHistory = async (req, res) => {
             `SELECT id_producto, nombre, codigo, precio, costo, existencia 
              FROM productos 
              WHERE codigo = ? OR codigo LIKE ? 
-             ORDER BY (codigo = ?) DESC, nombre ASC 
+             ORDER BY CASE WHEN codigo = ? THEN 0 ELSE 1 END, nombre ASC 
              LIMIT 10`,
             [code, `%${code}%`, code]
         );

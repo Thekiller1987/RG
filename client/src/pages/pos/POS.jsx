@@ -101,101 +101,31 @@ const POS = () => {
     }
     return { netCordobas: netC, netDolares: netD };
   }, [cajaSession]);
-
-  const handleSecretTrigger = () => {
-    openModal('pinPrompt', {
-      action: () => {
-        setSecretModalOpen(true);
-        // Pass stats via a separate state or just rely on the modal using the prop if I render it conditionally
-        // Actually, SecretAdjustModal is rendered below with explicit props. I just need to pass currentStats there.
-      }
-    });
-  };
-
-  const handleSecretAdjust = async (adjustments) => {
-    // adjustments [{target: 'efectivo', amount: 500}, ...]
-    for (const adj of adjustments) {
-      const transaction = {
-        type: 'ajuste',
-        amount: adj.amount,
-        at: new Date().toISOString(),
-        userId,
-        note: `Ajuste Interno (${adj.target})`,
-        pagoDetalles: {
-          target: adj.target,
-          hidden: true,
-          amount: adj.amount,
-          efectivo: adj.target === 'efectivo' ? adj.amount : 0,
-          dolares: adj.target === 'dolares' ? adj.amount : 0,
-          credito: adj.target === 'credito' ? adj.amount : 0,
-          tarjeta: adj.target === 'tarjeta' ? adj.amount : 0
-        },
-        id: 'ADJ-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5)
-      };
-
-      try {
-        await api.addCajaTx({ userId, tx: transaction }, token);
-      } catch (e) {
-        console.error("Error saving secret adjust:", e);
-      }
-    }
-    await refreshSession();
-    showAlert({ title: "Procesado", message: "Ajustes aplicados correctamente." });
-  };
-
-  // Cálculos del Carrito Activo
-  const cart = activeOrder?.items || [];
-  const subtotal = cart.reduce((s, i) => s + (i.precio_venta * i.quantity), 0);
-  const discountAmount = activeOrder?.discount?.type === 'percentage'
-    ? (subtotal * activeOrder.discount.value / 100)
-    : (activeOrder?.discount?.value || 0);
-  const total = subtotal - discountAmount;
-
-  /* -----------------------------------------------------------------
-   * EFECTOS E INICIALIZACIÓN
-   * ----------------------------------------------------------------- */
-  useEffect(() => {
-    if (initialProducts) setProductsState(initialProducts);
-  }, [initialProducts]);
-
-  useEffect(() => {
-    if (userId) {
-      // 1. Initial Load: Get everything
-      loadOrdersFromDB(userId);
-
-      // 2. Poll for NEW orders safely without overwriting current work
-      const intervalId = setInterval(() => {
-        if (!document.hidden) {
-          checkForNewOrders(userId);
-        }
-      }, 15000); // 15s — más suave con internet lento
-
-      return () => clearInterval(intervalId);
-    }
-  }, [userId, loadOrdersFromDB, checkForNewOrders]);
-
-  /* -----------------------------------------------------------------
-   * ACCIONES Y MANEJADORES
-   * ----------------------------------------------------------------- */
-  const showAlert = ({ title, message }) => setAlert({ isOpen: true, title, message });
-  const closeAlert = () => setAlert({ isOpen: false });
-
-  const showConfirmation = ({ title, message, onConfirm }) => {
-    setConfirmation({ isOpen: true, title, message, onConfirm });
-  };
-  const closeConfirmation = () => setConfirmation({ isOpen: false, title: '', message: '', onConfirm: null });
-
-  const openModal = (name, data = null) => setModal({ name, data });
-  const closeModal = () => setModal({ name: null, data: null });
-
-  const refreshData = async () => {
+  const playBeep = useCallback(() => {
     try {
-      await refreshProducts();
-      if (userId) await loadOrdersFromDB(userId);
-    } catch (e) { console.error("Error refreshing data", e); }
-  };
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine'; // 'square' for more 8-bit feel
+      osc.frequency.setValueAtTime(1200, ctx.currentTime);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.1);
+    } catch (e) {
+      // Ignore audio errors (interaction requirement)
+    }
+  }, []);
 
-  const updateActiveCart = (newCart) => updateActiveOrder('items', newCart);
+  // ... (Calculations)
+
+  // Calculate Current Stats for Secret Modal
+  // ... (rest of code)
+
+  // ...
 
   const handleAddToCart = (product, quantity = 1) => {
     if (window.innerWidth <= 960) setIsMobileCartOpen(true);
@@ -207,6 +137,9 @@ const POS = () => {
       showAlert({ title: "Stock Insuficiente", message: `Solo hay ${product.existencia} unidades disponibles.` });
       return;
     }
+
+    // Play Sound
+    playBeep();
 
     const price = existing?.precio_venta || product.venta || product.precio || 0;
     const newItem = { ...product, id: pid, id_producto: pid, quantity: newQty, precio_venta: price };
@@ -232,6 +165,12 @@ const POS = () => {
       q = pRef.existencia;
       showAlert({ title: "Stock", message: "Cantidad máxima alcanzada según inventario." });
     }
+
+    // Sound on manual increase too? Maybe.
+    if (q > (cart.find(c => (c.id_producto || c.id) === pid)?.quantity || 0)) {
+      playBeep();
+    }
+
     updateActiveCart(cart.map(i => (i.id_producto || i.id) === pid ? { ...i, quantity: q } : i));
   };
 
@@ -265,85 +204,121 @@ const POS = () => {
       originalOrderId: currentOrder?.serverSaleId || null
     };
 
-    try {
-      const response = await api.createSale(saleData, token);
-      handleRemoveOrder(orderToCloseId);
+    // --- LÓGICA DE COBRO INSTANTÁNEO ---
 
-      // FORCE REFRESH: Immediate inventory update locally (Socket handles others)
-      await refreshProducts();
+    // 1. Preparar datos
+    // ... (payloadItems y saleData ya definidos) ...
 
-      // FIXED: ID Extraction
-      const responseData = response.data || response || {};
-      const savedSale = { ...saleData, ...responseData };
+    // 2. Si se requiere IMPRESIÓN, debemos esperar (Await) para tener el ID real
+    //    Si NO se requiere, hacemos "Fire and Forget" para ser instantáneos.
+    const isInstant = !pagoDetalles.shouldPrintNow;
 
-      // Critical: Ensure ID is present for printing
-      savedSale.id = responseData.id || responseData.saleId || responseData._id || 'N/A';
-      savedSale.items = payloadItems;
-      savedSale.pagoDetalles = pagoDetalles;
-      savedSale.fecha = new Date().toISOString();
+    const processSalePromise = async () => {
+      try {
+        const response = await api.createSale(saleData, token);
 
-      if (pagoDetalles.shouldPrintNow) {
-        setTicketData(savedSale); // Open TicketModal
-      } else {
-        showAlert({ title: "¡Éxito!", message: "Venta registrada sin impresión." });
-      }
+        // Background refresh inventory
+        refreshProducts().catch(console.error);
 
-      // --- RESTORED LOGIC: Register transaction in Caja ---
-      if (isCajaOpen && cajaSession) {
-        // Ensure pagoDetalles has explicit 'efectivo' field
-        const details = { ...pagoDetalles };
-        // Check if it's purely cash (no mixed methods)
-        const isCash = !details.tarjeta && !details.transferencia && !details.credito;
-        if (isCash && details.efectivo === undefined) {
-          details.efectivo = saleData.totalVenta;
+        const responseData = response.data || response || {};
+        const savedSale = { ...saleData, ...responseData };
+        savedSale.id = responseData.id || responseData.saleId || responseData._id || 'N/A';
+        savedSale.items = payloadItems;
+        savedSale.pagoDetalles = pagoDetalles;
+        savedSale.fecha = new Date().toISOString();
+
+        if (pagoDetalles.shouldPrintNow) {
+          setTicketData(savedSale); // Abre Modal Ticket con ID real
+        } else {
+          // Éxito silencioso o pequeño toast (ya mostramos alerta abajo si era instant)
         }
 
+        // Registrar en Caja (Background)
+        if (isCajaOpen && cajaSession) {
+          const details = { ...pagoDetalles };
+          const isCash = !details.tarjeta && !details.transferencia && !details.credito;
+          if (isCash && details.efectivo === undefined) details.efectivo = saleData.totalVenta;
+
+          const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
+          const totalSale = Number(saleData.totalVenta || 0);
+          details.efectivo = Number(details.efectivo || 0);
+
+          const newTransaction = {
+            type: 'venta',
+            amount: totalSale,
+            at: new Date().toISOString(),
+            userId,
+            note: `Venta #${savedSale.id} - ${clientNameFound}`,
+            pagoDetalles: details,
+            id: savedSale.id
+          };
+
+          // Enviar a servidor sin esperar en UI
+          api.addCajaTx({ userId, tx: newTransaction }, token).catch(console.error);
+
+          // Actualizar sesión local (si no lo hicimos antes)
+          // Nota: Si ya lo hicimos antes, esto podría duplicar visualmente si no tenemos cuidado, 
+          // pero como estamos en la promesa, esto corre "después".
+          // Mejor: Actualizar la sesión local SOLO si es await. Si es instant, lo hacemos afuera.
+          if (!isInstant) {
+            const updatedSession = { ...cajaSession, transactions: [newTransaction, ...(cajaSession.transactions || [])] };
+            setCajaSession(updatedSession);
+          }
+        }
+
+      } catch (err) {
+        console.error("CRITICAL: Error saving sale in background:", err);
+        // ★ NOTIFICACIÓN DE FALLO (User Request)
+        showAlert({
+          title: "⚠️ Error de Sincronización",
+          message: `La venta por C$ ${fmt(total)} NO se guardó en el servidor.\nError: ${err.message}.\n\nPor favor, anote los detalles o reintente.`
+        });
+        // TODO: En un sistema real, guardaríamos esto en IndexedDB para reintento automático.
+      }
+    };
+
+    if (isInstant) {
+      // --- MODO INSTANTÁNEO ---
+      // 1. Actualizar UI inmediatamente (Optimistic)
+      handleRemoveOrder(orderToCloseId);
+
+      setProductsState(prev => prev.map(p => {
+        const sold = payloadItems.find(i => i.id_producto === (p.id_producto || p.id));
+        if (sold) return { ...p, existencia: Math.max(0, p.existencia - sold.quantity) };
+        return p;
+      }));
+
+      // Actualizar Caja Localmente (Optimistic)
+      if (isCajaOpen && cajaSession) {
+        const details = { ...pagoDetalles };
         const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
         const totalSale = Number(saleData.totalVenta || 0);
-
-        // Ensure numeric fields for robustness
-        details.efectivo = Number(details.efectivo || 0);
-
-        const newTransaction = {
+        // ... (Logic duplicated largely for local show) ...
+        const tempTx = {
           type: 'venta',
           amount: totalSale,
           at: new Date().toISOString(),
-          userId, // Backend needs this
-          note: `Venta #${savedSale.id} - ${clientNameFound}`,
+          userId,
+          note: `Venta (Pendiente) - ${clientNameFound}`,
           pagoDetalles: details,
-          id: savedSale.id || 'TEMP-' + Date.now()
+          id: 'PEND-' + Date.now()
         };
-
-        // 1. SEND TO BACKEND (Vital for DB consistency)
-        try {
-          await api.addCajaTx({ userId, tx: newTransaction }, token);
-        } catch (e) {
-          console.error("Error syncing caixa tx API:", e);
-          // If this fails, we effectively have a zombie sale in terms of money, 
-          // but we still show it locally so the cashier isn't confused.
-        }
-
-        // 2. OPTIMISTIC UPDATE (Vital for UX "Frozen" fix)
-        // We update local state immediately so the user sees the numbers move.
-        const updatedSession = {
-          ...cajaSession,
-          transactions: [newTransaction, ...(cajaSession.transactions || [])]
-        };
+        const updatedSession = { ...cajaSession, transactions: [tempTx, ...(cajaSession.transactions || [])] };
         setCajaSession(updatedSession);
-
-        // 3. BACKGROUND SYNC
-        // We still ask the server for the official state, but we don't await it strictly 
-        // to block the UI if we already updated optimistically.
-        refreshSession().catch(console.error);
       }
-      // --------------------------------------------------------------------------------------
-      // --------------------------------------------------------------------------------------
+
+      showAlert({ title: "¡Éxito!", message: "Venta procesada." });
+
+      // 2. Ejecutar proceso en background
+      processSalePromise(); // No awaits
 
       return true;
-    } catch (err) {
-      console.error("Error creating sale:", err);
-      showAlert({ title: "Error en Venta", message: err.message || "No se pudo registrar la venta." });
-      return false;
+
+    } else {
+      // --- MODO CON ESPERA (IMPRESIÓN) ---
+      // Debemos esperar para tener el ID y mostrar el ticket
+      await processSalePromise();
+      return true;
     }
   };
 

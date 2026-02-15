@@ -29,7 +29,8 @@ const pool = require('../config/db');
             console.log('✅ Tabla business_config verificada.');
         }
     } catch (err) {
-        console.error('⚠️ Error en migración business_config:', err.message);
+        console.error('⚠️ Error en verificación/migración business_config (No crítico):', err.message);
+        // No lanzamos error para no detener el servidor, pero lo logueamos.
     }
 })();
 
