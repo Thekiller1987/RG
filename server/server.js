@@ -60,8 +60,6 @@ const corsOptions = {
 };
 
 // 3. Configurar Middlewares
-const compression = require('compression');
-app.use(compression()); // Compress all routes
 app.use(cors(corsOptions));
 
 // Evita 413: payload grande
@@ -71,9 +69,6 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Servir archivos estáticos (Imágenes subidas)
 const path = require('path');
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
-
-// Servir el Frontend (Build)
-app.use(express.static(path.join(__dirname, '../client/dist')));
 
 // 4. Definir el puerto
 // Usamos BACKEND_PORT si existe (según tu .env), o PORT, o 3003 por defecto
@@ -95,22 +90,13 @@ app.use('/api/caja', cajaRoutes);
 // NUEVA RUTA AGREGADA
 app.use('/api/facturas-proveedores', providerInvoiceRoutes);
 app.use('/api/requests', requestRoutes);
-app.use('/api/outflow', outflowRoutes); // <--- REGISTRAR RUTA TRASLADOS
+app.use('/api/outflow', outflowRoutes);
 
 const settingsRoutes = require('./src/routes/settingsRoutes.js');
 app.use('/api/settings', settingsRoutes);
 
-app.get('/api', (_req, res) => {
-  res.send('¡API MultirepuestosRG funcionando! 🚀');
-});
-
-// 6. SPA Fallback: Todas las rutas no-API cargan index.html
-app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api')) {
-    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
-  } else {
-    res.status(404).json({ message: 'API Route not found' });
-  }
+app.get('/', (_req, res) => {
+  res.send('¡API de MultirepuestosRG funcionando! 🚀');
 });
 
 // 6. Middleware global de manejo de errores
