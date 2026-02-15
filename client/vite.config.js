@@ -71,6 +71,13 @@ export default defineConfig({
                         if (id.includes('react-icons')) {
                             return 'icons-vendor';
                         }
+                        // Separar librerías pesadas específicas
+                        if (id.includes('jspdf') || id.includes('html2canvas')) {
+                            return 'pdf-vendor';
+                        }
+                        if (id.includes('html5-qrcode')) {
+                            return 'scanner-vendor';
+                        }
                         // Resto de node_modules en un chunk separado
                         return 'vendor';
                     }
