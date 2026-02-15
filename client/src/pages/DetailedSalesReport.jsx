@@ -1,4 +1,3 @@
-// client/src/pages/DetailedSalesReport.jsx
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
 import axios from 'axios';
@@ -8,6 +7,7 @@ import {
     FaUser, FaClock, FaChevronDown, FaChevronUp, FaPrint
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx'; // Use centralized Auth
 
 /* ================== CONFIG ================== */
 const API_URL = 'https://multirepuestosrg.com/api';
@@ -40,10 +40,8 @@ const fmtDate = (iso) => {
     });
 };
 
-function useAuthToken() {
-    const [token] = useState(() => localStorage.getItem('token') || null);
-    return token;
-}
+// Removed local useAuthToken to avoid conflict and use the one from context
+
 
 /* ================== THEME ================== */
 const theme = {
@@ -343,12 +341,14 @@ const ProductSearchList = ({ query, onSelect, token }) => {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (!query || query.length < 3) {
+        if (!query || query.length < 2) { // Allow searching with 2 chars for snappiness
             setResults([]);
             return;
         }
 
-        const timer = setTimeout(async () => {
+        // INSTANT SEARCH: No setTimeout/Debounce
+        let isMounted = true;
+        const search = async () => {
             setLoading(true);
             try {
                 // Important: Use searchOnly=true to avoid heavy history query
@@ -356,15 +356,17 @@ const ProductSearchList = ({ query, onSelect, token }) => {
                     headers: { Authorization: `Bearer ${token}` },
                     params: { code: query, searchOnly: true }
                 });
-                setResults(Array.isArray(res.data) ? res.data : []);
+                if (isMounted) setResults(Array.isArray(res.data) ? res.data : []);
             } catch (e) {
                 console.error("Search error", e);
             } finally {
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
-        }, 300);
+        };
 
-        return () => clearTimeout(timer);
+        search();
+
+        return () => { isMounted = false; };
     }, [query, token]);
 
     if (loading) return <div style={{ padding: '12px', color: '#64748b', fontSize: '0.9rem' }}>Buscando...</div>;
@@ -395,7 +397,7 @@ const ProductSearchList = ({ query, onSelect, token }) => {
 
 /* ================== COMPONENT ================== */
 export default function DetailedSalesReport() {
-    const token = useAuthToken();
+    const { token } = useAuth(); // Use AuthContext
     const navigate = useNavigate();
 
     const [activeTab, setActiveTab] = useState('ventas'); // 'ventas' | 'devoluciones' | 'producto'
