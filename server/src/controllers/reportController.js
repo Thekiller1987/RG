@@ -233,10 +233,12 @@ const getProductHistory = async (req, res) => {
         const [products] = await db.query(
             `SELECT id_producto, nombre, codigo, precio, costo, existencia 
              FROM productos 
-             WHERE codigo = ? OR codigo LIKE ? 
+             WHERE codigo = ? OR codigo LIKE ? OR nombre LIKE ?
              LIMIT 20`,
-            [code, `%${code}%`]
+            [code, `%${code}%`, `%${code}%`]
         );
+
+        if (req.query.searchOnly) return res.json(products);
 
         if (!products.length) return res.json({ product: null, history: [] });
 

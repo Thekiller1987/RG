@@ -337,6 +337,62 @@ const LoadingOverlay = styled.div`
   font-size: 1rem;
 `;
 
+/* ================== SUB-COMPONENTS ================== */
+const ProductSearchList = ({ query, onSelect, token }) => {
+    const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!query || query.length < 3) {
+            setResults([]);
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            setLoading(true);
+            try {
+                // Important: Use searchOnly=true to avoid heavy history query
+                const res = await axios.get(`${API_URL}/reports/product-history`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    params: { code: query, searchOnly: true }
+                });
+                setResults(Array.isArray(res.data) ? res.data : []);
+            } catch (e) {
+                console.error("Search error", e);
+            } finally {
+                setLoading(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [query, token]);
+
+    if (loading) return <div style={{ padding: '12px', color: '#64748b', fontSize: '0.9rem' }}>Buscando...</div>;
+    if (results.length === 0) return <div style={{ padding: '12px', color: '#64748b', fontSize: '0.9rem' }}>Sin coincidencias.</div>;
+
+    return (
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {results.map(p => (
+                <li key={p.id_producto}
+                    onClick={() => onSelect(p)}
+                    style={{
+                        padding: '10px 14px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                >
+                    <div>
+                        <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.9rem' }}>{p.nombre}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{p.codigo}</div>
+                    </div>
+                </li>
+            ))}
+        </ul>
+    );
+};
+
 /* ================== COMPONENT ================== */
 const DetailedSalesReport = () => {
     const token = useAuthToken();
@@ -377,15 +433,21 @@ const DetailedSalesReport = () => {
         }
     }, [authHeader, startDate, endDate]);
 
-    const fetchProductHistory = useCallback(async () => {
-        if (!productCode.trim()) return;
+    const fetchProductHistory = useCallback(async (codeOverride = null) => {
+        const codeToSearch = typeof codeOverride === 'string' ? codeOverride : productCode;
+        if (!codeToSearch || !codeToSearch.trim()) return;
+
         setProductLoading(true);
+        // If we used autocomplete, we want to HIDE the list, so we might need to handle that UI state,
+        // but here we just fetch data. The UI list hides if productResult is set? No, logic is "productCode.length > 2 && !productResult"
+
         try {
             const res = await axios.get(`${API_URL}/reports/product-history`, {
                 headers: authHeader,
-                params: { code: productCode.trim() }
+                params: { code: codeToSearch.trim() }
             });
             setProductResult(res.data);
+            if (codeOverride) setProductCode(codeOverride); // Sync input if clicked from list
         } catch (err) {
             console.error('Error fetching product history:', err);
             setProductResult({ product: null, history: [] });
@@ -687,33 +749,60 @@ const DetailedSalesReport = () => {
             {/* ───── TAB: BUSCAR POR PRODUCTO ───── */}
             {activeTab === 'producto' && (
                 <>
-                    <FilterBar>
-                        <FaBarcode style={{ color: theme.primary }} />
-                        <input
-                            type="text"
-                            placeholder="Ingresa código del producto..."
-                            value={productCode}
-                            onChange={e => setProductCode(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && fetchProductHistory()}
-                            style={{ minWidth: 280 }}
-                        />
-                        <ActionBtn variant="primary" onClick={fetchProductHistory}>
-                            <FaSearch /> Buscar
-                        </ActionBtn>
-                    </FilterBar>
+                    <div style={{ position: 'relative', maxWidth: '600px', marginBottom: '1.5rem' }}>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <FaSearch style={{ position: 'absolute', left: '12px', top: '14px', color: theme.textLight }} />
+                            <input
+                                type="text"
+                                placeholder="Buscar producto por nombre o código..."
+                                value={productCode}
+                                onChange={e => {
+                                    setProductCode(e.target.value);
+                                    setProductResult(null); // Clear previous history when typing
+                                }}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 12px 12px 38px',
+                                    borderRadius: '8px',
+                                    border: `1px solid ${theme.border}`,
+                                    outline: 'none',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                }}
+                            />
+                        </div>
+
+                        {/* RESULTADOS DE BÚSQUEDA (AUTOCOMPLETE) */}
+                        {productCode.length > 2 && !productResult && (
+                            <div style={{
+                                position: 'absolute', top: '100%', left: 0, right: 0,
+                                background: 'white', border: `1px solid ${theme.border}`,
+                                borderRadius: '8px', marginTop: '4px', zIndex: 10,
+                                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+                                maxHeight: '300px', overflowY: 'auto'
+                            }}>
+                                <ProductSearchList
+                                    query={productCode}
+                                    onSelect={(selected) => {
+                                        setProductCode(selected.nombre); // Show name in input
+                                        fetchProductHistory(selected.codigo); // Fetch history by Unique Code
+                                    }}
+                                    token={token}
+                                />
+                            </div>
+                        )}
+                    </div>
 
                     {productLoading ? (
-                        <LoadingOverlay><FaSyncAlt /> Buscando producto...</LoadingOverlay>
+                        <LoadingOverlay><FaSyncAlt className="icon-spin" /> Buscando historial...</LoadingOverlay>
                     ) : productResult === null ? (
                         <EmptyState>
                             <FaBarcode />
-                            <p>Ingresa un código de producto para ver su historial completo de ventas.</p>
-                            <p style={{ fontSize: '0.85rem' }}>Verás exactamente cuándo, a quién y cuántas unidades se vendieron.</p>
+                            <p>Escribe el nombre o código del producto arriba para ver su historial.</p>
                         </EmptyState>
                     ) : !productResult.product ? (
                         <EmptyState>
                             <FaSearch />
-                            <p>No se encontró ningún producto con el código "{productCode}".</p>
+                            <p>No se encontró historial.</p>
                         </EmptyState>
                     ) : (
                         <>
