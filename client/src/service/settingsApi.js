@@ -46,18 +46,18 @@ export const uploadLogo = async (token, file) => {
         reader.readAsDataURL(file);
         reader.onload = async () => {
             try {
-                const response = await fetch(`${import.meta.env.VITE_API_URL}/upload/logo`, {
+                const response = await fetch(`${import.meta.env.VITE_API_URL}/settings/logo`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({ image: reader.result, filename: file.name })
+                    body: JSON.stringify({ logo: reader.result })
                 });
 
                 if (!response.ok) throw new Error('Error subiendo logo');
                 const data = await response.json();
-                resolve(data.url);
+                resolve(data.logoUrl);
             } catch (error) {
                 reject(error);
             }

@@ -173,6 +173,19 @@ const Dashboard = () => {
         logout();
     };
 
+    // --- PRE-FETCHING LOGIC FOR "INSTANT" FEEL ---
+    const prefetch = (path) => {
+        switch (path) {
+            case '/pos': import('./pos/POS.jsx'); break;
+            case '/inventory': import('./InventoryManagement.jsx'); break;
+            case '/traslados': import('./InventoryOutflowPage.jsx'); break;
+            case '/credits': import('./ClientesYCreditos.jsx'); break;
+            case '/invoices': import('./FacturasProveedores.jsx'); break;
+            case '/orders': import('./PedidosYApartados.jsx'); break;
+            default: break;
+        }
+    };
+
     return (
         <PageWrapper>
             <Content>
@@ -189,7 +202,7 @@ const Dashboard = () => {
                 <GridContainer>
                     {/* 1. Punto de Venta */}
                     {canAccessPOS && (
-                        <Card to="/pos" color="#007bff">
+                        <Card to="/pos" color="#007bff" onMouseEnter={() => prefetch('/pos')}>
                             <CardIcon color="#007bff"><FaShoppingCart /></CardIcon>
                             <h2>Punto de Venta</h2>
                             <p>Registra ventas y gestiona transacciones diarias.</p>
@@ -208,7 +221,7 @@ const Dashboard = () => {
 
                     {/* 2. Pedidos y Apartados */}
                     {canAccessOrders && (
-                        <Card to="/orders" color="#ffc107">
+                        <Card to="/orders" color="#ffc107" onMouseEnter={() => prefetch('/orders')}>
                             <CardIcon color="#ffc107"><FaFileInvoice /></CardIcon>
                             <h2>Proformas y precios</h2>
                             <p>Crear Proformas y ver Productos</p>
@@ -217,7 +230,7 @@ const Dashboard = () => {
 
                     {/* NUEVO: Facturas Proveedores */}
                     {canAccessInvoices && (
-                        <Card to="/invoices" color="#e83e8c">
+                        <Card to="/invoices" color="#e83e8c" onMouseEnter={() => prefetch('/invoices')}>
                             <CardIcon color="#e83e8c"><FaFileInvoiceDollar /></CardIcon>
                             <h2>Facturas Proveedores</h2>
                             <p>Gestionar pagos, vencimientos y proveedores.</p>
@@ -226,7 +239,7 @@ const Dashboard = () => {
 
                     {/* 3. Clientes y Créditos */}
                     {canAccessCredits && (
-                        <Card to="/credits" color="#17a2b8">
+                        <Card to="/credits" color="#17a2b8" onMouseEnter={() => prefetch('/credits')}>
                             <CardIcon color="#17a2b8"><FaCreditCard /></CardIcon>
                             <h2>Clientes y Créditos</h2>
                             <p>Gestiona clientes, saldos pendientes y abonos.</p>
@@ -235,7 +248,7 @@ const Dashboard = () => {
 
                     {/* 4. Inventario */}
                     {canAccessInventory && (
-                        <Card to="/inventory" color="#28a745">
+                        <Card to="/inventory" color="#28a745" onMouseEnter={() => prefetch('/inventory')}>
                             <CardIcon color="#28a745"><FaBoxOpen /></CardIcon>
                             <h2>Inventario</h2>
                             <p>Controla el stock de tus productos y mercancía.</p>
@@ -253,7 +266,7 @@ const Dashboard = () => {
 
                     {/* NUEVO: TRASLADOS / SALIDAS (Admin Only) */}
                     {canAccessInventory && (
-                        <Card to="/traslados" color="#ef4444">
+                        <Card to="/traslados" color="#ef4444" onMouseEnter={() => prefetch('/traslados')}>
                             <CardIcon color="#ef4444"><FaTruck /></CardIcon>
                             <h2>Traslados / Salidas</h2>
                             <p>Descontar mercancía por traslados o merma.</p>

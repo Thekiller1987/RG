@@ -72,6 +72,9 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const path = require('path');
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
+// Servir el Frontend (Build)
+app.use(express.static(path.join(__dirname, '../client/dist')));
+
 // 4. Definir el puerto
 // Usamos BACKEND_PORT si existe (según tu .env), o PORT, o 3003 por defecto
 const PORT = process.env.BACKEND_PORT || process.env.PORT || 3003;
@@ -101,9 +104,13 @@ app.get('/api', (_req, res) => {
   res.send('¡API MultirepuestosRG funcionando! 🚀');
 });
 
-// Ruta de prueba
-app.get('/', (_req, res) => {
-  res.send('¡API de MultirepuestosRG funcionando! 🚀');
+// 6. SPA Fallback: Todas las rutas no-API cargan index.html
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+  } else {
+    res.status(404).json({ message: 'API Route not found' });
+  }
 });
 
 // 6. Middleware global de manejo de errores

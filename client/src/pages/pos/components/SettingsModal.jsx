@@ -3,8 +3,8 @@ import styled from 'styled-components';
 import { FaSave, FaWindowClose, FaBuilding, FaFileInvoice, FaCog } from 'react-icons/fa';
 import { useSettings } from '../../../context/SettingsContext';
 import { useAuthToken } from '../../../context/AuthContext'; // Helper if exists, or useAuth
-import axios from 'axios';
 import { toast } from 'react-hot-toast';
+import * as settingsApi from '../../../service/settingsApi';
 
 // --- STYLES ---
 const ModalOverlay = styled.div`
@@ -90,6 +90,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
     const [activeTab, setActiveTab] = useState('general'); // general | tickets
     const [saving, setSaving] = useState(false);
+    const [uploadingLogo, setUploadingLogo] = useState(false);
+    const [logoPreview, setLogoPreview] = useState(null);
 
     // Sync from settings context when opening
     useEffect(() => {
@@ -98,6 +100,10 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 ...prev,
                 ...settings
             }));
+            // If settings contains a logo URL, set it
+            if (settings.empresa_logo_url) {
+                setLogoPreview(settings.empresa_logo_url);
+            }
         }
     }, [isOpen, settings]);
 
@@ -109,10 +115,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
     const handleSave = async () => {
         setSaving(true);
         try {
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-            await axios.put(`${API_URL}/settings`, formData, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await settingsApi.updateSettings(token, formData);
             await refreshSettings();
             toast.success('Configuración actualizada correctamente');
             onClose();
@@ -121,6 +124,24 @@ const SettingsModal = ({ isOpen, onClose }) => {
             toast.error('Error al guardar configuración');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleLogoUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setUploadingLogo(true);
+        try {
+            const logoUrl = await settingsApi.uploadLogo(token, file);
+            setLogoPreview(logoUrl);
+            setFormData(prev => ({ ...prev, empresa_logo_url: logoUrl }));
+            toast.success('Logo subido correctamente');
+        } catch (error) {
+            console.error(error);
+            toast.error('Error al subir el logo');
+        } finally {
+            setUploadingLogo(false);
         }
     };
 
@@ -165,6 +186,45 @@ const SettingsModal = ({ isOpen, onClose }) => {
                             <FormGroup style={{ gridColumn: 'span 2' }}>
                                 <label>Eslogan / Frase</label>
                                 <input name="empresa_eslogan" value={formData.empresa_eslogan || ''} onChange={handleChange} />
+                            </FormGroup>
+
+                            <FormGroup style={{ gridColumn: 'span 2' }}>
+                                <label>Logo del Negocio (Aparecerá en Tickets)</label>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                                    <div style={{
+                                        width: '100px', height: '100px', border: '1px dashed #cbd5e1',
+                                        borderRadius: '12px', display: 'flex', alignItems: 'center',
+                                        justifyContent: 'center', background: '#f8fafc', overflow: 'hidden'
+                                    }}>
+                                        {logoPreview ? (
+                                            <img src={logoPreview} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                        ) : (
+                                            <small style={{ color: '#94a3b8' }}>Sin Logo</small>
+                                        )}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleLogoUpload}
+                                            id="logo-upload"
+                                            style={{ display: 'none' }}
+                                        />
+                                        <label
+                                            htmlFor="logo-upload"
+                                            style={{
+                                                display: 'inline-block', padding: '8px 16px', background: '#f1f5f9',
+                                                border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer',
+                                                fontWeight: '600', fontSize: '0.9rem'
+                                            }}
+                                        >
+                                            {uploadingLogo ? 'Subiendo...' : 'Seleccionar Imagen'}
+                                        </label>
+                                        <p style={{ margin: '5px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                                            Recomendado: PNG fondo transparente (aprox 200x200px)
+                                        </p>
+                                    </div>
+                                </div>
                             </FormGroup>
                         </div>
                     )}

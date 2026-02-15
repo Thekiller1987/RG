@@ -40,39 +40,22 @@ export default defineConfig({
         VitePWA(pwaConfig)
     ],
 
-    // 🛑 SOLUCIÓN CLAVE para 'react-toastify'
-    optimizeDeps: {
-        // Asegura que Vite pre-optimice y resuelva react-toastify
-        include: ['react-toastify'],
-    },
     build: {
-        commonjsOptions: {
-            // Indica a Rollup cómo interpretar los módulos CommonJS dentro de la dependencia
-            include: [/node_modules/],
-        },
-        // Opcional: Puede ayudar a resolver el problema del chunk
         rollupOptions: {
-            external: ['react-toastify/dist/ReactToastify.css'],
             output: {
-                entryFileNames: 'assets/[name].[hash].js',
-                chunkFileNames: 'assets/[name].[hash].js',
-                assetFileNames: 'assets/[name].[hash].[ext]',
                 manualChunks(id) {
                     if (id.includes('node_modules')) {
-                        // Separar librerías pesadas específicas (SOLO ESTAS para evitar errores vacíos)
                         if (id.includes('jspdf') || id.includes('html2canvas')) {
-                            return 'pdf-vendor'; // ~300KB
+                            return 'pdf-vendor';
                         }
                         if (id.includes('html5-qrcode')) {
-                            return 'scanner-vendor'; // ~200KB
+                            return 'scanner-vendor';
                         }
-                        // Resto de node_modules en un solo chunk 'vendor' para asegurar orden de carga correcto
-                        // Esto previene el error "Cannot access 'X' before initialization"
                         return 'vendor';
                     }
                 }
             }
         },
-        chunkSizeWarningLimit: 1000 // Aumentar límite de advertencia a 1MB
+        chunkSizeWarningLimit: 2000
     }
 });
