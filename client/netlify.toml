@@ -1,10 +1,11 @@
 # SPA: evita 404 al refrescar
 [[redirects]]
+  from = "/api/*"
+  to = "http://64.23.228.145/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
-# REGLA API ELIMINADA:
-# Se eliminó la regla de redireccionamiento para /api/* porque el código
-# JavaScript ahora usa una URL absoluta (http://IP:8080/api),
-# lo cual es más estable y evita conflictos con el proxy de Netlify.
