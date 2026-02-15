@@ -229,24 +229,18 @@ const getProductHistory = async (req, res) => {
     const { code } = req.query;
     if (!code) return res.status(400).json({ msg: 'Código de producto requerido.' });
     try {
-        console.log(`[getProductHistory] Searching for code: "${code}" (searchOnly: ${req.query.searchOnly})`);
+        // console.log(`[getProductHistory] Searching for code: "${code}"`);
 
-        // MEJORA: Búsqueda simple en SQL, ordenamiento en JS para máxima compatibilidad
+        // 1. Encontrar producto(s) coincidentes
         let products = [];
-        try {
-            const [rows] = await db.query(
-                `SELECT id_producto, nombre, codigo, precio, costo, existencia 
-                 FROM productos 
-                 WHERE codigo = ? OR codigo LIKE ? OR nombre LIKE ?
-                 LIMIT 20`,
-                [code, `%${code}%`, `%${code}%`]
-            );
-            products = rows;
-        } catch (dbError) {
-            console.error('[getProductHistory] Database Query Error (Recovering):', dbError);
-            // Fallback: Return empty to avoid crashing UI
-            products = [];
-        }
+        const [rows] = await db.query(
+            `SELECT id_producto, nombre, codigo, precio, costo, existencia 
+             FROM productos 
+             WHERE codigo = ? OR codigo LIKE ? OR nombre LIKE ?
+             LIMIT 20`,
+            [code, `%${code}%`, `%${code}%`]
+        );
+        products = rows;
 
         if (req.query.searchOnly) {
             return res.json(products);
@@ -254,7 +248,7 @@ const getProductHistory = async (req, res) => {
 
         if (!products.length) return res.json({ product: null, history: [] });
 
-        // Ordenar en JS: Exact match primero
+        // Ordenar: Exact match primero
         products.sort((a, b) => {
             const aExact = (a.codigo === code);
             const bExact = (b.codigo === code);
@@ -263,46 +257,46 @@ const getProductHistory = async (req, res) => {
             return a.nombre.localeCompare(b.nombre);
         });
 
-        // Tomamos el PRIMERO como el "principal" seleccionado
         const product = products[0];
         const productIds = products.map(p => p.id_producto);
 
-        // Obtener historial de ventas (Try-catch separado para no fallar todo si esto falla)
+        // 2. Obtener Historial
         let history = [];
-        try {
-            if (productIds.length > 0) {
-                const [histResults] = await db.query(`
-                    SELECT 
-                        v.id_venta AS idVenta,
-                        v.fecha,
-                        v.estado,
-                        v.tipo_venta,
-                        dv.cantidad,
-                        p.codigo AS codigoProducto,
-                        dv.precio_unitario AS precioUnitario,
-                        c.nombre AS clienteNombre,
-                        c.id_cliente AS clienteId,
-                        u.nombre_usuario AS vendedorNombre
-                    FROM detalle_ventas dv
-                    JOIN ventas v ON dv.id_venta = v.id_venta
-                    JOIN productos p ON dv.id_producto = p.id_producto
-                    LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
-                    LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
-                    WHERE dv.id_producto IN (?)
-                    ORDER BY v.fecha DESC
-                    LIMIT 200
-                `, [productIds]);
-                history = histResults;
-            }
-        } catch (histError) {
-            console.error("Error fetching history details (ignoring):", histError);
-            // Retornamos array vacío en historial pero SI retornamos los productos
+        if (productIds.length > 0) {
+            // Manual placeholder construction to ensure compatibility
+            const placeHolders = productIds.map(() => '?').join(',');
+
+            const sql = `
+                SELECT 
+                    v.id_venta AS idVenta,
+                    v.fecha,
+                    v.estado,
+                    v.tipo_venta,
+                    dv.cantidad,
+                    p.codigo AS codigoProducto,
+                    dv.precio_unitario AS precioUnitario,
+                    c.nombre AS clienteNombre,
+                    c.id_cliente AS clienteId,
+                    u.nombre_usuario AS vendedorNombre
+                FROM detalle_ventas dv
+                JOIN ventas v ON dv.id_venta = v.id_venta
+                JOIN productos p ON dv.id_producto = p.id_producto
+                LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
+                LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
+                WHERE dv.id_producto IN (${placeHolders})
+                ORDER BY v.fecha DESC
+                LIMIT 200
+            `;
+
+            // Pass flattened productIds array
+            const [histResults] = await db.query(sql, productIds);
+            history = histResults;
         }
 
         res.json({ product, products, history });
+
     } catch (error) {
         console.error('Error buscando historial de producto:', error);
-        // Devolvemos el error detallado para debug en producción si es necesario
         res.status(500).json({ msg: 'Error de servidor: ' + error.message });
     }
 };
