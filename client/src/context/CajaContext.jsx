@@ -15,7 +15,6 @@ export const CajaProvider = ({ children, user, socket }) => { // Accept socket a
     const refreshSession = useCallback(async () => {
         if (!userId) return;
         try {
-            console.log("🔄 Syncing Caja Session from Server...");
             const serverSession = await getCajaSession(userId);
 
             if (serverSession && !serverSession.closedAt) {
@@ -23,11 +22,20 @@ export const CajaProvider = ({ children, user, socket }) => { // Accept socket a
                 setIsCajaOpen(true);
                 if (serverSession.tasaDolar) setTasaDolar(Number(serverSession.tasaDolar));
             } else {
+                // El servidor respondió explícitamente que no hay sesión abierta
                 setCajaSession(null);
                 setIsCajaOpen(false);
             }
         } catch (error) {
-            console.error("❌ Error syncing caja (Server Error):", error);
+            // ⚠️ IMPORTANTE: Si es error de red/timeout, NO destruir la sesión existente.
+            // El usuario sigue teniendo caja abierta, solo es un problema de conexión temporal.
+            if (error.isNetworkError || error.message?.includes('timeout') || error.message?.includes('conexión') || !error.status) {
+                console.warn("⚠️ Error de red al sincronizar caja (manteniendo estado actual):", error.message);
+                // NO tocar el state — mantener lo que ya hay
+                return;
+            }
+            // Si es un error 401/403/500 del servidor, sí limpiamos
+            console.error("❌ Error de servidor al sincronizar caja:", error);
             setCajaSession(null);
             setIsCajaOpen(false);
         }

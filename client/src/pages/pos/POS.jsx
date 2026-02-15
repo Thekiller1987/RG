@@ -167,10 +167,8 @@ const POS = () => {
       const intervalId = setInterval(() => {
         if (!document.hidden) {
           checkForNewOrders(userId);
-          checkForNewOrders(userId);
-          // refreshProducts(); // REMOVED: Intrusive polling. Relying on Sockets now.
         }
-      }, 5000);
+      }, 15000); // 15s — más suave con internet lento
 
       return () => clearInterval(intervalId);
     }

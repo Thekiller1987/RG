@@ -28,16 +28,27 @@ export const AuthProvider = ({ children, socket }) => {
 
     const loadMasterData = useCallback(async (token) => {
         try {
-            const [usersData, productsData, clientsData] = await Promise.all([
+            const results = await Promise.allSettled([
                 api.fetchUsers(token),
                 api.fetchProducts(token),
                 api.fetchClients(token),
             ]);
-            setAllUsers(usersData || []);
-            setProducts(productsData || []);
-            setClients(clientsData || []);
+
+            // Cada uno se procesa individualmente — si uno falla, los demás aún cargan
+            if (results[0].status === 'fulfilled') setAllUsers(results[0].value || []);
+            else console.warn("⚠️ No se pudieron cargar usuarios:", results[0].reason?.message);
+
+            if (results[1].status === 'fulfilled') setProducts(results[1].value || []);
+            else console.warn("⚠️ No se pudieron cargar productos:", results[1].reason?.message);
+
+            if (results[2].status === 'fulfilled') setClients(results[2].value || []);
+            else console.warn("⚠️ No se pudieron cargar clientes:", results[2].reason?.message);
+
+            // Si TODOS fallaron con 401, hacer logout
+            const allUnauth = results.every(r => r.status === 'rejected' && r.reason?.status === 401);
+            if (allUnauth) logout();
         } catch (err) {
-            console.error("Fallo al cargar datos maestros:", err);
+            console.error("Fallo crítico cargando datos maestros:", err);
             if (err.status === 401) logout();
         }
     }, [logout]);

@@ -10,44 +10,66 @@ const API_URL = RAW_BASE; // Simplificado
 
 export { API_URL };
 
+const REQUEST_TIMEOUT = 15000; // 15 segundos máximo por request
+const MAX_RETRIES = 2; // Reintentos solo para GET
+
 const request = async (method, path, token = null, data = null, config = {}) => {
     const headers = { 'Content-Type': 'application/json', ...(config.headers || {}) };
     if (token) headers.Authorization = `Bearer ${token}`;
 
-    // =======================================================
-    // ESTA ES LA LINEA CLAVE: USA LA URL ABSOLUTA COMPLETA
     const fullUrl = `${RAW_BASE}${path}`;
-    // =======================================================
+    const normalizedMethod = String(method || 'get').toLowerCase();
+    const isGet = normalizedMethod === 'get';
+    const retries = isGet ? MAX_RETRIES : 0; // Solo reintentar GETs (evita duplicar ventas/pagos)
 
-    try {
-        const requestConfig = {
-            url: fullUrl, // Usamos la URL absoluta
-            method: String(method || 'get').toLowerCase(), // normaliza, soporta 'GET'/'get'
-            headers,
-            withCredentials: !!config.withCredentials,
-            ...config,
-        };
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            const requestConfig = {
+                url: fullUrl,
+                method: normalizedMethod,
+                headers,
+                timeout: config.timeout || REQUEST_TIMEOUT,
+                withCredentials: !!config.withCredentials,
+                ...config,
+            };
 
-        if (data !== null && requestConfig.method !== 'get') {
-            requestConfig.data = data;
+            if (data !== null && normalizedMethod !== 'get') {
+                requestConfig.data = data;
+            }
+
+            if (config.params && normalizedMethod === 'get') {
+                requestConfig.params = config.params;
+            }
+
+            const res = await axios.request(requestConfig);
+            return res.data;
+
+        } catch (err) {
+            // Error de servidor (respuesta con código de error) — no reintentar
+            if (err.response) {
+                const msg = err.response.data?.message || err.response.data?.msg || JSON.stringify(err.response.data);
+                const error = new Error(msg || `HTTP ${err.response.status}`);
+                error.status = err.response.status;
+                throw error;
+            }
+
+            // Error de red/timeout — reintentar si quedan intentos
+            const isLastAttempt = attempt >= retries;
+            if (isLastAttempt) {
+                const networkError = new Error(
+                    err.code === 'ECONNABORTED'
+                        ? 'Tiempo de espera agotado. Verifica tu conexión a internet.'
+                        : (err.message || 'Error de conexión con el servidor.')
+                );
+                networkError.isNetworkError = true;
+                throw networkError;
+            }
+
+            // Espera exponencial antes de reintentar (500ms, 1500ms)
+            const delay = 500 * Math.pow(2, attempt);
+            console.warn(`⚠️ Reintentando ${path} (intento ${attempt + 2}/${retries + 1}) en ${delay}ms...`);
+            await new Promise(r => setTimeout(r, delay));
         }
-
-        // Si hay 'params' en la configuración (usado por fetchSales), Axios los añade como query string.
-        if (config.params && requestConfig.method === 'get') {
-            requestConfig.params = config.params;
-        }
-
-        const res = await axios.request(requestConfig); // Usamos axios directamente
-        return res.data;
-
-    } catch (err) {
-        if (err.response) {
-            const msg = err.response.data?.message || err.response.data?.msg || JSON.stringify(err.response.data);
-            const error = new Error(msg || `HTTP ${err.response.status}`);
-            error.status = err.response.status;
-            throw error;
-        }
-        throw err;
     }
 };
 

@@ -67,6 +67,7 @@ async function ensureSchema() {
         total_ventas_tarjeta DECIMAL(12,2) DEFAULT 0,
         total_ventas_transferencia DECIMAL(12,2) DEFAULT 0,
         total_ventas_credito DECIMAL(12,2) DEFAULT 0,
+        total_dolares DECIMAL(12,2) DEFAULT 0,
         total_entradas DECIMAL(12,2) DEFAULT 0,
         total_salidas DECIMAL(12,2) DEFAULT 0,
         observaciones TEXT,
@@ -76,6 +77,13 @@ async function ensureSchema() {
         INDEX idx_fecha_cierre (fecha_cierre)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+
+    // 1b. Agregar columna total_dolares si no existe (migración)
+    try {
+      await pool.query(`ALTER TABLE cierres_caja ADD COLUMN total_dolares DECIMAL(12,2) DEFAULT 0 AFTER total_ventas_credito;`);
+    } catch (e) {
+      // Ignoramos si ya existe
+    }
 
     // 2. Crear tabla de carritos si no existe
     await pool.query(`
@@ -101,6 +109,85 @@ async function ensureSchema() {
 
 // Ejecutar corrección al cargar el archivo
 ensureSchema();
+
+// ───────── Helper: Calcular totales de sesión desde transacciones ─────────
+function calcularTotalesSesion(transactions, details) {
+  let totalEfectivo = 0, totalTarjeta = 0, totalTransferencia = 0, totalCredito = 0;
+  let totalDolares = 0, totalIngresos = 0, totalGastos = 0;
+  let movimientoNetoEfectivo = 0;
+
+  (transactions || []).forEach(tx => {
+    const tipo = (tx.type || '').toLowerCase();
+    const d = tx.pagoDetalles || {};
+
+    // VENTAS
+    if (tipo.startsWith('venta')) {
+      totalEfectivo += Number(d.efectivo || 0);
+      totalTarjeta += Number(d.tarjeta || 0);
+      totalTransferencia += Number(d.transferencia || 0);
+      totalCredito += Number(d.credito || 0);
+      totalDolares += Number(d.dolares || 0);
+
+      // Cálculo efectivo neto
+      const cashIn = Number(d.efectivo || 0);
+      const dolaresVal = Number(d.dolares || 0);
+      const tasa = Number(d.tasaDolarAlMomento || details?.tasaDolar || 1);
+      const cashOut = Number(d.cambio || 0);
+      if (!d.efectivo && !d.dolares) {
+        movimientoNetoEfectivo += Number(d.ingresoCaja || 0);
+      } else {
+        movimientoNetoEfectivo += (cashIn + (dolaresVal * tasa)) - cashOut;
+      }
+    }
+    // ABONOS
+    else if (tipo.includes('abono')) {
+      if (d.efectivo) totalEfectivo += Number(d.efectivo || 0);
+      else if (d.ingresoCaja > 0) totalEfectivo += Number(d.ingresoCaja || 0);
+      if (d.tarjeta) totalTarjeta += Number(d.tarjeta || 0);
+      if (d.transferencia) totalTransferencia += Number(d.transferencia || 0);
+      if (d.dolares) {
+        totalDolares += Number(d.dolares || 0);
+        movimientoNetoEfectivo += (Number(d.efectivo || 0) + (Number(d.dolares || 0) * Number(details?.tasaDolar || 1)));
+      } else {
+        movimientoNetoEfectivo += Number(d.ingresoCaja || 0);
+      }
+    }
+    // ENTRADAS
+    else if (tipo === 'entrada') {
+      const m = Number(tx.amount || 0);
+      totalIngresos += m;
+      movimientoNetoEfectivo += m;
+    }
+    // SALIDAS
+    else if (tipo === 'salida') {
+      const m = Number(tx.amount || 0);
+      totalGastos += m;
+      movimientoNetoEfectivo -= m;
+    }
+    // DEVOLUCIONES / CANCELACIONES
+    else if (tipo === 'devolucion' || tipo === 'cancelacion') {
+      totalEfectivo -= Number(d.efectivo || 0);
+      totalTarjeta -= Number(d.tarjeta || 0);
+      totalTransferencia -= Number(d.transferencia || 0);
+      totalCredito -= Number(d.credito || 0);
+      totalDolares -= Number(d.dolares || 0);
+      let impacto = Number(d.ingresoCaja || tx.amount || 0);
+      if (impacto > 0) impacto = -impacto;
+      movimientoNetoEfectivo += impacto;
+    }
+    // AJUSTES SECRETOS
+    else if (tipo === 'ajuste') {
+      const monto = Number(tx.amount || 0);
+      if (d.target === 'efectivo') movimientoNetoEfectivo += monto;
+      else if (d.target === 'credito') totalCredito += monto;
+      else if (d.target === 'tarjeta') totalTarjeta += monto;
+      else if (d.target === 'transferencia') totalTransferencia += monto;
+      else if (d.target === 'dolares') totalDolares += monto;
+    }
+  });
+
+  return { totalEfectivo, totalTarjeta, totalTransferencia, totalCredito, totalDolares, totalIngresos, totalGastos, movimientoNetoEfectivo };
+}
 
 // ───────── Sesiones de Caja (SQL ONLY) ─────────
 
@@ -128,6 +215,7 @@ function mapRowToSession(row) {
     countedAmount: row.final_real ? Number(row.final_real) : null,
     difference: row.diferencia ? Number(row.diferencia) : null,
     tasaDolar: Number(details.tasaDolar || 0),
+    totalDolares: Number(row.total_dolares || 0),
     notes: row.observaciones || ''
   };
 }
@@ -264,14 +352,30 @@ router.post('/session/tx', async (req, res) => {
       pagoDetalles: tx.pagoDetalles || {}
     });
 
-    // 3. Guardar JSON actualizado en BD
+    // 3. Recalcular totales corridos desde TODAS las transacciones
+    const totals = calcularTotalesSesion(details.transactions, details);
+
+    // 4. Guardar JSON + totales actualizados en BD (cada tx actualiza las columnas)
     await pool.query(`
       UPDATE cierres_caja 
-      SET detalles_json = ? 
+      SET detalles_json = ?,
+          total_ventas_efectivo = ?,
+          total_ventas_tarjeta = ?,
+          total_ventas_transferencia = ?,
+          total_ventas_credito = ?,
+          total_dolares = ?,
+          total_entradas = ?,
+          total_salidas = ?
       WHERE id = ?
-    `, [JSON.stringify(details), row.id]);
+    `, [
+      JSON.stringify(details),
+      totals.totalEfectivo, totals.totalTarjeta, totals.totalTransferencia,
+      totals.totalCredito, totals.totalDolares,
+      totals.totalIngresos, totals.totalGastos,
+      row.id
+    ]);
 
-    // 4. Devolver sesión actualizada
+    // 5. Devolver sesión actualizada
     res.status(201).json(mapRowToSession({ ...row, detalles_json: details }));
 
   } catch (error) {
@@ -325,92 +429,11 @@ router.post('/session/close', async (req, res) => {
 
     const transactions = details.transactions || [];
 
-    // 2. Calcular totales finales
-    let totalEfectivo = 0, totalTarjeta = 0, totalTransferencia = 0, totalCredito = 0;
-    let totalIngresos = 0, totalGastos = 0;
-    let movimientoNetoEfectivo = 0;
-
-    transactions.forEach(tx => {
-      const tipo = tx.type;
-      const d = tx.pagoDetalles || {};
-
-      // 1. ACUMULADORES GLOBALES (Ventas)
-      if (tipo.startsWith('venta')) {
-        totalEfectivo += Number(d.efectivo || 0);
-        totalTarjeta += Number(d.tarjeta || 0);
-        totalTransferencia += Number(d.transferencia || 0);
-        totalCredito += Number(d.credito || 0);
-      }
-      // 2. ACUMULADORES ABONOS (Credit Payments)
-      else if (tipo.includes('abono')) {
-        // Abonos can be Cash, Card, or Transfer
-        if (d.efectivo) totalEfectivo += Number(d.efectivo || 0);
-        // Fallback: If no breakdown but ingresoCaja > 0, assume cash
-        else if (d.ingresoCaja > 0) totalEfectivo += Number(d.ingresoCaja || 0);
-
-        if (d.tarjeta) totalTarjeta += Number(d.tarjeta || 0);
-        if (d.transferencia) totalTransferencia += Number(d.transferencia || 0);
-      }
-
-      // 3. FLUJO DE CAJA (Efectivo Neto)
-      if (tipo === 'entrada') {
-        const m = Number(tx.amount || 0);
-        totalIngresos += m; // Generic Income
-        movimientoNetoEfectivo += m;
-      } else if (tipo === 'salida') {
-        const m = Number(tx.amount || 0);
-        totalGastos += m; // Generic Expense
-        movimientoNetoEfectivo -= m;
-      } else if (tipo === 'devolucion' || tipo === 'cancelacion') {
-        // Reversal of revenue
-        totalEfectivo -= Number(d.efectivo || 0);
-        totalTarjeta -= Number(d.tarjeta || 0);
-        totalTransferencia -= Number(d.transferencia || 0);
-        totalCredito -= Number(d.credito || 0);
-
-        // Physical Cash Impact (Negative)
-        let impacto = Number(d.ingresoCaja || tx.amount || 0);
-        if (impacto > 0) impacto = -impacto;
-        movimientoNetoEfectivo += impacto;
-
-      } else if (tipo === 'venta_contado' || tipo === 'venta' || tipo.startsWith('venta')) {
-        const cashIn = Number(d.efectivo || 0);
-        const dolaresVal = Number(d.dolares || 0);
-        const tasa = Number(d.tasaDolarAlMomento || details.tasaDolar || 1);
-        const cashOut = Number(d.cambio || 0);
-        const netoFisico = (cashIn + (dolaresVal * tasa)) - cashOut;
-
-        // If legacy (no breakdown), use ingresoCaja directly
-        if (!d.efectivo && !d.dolares) {
-          movimientoNetoEfectivo += Number(d.ingresoCaja || 0);
-        } else {
-          movimientoNetoEfectivo += netoFisico;
-        }
-
-      } else if (tipo.includes('abono')) {
-        // Abono Cash Impact
-        if (d.dolares) {
-          movimientoNetoEfectivo += (Number(d.efectivo || 0) + (Number(d.dolares || 0) * Number(details.tasaDolar || 1)));
-        } else {
-          movimientoNetoEfectivo += Number(d.ingresoCaja || 0);
-        }
-      }
-      else if (tipo === 'ajuste') {
-        const monto = Number(tx.amount || 0);
-        if (d.target === 'efectivo') {
-          movimientoNetoEfectivo += monto;
-        } else if (d.target === 'credito') {
-          totalCredito += monto;
-        } else if (d.target === 'tarjeta') {
-          totalTarjeta += monto;
-        } else if (d.target === 'transferencia') {
-          totalTransferencia += monto;
-        }
-      }
-    });
+    // 2. Calcular totales finales usando helper compartido
+    const totals = calcularTotalesSesion(transactions, details);
 
     const montoInicial = Number(row.monto_inicial || 0);
-    const finalEsperado = montoInicial + movimientoNetoEfectivo;
+    const finalEsperado = montoInicial + totals.movimientoNetoEfectivo;
     const finalReal = Number(countedAmount);
     const diferencia = finalReal - finalEsperado;
 
@@ -425,14 +448,16 @@ router.post('/session/close', async (req, res) => {
         total_ventas_tarjeta = ?,
         total_ventas_transferencia = ?,
         total_ventas_credito = ?,
+        total_dolares = ?,
         total_entradas = ?,
         total_salidas = ?,
         observaciones = ?
       WHERE id = ?
     `, [
       new Date(closedAt), finalEsperado, finalReal, diferencia,
-      totalEfectivo, totalTarjeta, totalTransferencia, totalCredito,
-      totalIngresos, totalGastos,
+      totals.totalEfectivo, totals.totalTarjeta, totals.totalTransferencia, totals.totalCredito,
+      totals.totalDolares,
+      totals.totalIngresos, totals.totalGastos,
       notes || '',
       row.id
     ]);
@@ -475,6 +500,7 @@ router.get('/reporte', async (req, res) => {
       total_tarjeta: Number(r.total_ventas_tarjeta),
       total_transferencia: Number(r.total_ventas_transferencia),
       total_credito: Number(r.total_ventas_credito),
+      total_dolares: Number(r.total_dolares || 0),
       total_gastos: Number(r.total_salidas),
       total_ingresos: Number(r.total_entradas),
       detalles_json: r.detalles_json
