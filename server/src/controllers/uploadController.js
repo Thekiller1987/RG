@@ -29,7 +29,7 @@ async function getOrCreateMappingId(connection, tableName, name, nameColumn, idC
 
         // 2. Si no existe, intentar crearlo
         const [result] = await connection.query(`INSERT INTO ${tableName} (${nameColumn}) VALUES (?)`, [cleanName]);
-        return result.insertId; 
+        return result.insertId;
     } catch (insertError) {
         if (insertError.code === 'ER_DUP_ENTRY') {
             // Reintentar buscar si otro hilo lo creó durante el mapeo
@@ -50,9 +50,9 @@ async function getOrCreateMappingId(connection, tableName, name, nameColumn, idC
  * @returns {object} - Informe de éxito/error al cliente.
  */
 const bulkUpdateInventory = async (req, res) => { // 🚨 CAMBIADO A DECLARACIÓN CONST 🚨
-    const products = req.body.items; 
+    const products = req.body.items;
     const userId = req.user?.id_usuario ?? req.user?.id; // ID del usuario que realiza la carga
-    
+
     if (!products || products.length === 0) {
         return res.status(400).json({ message: "No se proporcionaron datos de productos válidos para la carga masiva." });
     }
@@ -61,7 +61,7 @@ const bulkUpdateInventory = async (req, res) => { // 🚨 CAMBIADO A DECLARACIÓ
     let errorCount = 0;
     const errors = [];
     let connection;
-    
+
     // SQL para el registro de movimientos de inventario
     const logSql = 'INSERT INTO movimientos_inventario (id_producto, tipo_movimiento, detalles, id_usuario) VALUES (?, ?, ?, ?)';
 
@@ -75,12 +75,12 @@ const bulkUpdateInventory = async (req, res) => { // 🚨 CAMBIADO A DECLARACIÓ
 
         // --- 1. PROCESAR, SANEAR Y MAPEAR (BUSCAR IDS) CADA PRODUCTO ---
         for (const product of products) {
-            
+
             // ⚠️ VALIDACIÓN CRÍTICA: Código y Nombre son obligatorios
             // Si falta alguno, lo marcamos como error y pasamos a la siguiente fila.
             const rawCodigo = String(product.codigo || '').trim();
             const rawNombre = String(product.nombre || '').trim();
-            
+
             if (!rawCodigo || !rawNombre) {
                 errorCount++;
                 errors.push({ codigo: rawCodigo || 'N/A', error: 'El Código y el Nombre del Producto son campos obligatorios y no pueden estar vacíos.' });
@@ -107,26 +107,26 @@ const bulkUpdateInventory = async (req, res) => { // 🚨 CAMBIADO A DECLARACIÓ
                     );
                 }
                 const id_proveedor = providerMap[providerMapKey];
-                
+
                 // SANIDAD Y DEFENSA CONTRA VACÍOS
                 const finalTipoVenta = String(product.tipo_venta || '').trim() || 'UNIDAD';
-                
+
                 // Valores numéricos: parseFloat() fallará si es una cadena vacía, 
                 // por lo que usamos el || null o || 0 para manejar los vacíos de forma segura.
                 // Usamos product.<campo> ya que el front-end ya limpió los símbolos de moneda ($,)
                 const finalCosto = parseFloat(product.costo) || 0.00;
-                const finalVenta = parseFloat(product.precio) || 0.00; 
+                const finalVenta = parseFloat(product.precio) || 0.00;
                 const finalMayoreo = parseFloat(product.mayoreo) || null; // Opcional
                 const finalMinimo = parseInt(product.minimo, 10) || null; // Opcional
                 const finalMaximo = parseInt(product.maximo, 10) || null; // Opcional
-                
+
                 // Existencia es la cantidad que ENTRA. Debe ser un número (o 0 si está vacío)
-                const entradaExistencia = parseInt(product.existencia, 10) || 0; 
+                const entradaExistencia = parseInt(product.existencia, 10) || 0;
 
                 processedProducts.push({
                     codigo: rawCodigo, nombre: rawNombre, tipo_venta: finalTipoVenta,
                     id_categoria: id_categoria, id_proveedor: id_proveedor,
-                    costo: finalCosto, venta: finalVenta, mayoreo: finalMayoreo, 
+                    costo: finalCosto, venta: finalVenta, mayoreo: finalMayoreo,
                     entrada_existencia: entradaExistencia, minimo: finalMinimo, maximo: finalMaximo,
                 });
 
@@ -135,9 +135,9 @@ const bulkUpdateInventory = async (req, res) => { // 🚨 CAMBIADO A DECLARACIÓ
                 errors.push({ codigo: rawCodigo || 'N/A', error: `Error al mapear Categoría/Proveedor: ${mapError.message}` });
             }
         }
-        
+
         // --- 2. QUERY DE INSERCIÓN/ACTUALIZACIÓN ÚNICA (UPSERT) ---
-        
+
         const queryText = `
             INSERT INTO productos (
                 codigo, nombre, costo, venta, existencia, id_categoria, 
@@ -155,29 +155,29 @@ const bulkUpdateInventory = async (req, res) => { // 🚨 CAMBIADO A DECLARACIÓ
                 maximo = VALUES(maximo),
                 existencia = existencia + VALUES(existencia); 
         `;
-        
+
         // SQL para obtener el ID de un producto existente (Necesario para registrar movimientos)
         const checkIdSql = 'SELECT id_producto FROM productos WHERE codigo = ?';
 
         // --- 3. EJECUTAR QUERIES Y REGISTRAR MOVIMIENTOS ---
-        
+
         for (const saneProduct of processedProducts) {
             // Saltamos filas que pudieron haber fallado el mapeo pero no el error crítico inicial
-            if (saneProduct.error) continue; 
+            if (saneProduct.error) continue;
 
             // Los valores de INSERT y ON DUPLICATE son los mismos en MySQL.
             const values = [
-                saneProduct.codigo, saneProduct.nombre, saneProduct.costo, saneProduct.venta, saneProduct.entrada_existencia, 
+                saneProduct.codigo, saneProduct.nombre, saneProduct.costo, saneProduct.venta, saneProduct.entrada_existencia,
                 saneProduct.id_categoria, saneProduct.id_proveedor, saneProduct.tipo_venta, saneProduct.mayoreo,
                 saneProduct.minimo, saneProduct.maximo
             ];
-            
+
             try {
                 const [result] = await connection.query(queryText, values);
-                
+
                 // result.affectedRows > 1 indica una actualización (2 filas afectadas)
                 // result.affectedRows === 1 indica una inserción
-                const isUpdate = result.affectedRows > 1; 
+                const isUpdate = result.affectedRows > 1;
                 const isInsert = result.affectedRows === 1;
 
                 let logDetails = '';
@@ -202,7 +202,7 @@ const bulkUpdateInventory = async (req, res) => { // 🚨 CAMBIADO A DECLARACIÓ
                 if (tipoMovimiento && productId) {
                     await connection.execute(logSql, [productId, tipoMovimiento, logDetails, userId]);
                 }
-                
+
                 updatedCount++;
 
             } catch (queryError) {
@@ -216,14 +216,14 @@ const bulkUpdateInventory = async (req, res) => { // 🚨 CAMBIADO A DECLARACIÓ
             await connection.rollback();
             return res.status(400).json({ message: 'Error: Ningún producto pudo ser procesado con éxito.', errors });
         }
-        
+
         await connection.commit(); // Confirmar todos los cambios si hubo al menos un éxito
-        
+
         // Respuesta final al cliente (Multi-Status si hay errores parciales)
-        const status = errorCount > 0 ? 207 : 200; 
-        
-        return res.status(status).json({ 
-            message: errorCount > 0 
+        const status = errorCount > 0 ? 207 : 200;
+
+        return res.status(status).json({
+            message: errorCount > 0
                 ? `Carga procesada con éxito: ${updatedCount}. Hubo errores en ${errorCount} productos.`
                 : `🎉 ¡Carga masiva completa! Se procesaron ${updatedCount} productos.`,
             count: updatedCount,
@@ -241,6 +241,53 @@ const bulkUpdateInventory = async (req, res) => { // 🚨 CAMBIADO A DECLARACIÓ
     }
 };
 
+const fs = require('fs');
+const path = require('path');
+
+/**
+ * Sube un logo (Base64) y lo guarda en el servidor.
+ */
+const uploadLogo = async (req, res) => {
+    try {
+        const { image, filename } = req.body;
+        if (!image) {
+            return res.status(400).json({ message: 'No se proporcionó imagen.' });
+        }
+
+        // Crear directorio uploads si no existe
+        const uploadDir = path.join(__dirname, '../../public/uploads');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+
+        // Limpiar base64 header (data:image/png;base64,...)
+        const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (!matches || matches.length !== 3) {
+            return res.status(400).json({ message: 'Formato de imagen inválido.' });
+        }
+
+        const buffer = Buffer.from(matches[2], 'base64');
+        const safeName = (filename || 'logo.png').replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+        const finalName = `logo_${Date.now()}_${safeName}`;
+        const filePath = path.join(uploadDir, finalName);
+
+        fs.writeFileSync(filePath, buffer);
+
+        // Retornar URL relativa (el server.js debe servir /uploads)
+        // Asume que el servidor sirve 'public' o 'public/uploads' mapeado a URL
+        const protocol = req.protocol;
+        const host = req.get('host');
+        // Construimos la URL completa para evitar problemas con rutas relativas en frontend
+        const fileUrl = `${protocol}://${host}/uploads/${finalName}`;
+
+        res.json({ url: fileUrl });
+    } catch (error) {
+        console.error('Error subiendo logo:', error);
+        res.status(500).json({ message: 'Error al procesar la imagen.' });
+    }
+};
+
 module.exports = {
-    bulkUpdateInventory // 🚨 EXPORTADO CORRECTAMENTE 🚨
+    bulkUpdateInventory,
+    uploadLogo
 };

@@ -233,8 +233,9 @@ const getProductHistory = async (req, res) => {
 
         // 1. Encontrar producto(s) coincidentes
         let products = [];
+        // Change 'precio' to 'venta AS precio' alias to keep frontend compatible
         const [rows] = await db.query(
-            `SELECT id_producto, nombre, codigo, precio, costo, existencia 
+            `SELECT id_producto, nombre, codigo, venta AS precio, costo, existencia 
              FROM productos 
              WHERE codigo = ? OR codigo LIKE ? OR nombre LIKE ?
              LIMIT 20`,

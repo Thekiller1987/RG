@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useSettings } from '../context/SettingsContext';
-import { updateSettings as apiUpdateSettings } from '../service/settingsApi';
+import { updateSettings as apiUpdateSettings, uploadLogo } from '../service/settingsApi';
 import { useAuth } from '../context/AuthContext';
-import { FaSave, FaBuilding, FaPhone, FaMapMarkerAlt, FaIdCard, FaImage } from 'react-icons/fa';
+import { FaSave, FaBuilding, FaPhone, FaMapMarkerAlt, FaIdCard, FaImage, FaReceipt, FaFileInvoice, FaExchangeAlt } from 'react-icons/fa';
 
 const Container = styled.div`
   padding: 2rem;
@@ -24,6 +24,18 @@ const Form = styled.form`
   padding: 2rem;
   border-radius: 12px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+`;
+
+const SectionTitle = styled.h3`
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  color: #334155;
+  font-size: 1.1rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 `;
 
 const FormGroup = styled.div`
@@ -62,6 +74,7 @@ const TextArea = styled.textarea`
   font-size: 1rem;
   min-height: 100px;
   resize: vertical;
+  font-family: inherit;
   &:focus {
     outline: none;
     border-color: #3b82f6;
@@ -96,12 +109,22 @@ const Message = styled.div`
   gap: 8px;
 `;
 
+const LogoPreview = styled.img`
+    max-width: 150px;
+    border: 1px solid #ddd;
+    padding: 5px;
+    border-radius: 4px;
+    margin-top: 10px;
+    display: block;
+`;
+
 const SettingsPage = () => {
     const { settings, refreshSettings } = useSettings();
     const { token } = useAuth();
     const [formData, setFormData] = useState({});
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null);
+    const [uploadingLogo, setUploadingLogo] = useState(false);
 
     useEffect(() => {
         if (settings) {
@@ -112,6 +135,24 @@ const SettingsPage = () => {
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleLogoChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setUploadingLogo(true);
+        setMessage(null);
+        try {
+            const url = await uploadLogo(token, file);
+            setFormData(prev => ({ ...prev, empresa_logo_url: url }));
+            setMessage({ type: 'success', text: 'Logo subido correctamente. Recuerda Guardar Cambios.' });
+        } catch (error) {
+            console.error(error);
+            setMessage({ type: 'error', text: 'Error al subir el logo.' });
+        } finally {
+            setUploadingLogo(false);
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -133,6 +174,9 @@ const SettingsPage = () => {
         <Container>
             <Title><FaBuilding /> Configuración de Empresa</Title>
             <Form onSubmit={handleSubmit}>
+
+                {/* --- SECCIÓN GENERAL --- */}
+                <SectionTitle>Datos Generales</SectionTitle>
                 <FormGroup>
                     <Label><FaBuilding /> Nombre de la Empresa</Label>
                     <Input
@@ -143,23 +187,25 @@ const SettingsPage = () => {
                     />
                 </FormGroup>
 
-                <FormGroup>
-                    <Label><FaIdCard /> RUC</Label>
-                    <Input
-                        name="empresa_ruc"
-                        value={formData.empresa_ruc || ''}
-                        onChange={handleChange}
-                    />
-                </FormGroup>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    <FormGroup>
+                        <Label><FaIdCard /> RUC</Label>
+                        <Input
+                            name="empresa_ruc"
+                            value={formData.empresa_ruc || ''}
+                            onChange={handleChange}
+                        />
+                    </FormGroup>
 
-                <FormGroup>
-                    <Label><FaPhone /> Teléfono(s)</Label>
-                    <Input
-                        name="empresa_telefono"
-                        value={formData.empresa_telefono || ''}
-                        onChange={handleChange}
-                    />
-                </FormGroup>
+                    <FormGroup>
+                        <Label><FaPhone /> Teléfono(s)</Label>
+                        <Input
+                            name="empresa_telefono"
+                            value={formData.empresa_telefono || ''}
+                            onChange={handleChange}
+                        />
+                    </FormGroup>
+                </div>
 
                 <FormGroup>
                     <Label><FaMapMarkerAlt /> Dirección</Label>
@@ -167,6 +213,7 @@ const SettingsPage = () => {
                         name="empresa_direccion"
                         value={formData.empresa_direccion || ''}
                         onChange={handleChange}
+                        style={{ minHeight: '80px' }}
                     />
                 </FormGroup>
 
@@ -180,19 +227,67 @@ const SettingsPage = () => {
                 </FormGroup>
 
                 <FormGroup>
-                    <Label><FaImage /> URL del Logo (Opcional)</Label>
+                    <Label><FaImage /> Logo del Ticket</Label>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLogoChange}
+                            disabled={uploadingLogo}
+                        />
+                        {uploadingLogo && <span>Subiendo...</span>}
+                    </div>
+
+                    {formData.empresa_logo_url && (
+                        <LogoPreview src={formData.empresa_logo_url} alt="Vista previa logo" />
+                    )}
+
                     <Input
+                        style={{ marginTop: '10px' }}
                         name="empresa_logo_url"
                         value={formData.empresa_logo_url || ''}
                         onChange={handleChange}
-                        placeholder="https://ejemplo.com/logo.png"
+                        placeholder="O ingresa una URL manual (https://...)"
                     />
-                    <small style={{ display: 'block', marginTop: 5, color: '#666' }}>
-                        Si se deja vacío, se usará el logo predeterminado (/icons/logo.png).
-                    </small>
                 </FormGroup>
 
-                <Button type="submit" disabled={loading}>
+                {/* --- SECCIÓN TICKETS --- */}
+                <SectionTitle>Personalización de Tickets</SectionTitle>
+
+                <FormGroup>
+                    <Label><FaReceipt /> Pie de Página (Ventas)</Label>
+                    <TextArea
+                        name="ticket_sales_footer"
+                        value={formData.ticket_sales_footer || ''}
+                        onChange={handleChange}
+                        placeholder="Ej: ¡Gracias por su compra! Vuelva pronto."
+                        style={{ minHeight: '60px' }}
+                    />
+                </FormGroup>
+
+                <FormGroup>
+                    <Label><FaFileInvoice /> Pie de Página (Proformas)</Label>
+                    <TextArea
+                        name="ticket_proforma_footer"
+                        value={formData.ticket_proforma_footer || ''}
+                        onChange={handleChange}
+                        placeholder="Ej: Cotización válida por 15 días."
+                        style={{ minHeight: '60px' }}
+                    />
+                </FormGroup>
+
+                <FormGroup>
+                    <Label><FaExchangeAlt /> Pie de Página (Traslados/Salidas)</Label>
+                    <TextArea
+                        name="ticket_transfer_footer"
+                        value={formData.ticket_transfer_footer || ''}
+                        onChange={handleChange}
+                        placeholder="Ej: Salida de inventario autorizada."
+                        style={{ minHeight: '60px' }}
+                    />
+                </FormGroup>
+
+                <Button type="submit" disabled={loading || uploadingLogo}>
                     <FaSave /> {loading ? 'Guardando...' : 'Guardar Cambios'}
                 </Button>
 

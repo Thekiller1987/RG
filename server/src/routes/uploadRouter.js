@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const uploadController = require('../controllers/uploadController.js'); 
+const uploadController = require('../controllers/uploadController.js');
 
 // Importamos solo las funciones existentes y las renombramos para ser consistentes
-const { verifyToken: protect, isAdmin } = require('../middleware/authMiddleware.js'); 
+const { verifyToken: protect, isAdmin } = require('../middleware/authMiddleware.js');
 
 // Middleware de roles que simula el comportamiento de allowedRoles,
 // pero usa la estructura de datos que 'verifyToken' adjunta a req.user (req.user.rol).
@@ -25,10 +25,18 @@ const allowedRolesMiddleware = (roles) => (req, res, next) => {
 
 // POST /api/upload/inventory
 router.post(
-    '/inventory',
-    protect, // Usamos la función verifyToken renombrada a 'protect'
-    allowedRolesMiddleware(['Administrador', 'Encargado de Inventario']), // Usamos la función local
-    uploadController.bulkUpdateInventory
+    '/inventory',
+    protect, // Usamos la función verifyToken renombrada a 'protect'
+    allowedRolesMiddleware(['Administrador', 'Encargado de Inventario']), // Usamos la función local
+    uploadController.bulkUpdateInventory
+);
+
+// POST /api/upload/logo
+router.post(
+    '/logo',
+    protect,
+    allowedRolesMiddleware(['Administrador']),
+    uploadController.uploadLogo
 );
 
 module.exports = router;
