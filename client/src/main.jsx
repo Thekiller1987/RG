@@ -4,6 +4,7 @@ import { BrowserRouter as Router } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { CajaProvider } from './context/CajaContext.jsx';
 import { OrdersProvider } from './context/OrdersContext.jsx';
+import { SettingsProvider } from './context/SettingsContext.jsx';
 import App from './App.jsx';
 import './index.css';
 
@@ -44,9 +45,11 @@ const AppProviders = ({ socket }) => {
 
   return (
     <CajaProvider user={user} socket={socket}>
-      <OrdersProvider>
-        <App />
-      </OrdersProvider>
+      <SettingsProvider>
+        <OrdersProvider>
+          <App />
+        </OrdersProvider>
+      </SettingsProvider>
     </CajaProvider>
   );
 };

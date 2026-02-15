@@ -88,6 +88,9 @@ app.use('/api/facturas-proveedores', providerInvoiceRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/outflow', outflowRoutes); // <--- REGISTRAR RUTA TRASLADOS
 
+const settingsRoutes = require('./src/routes/settingsRoutes.js');
+app.use('/api/settings', settingsRoutes);
+
 app.get('/api', (_req, res) => {
   res.send('¡API MultirepuestosRG funcionando! 🚀');
 });

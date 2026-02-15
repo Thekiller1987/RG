@@ -14,6 +14,7 @@ import {
   FaArrowLeft,
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import { useSettings } from '../context/SettingsContext.jsx'; // NEW hook
 
 /* ================== CONFIG ================== */
 const API_URL = '/api';
@@ -575,6 +576,7 @@ const BreakdownTable = styled.table`
 const CashReport = () => {
   const token = useAuthToken();
   const navigate = useNavigate();
+  const { settings } = useSettings(); // NEW: Configuración dinámica
 
   const [date, setDate] = useState(() => todayManagua());
   const [loading, setLoading] = useState(false);
@@ -648,7 +650,7 @@ const CashReport = () => {
     }
   };
 
-  // Función para imprimir
+  // Función para imprimir (A4 Profesional + Configuración Dinámica)
   const handlePrintDetail = (session) => {
     const stats = calculateReportStats(session); // Recalcular con lógica "Bank Level"
 
@@ -656,17 +658,22 @@ const CashReport = () => {
     const win = window.open('', '_blank');
     if (!win) return;
 
-    const css = `
+    // Datos de empresa dinámicos
+    const companyName = settings?.empresa_nombre || 'Multirepuestos RG';
+    const slogan = settings?.empresa_eslogan || 'Repuestos de confianza al mejor precio';
+    const logoUrl = settings?.empresa_logo_url || (window.location.origin + '/icons/logo.png');
+
+    const cssdetail = `
       @page { size: A4; margin: 15mm; }
-      body { font-family: 'Inter', Helvetica, Arial, sans-serif; padding: 0; margin: 0; color: #1e293b; max-width: none; }
+      body { font-family: 'Inter', Helvetica, Arial, sans-serif; padding: 0; margin: 0; color: #1e293b; max-width: none; background: #fff; }
       
       .brand { 
-        display: flex; justify-content: space-between; align-items: center;
+        display: flex; justify-content: space-between; align-items: flex-start;
         border-bottom: 3px solid #1e293b; padding-bottom: 20px; margin-bottom: 30px;
       }
-      .brand img { width: 140px; }
+      .brand img { width: 140px; height: auto; }
       .brand-info { text-align: right; }
-      .brand h1 { margin: 0 0 5px 0; color: #1e293b; font-size: 24pt; letter-spacing: -0.5px; }
+      .brand h1 { margin: 0 0 5px 0; color: #1e293b; font-size: 24pt; letter-spacing: -0.5px; font-weight: 800; }
       .brand p { margin: 2px 0; color: #64748b; font-size: 10pt; }
 
       .box { 
@@ -707,20 +714,19 @@ const CashReport = () => {
       .num { font-family: 'Roboto Mono', monospace; text-align: right; }
 
       .footer { margin-top: 50px; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; color: #94a3b8; font-size: 9pt; }
+      .signatures { display: flex; justify-content: space-between; margin-top: 40px; padding: 0 40px; }
+      .sign-box { border-top: 1px solid #94a3b8; width: 40%; text-align: center; padding-top: 5px; font-size: 10pt; color: #64748b; }
     `;
 
     // Diferencia calculada al vuelo
     const diff = Number(session.contado || session.countedAmount || 0) - stats.efectivoEsperado;
-
-    // Logo Path (Ensure explicit absolute path for print window)
-    const logoUrl = window.location.origin + '/icons/logo.png';
 
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
         <title>Reporte de Caja - ${fmtDT(session.closedAt || session.hora_cierre)}</title>
-        <style>${css}</style>
+        <style>${cssdetail}</style>
       </head>
       <body>
         
@@ -729,7 +735,8 @@ const CashReport = () => {
            <div class="brand-info">
              <h1>REPORTE DE CAJA</h1>
              <p>${new Date().toLocaleDateString('es-NI', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-             <p>Multirepuestos RG</p>
+             <p>"${slogan}"</p>
+             <p>${companyName}</p>
            </div>
         </div>
 
@@ -763,36 +770,40 @@ const CashReport = () => {
           <div class="box-header">Conciliación de Efectivo</div>
           <div class="box-content">
                 <div class="section">
-                  <div class="section-title">1. TOTAL INGRESOS (VENTAS + ABONOS)</div>
-                  <div class="row big"><span>TOTAL GLOBAL:</span><span>${fmtMoney(stats.totalVentasDia)}</span></div>
-                  <div class="row sub">(Ventas Contado + Crédito + Abonos + Ajustes)</div>
+                  <div class="row bold" style="background:#f8fafc; padding:8px;"><span>1. TOTAL INGRESOS BRUTOS:</span><span>${fmtMoney(stats.totalVentasDia)}</span></div>
+                  <div class="row sub-row" style="margin-bottom:10px;">(Incluye Ventas Contado, Crédito, Abonos, Entradas y Ajustes)</div>
                 </div>
 
                 <div class="section">
-                  <div class="section-title">2. DESGLOSE NO EFECTIVO</div>
+                  <div class="row bold" style="border:none;"><span>2. MENOS NO EFECTIVO:</span></div>
                   ${stats.totalTarjeta > 0 ? `<div class="row"><span>(-) Tarjetas:</span><span>${fmtMoney(stats.totalTarjeta)}</span></div>` : ''}
-                  ${stats.totalTransferencia > 0 ? `<div class="row"><span>(-) Transf.:</span><span>${fmtMoney(stats.totalTransferencia)}</span></div>` : ''}
-                  ${stats.totalCredito > 0 ? `<div class="row"><span>(-) Créditos:</span><span>${fmtMoney(stats.totalCredito)}</span></div>` : ''}
-                  <div class="row" style="border-top: 1px dashed #000;"><span>TOTAL NO EFECTIVO:</span><span>${fmtMoney(stats.totalNoEfectivo)}</span></div>
+                  ${stats.totalTransferencia > 0 ? `<div class="row"><span>(-) Transferencias:</span><span>${fmtMoney(stats.totalTransferencia)}</span></div>` : ''}
+                  ${stats.totalCredito > 0 ? `<div class="row"><span>(-) Créditos Otorgados:</span><span>${fmtMoney(stats.totalCredito)}</span></div>` : ''}
+                  <div class="row bold" style="border-top: 1px dashed #000; margin-top:5px;"><span>TOTAL DEDUCIBLE:</span><span>${fmtMoney(stats.totalNoEfectivo)}</span></div>
                 </div>
 
-                <div class="section">
-                  <div class="section-title">3. FLUJO EFECTIVO (RESUMEN)</div>
-                  <div class="row"><span>Fondo Inicial:</span><span>${fmtMoney(session.monto_inicial || session.initialAmount)}</span></div>
+                <div class="section" style="margin-top:15px;">
+                  <div class="row bold" style="border:none;"><span>3. FLUJO DE CAJA NETO:</span></div>
+                  <div class="row"><span>(+) Fondo Inicial:</span><span>${fmtMoney(session.monto_inicial || session.initialAmount)}</span></div>
                   <div class="row"><span>(+) Ingresos Totales:</span><span>${fmtMoney(stats.totalVentasDia)}</span></div>
-                  <div class="row"><span>(-) No Efectivo:</span><span>-${fmtMoney(stats.totalNoEfectivo)}</span></div>
+                  <div class="row"><span>(-) Total No Efectivo:</span><span>-${fmtMoney(stats.totalNoEfectivo)}</span></div>
                   ${Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)) > 0 ? `
-                      <div class="row"><span>(-) Salidas:</span><span>-${fmtMoney(Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)))}</span></div>
+                      <div class="row"><span>(-) Salidas de Caja:</span><span>-${fmtMoney(Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)))}</span></div>
                   ` : ''}
+                  <div class="row bold" style="background:#f0fdf4; padding:8px; border:1px solid #bbf7d0; margin-top:10px;">
+                    <span>= EFECTIVO ESPERADO EN CAJA:</span><span>${fmtMoney(stats.efectivoEsperado)}</span>
+                  </div>
                 </div>
             </div>
           </div>
         </div>
 
         <div class="footer">
-           <p>Reporte generado automáticamente por Sistema RG</p>
-           <p>__________________________ &nbsp;&nbsp;&nbsp;&nbsp; __________________________</p>
-           <p>Firma Cajero &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Firma Supervisor</p>
+           <div class="signatures">
+              <div class="sign-box">Firma Cajero</div>
+              <div class="sign-box">Firma Supervisor</div>
+           </div>
+           <p style="margin-top:30px;">Reporte generado automáticamente por Sistema RG</p>
         </div>
 
       </body>
@@ -801,11 +812,8 @@ const CashReport = () => {
 
     win.document.write(html);
     win.document.close();
-    // Esperar a que cargue la imagen
-    setTimeout(() => {
-      win.focus();
-      win.print();
-    }, 500);
+    win.focus();
+    // setTimeout(() => win.print(), 500); 
   };
 
   // Componente para mostrar desglose de transacciones en cada card de cierre

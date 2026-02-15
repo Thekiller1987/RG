@@ -22,6 +22,7 @@ import FacturasProveedores from './pages/FacturasProveedores.jsx';
 import Solicitudes from './pages/Solicitudes.jsx';
 import InventoryOutflowPage from './pages/InventoryOutflowPage.jsx'; // <--- NUEVA PAGINA
 import DetailedSalesReport from './pages/DetailedSalesReport.jsx';
+import SettingsPage from './pages/SettingsPage.jsx';
 
 // Mapa de roles
 const ROLES = {
@@ -176,6 +177,16 @@ function App() {
         element={
           <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.INVENTARIO, ROLES.FINANZAS, ROLES.GERENTE]}>
             <Solicitudes />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Configuración de Empresa (Nueva Ruta) */}
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE]}>
+            <SettingsPage />
           </ProtectedRoute>
         }
       />

@@ -21,6 +21,7 @@ const Button = styled.button`
 
 export default function ClientFormModal({ client, onClose, onSave }) {
     const [nombre, setNombre] = useState('');
+    const [cedula, setCedula] = useState('');
     const [telefono, setTelefono] = useState('');
     const [limite, setLimite] = useState('');
     const token = localStorage.getItem('token');
@@ -28,10 +29,12 @@ export default function ClientFormModal({ client, onClose, onSave }) {
     useEffect(() => {
         if (client) {
             setNombre(client.nombre || '');
+            setCedula(client.cedula || '');
             setTelefono(client.telefono || '');
             setLimite(client.limite_credito || '');
         } else {
             setNombre('');
+            setCedula('');
             setTelefono('');
             setLimite('');
         }
@@ -39,9 +42,10 @@ export default function ClientFormModal({ client, onClose, onSave }) {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         const clientData = {
             nombre,
+            cedula,
             telefono,
             limite_credito: limite === '' ? null : Number(limite)
         };
@@ -52,7 +56,7 @@ export default function ClientFormModal({ client, onClose, onSave }) {
             } else {
                 await api.createClient(clientData, token);
             }
-            onSave();
+            if (onSave) onSave(); // Ensure onSave is called
             onClose();
         } catch (err) {
             console.error(err);
@@ -69,6 +73,7 @@ export default function ClientFormModal({ client, onClose, onSave }) {
                 </Header>
                 <Form onSubmit={handleSubmit}>
                     <Input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre" required />
+                    <Input value={cedula} onChange={e => setCedula(e.target.value)} placeholder="Cédula / RUC" />
                     <Input value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="Teléfono" />
                     <Input type="number" step="0.01" value={limite} onChange={e => setLimite(e.target.value)} placeholder="Límite de crédito" />
                     <Button type="submit"><FaSave /> Guardar</Button>
