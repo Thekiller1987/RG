@@ -120,6 +120,96 @@ const POS = () => {
     }
   }, []);
 
+  // Cálculos del Carrito Activo
+  const cart = activeOrder?.items || [];
+  const subtotal = cart.reduce((s, i) => s + (i.precio_venta * i.quantity), 0);
+  const discountAmount = activeOrder?.discount?.type === 'percentage'
+    ? (subtotal * activeOrder.discount.value / 100)
+    : (activeOrder?.discount?.value || 0);
+  const total = subtotal - discountAmount;
+
+  /* -----------------------------------------------------------------
+   * EFECTOS E INICIALIZACIÓN
+   * ----------------------------------------------------------------- */
+  useEffect(() => {
+    if (initialProducts) setProductsState(initialProducts);
+  }, [initialProducts]);
+
+  useEffect(() => {
+    if (userId) {
+      // 1. Initial Load: Get everything
+      loadOrdersFromDB(userId);
+
+      // 2. Poll for NEW orders safely without overwriting current work
+      const intervalId = setInterval(() => {
+        if (!document.hidden) {
+          checkForNewOrders(userId);
+        }
+      }, 15000);
+
+      return () => clearInterval(intervalId);
+    }
+  }, [userId, loadOrdersFromDB, checkForNewOrders]);
+
+  /* -----------------------------------------------------------------
+   * ACCIONES Y MANEJADORES
+   * ----------------------------------------------------------------- */
+  const showAlert = ({ title, message }) => setAlert({ isOpen: true, title, message });
+  const closeAlert = () => setAlert({ isOpen: false });
+
+  const showConfirmation = ({ title, message, onConfirm }) => {
+    setConfirmation({ isOpen: true, title, message, onConfirm });
+  };
+  const closeConfirmation = () => setConfirmation({ isOpen: false, title: '', message: '', onConfirm: null });
+
+  const openModal = (name, data = null) => setModal({ name, data });
+  const closeModal = () => setModal({ name: null, data: null });
+
+  const refreshData = async () => {
+    try {
+      await refreshProducts();
+      if (userId) await loadOrdersFromDB(userId);
+    } catch (e) { console.error("Error refreshing data", e); }
+  };
+
+  const updateActiveCart = (newCart) => updateActiveOrder('items', newCart);
+
+  const handleSecretTrigger = () => {
+    openModal('pinPrompt', {
+      action: () => setSecretModalOpen(true)
+    });
+  };
+
+  const handleSecretAdjust = async (adjustments) => {
+    for (const adj of adjustments) {
+      const transaction = {
+        type: 'ajuste',
+        amount: adj.amount,
+        at: new Date().toISOString(),
+        userId,
+        note: `Ajuste Interno (${adj.target})`,
+        pagoDetalles: {
+          target: adj.target,
+          hidden: true,
+          amount: adj.amount,
+          efectivo: adj.target === 'efectivo' ? adj.amount : 0,
+          dolares: adj.target === 'dolares' ? adj.amount : 0,
+          credito: adj.target === 'credito' ? adj.amount : 0,
+          tarjeta: adj.target === 'tarjeta' ? adj.amount : 0
+        },
+        id: 'ADJ-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5)
+      };
+
+      try {
+        await api.addCajaTx({ userId, tx: transaction }, token);
+      } catch (e) {
+        console.error("Error saving secret adjust:", e);
+      }
+    }
+    await refreshSession();
+    showAlert({ title: "Procesado", message: "Ajustes aplicados correctamente." });
+  };
+
   // ... (Calculations)
 
   // Calculate Current Stats for Secret Modal
