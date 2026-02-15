@@ -540,7 +540,13 @@ const TicketModal = ({
 
             <div className="thanks">
               <p>"{companyInfo.slogan}"</p>
-              <p>¡Gracias por su compra!</p>
+              <p style={{ whiteSpace: 'pre-line', marginTop: '5px' }}>
+                {(() => {
+                  if (isProforma) return settings?.ticket_proforma_footer || 'Cotización válida por 15 días.';
+                  if (isOutflow) return settings?.ticket_transfer_footer || 'Salida de Inventario.';
+                  return settings?.ticket_sales_footer || '¡Gracias por su compra!';
+                })()}
+              </p>
             </div>
 
           </PrintWrapper>

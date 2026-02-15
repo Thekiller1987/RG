@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import styled, { css, createGlobalStyle } from 'styled-components';
 import { FaPrint, FaWindowClose, FaReceipt, FaTruck, FaFileInvoice } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSettings } from '../../../context/SettingsContext.jsx'; // Import hook
 
 const COMPANY = {
   NAME: 'Multirepuestos RG',
@@ -152,6 +153,17 @@ const HeaderBar = styled.div`
 `;
 
 const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
+  const { settings } = useSettings();
+
+  const companyInfo = {
+    name: settings?.empresa_nombre || 'Multirepuestos RG',
+    ruc: settings?.empresa_ruc || '1211812770001E',
+    phone: settings?.empresa_telefono || '84031936 / 84058142',
+    address: settings?.empresa_direccion || 'Del portón de la normal 75 varas al este. Juigalpa, Chontales.',
+    slogan: settings?.empresa_eslogan || 'Repuestos de confianza al mejor precio — calidad que mantiene tu motor en marcha.',
+    logo: settings?.empresa_logo_url || new URL('/icons/logo.png', window.location.origin).toString()
+  };
+
   if (!isOpen || !transaction) return null;
 
   const fmt = (n) => new Intl.NumberFormat('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n || 0));
@@ -336,10 +348,10 @@ const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
                   <TicketLogo src={getLogoPath()} alt="Logo" onError={(e) => e.target.style.display = 'none'} />
 
                   <div className="brand-info">
-                    <h1>{COMPANY.NAME}</h1>
-                    <small>{COMPANY.SLOGAN}</small>
-                    <small>RUC: {COMPANY.RUC}</small>
-                    <small>{COMPANY.ADDRESS}</small>
+                    <h1>{companyInfo.name}</h1>
+                    <small>{companyInfo.slogan}</small>
+                    <small>RUC: {companyInfo.ruc}</small>
+                    <small>{companyInfo.address}</small>
                     <div className="tag">COMPROBANTE DE SALIDA</div>
                   </div>
                 </div>
@@ -411,6 +423,9 @@ const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
                       <p>Recibido Por</p>
                     </div>
                   </div>
+                  <p style={{ marginTop: '20px', whiteSpace: 'pre-line' }}>
+                    {settings?.ticket_transfer_footer || 'Salida de Inventario autorizada.'}
+                  </p>
                 </div>
               </PrintWrapper>
 

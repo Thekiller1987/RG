@@ -412,6 +412,41 @@ const DetailedSalesReport = () => {
     // Expanded rows
     const [expandedRows, setExpandedRows] = useState({});
 
+    // ─── VISUAL HISTORY LOGIC ───
+    const [allProducts, setAllProducts] = useState([]);
+
+    const loadProducts = useCallback(async () => {
+        setProductLoading(true);
+        try {
+            // Reutilizamos el endpoint de productos (el mismo que usa POS/Inventario)
+            const res = await axios.get(`${API_URL}/products`, { headers: authHeader });
+            setAllProducts(Array.isArray(res.data) ? res.data : []);
+        } catch (e) {
+            console.error("Error cargando inventario visual:", e);
+        } finally {
+            setProductLoading(false);
+        }
+    }, [authHeader]);
+
+    // Filtrado local instantáneo
+    const filteredProducts = useMemo(() => {
+        if (!productCode) return allProducts;
+        const lower = productCode.toLowerCase();
+        return allProducts.filter(p =>
+            (p.nombre || '').toLowerCase().includes(lower) ||
+            (p.codigo || '').toLowerCase().includes(lower)
+        );
+    }, [allProducts, productCode]);
+
+    // Cargar productos al entrar a la tab
+    useEffect(() => {
+        if (activeTab === 'producto' && allProducts.length === 0) {
+            loadProducts();
+        }
+    }, [activeTab, allProducts.length, loadProducts]);
+
+
+
     const authHeader = useMemo(() => {
         const h = { 'Content-Type': 'application/json' };
         if (token) h.Authorization = `Bearer ${token}`;
@@ -746,135 +781,149 @@ const DetailedSalesReport = () => {
                 </>
             )}
 
-            {/* ───── TAB: BUSCAR POR PRODUCTO ───── */}
+            {/* ───── TAB: BUSCAR POR PRODUCTO (TABLA VISUAL) ───── */}
             {activeTab === 'producto' && (
                 <>
-                    <div style={{ position: 'relative', maxWidth: '600px', marginBottom: '1.5rem' }}>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            <FaSearch style={{ position: 'absolute', left: '12px', top: '14px', color: theme.textLight }} />
-                            <input
-                                type="text"
-                                placeholder="Buscar producto por nombre o código..."
-                                value={productCode}
-                                onChange={e => {
-                                    setProductCode(e.target.value);
-                                    setProductResult(null); // Clear previous history when typing
-                                }}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 12px 12px 38px',
-                                    borderRadius: '8px',
-                                    border: `1px solid ${theme.border}`,
-                                    outline: 'none',
-                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                                }}
-                            />
-                        </div>
-
-                        {/* RESULTADOS DE BÚSQUEDA (AUTOCOMPLETE) */}
-                        {productCode.length > 2 && !productResult && (
-                            <div style={{
-                                position: 'absolute', top: '100%', left: 0, right: 0,
-                                background: 'white', border: `1px solid ${theme.border}`,
-                                borderRadius: '8px', marginTop: '4px', zIndex: 10,
-                                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-                                maxHeight: '300px', overflowY: 'auto'
-                            }}>
-                                <ProductSearchList
-                                    query={productCode}
-                                    onSelect={(selected) => {
-                                        setProductCode(selected.nombre); // Show name in input
-                                        fetchProductHistory(selected.codigo); // Fetch history by Unique Code
-                                    }}
-                                    token={token}
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    {productLoading ? (
-                        <LoadingOverlay><FaSyncAlt className="icon-spin" /> Buscando historial...</LoadingOverlay>
-                    ) : productResult === null ? (
-                        <EmptyState>
-                            <FaBarcode />
-                            <p>Escribe el nombre o código del producto arriba para ver su historial.</p>
-                        </EmptyState>
-                    ) : !productResult.product ? (
-                        <EmptyState>
-                            <FaSearch />
-                            <p>No se encontró historial.</p>
-                        </EmptyState>
-                    ) : (
+                    {/* VISTA 1: LISTA DE PRODUCTOS */}
+                    {!productResult ? (
                         <>
-                            {/* Product Info Card */}
-                            <ProductCard>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-                                    <div>
-                                        <h2 style={{ margin: '0 0 4px', fontSize: '1.3rem', color: theme.primary }}>
-                                            {productResult.product.nombre}
-                                        </h2>
-                                        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.9rem', color: theme.secondary, flexWrap: 'wrap' }}>
-                                            <span><strong>Código:</strong> {productResult.product.codigo}</span>
-                                            <span><strong>Precio:</strong> {fmtMoney(productResult.product.precio)}</span>
-                                            <span><strong>Costo:</strong> {fmtMoney(productResult.product.costo)}</span>
-                                            <span><strong>Stock Actual:</strong> {productResult.product.existencia} uds</span>
-                                        </div>
-                                    </div>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <div style={{ fontSize: '0.8rem', color: theme.textLight }}>Movimientos Encontrados</div>
-                                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: theme.primary }}>
-                                            {productResult.history.length}
-                                        </div>
+                            <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '10px' }}>
+                                <div style={{ position: 'relative', flex: 1, maxWidth: '600px' }}>
+                                    <FaSearch style={{ position: 'absolute', left: '12px', top: '14px', color: theme.textLight }} />
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar en inventario (nombre o código)..."
+                                        value={productCode}
+                                        onChange={e => setProductCode(e.target.value)}
+                                        autoFocus
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 12px 12px 38px',
+                                            borderRadius: '8px',
+                                            border: `1px solid ${theme.border}`,
+                                            outline: 'none',
+                                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                        }}
+                                    />
+                                </div>
+                                <ActionBtn onClick={() => loadProducts()} disabled={productLoading}>
+                                    <FaSyncAlt className={productLoading ? 'icon-spin' : ''} /> Actualizar Lista
+                                </ActionBtn>
+                            </div>
+
+                            {/* TABLA DE PRODUCTOS FILTRADA */}
+                            <Table>
+                                <thead>
+                                    <tr>
+                                        <th>Código</th>
+                                        <th>Nombre del Producto</th>
+                                        <th className="center">Stock</th>
+                                        <th className="num">Precio</th>
+                                        <th className="center">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredProducts.slice(0, 50).map(p => (
+                                        <tr key={p.id_producto} onClick={() => fetchProductHistory(p.codigo)} style={{ cursor: 'pointer' }}>
+                                            <td style={{ fontFamily: 'monospace', fontWeight: 600, color: theme.secondary }}>{p.codigo}</td>
+                                            <td style={{ fontWeight: 600 }}>{p.nombre}</td>
+                                            <td className="center">
+                                                <Badge style={{ background: p.existencia > 0 ? '#dcfce7' : '#fee2e2', color: p.existencia > 0 ? '#166534' : '#991b1b' }}>
+                                                    {p.existencia}
+                                                </Badge>
+                                            </td>
+                                            <td className="num">{fmtMoney(p.precio)}</td>
+                                            <td className="center">
+                                                <ActionBtn style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
+                                                    <FaClock /> Ver Historial
+                                                </ActionBtn>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {filteredProducts.length === 0 && !productLoading && (
+                                        <tr>
+                                            <td colSpan="5" className="center" style={{ padding: '2rem', color: theme.textLight }}>
+                                                {allProducts.length === 0 ? 'Cargando inventario...' : 'No hay coincidencias.'}
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </Table>
+                            {filteredProducts.length > 50 && (
+                                <div style={{ textAlign: 'center', padding: '1rem', color: theme.textLight, fontSize: '0.9rem' }}>
+                                    Mostrando 50 de {filteredProducts.length} resultados. Sigue escribiendo para filtrar.
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        /* VISTA 2: HISTORIAL DEL PRODUCTO SELECCIONADO */
+                        <div style={{ animation: 'fadeIn 0.3s ease' }}>
+                            <div style={{ marginBottom: '1rem' }}>
+                                <ActionBtn onClick={() => { setProductResult(null); setProductCode(''); }}>
+                                    <FaArrowLeft /> Volver al listado
+                                </ActionBtn>
+                            </div>
+
+                            {/* HEADER DEL PRODUCTO */}
+                            <div style={{
+                                background: 'white', padding: '1.5rem', borderRadius: '12px',
+                                border: `1px solid ${theme.border}`, marginBottom: '1.5rem',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', gap: '2rem', flexWrap: 'wrap'
+                            }}>
+                                <div>
+                                    <div style={{ fontSize: '0.85rem', color: theme.textLight, textTransform: 'uppercase' }}>Producto</div>
+                                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: theme.primary }}>{productResult.product.nombre}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.85rem', color: theme.textLight, textTransform: 'uppercase' }}>Código</div>
+                                    <div style={{ fontSize: '1.25rem', fontFamily: 'monospace' }}>{productResult.product.codigo}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.85rem', color: theme.textLight, textTransform: 'uppercase' }}>Existencia Actual</div>
+                                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: productResult.product.existencia > 0 ? theme.success : theme.danger }}>
+                                        {productResult.product.existencia}
                                     </div>
                                 </div>
-                            </ProductCard>
+                                <div>
+                                    <div style={{ fontSize: '0.85rem', color: theme.textLight, textTransform: 'uppercase' }}>Precio Venta</div>
+                                    <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{fmtMoney(productResult.product.precio)}</div>
+                                </div>
+                            </div>
 
-                            {/* History Table */}
-                            {productResult.history.length === 0 ? (
-                                <EmptyState>
-                                    <FaClock />
-                                    <p>Este producto no tiene historial de ventas registrado.</p>
-                                </EmptyState>
-                            ) : (
-                                <Table>
-                                    <thead>
-                                        <tr>
-                                            <th># Factura</th>
-                                            <th>Fecha / Hora</th>
-                                            <th>Estado</th>
-                                            <th>Tipo</th>
-                                            <th>Cliente</th>
-                                            <th>Vendedor</th>
-                                            <th className="center">Cantidad</th>
-                                            <th className="num">Precio Unit.</th>
-                                            <th className="num">Subtotal</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {productResult.history.map((h, i) => (
-                                            <tr key={i}>
-                                                <td style={{ fontWeight: 600, color: theme.info }}>#{h.idVenta}</td>
-                                                <td style={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{fmtDT(h.fecha)}</td>
-                                                <td><Badge type={h.estado}>{h.estado}</Badge></td>
-                                                <td style={{ fontSize: '0.85rem' }}>{h.tipo_venta || '—'}</td>
-                                                <td>
-                                                    {h.clienteNombre ? (
-                                                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                            <FaUser style={{ color: theme.textLight, fontSize: '0.7rem' }} />
-                                                            {h.clienteNombre}
-                                                        </span>
-                                                    ) : <span style={{ color: theme.textLight }}>Público General</span>}
+                            {/* TABLA DE HISTORIAL */}
+                            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: theme.secondary }}>Movimientos y Ventas Recientes</h3>
+                            <Table>
+                                <thead>
+                                    <tr>
+                                        <th>Fecha / Hora</th>
+                                        <th>Tipo Mov.</th>
+                                        <th>Factura #</th>
+                                        <th>Cliente</th>
+                                        <th className="center">Cantidad</th>
+                                        <th className="num">Precio Unit.</th>
+                                        <th className="num">Total Línea</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {productResult.history.length === 0 ? (
+                                        <tr><td colSpan="7" className="center" style={{ padding: '2rem' }}>No hay movimientos registrados para este producto.</td></tr>
+                                    ) : (
+                                        productResult.history.map((h, idx) => (
+                                            <tr key={idx}>
+                                                <td>{fmtDT(h.fecha)}</td>
+                                                <td><Badge type={h.tipo_venta || 'VENTA'}>{h.tipo_venta || 'VENTA'}</Badge></td>
+                                                <td style={{ fontFamily: 'monospace', color: theme.info }}>
+                                                    {h.idVenta ? `#${h.idVenta}` : '—'}
                                                 </td>
-                                                <td style={{ fontSize: '0.85rem' }}>{h.vendedorNombre || '—'}</td>
-                                                <td className="center" style={{ fontWeight: 600 }}>{h.cantidad}</td>
+                                                <td>{h.clienteNombre || 'Público General'}</td>
+                                                <td className="center" style={{ fontWeight: 700 }}>{h.cantidad}</td>
                                                 <td className="num">{fmtMoney(h.precioUnitario)}</td>
                                                 <td className="num" style={{ fontWeight: 700 }}>{fmtMoney(h.cantidad * h.precioUnitario)}</td>
                                             </tr>
                                         ))}
-                                    </tbody>
-                                </Table>
-                            )}
-                        </>
+                                </tbody>
+                            </Table>
+                        </div>
                     )}
                 </>
             )}

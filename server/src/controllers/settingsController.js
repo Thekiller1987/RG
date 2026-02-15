@@ -13,27 +13,30 @@ const pool = require('../config/db');
                 empresa_eslogan TEXT,
                 empresa_logo_url TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ticket_sales_footer TEXT,
+                ticket_proforma_footer TEXT,
+                ticket_transfer_footer TEXT
             )
         `);
+        // Insert default if not exists
+        await pool.query(`INSERT IGNORE INTO business_config (id) VALUES (1)`);
 
-        // Insertar registro por defecto si no existe
-        const [rows] = await pool.query('SELECT COUNT(*) as count FROM business_config');
-        if (rows[0].count === 0) {
-            await pool.query(`
-                INSERT INTO business_config (id, empresa_nombre, empresa_direccion, empresa_eslogan)
-                VALUES (1, 'Multirepuestos RG', 'Del portón de la normal 75 varas al este. Juigalpa, Chontales.', 'Repuestos de confianza al mejor precio — calidad que mantiene tu motor en marcha.')
-            `);
-            console.log('✅ Configuración inicial de empresa creada.');
-        } else {
-            console.log('✅ Tabla business_config verificada.');
+        // Migration for existing tables: Add columns if they don't exist
+        const columns = ['ticket_sales_footer', 'ticket_proforma_footer', 'ticket_transfer_footer'];
+        for (const col of columns) {
+            try {
+                await pool.query(`ALTER TABLE business_config ADD COLUMN ${col} TEXT`);
+            } catch (e) {
+                // Ignore "Column already exists" (Error 1060)
+                if (e.code !== 'ER_DUP_FIELDNAME') console.error(`Error adding column ${col}:`, e);
+            }
         }
-    } catch (err) {
-        console.error('⚠️ Error en verificación/migración business_config (No crítico):', err.message);
-        // No lanzamos error para no detener el servidor, pero lo logueamos.
+    } catch (error) {
+        console.error('Error inicializando business_config:', error);
     }
 })();
 
+/* ===================== READ ===================== */
 const getSettings = async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM business_config WHERE id = 1');
@@ -48,14 +51,33 @@ const getSettings = async (req, res) => {
     }
 };
 
+/* ===================== UPDATE ===================== */
 const updateSettings = async (req, res) => {
-    const { empresa_nombre, empresa_ruc, empresa_telefono, empresa_direccion, empresa_eslogan, empresa_logo_url } = req.body;
+    const {
+        empresa_nombre, empresa_ruc, empresa_telefono,
+        empresa_direccion, empresa_eslogan, empresa_logo_url,
+        ticket_sales_footer, ticket_proforma_footer, ticket_transfer_footer
+    } = req.body;
+
     try {
         await pool.query(`
             UPDATE business_config 
-            SET empresa_nombre = ?, empresa_ruc = ?, empresa_telefono = ?, empresa_direccion = ?, empresa_eslogan = ?, empresa_logo_url = ?
+            SET 
+                empresa_nombre = ?, 
+                empresa_ruc = ?, 
+                empresa_telefono = ?, 
+                empresa_direccion = ?, 
+                empresa_eslogan = ?, 
+                empresa_logo_url = ?,
+                ticket_sales_footer = ?,
+                ticket_proforma_footer = ?,
+                ticket_transfer_footer = ?
             WHERE id = 1
-        `, [empresa_nombre, empresa_ruc, empresa_telefono, empresa_direccion, empresa_eslogan, empresa_logo_url]);
+        `, [
+            empresa_nombre, empresa_ruc, empresa_telefono,
+            empresa_direccion, empresa_eslogan, empresa_logo_url,
+            ticket_sales_footer, ticket_proforma_footer, ticket_transfer_footer
+        ]);
 
         const [updated] = await pool.query('SELECT * FROM business_config WHERE id = 1');
         res.json(updated[0]);

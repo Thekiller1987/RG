@@ -321,7 +321,9 @@ const ProformaModal = ({
 
             <div className="thanks">
               <p>"{companyInfo.slogan}"</p>
-              <p>¡Gracias por cotizar con nosotros!</p>
+              <p style={{ whiteSpace: 'pre-line', marginTop: '5px' }}>
+                {settings?.ticket_proforma_footer || '¡Gracias por cotizar con nosotros!'}
+              </p>
             </div>
           </PrintWrapper>
         </Wrapper>

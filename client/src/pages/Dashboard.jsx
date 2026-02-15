@@ -4,11 +4,12 @@ import styled from 'styled-components';
 import {
     FaSignOutAlt, FaShoppingCart, FaBoxOpen, FaFileInvoice,
     FaCreditCard, FaCloudUploadAlt, FaChartBar, FaBriefcase, FaUsers,
-    FaFileInvoiceDollar, FaClipboardList, FaTruck, FaTags
+    FaFileInvoiceDollar, FaClipboardList, FaTruck, FaTags, FaCog
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext.jsx';
 
 import ConfirmationModal from './pos/components/ConfirmationModal.jsx';
+import SettingsModal from './pos/components/SettingsModal.jsx';
 
 // --- ESTILOS MEJORADOS Y RESPONSIVOS ---
 const PageWrapper = styled.div`
@@ -125,6 +126,7 @@ const CardIcon = styled.div`
 const Dashboard = () => {
     const { user, logout } = useAuth();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
 
     if (!user) {
         return (
@@ -300,6 +302,15 @@ const Dashboard = () => {
                         <h2>Solicitudes</h2>
                         <p>Realizar pedidos y requerimientos.</p>
                     </Card>
+
+                    {/* 10. Configuración (Solo Admin) */}
+                    {isAdmin && (
+                        <Card as="button" onClick={() => setShowSettings(true)} color="#343a40" style={{ textAlign: 'left', border: 'none', cursor: 'pointer' }}>
+                            <CardIcon color="#343a40"><FaCog /></CardIcon>
+                            <h2>Configuración</h2>
+                            <p>Datos de empresa y tickets.</p>
+                        </Card>
+                    )}
                 </GridContainer>
             </Content>
 
@@ -309,6 +320,11 @@ const Dashboard = () => {
                 message="¿Estás seguro de que quieres cerrar tu sesión actual?"
                 onClose={() => setShowLogoutModal(false)}
                 onConfirm={handleConfirmLogout}
+            />
+
+            <SettingsModal
+                isOpen={showSettings}
+                onClose={() => setShowSettings(false)}
             />
         </PageWrapper >
     );
