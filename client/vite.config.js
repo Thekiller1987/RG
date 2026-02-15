@@ -59,26 +59,15 @@ export default defineConfig({
                 assetFileNames: 'assets/[name].[hash].[ext]',
                 manualChunks(id) {
                     if (id.includes('node_modules')) {
-                        // Separar React y React DOM para caché eficiente
-                        if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
-                            return 'react-vendor';
-                        }
-                        // Separar librerías de gráficos si son pesadas
-                        if (id.includes('recharts') || id.includes('chart.js')) {
-                            return 'charts-vendor';
-                        }
-                        // Separar iconos si son muchos
-                        if (id.includes('react-icons')) {
-                            return 'icons-vendor';
-                        }
-                        // Separar librerías pesadas específicas
+                        // Separar librerías pesadas específicas (SOLO ESTAS para evitar errores vacíos)
                         if (id.includes('jspdf') || id.includes('html2canvas')) {
-                            return 'pdf-vendor';
+                            return 'pdf-vendor'; // ~300KB
                         }
                         if (id.includes('html5-qrcode')) {
-                            return 'scanner-vendor';
+                            return 'scanner-vendor'; // ~200KB
                         }
-                        // Resto de node_modules en un chunk separado
+                        // Resto de node_modules en un solo chunk 'vendor' para asegurar orden de carga correcto
+                        // Esto previene el error "Cannot access 'X' before initialization"
                         return 'vendor';
                     }
                 }
