@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
+import { Toaster } from 'react-hot-toast';
 
 // Páginas
 // Módulos
@@ -50,6 +51,7 @@ function App() {
 
   return (
     <React.Suspense fallback={<Loading />}>
+      <Toaster position="top-center" reverseOrder={false} />
       <Routes>
         {/* Públicas */}
         <Route path="/login" element={<Login />} />
