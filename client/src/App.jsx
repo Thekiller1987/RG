@@ -21,6 +21,7 @@ import CashReport from './pages/CashReport.jsx';
 import FacturasProveedores from './pages/FacturasProveedores.jsx';
 import Solicitudes from './pages/Solicitudes.jsx';
 import InventoryOutflowPage from './pages/InventoryOutflowPage.jsx'; // <--- NUEVA PAGINA
+import DetailedSalesReport from './pages/DetailedSalesReport.jsx';
 
 // Mapa de roles
 const ROLES = {
@@ -145,6 +146,16 @@ function App() {
         element={
           <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.INVENTARIO]}>
             <InventoryOutflowPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Reportes de Ventas Detallado */}
+      <Route
+        path="/detailed-sales-report"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
+            <DetailedSalesReport />
           </ProtectedRoute>
         }
       />

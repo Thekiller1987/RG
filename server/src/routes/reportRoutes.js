@@ -9,7 +9,9 @@ const {
     getInventoryValueReport,
     getSalesByUserReport,
     getTopProductsReport,
-    getSalesChartReport
+    getSalesChartReport,
+    getDetailedSales,
+    getProductHistory
 } = require('../controllers/reportController');
 
 // --- RUTAS PARA REPORTES ---
@@ -28,5 +30,11 @@ router.get('/top-products', verifyToken, getTopProductsReport);
 
 // GET /api/reports/sales-chart?startDate=...&endDate=...
 router.get('/sales-chart', verifyToken, getSalesChartReport);
+
+// GET /api/reports/detailed-sales?startDate=...&endDate=...&tipo=...
+router.get('/detailed-sales', verifyToken, getDetailedSales);
+
+// GET /api/reports/product-history?code=...
+router.get('/product-history', verifyToken, getProductHistory);
 
 module.exports = router;

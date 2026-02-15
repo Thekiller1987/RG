@@ -276,6 +276,15 @@ const Dashboard = () => {
                         </Card>
                     )}
 
+                    {/* Reportes de Ventas Detallado (NUEVO) */}
+                    {canAccessReports && (
+                        <Card to="/detailed-sales-report" color="#6366f1">
+                            <CardIcon color="#6366f1"><FaFileInvoiceDollar /></CardIcon>
+                            <h2>Reportes de Ventas Detallado</h2>
+                            <p>Ventas, devoluciones y rastreo por producto.</p>
+                        </Card>
+                    )}
+
                     {/* 8. Usuarios */}
                     {canAccessAdminUsers && (
                         <Card to="/admin/users" color="#ff6b6b">

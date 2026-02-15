@@ -51,7 +51,33 @@ function localDayKey(isoOrDate) {
 // ───────── PREVENCIÓN DE ERRORES: AUTOCORRECCIÓN DE BASE DE DATOS ─────────
 async function ensureSchema() {
   try {
-    // 1. Crear tabla de carritos si no existe
+    // 1. Crear tabla cierres_caja si no existe
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cierres_caja (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        fecha_apertura DATETIME NOT NULL,
+        fecha_cierre DATETIME NULL DEFAULT NULL,
+        usuario_id INT NOT NULL,
+        usuario_nombre VARCHAR(255) DEFAULT '',
+        monto_inicial DECIMAL(12,2) DEFAULT 0,
+        final_esperado DECIMAL(12,2) DEFAULT 0,
+        final_real DECIMAL(12,2) DEFAULT 0,
+        diferencia DECIMAL(12,2) DEFAULT 0,
+        total_ventas_efectivo DECIMAL(12,2) DEFAULT 0,
+        total_ventas_tarjeta DECIMAL(12,2) DEFAULT 0,
+        total_ventas_transferencia DECIMAL(12,2) DEFAULT 0,
+        total_ventas_credito DECIMAL(12,2) DEFAULT 0,
+        total_entradas DECIMAL(12,2) DEFAULT 0,
+        total_salidas DECIMAL(12,2) DEFAULT 0,
+        observaciones TEXT,
+        detalles_json JSON,
+        INDEX idx_usuario (usuario_id),
+        INDEX idx_fecha_apertura (fecha_apertura),
+        INDEX idx_fecha_cierre (fecha_cierre)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 2. Crear tabla de carritos si no existe
     await pool.query(`
       CREATE TABLE IF NOT EXISTS active_carts (
         user_id INT PRIMARY KEY,
@@ -60,15 +86,14 @@ async function ensureSchema() {
       ) ENGINE=InnoDB;
     `);
 
-    // 2. Corregir tabla cierres_caja para permitir NULL en fecha_cierre
-    // Usamos un bloque try/catch específico porque si ya es NULL, no pasa nada, pero si falla no queremos detener el server
+    // 3. Corregir tabla cierres_caja para permitir NULL en fecha_cierre
     try {
       await pool.query(`ALTER TABLE cierres_caja MODIFY COLUMN fecha_cierre DATETIME NULL DEFAULT NULL;`);
-      // console.log('✅ Esquema de cierres_caja verificado/corregido.');
     } catch (e) {
-      // Ignoramos error si es por sintaxis (ya corregido) o acceso, pero lo logueamos por si acaso
-      // console.warn('Nota sobre esquema DB:', e.message);
+      // Ignoramos error si ya es NULL
     }
+
+    console.log('✅ Esquema de caja verificado/creado correctamente.');
   } catch (error) {
     console.error('❌ Error fatal verificando esquema DB:', error);
   }

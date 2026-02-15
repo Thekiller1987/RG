@@ -808,7 +808,71 @@ const CashReport = () => {
     }, 500);
   };
 
-  // ... (RenderProductBreakdown se mantiene igual) ...
+  // Componente para mostrar desglose de transacciones en cada card de cierre
+  const RenderProductBreakdown = ({ session }) => {
+    let transactions = [];
+    if (session?.detalles_json) {
+      try {
+        const json = typeof session.detalles_json === 'string' ? JSON.parse(session.detalles_json) : session.detalles_json;
+        transactions = json.transactions || [];
+      } catch { transactions = []; }
+    } else if (Array.isArray(session?.transactions)) {
+      transactions = session.transactions;
+    }
+
+    if (!transactions.length) return null;
+
+    const ventas = transactions.filter(tx => (tx.type || '').startsWith('venta'));
+    const abonos = transactions.filter(tx => (tx.type || '').includes('abono'));
+    const devoluciones = transactions.filter(tx => (tx.type || '').includes('devolucion'));
+    const entradas = transactions.filter(tx => tx.type === 'entrada');
+    const salidas = transactions.filter(tx => tx.type === 'salida');
+
+    const renderGroup = (title, items, color) => {
+      if (!items.length) return null;
+      return (
+        <div style={{ marginTop: '0.75rem' }}>
+          <h5 style={{ margin: '0 0 0.4rem 0', color: color || theme.secondary, fontSize: '0.85rem', borderBottom: `1px solid ${theme.border}`, paddingBottom: 4 }}>
+            {title} ({items.length})
+          </h5>
+          <BreakdownTable>
+            <thead>
+              <tr>
+                <th>Hora</th>
+                <th>Detalle</th>
+                <th className="num">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((tx, i) => {
+                const pd = tx.pagoDetalles || {};
+                const hora = tx.at ? new Date(tx.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+                const monto = Number(pd.totalVenta || pd.ingresoCaja || tx.amount || 0);
+                const nota = tx.note || pd.nota || pd.clienteNombre || '';
+                return (
+                  <tr key={tx.id || i}>
+                    <td>{hora}</td>
+                    <td>{nota || tx.type}</td>
+                    <td className="num">{fmtMoney(monto)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </BreakdownTable>
+        </div>
+      );
+    };
+
+    return (
+      <div style={{ marginTop: '1rem' }}>
+        {renderGroup('💰 Ventas', ventas, '#16a34a')}
+        {renderGroup('💳 Abonos', abonos, '#0284c7')}
+        {renderGroup('🔄 Devoluciones', devoluciones, '#dc2626')}
+        {renderGroup('📥 Entradas', entradas, '#d97706')}
+        {renderGroup('📤 Salidas', salidas, '#7c3aed')}
+      </div>
+    );
+  };
 
   return (
     <Container>
