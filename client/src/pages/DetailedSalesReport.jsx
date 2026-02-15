@@ -228,6 +228,15 @@ const Table = styled.table`
   .center { text-align: center; }
 `;
 
+const getBadgeStyle = (type) => {
+    switch (type) {
+        case 'COMPLETADA': return { background: '#dcfce7', color: '#166534' };
+        case 'DEVOLUCION': return { background: '#fee2e2', color: '#991b1b' };
+        case 'CANCELADA': return { background: '#fef3c7', color: '#92400e' };
+        default: return { background: '#f1f5f9', color: '#475569' };
+    }
+};
+
 const Badge = styled.span`
   font-size: 0.7rem;
   font-weight: 700;
@@ -236,14 +245,8 @@ const Badge = styled.span`
   text-transform: uppercase;
   letter-spacing: 0.03em;
   white-space: nowrap;
-  ${props => {
-        switch (props.type) {
-            case 'COMPLETADA': return `background: #dcfce7; color: #166534;`;
-            case 'DEVOLUCION': return `background: #fee2e2; color: #991b1b;`;
-            case 'CANCELADA': return `background: #fef3c7; color: #92400e;`;
-            default: return `background: #f1f5f9; color: #475569;`;
-        }
-    }}
+  background: ${props => getBadgeStyle(props.type).background};
+  color: ${props => getBadgeStyle(props.type).color};
 `;
 
 const EmptyState = styled.div`
