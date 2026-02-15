@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import {
+    FaExclamationTriangle, FaArrowLeft, FaTruck, FaHistory,
+    FaSearch, FaBarcode, FaTrash, FaSave, FaTimes, FaPrint
+} from 'react-icons/fa';
 import * as api from '../service/api';
 import { useAuth } from '../context/AuthContext';
 import OutflowTicketModal from './pos/components/OutflowTicketModal';
