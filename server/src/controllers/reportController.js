@@ -286,7 +286,6 @@ const getProductHistory = async (req, res) => {
                 LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
                 WHERE dv.id_producto IN (${placeHolders})
                 ORDER BY v.fecha DESC
-                LIMIT 200
             `;
 
             // Pass flattened productIds array
@@ -297,8 +296,12 @@ const getProductHistory = async (req, res) => {
         res.json({ product, products, history });
 
     } catch (error) {
-        console.error('Error buscando historial de producto:', error);
-        res.status(500).json({ msg: 'Error de servidor: ' + error.message });
+        console.error('CRITICAL ERROR in getProductHistory:', error);
+        res.status(500).json({
+            msg: 'Error de servidor buscando historial',
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 };
 

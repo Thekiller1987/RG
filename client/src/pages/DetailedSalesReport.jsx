@@ -769,7 +769,7 @@ export default function DetailedSalesReport() {
                                             <tr key={i}>
                                                 <td>{fmtDT(h.fecha)}</td>
                                                 <td>#{h.idVenta}</td>
-                                                <td>{h.cliente, h.clienteNombre || 'Público'}</td>
+                                                <td>{h.clienteNombre || 'Público'}</td>
                                                 <td><Badge type={h.tipo_venta}>{h.tipo_venta}</Badge></td>
                                                 <td className="center" style={{ fontWeight: 700 }}>{h.cantidad}</td>
                                                 <td className="num">{fmtMoney(h.precioUnitario)}</td>
