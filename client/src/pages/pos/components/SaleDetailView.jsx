@@ -40,21 +40,10 @@ const SaleDetailView = ({
   showConfirmation, showPrompt, showAlert
 }) => {
   const canModifySale = useMemo(() => {
-    // Relaxed permission: Allow if sale is defined and Completed. 
-    // Removed !isAdmin check to allow Cashiers to process returns/cancels.
+    // Allow modification if sale is COMPLETADA
     if (!sale || sale.estado !== 'COMPLETADA') return false;
-    if (sale.pagoDetalles?.credito > 0) {
-      const saleDate = new Date(sale.fecha);
-      const hasSubsequentPayments = dailySales.some(
-        tx =>
-          (tx.clientId === sale.clientId || tx.idCliente === sale.idCliente) &&
-          tx.estado === 'ABONO_CREDITO' &&
-          new Date(tx.fecha) > saleDate
-      );
-      return !hasSubsequentPayments;
-    }
     return true;
-  }, [sale, isAdmin, dailySales]);
+  }, [sale]);
 
   if (!sale) {
     return (

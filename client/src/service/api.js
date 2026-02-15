@@ -268,6 +268,10 @@ export const getCreditosByClient = (clientId, token) => {
 export const getAbonosByClient = (clientId, token) => {
     return request('GET', `/clients/${clientId}/abonos`, token);
 };
+// NUEVO: Créditos pendientes con saldo por ticket
+export const getCreditosPendientes = (clientId, token) => {
+    return request('GET', `/clients/${clientId}/creditos-pendientes`, token);
+};
 
 
 // ===================================================================

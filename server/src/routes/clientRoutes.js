@@ -1,19 +1,16 @@
 const express = require('express');
 const router = express.Router();
 
-// ===================================================================
-// =================== CORRECCIÓN PRINCIPAL AQUÍ =====================
-// ===================================================================
-const { 
-    getAllClients, 
-    createClient, 
-    updateClient, 
-    deleteClient, 
+const {
+    getAllClients,
+    createClient,
+    updateClient,
+    deleteClient,
     addCreditPayment,
-    getCreditosByClient, // <-- AÑADE ESTA LÍNEA
-    getAbonosByClient    // <-- AÑADE ESTA LÍNEA
+    getCreditosByClient,
+    getAbonosByClient,
+    getCreditosPendientes,
 } = require('../controllers/clientController');
-// ===================================================================
 
 const { verifyToken } = require('../middleware/authMiddleware');
 
@@ -28,9 +25,8 @@ router.route('/:id')
     .delete(deleteClient);
 
 router.post('/:id/abono', addCreditPayment);
-
-// Estas rutas ya no darán error porque las funciones fueron importadas arriba
 router.get('/:id/creditos', getCreditosByClient);
 router.get('/:id/abonos', getAbonosByClient);
+router.get('/:id/creditos-pendientes', getCreditosPendientes);
 
 module.exports = router;
