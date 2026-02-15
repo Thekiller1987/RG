@@ -2,14 +2,14 @@ import React, { useState, useMemo } from 'react';
 import styled from 'styled-components';
 import { FaUsers, FaCreditCard, FaTrashAlt, FaEdit, FaPlus, FaMoneyBillWave, FaArrowLeft, FaRedo, FaHistory } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../service/api';
 import ClientFormModal from './pos/components/ClientFormModal';
 import AbonoCreditoModal from './pos/components/AbonoCreditoModal';
 import HistorialCreditoModal from './pos/components/HistorialCreditoModal';
-import SalesHistoryModal from './pos/components/SalesHistoryModal'; // Importar Historial Ventas
-import TicketModal from './pos/components/TicketModal'; // Importar TicketModal para reimpresión
-import AlertModal from './pos/components/AlertModal';
+import SalesHistoryModal from './pos/components/SalesHistoryModal';
+import TicketModal from './pos/components/TicketModal';
 
 const PageWrapper = styled.div`
     padding: 2rem 4rem;
@@ -110,13 +110,9 @@ const Table = styled.table`
 `;
 
 export default function ClientesYCreditos() {
-    const { clients, user, token, isLoading, refreshClients, cajaSession, allUsers } = useAuth(); // Extract allUsers via context if needed, or pass empty. SalesHistory needs it.
+    const { clients, user, token, isLoading, refreshClients, cajaSession, allUsers } = useAuth();
     const [modal, setModal] = useState({ name: null, data: null });
-    const [ticketToPrint, setTicketToPrint] = useState(null); // State for reprinting
-    const [alert, setAlert] = useState({ isOpen: false, title: '', message: '' });
-
-    const showAlert = ({ title, message }) => setAlert({ isOpen: true, title, message });
-    const closeAlert = () => setAlert({ isOpen: false });
+    const [ticketToPrint, setTicketToPrint] = useState(null);
 
     const isCajaOpen = useMemo(() => {
         return cajaSession && !cajaSession.closedAt;
@@ -124,16 +120,16 @@ export default function ClientesYCreditos() {
 
     const handleDelete = async (cliente) => {
         if (cliente.saldo_pendiente > 0) {
-            showAlert({ title: "No permitido", message: "El cliente tiene saldo pendiente." });
+            toast.error("El cliente tiene saldo pendiente.");
             return;
         }
         if (window.confirm("¿Seguro de eliminar este cliente?")) {
             try {
                 await api.deleteClient(cliente.id_cliente, token);
-                showAlert({ title: "Éxito", message: "Cliente eliminado" });
+                toast.success("Cliente eliminado correctamente.");
                 refreshClients();
             } catch (err) {
-                showAlert({ title: "Error", message: `${err.message}` });
+                toast.error(err.message || "Error al eliminar cliente.");
             }
         }
     };
@@ -220,8 +216,6 @@ export default function ClientesYCreditos() {
                     currentUser={user}
                 />
             )}
-
-            <AlertModal isOpen={alert.isOpen} onClose={closeAlert} title={alert.title} message={alert.message} />
         </PageWrapper>
     );
 }

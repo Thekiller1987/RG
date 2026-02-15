@@ -122,6 +122,14 @@ export const fetchClients = async (token) => {
     return contado ? [contado, ...others] : list;
 };
 
+export const fetchCategories = async (token) => {
+    return await request('get', '/categories', token);
+};
+
+export const fetchProviders = async (token) => {
+    return await request('get', '/providers', token);
+};
+
 // ===================================================================
 // ==================== TERMINA SECCIÓN CLIENTES =====================
 // ===================================================================

@@ -10,6 +10,8 @@ export const AuthProvider = ({ children, socket }) => {
     const [allUsers, setAllUsers] = useState([]);
     const [products, setProducts] = useState([]);
     const [clients, setClients] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [providers, setProviders] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
     const [token, setToken] = useState(() => localStorage.getItem('token'));
@@ -34,21 +36,22 @@ export const AuthProvider = ({ children, socket }) => {
                 api.fetchUsers(token),
                 api.fetchProducts(token),
                 api.fetchClients(token),
+                api.fetchCategories(token),
+                api.fetchProviders(token),
             ]);
 
             // Cada uno se procesa individualmente — si uno falla, los demás aún cargan
             const newUsers = results[0].status === 'fulfilled' ? (results[0].value || []) : null;
             const newProducts = results[1].status === 'fulfilled' ? (results[1].value || []) : null;
             const newClients = results[2].status === 'fulfilled' ? (results[2].value || []) : null;
+            const newCategories = results[3].status === 'fulfilled' ? (results[3].value || []) : null;
+            const newProviders = results[4].status === 'fulfilled' ? (results[4].value || []) : null;
 
             if (newUsers) setAllUsers(newUsers);
-            else console.warn("⚠️ No se pudieron cargar usuarios:", results[0].reason?.message);
-
             if (newProducts) setProducts(newProducts);
-            else console.warn("⚠️ No se pudieron cargar productos:", results[1].reason?.message);
-
             if (newClients) setClients(newClients);
-            else console.warn("⚠️ No se pudieron cargar clientes:", results[2].reason?.message);
+            if (newCategories) setCategories(newCategories);
+            if (newProviders) setProviders(newProviders);
 
             // Guardar en caché local para carga instantánea futura
             try {
@@ -56,6 +59,8 @@ export const AuthProvider = ({ children, socket }) => {
                     users: newUsers || [],
                     products: newProducts || [],
                     clients: newClients || [],
+                    categories: newCategories || [],
+                    providers: newProviders || [],
                     timestamp: Date.now()
                 };
                 localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
@@ -79,6 +84,8 @@ export const AuthProvider = ({ children, socket }) => {
                 if (data.users?.length) setAllUsers(data.users);
                 if (data.products?.length) setProducts(data.products);
                 if (data.clients?.length) setClients(data.clients);
+                if (data.categories?.length) setCategories(data.categories);
+                if (data.providers?.length) setProviders(data.providers);
                 return true; // Caché encontrada
             }
         } catch (e) { /* caché corrupta */ }
@@ -237,6 +244,8 @@ export const AuthProvider = ({ children, socket }) => {
         allUsers,
         products,
         clients,
+        categories,
+        providers,
         isLoading,
         login,
         logout,

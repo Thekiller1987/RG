@@ -1,10 +1,42 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
-import { FaTruck, FaSearch, FaBarcode, FaTimes, FaSave, FaHistory, FaArrowLeft, FaPrint, FaTrash } from 'react-icons/fa';
-import { useNavigate, Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import * as api from '../service/api';
 import { useAuth } from '../context/AuthContext';
 import OutflowTicketModal from './pos/components/OutflowTicketModal';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const ModalOverlay = styled(motion.div)`
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+  background: rgba(15, 23, 42, 0.6); z-index: 50; 
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+  backdrop-filter: blur(4px);
+`;
+const ModalContent = styled.div`
+  background: white; width: 100%; max-width: 450px; 
+  border-radius: 20px; padding: 2rem; 
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+`;
+const ModalTitle = styled.h2` margin-top: 0; color: #1e293b; margin-bottom: 1rem; font-size: 1.4rem; display: flex; align-items: center; gap: 10px; `;
+const ModalActions = styled.div` display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; `;
+const CancelButton = styled.button` background: white; color: #64748b; border: 1px solid #cbd5e1; padding: 10px 20px; border-radius: 10px; font-weight: 600; cursor: pointer; `;
+const SaveButton = styled.button` background: #ef4444; color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: 600; cursor: pointer; `;
+
+const ConfirmDialog = ({ open, onCancel, onConfirm, title, message }) => {
+    if (!open) return null;
+    return (
+        <ModalOverlay onClick={onCancel} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <ModalContent onClick={e => e.stopPropagation()}>
+                <ModalTitle><FaExclamationTriangle color="#ef4444" /> {title}</ModalTitle>
+                <p style={{ color: '#4b5563', lineHeight: 1.5 }}>{message}</p>
+                <ModalActions>
+                    <CancelButton onClick={onCancel}>Cancelar</CancelButton>
+                    <SaveButton onClick={onConfirm}>Confirmar Salida</SaveButton>
+                </ModalActions>
+            </ModalContent>
+        </ModalOverlay>
+    );
+};
 
 /* ================== STYLES COPIED/ADAPTED FROM POS/INVENTORY ================== */
 const PageContainer = styled.div`
@@ -89,52 +121,31 @@ const HistoryItem = styled.div`
 /* ================== COMPONENTS ================== */
 
 const InventoryOutflowPage = () => {
-    const { user } = useAuth();
+    const { user, products: globalProducts, refreshProducts } = useAuth();
     const navigate = useNavigate();
 
     // States
     const [searchTerm, setSearchTerm] = useState('');
-    const [products, setProducts] = useState([]);
-    const [results, setResults] = useState([]);
     const [cart, setCart] = useState([]);
     const [reason, setReason] = useState('');
     const [showHistory, setShowHistory] = useState(false);
     const [history, setHistory] = useState([]);
     const [ticketData, setTicketData] = useState(null); // For printing
     const [isLoading, setIsLoading] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
 
     // Refs
     const searchInputRef = useRef(null);
 
-    // 1. Fetch Products on Mount
-    useEffect(() => {
-        const fetchProducts = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                if (!token) return;
-                const data = await api.fetchProducts(token);
-                setProducts(data);
-                setResults(data.slice(0, 20));
-            } catch (err) {
-                console.error("Error loading products", err);
-            }
-        };
-        fetchProducts();
-    }, []);
-
-    // 2. Search Logic
-    useEffect(() => {
-        if (!searchTerm.trim()) {
-            setResults(products.slice(0, 20)); // Show default items
-            return;
-        }
+    // Search Logic (Memoized for performance)
+    const results = React.useMemo(() => {
+        if (!searchTerm.trim()) return globalProducts.slice(0, 24);
         const term = searchTerm.toLowerCase();
-        const filtered = products.filter(p =>
+        return globalProducts.filter(p =>
             (p.nombre?.toLowerCase().includes(term)) ||
-            (p.codigo?.toLowerCase().includes(term))
-        );
-        setResults(filtered.slice(0, 50));
-    }, [searchTerm, products]);
+            (p.codigo?.toString().toLowerCase().includes(term))
+        ).slice(0, 50);
+    }, [searchTerm, globalProducts]);
 
     // 3. Add to Cart
     const addToCart = (product) => {
@@ -143,7 +154,7 @@ const InventoryOutflowPage = () => {
             if (existing) {
                 // Check stock
                 if (existing.cantidad >= product.existencia) {
-                    alert('No hay suficiente stock.');
+                    toast.error('No hay suficiente stock.');
                     return prev;
                 }
                 return prev.map(item =>
@@ -153,9 +164,10 @@ const InventoryOutflowPage = () => {
                 );
             } else {
                 if (product.existencia <= 0) {
-                    alert('Producto sin existencia.');
+                    toast.error('Producto sin existencia.');
                     return prev;
                 }
+                toast.success(`${product.nombre} añadido`);
                 return [...prev, { ...product, cantidad: 1 }];
             }
         });
@@ -178,10 +190,13 @@ const InventoryOutflowPage = () => {
 
     // 5. Submit Outflow
     const handleSubmit = async () => {
-        if (!reason.trim()) return alert('Debe ingresar un motivo para la salida.');
-        if (cart.length === 0) return alert('El carrito está vacío.');
+        if (!reason.trim()) return toast.error('Debe ingresar un motivo para la salida.');
+        if (cart.length === 0) return toast.error('El carrito está vacío.');
+        setShowConfirm(true);
+    };
 
-        if (!window.confirm('¿Confirmar salida de inventario? Esta acción descontará el stock.')) return;
+    const confirmSubmit = async () => {
+        setShowConfirm(false);
 
         setIsLoading(true);
         try {
@@ -195,19 +210,14 @@ const InventoryOutflowPage = () => {
             setCart([]);
             setReason('');
             setTicketData(res.ticket); // Trigger print modal
+            toast.success('Salida procesada correctamente');
 
-            // Refresh products (simple way: fetch again or decrement local)
-            // Let's reload page data or just decrement locally for speed
-            const updatedProducts = products.map(p => {
-                const inCart = cart.find(c => c.id_producto === p.id_producto);
-                if (inCart) return { ...p, existencia: p.existencia - inCart.cantidad };
-                return p;
-            });
-            setProducts(updatedProducts);
+            // Refresh global products in background
+            refreshProducts();
 
         } catch (err) {
             console.error(err);
-            alert(err.response?.data?.msg || 'Error al procesar salida.');
+            toast.error(err.response?.data?.msg || 'Error al procesar salida.');
         } finally {
             setIsLoading(false);
         }
@@ -385,6 +395,18 @@ const InventoryOutflowPage = () => {
                     onClose={() => setTicketData(null)}
                 />
             )}
+
+            <AnimatePresence>
+                {showConfirm && (
+                    <ConfirmDialog
+                        open={showConfirm}
+                        onCancel={() => setShowConfirm(false)}
+                        onConfirm={confirmSubmit}
+                        title="Confirmar Salida"
+                        message="¿Estás seguro de que deseas procesar esta salida? El inventario se descontará inmediatamente."
+                    />
+                )}
+            </AnimatePresence>
         </PageContainer>
     );
 };
