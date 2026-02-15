@@ -3,26 +3,34 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 
 // Páginas
-import Login from './pages/login.jsx';
-import Dashboard from './pages/Dashboard.jsx';
-import UserManagement from './pages/UserManagement.jsx';
-import InventoryManagement from './pages/InventoryManagement.jsx';
-import PedidosYApartados from './pages/PedidosYApartados.jsx';
-import ClientesYCreditos from './pages/ClientesYCreditos.jsx';
-import Finances from './pages/Finances.jsx';
-import POS from './pages/pos/POS.jsx';
-import Reports from './pages/Reports.jsx';
-import Unauthorized from './components/Unauthorized.jsx';
-
 // Módulos
 import ProtectedRoute from './components/ProtectedRoute.jsx';
-import InventoryUpload from './pages/InventoryUpload.jsx';
-import CashReport from './pages/CashReport.jsx';
-import FacturasProveedores from './pages/FacturasProveedores.jsx';
-import Solicitudes from './pages/Solicitudes.jsx';
-import InventoryOutflowPage from './pages/InventoryOutflowPage.jsx'; // <--- NUEVA PAGINA
-import DetailedSalesReport from './pages/DetailedSalesReport.jsx';
-import SettingsPage from './pages/SettingsPage.jsx';
+
+// Lazy Load Pages for Performance ("Instant" feeling)
+const Login = React.lazy(() => import('./pages/login.jsx'));
+const Dashboard = React.lazy(() => import('./pages/Dashboard.jsx'));
+const UserManagement = React.lazy(() => import('./pages/UserManagement.jsx'));
+const InventoryManagement = React.lazy(() => import('./pages/InventoryManagement.jsx'));
+const PedidosYApartados = React.lazy(() => import('./pages/PedidosYApartados.jsx'));
+const ClientesYCreditos = React.lazy(() => import('./pages/ClientesYCreditos.jsx'));
+const Finances = React.lazy(() => import('./pages/Finances.jsx'));
+const POS = React.lazy(() => import('./pages/pos/POS.jsx'));
+const Reports = React.lazy(() => import('./pages/Reports.jsx'));
+const Unauthorized = React.lazy(() => import('./components/Unauthorized.jsx'));
+const InventoryUpload = React.lazy(() => import('./pages/InventoryUpload.jsx'));
+const CashReport = React.lazy(() => import('./pages/CashReport.jsx'));
+const FacturasProveedores = React.lazy(() => import('./pages/FacturasProveedores.jsx'));
+const Solicitudes = React.lazy(() => import('./pages/Solicitudes.jsx'));
+const InventoryOutflowPage = React.lazy(() => import('./pages/InventoryOutflowPage.jsx'));
+const DetailedSalesReport = React.lazy(() => import('./pages/DetailedSalesReport.jsx'));
+const SettingsPage = React.lazy(() => import('./pages/SettingsPage.jsx'));
+
+// Simple fallback component
+const Loading = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#64748b' }}>
+    Cargando...
+  </div>
+);
 
 // Mapa de roles
 const ROLES = {
@@ -38,162 +46,155 @@ function App() {
   const { user, isLoading } = useAuth();
 
   // Evitar parpadeo mientras auth carga
-  if (isLoading) return null;
+  if (isLoading) return <Loading />;
 
   return (
-    <Routes>
-      {/* Públicas */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/unauthorized" element={<Unauthorized />} />
+    <React.Suspense fallback={<Loading />}>
+      <Routes>
+        {/* Públicas */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/unauthorized" element={<Unauthorized />} />
 
-      {/* Protegidas */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
+        {/* Protegidas */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        {/* ... rest of routes ... */}
 
-      <Route
-        path="/pos"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR]}>
-            <POS />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/pos"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR]}>
+              <POS />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/inventory"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.INVENTARIO]}>
-            <InventoryManagement />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/inventory"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.INVENTARIO]}>
+              <InventoryManagement />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/orders"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.EMPLEADO]}>
-            <PedidosYApartados />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/orders"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.EMPLEADO]}>
+              <PedidosYApartados />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Alineado con Dashboard: también VENDEDOR */}
-      <Route
-        path="/credits"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.FINANZAS]}>
-            <ClientesYCreditos />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/credits"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.FINANZAS]}>
+              <ClientesYCreditos />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/finances"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS]}>
-            <Finances />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/finances"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS]}>
+              <Finances />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Alineado con Dashboard: ADMIN, GERENTE y FINANZAS */}
-      <Route
-        path="/reports"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
-            <Reports />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
+              <Reports />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/admin/users"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-            <UserManagement />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <UserManagement />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* ✅ Ruta que faltaba para tu card de Dashboard */}
-      <Route
-        path="/upload/inventory"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.INVENTARIO]}>
-            <InventoryUpload />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/upload/inventory"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.INVENTARIO]}>
+              <InventoryUpload />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Gestión de Cajas */}
-      <Route
-        path="/cash-report"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
-            <CashReport />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/cash-report"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
+              <CashReport />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Traslados / Salidas (NUEVA RUTA) */}
-      <Route
-        path="/traslados"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.INVENTARIO]}>
-            <InventoryOutflowPage />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/traslados"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.INVENTARIO]}>
+              <InventoryOutflowPage />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Reportes de Ventas Detallado */}
-      <Route
-        path="/detailed-sales-report"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
-            <DetailedSalesReport />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/detailed-sales-report"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
+              <DetailedSalesReport />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Facturas de Proveedores (Nueva Ruta) */}
-      <Route
-        path="/invoices"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS]}>
-            <FacturasProveedores />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/invoices"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS]}>
+              <FacturasProveedores />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Solicitudes (Nueva Ruta) */}
-      <Route
-        path="/solicitudes"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.INVENTARIO, ROLES.FINANZAS, ROLES.GERENTE]}>
-            <Solicitudes />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/solicitudes"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.INVENTARIO, ROLES.FINANZAS, ROLES.GERENTE]}>
+              <Solicitudes />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Configuración de Empresa (Nueva Ruta) */}
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE]}>
-            <SettingsPage />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE]}>
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Default */}
-      <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
+      </Routes>
+    </React.Suspense>
   );
 }
 

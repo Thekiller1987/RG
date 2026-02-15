@@ -229,23 +229,34 @@ const getProductHistory = async (req, res) => {
     const { code } = req.query;
     if (!code) return res.status(400).json({ msg: 'Código de producto requerido.' });
     try {
-        // MEJORA: Búsqueda simple en SQL, ordenamiento en JS para máxima compatibilidad
-        const [products] = await db.query(
-            `SELECT id_producto, nombre, codigo, precio, costo, existencia 
-             FROM productos 
-             WHERE codigo = ? OR codigo LIKE ? OR nombre LIKE ?
-             LIMIT 20`,
-            [code, `%${code}%`, `%${code}%`]
-        );
+        console.log(`[getProductHistory] Searching for code: "${code}" (searchOnly: ${req.query.searchOnly})`);
 
-        if (req.query.searchOnly) return res.json(products);
+        // MEJORA: Búsqueda simple en SQL, ordenamiento en JS para máxima compatibilidad
+        let products = [];
+        try {
+            const [rows] = await db.query(
+                `SELECT id_producto, nombre, codigo, precio, costo, existencia 
+                 FROM productos 
+                 WHERE codigo = ? OR codigo LIKE ? OR nombre LIKE ?
+                 LIMIT 20`,
+                [code, `%${code}%`, `%${code}%`]
+            );
+            products = rows;
+        } catch (dbError) {
+            console.error('[getProductHistory] Database Query Error:', dbError);
+            throw new Error('Error executing product search query: ' + dbError.message);
+        }
+
+        if (req.query.searchOnly) {
+            return res.json(products);
+        }
 
         if (!products.length) return res.json({ product: null, history: [] });
 
         // Ordenar en JS: Exact match primero
         products.sort((a, b) => {
-            const aExact = a.codigo === code;
-            const bExact = b.codigo === code;
+            const aExact = (a.codigo === code);
+            const bExact = (b.codigo === code);
             if (aExact && !bExact) return -1;
             if (!aExact && bExact) return 1;
             return a.nombre.localeCompare(b.nombre);
