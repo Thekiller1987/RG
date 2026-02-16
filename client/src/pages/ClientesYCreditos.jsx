@@ -109,6 +109,79 @@ const Table = styled.table`
     }
 `;
 
+const MobileContainer = styled.div`
+    display: none;
+    flex-direction: column;
+    gap: 1rem;
+    @media(max-width: 992px) {
+        display: flex;
+    }
+`;
+
+const ClientCard = styled.div`
+    background: white;
+    border-radius: 12px;
+    padding: 1.25rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    border: 1px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+`;
+
+const CardHeader = styled.div`
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px solid #f1f3f5;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.25rem;
+`;
+
+const CardTitle = styled.h3`
+    font-size: 1.1rem;
+    margin: 0;
+    color: #343a40;
+    font-weight: 700;
+`;
+
+const CardSubtitle = styled.span`
+    font-size: 0.85rem;
+    color: #868e96;
+    display: block;
+    margin-top: 4px;
+`;
+
+const CardBody = styled.div`
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+`;
+
+const InfoItem = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    span.label { font-size: 0.75rem; color: #adb5bd; text-transform: uppercase; font-weight: 600; }
+    span.value { font-size: 1rem; font-weight: 600; color: #495057; }
+    span.balance { font-size: 1.1rem; font-weight: 700; color: ${props => props.isDebt ? '#dc3545' : '#28a745'}; }
+`;
+
+const CardActions = styled.div`
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px dashed #e9ecef;
+
+    button {
+        justify-content: center;
+        width: 100%;
+        font-size: 0.85rem;
+    }
+`;
+
 export default function ClientesYCreditos() {
     const { clients, user, token, isLoading, refreshClients, cajaSession, allUsers } = useAuth();
     const [modal, setModal] = useState({ name: null, data: null });
@@ -169,18 +242,67 @@ export default function ClientesYCreditos() {
                             <td style={{ fontWeight: 'bold', color: c.saldo_pendiente > 0 ? '#dc3545' : '#28a745' }}>{formatCurrency(c.saldo_pendiente)}</td>
                             <td>
                                 <ButtonGroup>
-                                    <Button $abono disabled={!isCajaOpen || c.saldo_pendiente <= 0} onClick={() => handleOpenModal('abono', c)}><FaMoneyBillWave /> Abono</Button>
-                                    <Button onClick={() => handleOpenModal('client', c)}><FaEdit /> Editar</Button>
-                                    <Button $delete onClick={() => handleDelete(c)}><FaTrashAlt /> Eliminar</Button>
-                                    <Button $delete onClick={() => handleDelete(c)}><FaTrashAlt /> Eliminar</Button>
-                                    <Button primary onClick={() => handleOpenModal('historial', c)}><FaHistory /> Créditos</Button>
-                                    <Button $refresh style={{ background: '#6f42c1' }} onClick={() => handleOpenModal('tickets', c)}><FaMoneyBillWave /> Ver Tickets</Button>
+                                    <Button $abono disabled={!isCajaOpen || c.saldo_pendiente <= 0} onClick={() => handleOpenModal('abono', c)} title="Realizar Abono"><FaMoneyBillWave /></Button>
+                                    <Button onClick={() => handleOpenModal('client', c)} title="Editar Cliente"><FaEdit /></Button>
+                                    <Button primary onClick={() => handleOpenModal('historial', c)} title="Ver Historial"><FaHistory /></Button>
+                                    <Button $refresh style={{ background: '#6f42c1' }} onClick={() => handleOpenModal('tickets', c)} title="Ver Tickets"><FaMoneyBillWave /></Button>
+                                    <Button $delete onClick={() => handleDelete(c)} title="Eliminar Cliente"><FaTrashAlt /></Button>
                                 </ButtonGroup>
                             </td>
                         </tr>
                     ))}
                 </tbody>
             </Table>
+
+            <MobileContainer>
+                {clients.map(c => (
+                    <ClientCard key={c.id_cliente}>
+                        <CardHeader>
+                            <div>
+                                <CardTitle>{c.nombre}</CardTitle>
+                                <CardSubtitle>ID: {c.id_cliente} • {c.telefono || 'Sin Teléfono'}</CardSubtitle>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                <span style={{ fontSize: '0.75rem', color: '#adb5bd', fontWeight: '600' }}>SALDO</span>
+                                <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: c.saldo_pendiente > 0 ? '#dc3545' : '#28a745' }}>
+                                    {formatCurrency(c.saldo_pendiente)}
+                                </span>
+                            </div>
+                        </CardHeader>
+
+                        <CardBody>
+                            <InfoItem>
+                                <span className="label">Límite Crédito</span>
+                                <span className="value">{renderLimit(c.limite_credito)}</span>
+                            </InfoItem>
+                            <InfoItem>
+                                <span className="label">Estado</span>
+                                <span className="value" style={{ color: c.saldo_pendiente > 0 ? '#e03131' : '#2f9e44' }}>
+                                    {c.saldo_pendiente > 0 ? 'Con Deuda' : 'Al Día'}
+                                </span>
+                            </InfoItem>
+                        </CardBody>
+
+                        <CardActions>
+                            <Button $abono disabled={!isCajaOpen || c.saldo_pendiente <= 0} onClick={() => handleOpenModal('abono', c)}>
+                                <FaMoneyBillWave /> Abonar
+                            </Button>
+                            <Button onClick={() => handleOpenModal('client', c)}>
+                                <FaEdit /> Editar
+                            </Button>
+                            <Button primary onClick={() => handleOpenModal('historial', c)}>
+                                <FaHistory /> Historial
+                            </Button>
+                            <Button $refresh style={{ background: '#6f42c1' }} onClick={() => handleOpenModal('tickets', c)}>
+                                <FaMoneyBillWave /> Tickets
+                            </Button>
+                            <Button $delete style={{ gridColumn: 'span 2' }} onClick={() => handleDelete(c)}>
+                                <FaTrashAlt /> Eliminar Cliente
+                            </Button>
+                        </CardActions>
+                    </ClientCard>
+                ))}
+            </MobileContainer>
 
             {modal.name === 'client' && <ClientFormModal client={modal.data} onClose={handleCloseModal} onSave={refreshClients} />}
             {modal.name === 'abono' && <AbonoCreditoModal client={modal.data} onClose={handleCloseModal} onAbonoSuccess={refreshClients} showAlert={showAlert} />}
