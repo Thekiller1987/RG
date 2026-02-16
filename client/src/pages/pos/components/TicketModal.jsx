@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { FaReceipt, FaWindowClose, FaFileInvoice } from 'react-icons/fa';
 import styled, { css, createGlobalStyle } from 'styled-components';
 import { ModalOverlay, Button, TotalsRow, ModalContent } from '../POS.styles.jsx';
@@ -281,6 +281,7 @@ const TicketModal = ({
   printMode = '80',
   currentUser = null,
   onPersistPrint = null,
+  autoTriggerPrint = false,
 }) => {
   const { user: authUser } = (typeof useAuth === 'function' ? useAuth() : { user: null });
   const { settings } = useSettings(); // NEW: Hook para configuración
@@ -441,8 +442,22 @@ const TicketModal = ({
     w.document.write(`<html><head><title>Impresión ${mode.toUpperCase()} - ${companyInfo.name}</title><style>${printStyles}</style></head><body>${htmlToPrint}</body></html>`);
     w.document.close();
     w.focus();
-    w.onload = () => { setTimeout(() => { w.print(); }, 250); };
+    // Usar setTimeout directo en vez de w.onload (más confiable después de document.write)
+    setTimeout(() => {
+      try { w.print(); } catch (e) { console.error('Print error:', e); }
+    }, 350);
   }, [companyInfo]);
+
+  // === Auto-trigger print for "Pagar e Imprimir" ===
+  const hasAutoTriggered = useRef(false);
+  useEffect(() => {
+    if (autoTriggerPrint && !hasAutoTriggered.current) {
+      hasAutoTriggered.current = true;
+      // Pequeño delay para que el DOM del ticket se renderice completamente
+      const timer = setTimeout(() => doPrint('80'), 400);
+      return () => clearTimeout(timer);
+    }
+  }, [autoTriggerPrint, doPrint]);
 
   return (
     <ModalOverlay className="no-print">

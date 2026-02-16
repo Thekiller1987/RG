@@ -45,6 +45,7 @@ const POS = () => {
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [modal, setModal] = useState({ name: null, data: null });
   const [ticketData, setTicketData] = useState(null); // State for the ticket to print
+  const [shouldAutoTriggerPrint, setShouldAutoTriggerPrint] = useState(false); // Auto-print 80mm on open
   const [alert, setAlert] = useState({ isOpen: false, title: '', message: '' });
   const [confirmation, setConfirmation] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const [secretModalOpen, setSecretModalOpen] = useState(false);
@@ -110,13 +111,57 @@ const POS = () => {
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.type = 'sine'; // 'square' for more 8-bit feel
+      osc.type = 'sine';
       osc.frequency.setValueAtTime(1200, ctx.currentTime);
       gain.gain.setValueAtTime(0.1, ctx.currentTime);
       osc.start();
       osc.stop(ctx.currentTime + 0.1);
     } catch (e) {
       // Ignore audio errors (interaction requirement)
+    }
+  }, []);
+
+  // Sonido de éxito al completar una venta (chime agradable)
+  const playSuccessSound = useCallback(() => {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const now = ctx.currentTime;
+
+      // Nota 1: Do (C5)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.connect(gain1); gain1.connect(ctx.destination);
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(523, now);
+      gain1.gain.setValueAtTime(0.15, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      osc1.start(now); osc1.stop(now + 0.4);
+
+      // Nota 2: Mi (E5)
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.connect(gain2); gain2.connect(ctx.destination);
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(659, now + 0.12);
+      gain2.gain.setValueAtTime(0.001, now);
+      gain2.gain.setValueAtTime(0.15, now + 0.12);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      osc2.start(now + 0.12); osc2.stop(now + 0.5);
+
+      // Nota 3: Sol (G5)
+      const osc3 = ctx.createOscillator();
+      const gain3 = ctx.createGain();
+      osc3.connect(gain3); gain3.connect(ctx.destination);
+      osc3.type = 'sine';
+      osc3.frequency.setValueAtTime(784, now + 0.24);
+      gain3.gain.setValueAtTime(0.001, now);
+      gain3.gain.setValueAtTime(0.18, now + 0.24);
+      gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+      osc3.start(now + 0.24); osc3.stop(now + 0.7);
+    } catch (e) {
+      // Ignore audio errors
     }
   }, []);
 
@@ -145,7 +190,7 @@ const POS = () => {
         if (!document.hidden) {
           checkForNewOrders(userId);
         }
-      }, 15000);
+      }, 3000);
 
       return () => clearInterval(intervalId);
     }
@@ -318,6 +363,7 @@ const POS = () => {
         savedSale.fecha = new Date().toISOString();
 
         if (pagoDetalles.shouldPrintNow) {
+          setShouldAutoTriggerPrint(true);
           setTicketData(savedSale); // Abre Modal Ticket con ID real
         } else {
           // Éxito silencioso o pequeño toast (ya mostramos alerta abajo si era instant)
@@ -397,6 +443,7 @@ const POS = () => {
         setCajaSession(updatedSession);
       }
 
+      playSuccessSound();
       showAlert({ title: "¡Éxito!", message: "Venta procesada." });
 
       // 2. Ejecutar proceso en background
@@ -408,6 +455,16 @@ const POS = () => {
       // --- MODO CON ESPERA (IMPRESIÓN) ---
       // Debemos esperar para tener el ID y mostrar el ticket
       await processSalePromise();
+
+      // Limpiar carrito y stock después de venta exitosa (igual que modo instantáneo)
+      handleRemoveOrder(orderToCloseId);
+      setProductsState(prev => prev.map(p => {
+        const sold = payloadItems.find(i => i.id_producto === (p.id_producto || p.id));
+        if (sold) return { ...p, existencia: Math.max(0, p.existencia - sold.quantity) };
+        return p;
+      }));
+
+      playSuccessSound();
       return true;
     }
   };
@@ -952,6 +1009,7 @@ const POS = () => {
             users={allUsers} // Fixed: Pass ALL users so history shows seller names
             clients={clients || []} // Pass clients from auth context
             onReprintTicket={(sale) => {
+              setShouldAutoTriggerPrint(false); // Reprint: no auto-trigger
               setTicketData(sale); // Open TicketModal for reprint
             }}
             onCancelSale={async (sale) => {
@@ -1075,7 +1133,8 @@ const POS = () => {
           <TicketModal
             isOpen={true}
             transaction={ticketData}
-            onClose={() => setTicketData(null)}
+            onClose={() => { setTicketData(null); setShouldAutoTriggerPrint(false); }}
+            autoTriggerPrint={shouldAutoTriggerPrint}
             clients={clients}
             users={[user]}
             currentUser={user}
