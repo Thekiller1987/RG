@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue } from 'react';
 import styled, { keyframes } from 'styled-components';
 import axios from 'axios';
-import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import {
   FaPlus, FaBoxOpen, FaTags, FaTruck, FaTrash, FaEdit, FaArrowLeft, FaHistory, FaSpinner,
   FaSearch, FaTimes, FaPlusCircle, FaMinusCircle, FaExclamationTriangle,
@@ -285,7 +283,7 @@ const ImageUpload = ({ currentImage, onImageChange }) => {
 
     // Validar tipo
     if (!file.type.startsWith('image/')) {
-      toast.error('Solo se permiten imágenes.');
+      alert('Solo se permiten imágenes.');
       return;
     }
 
@@ -296,7 +294,7 @@ const ImageUpload = ({ currentImage, onImageChange }) => {
       onImageChange(compressed);
     } catch (err) {
       console.error(err);
-      toast.error('Error al procesar la imagen.');
+      alert('Error al procesar la imagen.');
     } finally {
       setLoading(false);
     }
@@ -385,6 +383,18 @@ const LARGE_LIST_CUTOFF = 500;
    COMPONENTES DE MODAL FALTANTES
 ================================== */
 
+const AlertModal = ({ isOpen, onClose, title, message }) => {
+  if (!isOpen) return null;
+  return (
+    <ModalOverlay onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <ModalContent as="div" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center' }}>
+        <ModalTitle>{title}</ModalTitle>
+        <p style={{ color: '#4a5568', marginBottom: '20px' }}>{message}</p>
+        <SaveButton onClick={onClose} style={{ width: '100%' }}>Aceptar</SaveButton>
+      </ModalContent>
+    </ModalOverlay>
+  );
+};
 
 const ConfirmDialog = ({ open, onCancel, onConfirm, title, message, confirmLabel, danger }) => {
   if (!open) return null;
@@ -499,7 +509,7 @@ const StockAdjustmentModal = ({ isOpen, product, onClose, onConfirm }) => {
             if (!isNaN(val) && val !== 0 && razon.trim()) {
               onConfirm(product, val, razon);
             } else {
-              toast.error('Debe ingresar una cantidad válida y una razón.');
+              alert('Debe ingresar una cantidad válida y una razón.');
             }
           }}>Aplicar Ajuste</SaveButton>
         </ModalActions>
@@ -810,16 +820,10 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
   COMPONENTE PRINCIPAL: InventoryManagement
 ===================================== */
 const InventoryManagement = () => {
-  const {
-    products: globalProducts,
-    categories: globalCategories,
-    providers: globalProviders,
-    refreshProducts,
-    loadMasterData,
-    token
-  } = useAuth();
-
+  const [allProductsRaw, setAllProductsRaw] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [providers, setProviders] = useState([]);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchType, setSearchType] = useState('description'); // <--- AGREGADO: ESTADO PARA TIPO BÚSQUEDA
@@ -839,6 +843,7 @@ const InventoryManagement = () => {
   const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [adjustmentModal, setAdjustmentModal] = useState({ isOpen: false, product: null });
+  const [alert, setAlert] = useState({ isOpen: false, title: '', message: '' });
   const [archivePrompt, setArchivePrompt] = useState({ open: false, product: null, detail: null });
   const [currentPage, setCurrentPage] = useState(1);
   const [viewImage, setViewImage] = useState({ isOpen: false, imageUrl: null });
@@ -853,44 +858,57 @@ const InventoryManagement = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
+  const showAlert = useCallback(({ title, message, type }) => setAlert({ isOpen: true, title, message, type }), []);
+  const closeAlert = () => setAlert({ isOpen: false });
 
-  // Transform global products for local UI needs (indexing, normalization)
-  useEffect(() => {
-    if (!globalProducts) return;
+  const fetchProductList = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    const res = await axios.get('/api/products', { headers: { Authorization: `Bearer ${token}` } });
+    return res.data;
+  }, []);
 
-    const indexed = globalProducts.map(p => {
-      const nombre = p.nombre ?? '';
-      const codigo = p.codigo ?? '';
-      const descripcion = p.descripcion ?? '';
-      const q = `${norm(nombre)}|${norm(codigo)}|${norm(descripcion)}`;
-      const qStarts = [norm(nombre), norm(codigo)];
-      const costoNum = Number(p.costo || 0);
-      const ventaNum = Number(p.venta || 0);
-      const existenciaNum = Number(p.existencia || 0);
-      return {
-        ...p,
-        __fmt: {
-          costo: `C$${costoNum.toFixed(2)}`,
-          venta: `C$${ventaNum.toFixed(2)}`,
-          costoTotal: `C$${(costoNum * existenciaNum).toFixed(2)}`
-        },
-        q,
-        qStarts
-      };
-    });
-
-    setAllProducts(indexed);
-    setInitialLoadComplete(true);
-  }, [globalProducts]);
-
-  // Refresh data if needed (though AuthContext handles most)
   const fetchData = useCallback(async () => {
     try {
-      await refreshProducts();
+      const token = localStorage.getItem('token');
+      const [full, cats, provs] = await Promise.all([
+        fetchProductList(),
+        axios.get('/api/categories', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/providers', { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+
+      setAllProductsRaw(full);
+
+      const indexed = full.map(p => {
+        const nombre = p.nombre ?? '';
+        const codigo = p.codigo ?? '';
+        const descripcion = p.descripcion ?? '';
+        const q = `${norm(nombre)}|${norm(codigo)}|${norm(descripcion)}`;
+        const qStarts = [norm(nombre), norm(codigo)];
+        const costoNum = Number(p.costo || 0);
+        const ventaNum = Number(p.venta || 0);
+        const existenciaNum = Number(p.existencia || 0);
+        return {
+          ...p,
+          __fmt: {
+            costo: `C$${costoNum.toFixed(2)}`,
+            venta: `C$${ventaNum.toFixed(2)}`,
+            costoTotal: `C$${(costoNum * existenciaNum).toFixed(2)}`
+          },
+          q,
+          qStarts
+        };
+      });
+
+      setAllProducts(indexed);
+      setCategories(cats.data);
+      setProviders(provs.data);
+      setInitialLoadComplete(true);
     } catch (e) {
-      toast.error('Error al actualizar inventario.');
+      setError('Error al cargar los datos.');
     }
-  }, [refreshProducts]);
+  }, [fetchProductList]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const { filtered, totalFilteredCount } = useMemo(() => {
     const q = (deferredSearch || '').toLowerCase().trim();
@@ -964,24 +982,25 @@ const InventoryManagement = () => {
       const token = localStorage.getItem('token');
       await axios.post('/api/products', payload, { headers: { Authorization: `Bearer ${token}` } });
       setIsCreateModalOpen(false);
-      toast.success('Producto creado correctamente.');
-      await refreshProducts();
+      showAlert({ title: 'Éxito', message: 'Producto creado correctamente.' });
+      await fetchData();
     } catch (err) {
       console.error('CLIENT CREATE ERROR:', err);
-      toast.error(err.response?.data?.msg || 'Error al crear el producto.');
+      showAlert({ title: 'Error', message: err.response?.data?.msg || 'Error al crear el producto.', type: 'error' });
     }
   };
 
   const handleUpdateProduct = async (payload, productId) => {
     try {
       console.log('CLIENT SENDING UPDATE PAYLOAD:', { ...payload, imagenLength: payload.imagen ? payload.imagen.length : 'NULL' });
+      const token = localStorage.getItem('token');
       await axios.put(`/api/products/${productId}`, payload, { headers: { Authorization: `Bearer ${token}` } });
       setIsEditModalOpen(false);
-      toast.success('Producto actualizado correctamente.');
-      await refreshProducts();
+      showAlert({ title: 'Éxito', message: 'Producto actualizado correctamente.' });
+      await fetchData();
     } catch (err) {
       console.error('CLIENT UPDATE ERROR:', err);
-      toast.error(err.response?.data?.msg || 'Error al actualizar el producto.');
+      showAlert({ title: 'Error', message: err.response?.data?.msg || 'Error al actualizar el producto.', type: 'error' });
     }
   };
 
@@ -992,10 +1011,10 @@ const InventoryManagement = () => {
       await axios.delete(`/api/products/${productToDelete.id_producto}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      await refreshProducts();
+      await fetchData();
       setIsDeleteModalOpen(false);
       setProductToDelete(null);
-      toast.success(`El producto ${productToDelete.nombre} fue eliminado.`);
+      showAlert({ title: 'Éxito', message: `El producto ${productToDelete.nombre} fue eliminado.` });
     } catch (err) {
       const data = err?.response?.data;
       const msg = data?.msg || 'No se pudo eliminar el producto.';
@@ -1029,10 +1048,10 @@ const InventoryManagement = () => {
         { cantidad, razon }, { headers: { Authorization: `Bearer ${token}` } }
       );
       setAdjustmentModal({ isOpen: false, product: null });
-      toast.success('Stock actualizado correctamente.');
-      await refreshProducts();
+      showAlert({ title: 'Éxito', message: 'Stock actualizado correctamente.' });
+      await fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.msg || 'No se pudo ajustar el stock.');
+      showAlert({ title: 'Error', message: error.response?.data?.msg || 'No se pudo ajustar el stock.' });
     }
   };
 
@@ -1114,11 +1133,11 @@ const InventoryManagement = () => {
 
         <Select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
           <option value="">Todas las categorías</option>
-          {globalCategories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}
+          {categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}
         </Select>
         <Select value={filterProvider} onChange={(e) => setFilterProvider(e.target.value)}>
           <option value="">Todos los proveedores</option>
-          {globalProviders.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}
+          {providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}
         </Select>
       </FilterContainer>
 
@@ -1206,12 +1225,12 @@ const InventoryManagement = () => {
       )}
       <AnimatePresence>
         {isCreateModalOpen && (
-          <CreateProductModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSave={handleCreateProduct} categories={globalCategories} providers={globalProviders} allProductsRaw={allProducts} />
+          <CreateProductModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSave={handleCreateProduct} categories={categories} providers={providers} allProductsRaw={allProductsRaw} />
         )}
       </AnimatePresence>
       <AnimatePresence>
         {isEditModalOpen && (
-          <EditProductModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSave={handleUpdateProduct} productToEdit={productToEdit} categories={globalCategories} providers={globalProviders} allProductsRaw={allProducts} />
+          <EditProductModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSave={handleUpdateProduct} productToEdit={productToEdit} categories={categories} providers={providers} allProductsRaw={allProductsRaw} />
         )}
       </AnimatePresence>
       <AnimatePresence>
@@ -1251,12 +1270,12 @@ const InventoryManagement = () => {
       </AnimatePresence>
       <AnimatePresence>
         {isCategoryModalOpen && (
-          <ManagementModal title="Gestionar Categorías" items={globalCategories} onAdd={handleAddCategory} onDelete={handleDeleteCategory} onClose={() => setIsCategoryModalOpen(false)} />
+          <ManagementModal title="Gestionar Categorías" items={categories} onAdd={handleAddCategory} onDelete={handleDeleteCategory} onClose={() => setIsCategoryModalOpen(false)} />
         )}
       </AnimatePresence>
       <AnimatePresence>
         {isProviderModalOpen && (
-          <ManagementModal title="Gestionar Proveedores" items={globalProviders} onAdd={handleAddProvider} onDelete={handleDeleteProvider} onClose={() => setIsProviderModalOpen(false)} />
+          <ManagementModal title="Gestionar Proveedores" items={providers} onAdd={handleAddProvider} onDelete={handleDeleteProvider} onClose={() => setIsProviderModalOpen(false)} />
         )}
       </AnimatePresence>
       <AnimatePresence>
@@ -1266,6 +1285,9 @@ const InventoryManagement = () => {
         {adjustmentModal.isOpen && (
           <StockAdjustmentModal isOpen={adjustmentModal.isOpen} product={adjustmentModal.product} onClose={() => setAdjustmentModal({ isOpen: false, product: null })} onConfirm={executeStockAdjustment} />
         )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {alert.isOpen && <AlertModal isOpen={alert.isOpen} onClose={closeAlert} title={alert.title} message={alert.message} />}
       </AnimatePresence>
       <AnimatePresence>
         {viewImage.isOpen && <ImageViewModal isOpen={viewImage.isOpen} imageSrc={viewImage.imageUrl} onClose={() => setViewImage({ isOpen: false, imageUrl: null })} />}
