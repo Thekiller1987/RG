@@ -1133,8 +1133,16 @@ const POS = () => {
           <TicketModal
             isOpen={true}
             transaction={ticketData}
-            onClose={() => { setTicketData(null); setShouldAutoTriggerPrint(false); }}
+            onClose={() => {
+              const wasAutoPrint = shouldAutoTriggerPrint;
+              setTicketData(null);
+              setShouldAutoTriggerPrint(false);
+              if (wasAutoPrint) {
+                showAlert({ title: "✅ ¡Venta Realizada con Éxito!", message: "El ticket se envió a imprimir correctamente." });
+              }
+            }}
             autoTriggerPrint={shouldAutoTriggerPrint}
+            showAlert={showAlert}
             clients={clients}
             users={[user]}
             currentUser={user}

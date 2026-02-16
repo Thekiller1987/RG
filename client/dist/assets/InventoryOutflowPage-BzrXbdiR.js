@@ -1,4 +1,4 @@
-import{r as c,j as e,A as Q,C as O,O as L,aA as Z,x as ie,s as o,m as $,u as ne,R as ae,U as se,V as le,X as de,Y as ce,h as pe,n as B,$ as xe,a5 as me,D as ue,ai as w,a9 as he}from"./vendor-DfgwALhZ.js";import{a as fe,u as E,P as ge,Q as be}from"./index-HeWOI7J3.js";import"./scanner-vendor-DfxRpMWJ.js";import"./pdf-vendor-CTN92j8O.js";const we=()=>new URL("/icons/logo.png",window.location.origin).toString(),ye=o($.div)`
+import{r as c,j as e,A as Q,C as O,O as L,aA as Z,x as ie,s as o,m as $,u as ne,R as ae,U as se,V as le,X as de,Y as ce,h as pe,n as B,$ as xe,a5 as me,D as ue,ai as w,a9 as he}from"./vendor-DfgwALhZ.js";import{a as fe,u as E,P as ge,Q as be}from"./index-BXLiT6jj.js";import"./scanner-vendor-DfxRpMWJ.js";import"./pdf-vendor-CTN92j8O.js";const we=()=>new URL("/icons/logo.png",window.location.origin).toString(),ye=o($.div)`
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0, 0, 0, 0.6);
   z-index: 1100;

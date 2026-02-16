@@ -1,5 +1,5 @@
-import React, { useMemo, useEffect, useRef } from 'react';
-import { FaReceipt, FaWindowClose, FaFileInvoice } from 'react-icons/fa';
+import React, { useMemo, useEffect, useRef, useCallback } from 'react';
+import { FaReceipt, FaWindowClose, FaFileInvoice, FaPrint, FaCheckCircle } from 'react-icons/fa';
 import styled, { css, createGlobalStyle } from 'styled-components';
 import { ModalOverlay, Button, TotalsRow, ModalContent } from '../POS.styles.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
@@ -45,7 +45,7 @@ const PrintWrapper = styled.div`
   font-family: 'Consolas','Courier New',monospace;
   color: #000;
   background: #fff;
-  width: 310px; /* Default for preview */
+  width: 310px;
   margin: 0 auto;
   padding: 12px 10px;
   box-shadow: 0 0 10px rgba(0,0,0,.08);
@@ -57,38 +57,50 @@ const PrintWrapper = styled.div`
   /* --- BRAND --- */
   .brand {
     text-align: center;
-    border-bottom: 1px dashed #333;
+    border-bottom: 2px dashed #333;
     padding-bottom: 10px;
     margin-bottom: 10px;
   }
-  .brand h1 { margin: 6px 0 2px; font-size: 1.35rem; font-weight: 700; color: #1e3a8a; line-height: 1.25; }
-  .brand small { color: #555; display: block; margin: 3px 0; line-height: 1.35; white-space: normal; word-break: break-word; }
+  .brand-logo-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .brand h1 { margin: 6px 0 2px; font-size: 1.4rem; font-weight: 900; color: #000; line-height: 1.25; letter-spacing: 0.5px; }
+  .brand small { color: #333; display: block; margin: 2px 0; line-height: 1.35; white-space: normal; word-break: break-word; font-weight: 500; }
 
   /* --- META --- */
-  .meta { font-size: .9rem; margin-bottom: 12px; border-bottom: 1px dashed #ccc; padding-bottom: 8px; }
-  .meta p { margin: 2px 0; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 4px 8px; font-weight: 400; }
-  .meta-label { font-weight: 700; }
-  .meta-value { font-weight: 400; text-align: right; }
+  .meta { font-size: .85rem; margin-bottom: 12px; border-bottom: 1px dashed #ccc; padding-bottom: 8px; }
+  .meta p { margin: 3px 0; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 2px 8px; font-weight: 400; }
+  .meta-label { font-weight: 800; color: #000; }
+  .meta-value { font-weight: 500; text-align: right; }
 
   /* --- ITEMS --- */
-  table.items { width: 100%; border-collapse: collapse; font-size: .9rem; table-layout: fixed; }
-  table.items th, table.items td { padding: 6px 4px; vertical-align: top; word-wrap: break-word; }
-  table.items th { border-bottom: 2px solid #333; font-weight: 700; text-transform: uppercase; font-size: 0.75rem; color: #1e3a8a; }
-  &.compact table.items th, &.compact table.items td { padding: 4px 2px; }
+  table.items { width: 100%; border-collapse: collapse; font-size: .85rem; table-layout: fixed; }
+  table.items th, table.items td { padding: 5px 3px; vertical-align: top; word-wrap: break-word; }
+  table.items th { border-bottom: 2px solid #000; font-weight: 900; text-transform: uppercase; font-size: 0.7rem; color: #000; }
+  table.items td { font-weight: 500; border-bottom: 1px dotted #ccc; }
+  &.compact table.items th, &.compact table.items td { padding: 3px 2px; }
   .text-right { text-align: right; }
-  .col-qty { width: 15%; text-align: center; }
+  .col-qty { width: 12%; text-align: center; }
   .col-unit { width: 25%; text-align: right; }
   .col-total { width: 25%; text-align: right; }
   table.items td:nth-child(2) { white-space: normal; text-align: left; }
 
   /* --- TOTALS --- */
-  .totals { border-top: 2px solid #333; padding-top: 6px; margin-top: 12px; }
-  .badge { display: inline-block; font-weight: 700; letter-spacing: .5px; padding: 6px 10px; border: 2px solid #0b72b9; border-radius: 4px; margin: 10px auto; text-align: center; color: #0b72b9; }
-  .thanks { text-align: center; font-size: .85rem; border-top: 1px dashed #333; padding-top: 10px; margin-top: 12px; color: #444; line-height: 1.4; }
+  .totals { border-top: 2px solid #000; padding-top: 8px; margin-top: 12px; }
+  .badge { display: inline-block; font-weight: 900; letter-spacing: .5px; padding: 6px 10px; border: 2px solid #000; border-radius: 4px; margin: 10px auto; text-align: center; color: #000; }
+  .thanks { text-align: center; font-size: .8rem; border-top: 1px dashed #333; padding-top: 8px; margin-top: 10px; color: #333; line-height: 1.4; font-weight: 600; }
 
   /* ====== A4 SPECIFIC LAYOUT ====== */
   &.print-a4 {
-    /* Layout A4 Professional */
+    width: 100%;
+    max-width: 700px;
+    font-family: 'Inter', Helvetica, Arial, sans-serif;
+    padding: 30px;
+    border-radius: 0;
+
     .brand {
         display: flex;
         justify-content: space-between;
@@ -98,10 +110,10 @@ const PrintWrapper = styled.div`
         margin-bottom: 2rem;
         padding-bottom: 1rem;
     }
-    .brand-logo-container { width: 150px; }
+    .brand-logo-container { width: 150px; justify-content: flex-start; }
     .brand-info { text-align: right; max-width: 60%; }
-    .brand h1 { font-size: 20pt; color: #1e3a8a; margin-bottom: 5px; }
-    .brand small { font-size: 9pt; color: #444; margin: 1px 0; }
+    .brand h1 { font-size: 20pt; color: #1e3a8a; margin-bottom: 5px; font-weight: 900; }
+    .brand small { font-size: 9pt; color: #444; margin: 1px 0; font-weight: 500; }
     
     .meta { 
         display: grid;
@@ -114,13 +126,13 @@ const PrintWrapper = styled.div`
         margin-bottom: 25px;
     }
     .meta-col { display: flex; flex-direction: column; gap: 5px; }
-    .meta-title { font-weight: bold; text-transform: uppercase; color: #1e3a8a; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 6px; font-size: 9pt; }
+    .meta-title { font-weight: 900; text-transform: uppercase; color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 4px; margin-bottom: 6px; font-size: 9pt; }
     .meta p { justify-content: flex-start; gap: 8px; border-bottom: none; width: 100%; display: grid; grid-template-columns: 120px 1fr; }
-    .meta-label { text-align: left; color: #64748b; font-weight: 500; }
-    .meta-value { text-align: left; color: #0f172a; font-weight: 600; }
+    .meta-label { text-align: left; color: #64748b; font-weight: 600; }
+    .meta-value { text-align: left; color: #0f172a; font-weight: 700; }
 
-    table.items th { background: #f1f5f9; color: #334155; padding: 10px; border-bottom: 2px solid #cbd5e1; font-size: 9pt; }
-    table.items td { padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 10pt; color: #334155; }
+    table.items th { background: #f1f5f9; color: #334155; padding: 10px; border-bottom: 2px solid #cbd5e1; font-size: 9pt; font-weight: 800; }
+    table.items td { padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 10pt; color: #334155; font-weight: 500; }
     .col-qty { width: 10%; }
     .col-unit { width: 15%; }
     .col-total { width: 15%; }
@@ -172,31 +184,79 @@ const PrintWrapper = styled.div`
 
 const Wrapper = styled.div`
   display: flex; flex-direction: column; gap: 12px;
+  max-height: 60vh;
+  overflow-y: auto;
+  
+  @media (max-width: 768px) {
+    max-height: 65vh;
+  }
 `;
 
 const TicketLogo = styled.img`
+  max-width: 140px;
   width: 100%;
-  max-width: 160px;
   height: auto;
   display: block;
-  margin: 0 auto; 
-  border-radius: 6px;
-  &.a4-logo { margin: 0; max-width: 140px; }
+  border-radius: 4px;
+  object-fit: contain;
+
+  &.logo-80mm {
+    max-width: 120px;
+    margin: 0 auto;
+  }
+  &.logo-a4 {
+    max-width: 130px;
+    margin: 0;
+  }
 `;
 
 const Tag = styled.span`
   display: inline-flex; align-items: center; gap: 6px;
-  font-weight: 700; letter-spacing: .4px; padding: 4px 8px; border-radius: 4px;
+  font-weight: 900; letter-spacing: .5px; padding: 5px 10px; border-radius: 4px;
   font-size: 0.85rem;
-  ${({ $type }) => $type === 'proforma' && css`background: #e8f4ff; color: #0b72b9; border: 1px solid #b9defc;`}
-  ${({ $type }) => $type === 'abono' && css`background: #fff3cd; color: #856404; border: 1px solid #ffeeba;`}
-  ${({ $type }) => $type === 'venta' && css`background: #e8f7ee; color: #1c7d3a; border: 1px solid #bfe8cf;`}
-  ${({ $type }) => $type === 'outflow' && css`background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;`}
+  ${({ $type }) => $type === 'proforma' && css`background: #e8f4ff; color: #0b72b9; border: 2px solid #0b72b9;`}
+  ${({ $type }) => $type === 'abono' && css`background: #fff3cd; color: #856404; border: 2px solid #856404;`}
+  ${({ $type }) => $type === 'venta' && css`background: #e8f7ee; color: #1c7d3a; border: 2px solid #1c7d3a;`}
+  ${({ $type }) => $type === 'outflow' && css`background: #fee2e2; color: #991b1b; border: 2px solid #991b1b;`}
 `;
 
 const HeaderBar = styled.div`
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 1rem; border-bottom: 1px solid #eee; padding-bottom: .75rem;
+  margin-bottom: 1rem; border-bottom: 2px solid #e2e8f0; padding-bottom: .75rem;
+  flex-wrap: wrap; gap: 8px;
+
+  h2 { font-size: 1.1rem; }
+
+  @media (max-width: 600px) {
+    flex-direction: column; align-items: stretch;
+    h2 { font-size: 1rem; }
+  }
+`;
+
+const ActionButtons = styled.div`
+  display: flex; gap: 8px; flex-wrap: wrap;
+  
+  @media (max-width: 600px) {
+    justify-content: stretch;
+    button { flex: 1; font-size: 0.85rem; padding: 10px 8px; }
+  }
+`;
+
+const ResponsiveModalContent = styled(ModalContent)`
+  max-width: 540px;
+  width: 96%;
+  padding: 1.2rem;
+  background: #fff;
+  max-height: 95vh;
+  overflow-y: auto;
+
+  @media (max-width: 600px) {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 12px 12px 0 0;
+    padding: 1rem;
+    max-height: 92vh;
+  }
 `;
 
 /* ======================= HELPERS ======================= */
@@ -282,9 +342,10 @@ const TicketModal = ({
   currentUser = null,
   onPersistPrint = null,
   autoTriggerPrint = false,
+  showAlert = null,
 }) => {
   const { user: authUser } = (typeof useAuth === 'function' ? useAuth() : { user: null });
-  const { settings } = useSettings(); // NEW: Hook para configuración
+  const { settings } = useSettings();
 
   if (!isOpen || transaction == null) return null;
 
@@ -295,12 +356,12 @@ const TicketModal = ({
   if (loading || error || !resolved) {
     return (
       <ModalOverlay className="no-print">
-        <ModalContent className="no-print" style={{ maxWidth: 420, padding: '1rem' }}>
+        <ResponsiveModalContent className="no-print" style={{ maxWidth: 420, padding: '1rem' }}>
           <h3 style={{ color: '#dc3545' }}>No se pudo imprimir</h3>
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
             <Button onClick={onClose} $cancel><FaWindowClose /> Cerrar</Button>
           </div>
-        </ModalContent>
+        </ResponsiveModalContent>
       </ModalOverlay>
     );
   }
@@ -321,7 +382,6 @@ const TicketModal = ({
     ? tx.proformaNombre
     : coalesce(clienteObj?.nombre, tx.clienteNombre, 'Consumidor Final');
 
-  // Campo cédula si aplica
   const clienteCedula = clienteObj?.cedula || tx.clienteCedula;
 
   const userId =
@@ -385,18 +445,16 @@ const TicketModal = ({
   }, []);
 
   // ====== Impresión centralizada (A4/80 mm) ======
-  const doPrint = React.useCallback((mode = '80') => {
+  const doPrint = React.useCallback((mode = '80', autoCloseAfter = false) => {
     const node = document.getElementById('print-wrapper-ticket');
     if (!node) return;
     const htmlToPrint = node.outerHTML;
 
-    // Estilos CSS inyectados para ventana de impresión
     const printStyles = `
       @charset "UTF-8";
       @page { size: ${mode === 'A4' ? 'A4 portrait' : '80mm auto'}; margin: ${mode === 'A4' ? '12mm' : '0'}; }
       html, body { background: #fff; margin: 0 !important; padding: 0 !important; font-family: ${mode === 'A4' ? "'Inter', Helvetica, Arial, sans-serif" : "'Consolas', monospace"}; color: #000 !important; }
       
-      /* Reset para impresión */
       #print-wrapper-ticket {
         box-shadow: none !important; border: none !important; margin: 0 !important;
         ${mode === 'A4'
@@ -405,21 +463,46 @@ const TicketModal = ({
       }
       }
 
-      /* Estilos específicos A4 en impresión */
-      ${mode === 'A4' ? `
-        #print-wrapper-ticket .brand { display: flex !important; justify-content: space-between !important; align-items: flex-start !important; border-bottom: 3px solid #1e3a8a !important; margin-bottom: 25px !important; padding-bottom: 15px !important; text-align: left !important; }
-        #print-wrapper-ticket .brand-logo-container { order: 1 !important; width: 140px !important; }
+      /* === ESTILOS 80mm MEJORADOS === */
+      ${mode !== 'A4' ? `
+        #print-wrapper-ticket { font-family: 'Consolas', monospace !important; }
+        #print-wrapper-ticket .brand { text-align: center !important; border-bottom: 2px dashed #000 !important; padding-bottom: 8px !important; margin-bottom: 8px !important; }
+        #print-wrapper-ticket .brand-logo-container { display: flex !important; justify-content: center !important; margin-bottom: 6px !important; }
+        #print-wrapper-ticket .brand-logo-container img { max-width: 50mm !important; height: auto !important; display: block !important; margin: 0 auto !important; }
+        #print-wrapper-ticket .brand h1 { font-size: 14pt !important; font-weight: 900 !important; color: #000 !important; margin: 4px 0 2px !important; letter-spacing: 0.5px !important; }
+        #print-wrapper-ticket .brand small { font-size: 7pt !important; color: #000 !important; font-weight: 600 !important; margin: 1px 0 !important; }
+        #print-wrapper-ticket .brand-info { text-align: center !important; }
+        
+        #print-wrapper-ticket .meta { font-size: 8pt !important; border-bottom: 1px dashed #000 !important; }
+        #print-wrapper-ticket .meta-label { font-weight: 900 !important; }
+        #print-wrapper-ticket .meta-value { font-weight: 600 !important; }
+        #print-wrapper-ticket .meta-title { font-weight: 900 !important; font-size: 8pt !important; border-bottom: 1px solid #000 !important; color: #000 !important; }
+        
+        #print-wrapper-ticket table.items th { border-bottom: 2px solid #000 !important; font-weight: 900 !important; font-size: 7pt !important; color: #000 !important; }
+        #print-wrapper-ticket table.items td { font-weight: 600 !important; font-size: 7.5pt !important; border-bottom: 1px dotted #999 !important; }
+        
+        #print-wrapper-ticket .totals { border-top: 2px solid #000 !important; }
+        #print-wrapper-ticket .grand-total { font-size: 13pt !important; font-weight: 900 !important; }
+        #print-wrapper-ticket .thanks { font-size: 7pt !important; font-weight: 700 !important; border-top: 1px dashed #000 !important; }
+        
+        #print-wrapper-ticket .ticket-tag { font-weight: 900 !important; font-size: 9pt !important; border: 2px solid #000 !important; padding: 3px 8px !important; }
+        #print-wrapper-ticket .footer-sign { display: none !important; }
+      ` : `
+        /* === ESTILOS A4 MEJORADOS === */
+        #print-wrapper-ticket .brand { display: flex !important; justify-content: space-between !important; align-items: center !important; border-bottom: 3px solid #1e3a8a !important; margin-bottom: 25px !important; padding-bottom: 15px !important; text-align: left !important; }
+        #print-wrapper-ticket .brand-logo-container { order: 1 !important; width: 140px !important; justify-content: flex-start !important; }
+        #print-wrapper-ticket .brand-logo-container img { max-width: 130px !important; height: auto !important; }
         #print-wrapper-ticket .brand-info { order: 2 !important; text-align: right !important; flex: 1 !important; }
-        #print-wrapper-ticket .brand h1 { font-size: 22pt !important; color: #1e3a8a !important; margin: 0 0 5px 0 !important; }
-        #print-wrapper-ticket .brand small { display: block !important; font-size: 9pt !important; margin: 2px 0 !important; color: #334155 !important; }
+        #print-wrapper-ticket .brand h1 { font-size: 22pt !important; color: #1e3a8a !important; margin: 0 0 5px 0 !important; font-weight: 900 !important; }
+        #print-wrapper-ticket .brand small { display: block !important; font-size: 9pt !important; margin: 2px 0 !important; color: #334155 !important; font-weight: 500 !important; }
         
         #print-wrapper-ticket .meta { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 30px !important; background: #f8fafc !important; border: 1px solid #e2e8f0 !important; padding: 15px !important; border-radius: 8px !important; margin-bottom: 30px !important; }
         #print-wrapper-ticket .meta p { display: grid !important; grid-template-columns: 140px 1fr !important; width: 100% !important; border-bottom: 1px dashed #e2e8f0 !important; padding-bottom: 4px !important; margin-bottom: 4px !important; }
-        #print-wrapper-ticket .meta-title { font-weight: 800 !important; text-transform: uppercase !important; color: #1e3a8a !important; border-bottom: 2px solid #cbd5e1 !important; margin-bottom: 10px !important; padding-bottom: 5px !important; display: block !important; width: 100% !important; }
+        #print-wrapper-ticket .meta-title { font-weight: 900 !important; text-transform: uppercase !important; color: #1e3a8a !important; border-bottom: 2px solid #cbd5e1 !important; margin-bottom: 10px !important; padding-bottom: 5px !important; display: block !important; width: 100% !important; }
         
         #print-wrapper-ticket table.items { width: 100% !important; border-collapse: collapse !important; border: 1px solid #e2e8f0 !important; }
-        #print-wrapper-ticket table.items th { background: #f1f5f9 !important; color: #334155 !important; padding: 12px 8px !important; font-weight: 700 !important; text-transform: uppercase !important; font-size: 8pt !important; border-bottom: 2px solid #cbd5e1 !important; text-align: left !important; }
-        #print-wrapper-ticket table.items td { padding: 10px 8px !important; border-bottom: 1px solid #f1f5f9 !important; font-size: 9.5pt !important; color: #334155 !important; vertical-align: top !important; }
+        #print-wrapper-ticket table.items th { background: #f1f5f9 !important; color: #334155 !important; padding: 12px 8px !important; font-weight: 800 !important; text-transform: uppercase !important; font-size: 8pt !important; border-bottom: 2px solid #cbd5e1 !important; text-align: left !important; }
+        #print-wrapper-ticket table.items td { padding: 10px 8px !important; border-bottom: 1px solid #f1f5f9 !important; font-size: 9.5pt !important; color: #334155 !important; vertical-align: top !important; font-weight: 500 !important; }
         #print-wrapper-ticket .col-qty { text-align: center !important; }
         #print-wrapper-ticket .col-unit, #print-wrapper-ticket .col-total { text-align: right !important; }
         
@@ -427,12 +510,6 @@ const TicketModal = ({
         #print-wrapper-ticket .totals-box { width: 300px !important; background: #f8fafc !important; padding: 15px !important; border-radius: 8px !important; border: 1px solid #e2e8f0 !important; }
         #print-wrapper-ticket .footer-sign { display: flex !important; justify-content: space-between !important; margin-top: 80px !important; padding: 0 50px !important; }
         #print-wrapper-ticket .sign-box { border-top: 1px solid #94a3b8 !important; width: 40% !important; text-align: center !important; padding-top: 5px !important; font-size: 9pt !important; color: #64748b !important; }
-      ` : `
-        /* Estilos 80mm */
-        #print-wrapper-ticket { font-family: 'Consolas', monospace !important; }
-        #print-wrapper-ticket .brand { text-align: center !important; border-bottom: 1px dashed #000 !important; }
-        #print-wrapper-ticket table.items th { border-bottom: 1px dashed #000 !important; }
-        #print-wrapper-ticket .grand-total { font-size: 12pt !important; font-weight: 900 !important; }
       `}
     `;
 
@@ -442,19 +519,30 @@ const TicketModal = ({
     w.document.write(`<html><head><title>Impresión ${mode.toUpperCase()} - ${companyInfo.name}</title><style>${printStyles}</style></head><body>${htmlToPrint}</body></html>`);
     w.document.close();
     w.focus();
-    // Usar setTimeout directo en vez de w.onload (más confiable después de document.write)
+
+    // Usar setTimeout directo (más confiable que w.onload con document.write)
     setTimeout(() => {
       try { w.print(); } catch (e) { console.error('Print error:', e); }
-    }, 350);
-  }, [companyInfo]);
+      // Auto-cerrar ventana de impresión después
+      setTimeout(() => {
+        try { w.close(); } catch (e) { /* ignore */ }
+      }, 1000);
+    }, 400);
+
+    // Si autoCloseAfter, cerrar el modal y mostrar éxito
+    if (autoCloseAfter) {
+      setTimeout(() => {
+        if (onClose) onClose();
+      }, 800);
+    }
+  }, [companyInfo, onClose]);
 
   // === Auto-trigger print for "Pagar e Imprimir" ===
   const hasAutoTriggered = useRef(false);
   useEffect(() => {
     if (autoTriggerPrint && !hasAutoTriggered.current) {
       hasAutoTriggered.current = true;
-      // Pequeño delay para que el DOM del ticket se renderice completamente
-      const timer = setTimeout(() => doPrint('80'), 400);
+      const timer = setTimeout(() => doPrint('80', true), 500);
       return () => clearTimeout(timer);
     }
   }, [autoTriggerPrint, doPrint]);
@@ -462,33 +550,45 @@ const TicketModal = ({
   return (
     <ModalOverlay className="no-print">
       <GlobalPrintStyle />
-      <ModalContent className="no-print" style={{ maxWidth: 520, width: '96%', padding: '1.2rem', background: '#fff' }}>
+      <ResponsiveModalContent className="no-print">
         <HeaderBar>
-          <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}><FaReceipt /> Vista de Impresión ({printMode.toUpperCase()})</h2>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button onClick={() => doPrint('80')}>Ticket 80mm</Button>
-            <Button onClick={() => doPrint('A4')}><FaFileInvoice /> A4 (1 pág.)</Button>
-            <Button $cancel onClick={onClose}><FaWindowClose /></Button>
-          </div>
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+            <FaReceipt color="#2563eb" /> Vista de Impresión
+          </h2>
+          <ActionButtons>
+            <Button onClick={() => doPrint('80')} style={{ background: '#2563eb', color: '#fff', fontWeight: 700 }}>
+              <FaPrint /> 80mm
+            </Button>
+            <Button onClick={() => doPrint('A4')} style={{ background: '#0f766e', color: '#fff', fontWeight: 700 }}>
+              <FaFileInvoice /> A4
+            </Button>
+            <Button $cancel onClick={onClose} style={{ background: '#fee2e2', color: '#ef4444' }}>
+              <FaWindowClose />
+            </Button>
+          </ActionButtons>
         </HeaderBar>
 
-        {/* LOGIC FOR PREVIEW (Using same structure, classes handle layout changes) */}
         <Wrapper>
           <PrintWrapper id="print-wrapper-ticket" className={`print-area ${printMode === 'A4' ? 'print-a4' : 'print-80'} ${compact ? 'compact' : ''}`}>
 
             {/* BRAND HEADER */}
             <div className="brand">
               <div className="brand-logo-container">
-                <TicketLogo className="a4-logo" src={companyInfo.logo} alt="Logo" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                <TicketLogo
+                  className={printMode === 'A4' ? 'logo-a4' : 'logo-80mm'}
+                  src={companyInfo.logo}
+                  alt="Logo"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
               </div>
               <div className="brand-info">
                 <h1>{companyInfo.name}</h1>
-                <small>{companyInfo.slogan}</small>
-                <small>RUC: {companyInfo.ruc}</small>
-                <small>Tel: {companyInfo.phone}</small>
+                <small><strong>{companyInfo.slogan}</strong></small>
+                <small><strong>RUC:</strong> {companyInfo.ruc}</small>
+                <small><strong>Tel:</strong> {companyInfo.phone}</small>
                 <small>{companyInfo.address}</small>
                 <div style={{ marginTop: 8 }}>
-                  {isProforma ? <Tag $type="proforma">PROFORMA</Tag> : isAbono ? <Tag $type="abono">RECIBO</Tag> : isOutflow ? <Tag $type="outflow">SALIDA</Tag> : <Tag $type="venta">{isDevol ? 'DEVOLUCIÓN' : 'FACTURA'}</Tag>}
+                  {isProforma ? <Tag $type="proforma" className="ticket-tag">PROFORMA</Tag> : isAbono ? <Tag $type="abono" className="ticket-tag">RECIBO</Tag> : isOutflow ? <Tag $type="outflow" className="ticket-tag">SALIDA</Tag> : <Tag $type="venta" className="ticket-tag">{isDevol ? 'DEVOLUCIÓN' : 'FACTURA'}</Tag>}
                 </div>
               </div>
             </div>
@@ -506,7 +606,6 @@ const TicketModal = ({
                 <p><span className="meta-label">Cliente:</span><span className="meta-value">{clientName}</span></p>
                 {clienteCedula && <p><span className="meta-label">Cédula/RUC:</span><span className="meta-value">{clienteCedula}</span></p>}
                 {!isProforma && !isOutflow && <p><span className="meta-label">Pago:</span><span className="meta-value">{metodo}</span></p>}
-                {/* Add Address if available in clientObj later */}
               </div>
             </div>
 
@@ -524,10 +623,10 @@ const TicketModal = ({
                 {items.length === 0 ? <tr><td colSpan="4" style={{ textAlign: 'center' }}>Sin ítems</td></tr> :
                   items.map(it => (
                     <tr key={it.id}>
-                      <td className="col-qty">{it.quantity}</td>
-                      <td>{it.nombre}</td>
+                      <td className="col-qty" style={{ fontWeight: 800 }}>{it.quantity}</td>
+                      <td style={{ fontWeight: 600 }}>{it.nombre}</td>
                       <td className="text-right col-unit">C${fmt(it.unit)}</td>
-                      <td className="text-right col-total">C${fmt(it.total)}</td>
+                      <td className="text-right col-total" style={{ fontWeight: 700 }}>C${fmt(it.total)}</td>
                     </tr>
                   ))
                 }
@@ -537,13 +636,15 @@ const TicketModal = ({
             {/* TOTALS */}
             <div className="totals">
               <div className="totals-box">
-                <TotalsRow><span>Subtotal:</span><span>C${fmt(subtotal)}</span></TotalsRow>
-                {descuento > 0 && <TotalsRow style={{ color: '#dc3545' }}><span>Descuento:</span><span>- C${fmt(descuento)}</span></TotalsRow>}
-                <TotalsRow className="grand-total" $bold style={{ fontSize: '1.2em', borderTop: '1px solid #ccc', marginTop: 5, paddingTop: 5 }}><span>TOTAL:</span><span>C${fmt(total)}</span></TotalsRow>
+                <TotalsRow><span style={{ fontWeight: 700 }}>Subtotal:</span><span style={{ fontWeight: 700 }}>C${fmt(subtotal)}</span></TotalsRow>
+                {descuento > 0 && <TotalsRow style={{ color: '#dc3545' }}><span style={{ fontWeight: 700 }}>Descuento:</span><span style={{ fontWeight: 700 }}>- C${fmt(descuento)}</span></TotalsRow>}
+                <TotalsRow className="grand-total" $bold style={{ fontSize: '1.3em', borderTop: '2px solid #000', marginTop: 5, paddingTop: 5 }}>
+                  <span style={{ fontWeight: 900 }}>TOTAL:</span><span style={{ fontWeight: 900 }}>C${fmt(total)}</span>
+                </TotalsRow>
                 {!isProforma && (
                   <>
-                    <TotalsRow style={{ marginTop: 10, fontSize: '0.9em', color: '#666' }}><span>Pagado:</span><span>C${fmt(pagado)}</span></TotalsRow>
-                    {cambio > 0 && <TotalsRow $bold style={{ color: '#dc3545' }}><span>Cambio:</span><span>C${fmt(cambio)}</span></TotalsRow>}
+                    <TotalsRow style={{ marginTop: 10, fontSize: '0.9em' }}><span style={{ fontWeight: 700 }}>Pagado:</span><span style={{ fontWeight: 700 }}>C${fmt(pagado)}</span></TotalsRow>
+                    {cambio > 0 && <TotalsRow $bold style={{ color: '#dc3545', fontWeight: 900 }}><span>Cambio:</span><span>C${fmt(cambio)}</span></TotalsRow>}
                   </>
                 )}
               </div>
@@ -556,7 +657,7 @@ const TicketModal = ({
             </div>
 
             <div className="thanks">
-              <p>"{companyInfo.slogan}"</p>
+              <p><strong>"{companyInfo.slogan}"</strong></p>
               <p style={{ whiteSpace: 'pre-line', marginTop: '5px' }}>
                 {(() => {
                   if (isProforma) return settings?.ticket_proforma_footer || 'Cotización válida por 15 días.';
@@ -568,7 +669,7 @@ const TicketModal = ({
 
           </PrintWrapper>
         </Wrapper>
-      </ModalContent>
+      </ResponsiveModalContent>
     </ModalOverlay>
   );
 };
