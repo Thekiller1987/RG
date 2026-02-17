@@ -230,15 +230,24 @@ const createReturn = async (req, res) => {
 
     // 7. Registro de auditoría
     const esCreditoDevolucion = creditoOriginal > 0;
+    const itemPrice = Number(item.precio || item.precio_unitario || currentItem.precio_unitario || 0);
     const logPagoDetalles = {
       efectivo: esCreditoDevolucion ? 0 : refundAmount,
       ingresoCaja: esCreditoDevolucion ? 0 : -refundAmount,
       credito: esCreditoDevolucion ? -refundAmount : 0,
-      nota: `Devolución s/Ticket #${originalSaleId}${esCreditoDevolucion ? ' (crédito)' : ''}`
+      nota: `Devolución s/Ticket #${originalSaleId}${esCreditoDevolucion ? ' (crédito)' : ''}`,
+      originalSaleId: originalSaleId
     };
-    await connection.query(
+    const [devolucionResult] = await connection.query(
       "INSERT INTO ventas (fecha, total_venta, estado, id_usuario, id_cliente, pago_detalles, tipo_venta) VALUES (NOW(), ?, 'DEVOLUCION', ?, ?, ?, 'DEVOLUCION')",
       [-refundAmount, userId, originalSale.id_cliente || null, JSON.stringify(logPagoDetalles)]
+    );
+
+    // 7b. Registrar el item devuelto en detalle_ventas para que aparezca en historial
+    const devolucionId = devolucionResult.insertId;
+    await connection.query(
+      'INSERT INTO detalle_ventas (id_venta, id_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?)',
+      [devolucionId, productId, qtyToReturn, itemPrice]
     );
 
     await connection.commit();

@@ -1,15 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import styled from 'styled-components';
 import { FaUsers, FaCreditCard, FaTrashAlt, FaEdit, FaPlus, FaMoneyBillWave, FaArrowLeft, FaRedo, FaHistory } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { useCaja } from '../context/CajaContext';
 import * as api from '../service/api';
 import ClientFormModal from './pos/components/ClientFormModal';
 import AbonoCreditoModal from './pos/components/AbonoCreditoModal';
 import HistorialCreditoModal from './pos/components/HistorialCreditoModal';
 import SalesHistoryModal from './pos/components/SalesHistoryModal';
 import TicketModal from './pos/components/TicketModal';
+import AlertModal from './pos/components/AlertModal';
 
 const PageWrapper = styled.div`
     padding: 2rem 4rem;
@@ -183,13 +185,20 @@ const CardActions = styled.div`
 `;
 
 export default function ClientesYCreditos() {
-    const { clients, user, token, isLoading, refreshClients, cajaSession, allUsers } = useAuth();
+    const { clients, user, token, isLoading, refreshClients, allUsers } = useAuth();
+    const { isCajaOpen, cajaSession, setCajaSession } = useCaja();
     const [modal, setModal] = useState({ name: null, data: null });
     const [ticketToPrint, setTicketToPrint] = useState(null);
+    const [alertState, setAlertState] = useState({ open: false, title: '', message: '' });
 
-    const isCajaOpen = useMemo(() => {
-        return cajaSession && !cajaSession.closedAt;
-    }, [cajaSession]);
+    const showAlert = useCallback(({ title, message }) => {
+        setAlertState({ open: true, title: title || 'Aviso', message: message || '' });
+    }, []);
+
+    const closeAlert = useCallback(() => {
+        setAlertState({ open: false, title: '', message: '' });
+    }, []);
+
 
     const handleDelete = async (cliente) => {
         if (cliente.saldo_pendiente > 0) {
@@ -305,7 +314,7 @@ export default function ClientesYCreditos() {
             </MobileContainer>
 
             {modal.name === 'client' && <ClientFormModal client={modal.data} onClose={handleCloseModal} onSave={refreshClients} />}
-            {modal.name === 'abono' && <AbonoCreditoModal client={modal.data} onClose={handleCloseModal} onAbonoSuccess={refreshClients} showAlert={showAlert} />}
+            {modal.name === 'abono' && <AbonoCreditoModal client={modal.data} onClose={handleCloseModal} onAbonoSuccess={() => { refreshClients(); toast.success('Abono registrado correctamente.'); }} showAlert={showAlert} />}
             {modal.name === 'historial' && <HistorialCreditoModal client={modal.data} onClose={handleCloseModal} token={token} />}
 
             {/* Modal de Tickets (SalesHistoryModal) Integrado */}
@@ -336,6 +345,15 @@ export default function ClientesYCreditos() {
                     clients={clients}
                     users={allUsers}
                     currentUser={user}
+                />
+            )}
+
+            {/* Alert Modal */}
+            {alertState.open && (
+                <AlertModal
+                    title={alertState.title}
+                    message={alertState.message}
+                    onClose={closeAlert}
                 />
             )}
         </PageWrapper>
