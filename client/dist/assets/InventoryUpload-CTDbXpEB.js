@@ -1,4 +1,4 @@
-import{u as B,r as u,j as e,V as M,s,b0 as U,b1 as N,a7 as L,a8 as O,t as C,b2 as H,v as R,n as Y}from"./vendor-DfgwALhZ.js";import{E as W}from"./index-vx8gNX1l.js";import"./scanner-vendor-DfxRpMWJ.js";import"./pdf-vendor-CTN92j8O.js";const Z=C`from { opacity: 0; } to { opacity: 1; }`,_=C`from { transform: rotate(0deg); } to { transform: rotate(360deg); }`,q=s.div`
+import{u as B,r as u,j as e,V as M,s,b0 as U,b1 as N,a7 as L,a8 as O,t as C,b2 as H,v as R,n as Y}from"./vendor-DfgwALhZ.js";import{E as W}from"./index-DIhA_mRk.js";import"./scanner-vendor-DfxRpMWJ.js";import"./pdf-vendor-CTN92j8O.js";const Z=C`from { opacity: 0; } to { opacity: 1; }`,_=C`from { transform: rotate(0deg); } to { transform: rotate(360deg); }`,q=s.div`
     padding: 2rem;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     min-height: 100vh;

@@ -1102,7 +1102,7 @@ const POS = () => {
                     userId,
                     userName: currentUser?.nombre_usuario || 'Caja',
                     note: `Devolución: ${qty}x ${item.nombre}`,
-                    pagoDetalles: { efectivo: refundAmount, ingresoCaja: -refundAmount }, // Explicit cash details
+                    pagoDetalles: { efectivo: -refundAmount, ingresoCaja: -refundAmount, totalVenta: -refundAmount },
                     id: 'REFUND-' + Date.now()
                   };
                   const updatedSession = {

@@ -214,6 +214,9 @@ const CajaModal = ({
       if (t.startsWith('venta') || t.includes('abono') || t === 'entrada') {
         tVentasDia += Math.abs(totalAmount);
       }
+      else if (t.includes('devolucion') || t.includes('cancelacion')) {
+        tVentasDia -= Math.abs(totalAmount); // ★ RESTAR devoluciones y cancelaciones del total
+      }
       else if (t === 'ajuste') {
         tVentasDia += totalAmount;
       }
@@ -398,9 +401,9 @@ const CajaModal = ({
                     <tr style={{ borderBottom: '1px solid #f1f1f1' }}><td style={{ padding: 10 }}>Fondo Inicial</td><td className="text-right" style={{ padding: 10, fontWeight: 'bold' }}>{money(cajaInicial)}</td></tr>
 
                     {/* Sección Detallada de Ventas */}
-                    {/* Sección Detallada de Ventas */}
                     <tr style={{ background: '#f8f9fa' }}><td colSpan="2" style={{ padding: '8px 10px', fontSize: '0.85rem', fontWeight: 'bold', color: '#007bff' }}>RESUMEN DE INGRESOS</td></tr>
-                    <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem' }}>(+) Total Ingresos (Ventas + Abonos)</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem' }}>{money(totalVentasDia)}</td></tr>
+                    <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem' }}>(+) Ventas Netas (Ventas + Abonos - Devoluciones)</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem' }}>{money(totalVentasDia)}</td></tr>
+                    {sumDevolucionesCancelaciones > 0 && <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.85rem', color: '#856404' }}>    (Devoluciones/Cancel. ya descontadas: {money(sumDevolucionesCancelaciones)})</td><td></td></tr>}
                     <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem', color: '#dc3545' }}>(-) Tarjetas / Transf / Crédito</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem', color: '#dc3545' }}>- {money(totalNoEfectivo)}</td></tr>
                     <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem', color: '#dc3545' }}>(-) Salidas de Efectivo</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem', color: '#dc3545' }}>- {money(salidas.reduce((a, b) => a + Math.abs(b.displayAmount || 0), 0))}</td></tr>
 
@@ -456,9 +459,10 @@ const CajaModal = ({
                 </div>
 
                 <div className="section">
-                  <div className="section-title">1. TOTAL INGRESOS (VENTAS + ABONOS)</div>
-                  <div className="row big"><span>TOTAL GLOBAL:</span><span>{money(totalVentasDia)}</span></div>
-                  <div className="row sub">(Ventas Contado + Crédito + Abonos + Ajustes)</div>
+                  <div className="section-title">1. VENTAS NETAS</div>
+                  <div className="row big"><span>TOTAL NETO:</span><span>{money(totalVentasDia)}</span></div>
+                  <div className="row sub">(Ventas + Abonos - Devoluciones/Cancelaciones)</div>
+                  {sumDevolucionesCancelaciones > 0 && <div className="row sub" style={{ color: '#856404' }}>(Devol./Cancel.: -{money(sumDevolucionesCancelaciones)})</div>}
                 </div>
 
                 <div className="section">
@@ -472,7 +476,7 @@ const CajaModal = ({
                 <div className="section">
                   <div className="section-title">3. FLUJO EFECTIVO (RESUMEN)</div>
                   <div className="row"><span>Fondo Inicial:</span><span>{money(cajaInicial)}</span></div>
-                  <div className="row"><span>(+) Ingresos Totales:</span><span>{money(totalVentasDia)}</span></div>
+                  <div className="row"><span>(+) Ventas Netas:</span><span>{money(totalVentasDia)}</span></div>
                   <div className="row"><span>(-) No Efectivo:</span><span>-{money(totalNoEfectivo)}</span></div>
                   {Math.abs(salidas.reduce((s, t) => s + Math.abs(t.displayAmount || 0), 0)) > 0 && (
                     <div className="row"><span>(-) Salidas:</span><span>-{money(salidas.reduce((s, t) => s + Math.abs(t.displayAmount || 0), 0))}</span></div>
