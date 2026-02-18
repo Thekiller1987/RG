@@ -24,18 +24,6 @@ const providerInvoiceRoutes = require('./src/routes/providerInvoiceRoutes.js');
 const requestRoutes = require('./src/routes/requestRoutes.js');
 const outflowRoutes = require('./src/routes/outflowRoutes.js');
 
-// TEMP MIGRATION ROUTE
-app.get('/migrate-promo', async (req, res) => {
-  try {
-    const pool = require('./src/config/db.js');
-    await pool.query("ALTER TABLE promociones_mayorista ADD COLUMN tipo_cliente VARCHAR(50) DEFAULT NULL AFTER id_categoria");
-    await pool.query("ALTER TABLE clientes ADD COLUMN tipo_cliente VARCHAR(50) DEFAULT 'General'");
-    res.send('Migration successful');
-  } catch (e) {
-    res.send('Migration failed: ' + e.message);
-  }
-});
-
 // 2. Crear una instancia de Express
 const app = express();
 
