@@ -85,7 +85,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
     const [formData, setFormData] = useState({
         empresa_nombre: '', empresa_ruc: '', empresa_telefono: '',
         empresa_direccion: '', empresa_eslogan: '', empresa_logo_url: '',
-        ticket_sales_footer: '', ticket_proforma_footer: '', ticket_transfer_footer: ''
+        ticket_sales_footer: '', ticket_proforma_footer: '', ticket_transfer_footer: '',
+        mayorista_pin: ''
     });
 
     const [activeTab, setActiveTab] = useState('general'); // general | tickets
@@ -162,6 +163,9 @@ const SettingsModal = ({ isOpen, onClose }) => {
                         </Tab>
                         <Tab active={activeTab === 'tickets'} onClick={() => setActiveTab('tickets')}>
                             <FaFileInvoice /> Personalización Tickets
+                        </Tab>
+                        <Tab active={activeTab === 'security'} onClick={() => setActiveTab('security')}>
+                            <FaBuilding /> Seguridad
                         </Tab>
                     </Tabs>
 
@@ -266,6 +270,30 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                     placeholder="Ej: Salida autorizada por Gerencia."
                                 />
                                 <small>Notas internas o firmas requeridas.</small>
+                            </FormGroup>
+                        </div>
+                    )}
+
+                    {activeTab === 'security' && (
+                        <div>
+                            <p style={{ marginBottom: '1rem', color: '#64748b' }}>
+                                Configuración de seguridad y acceso a módulos protegidos.
+                            </p>
+
+                            <FormGroup>
+                                <label>PIN del Módulo Mayorista</label>
+                                <div style={{ position: 'relative' }}>
+                                    <input
+                                        type="text"
+                                        name="mayorista_pin"
+                                        value={formData.mayorista_pin || ''}
+                                        onChange={handleChange}
+                                        placeholder="Ej: 2004"
+                                        maxLength={10}
+                                        style={{ letterSpacing: '2px', fontWeight: 'bold' }}
+                                    />
+                                </div>
+                                <small>Este PIN será requerido para ingresar al área de ventas mayorista.</small>
                             </FormGroup>
                         </div>
                     )}
