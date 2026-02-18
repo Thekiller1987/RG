@@ -118,7 +118,7 @@ export default function WholesaleAuthModal({ isOpen, onClose }) {
             const res = await validateWholesalePin(pin, token);
             if (res && (res.success || res.message === 'Acceso concedido.')) {
                 onClose();
-                navigate('/wholesale-pos'); // Navigate to the dedicated route
+                navigate('/wholesale-menu'); // Navigate to the dedicated menu
             } else {
                 setError('PIN incorrecto');
                 setPin('');

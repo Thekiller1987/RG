@@ -221,14 +221,7 @@ const Dashboard = () => {
                         </Card>
                     )}
 
-                    {/* Admin Promociones Mayorista */}
-                    {isAdmin && (
-                        <Card to="/admin/wholesale-promotions" color="#8b5cf6" style={{ borderColor: '#8b5cf6', borderStyle: 'dashed', borderWidth: '2px' }}>
-                            <CardIcon color="#8b5cf6"><FaTags /></CardIcon>
-                            <h2>Promociones Mayorista</h2>
-                            <p>Administrar descuentos y ofertas.</p>
-                        </Card>
-                    )}
+
 
                     {/* 2. Pedidos y Apartados */}
                     {canAccessOrders && (
