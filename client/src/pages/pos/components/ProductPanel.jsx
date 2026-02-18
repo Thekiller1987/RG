@@ -60,12 +60,26 @@ export default function ProductPanel({
   setSearchTerm,
   onProductClick,
   cartItems = [],
-  reservedStock, // Recibimos el mapa de stock reservado
+  reservedStock,
   inputRef,
   searchType = 'description',
-  setSearchType = () => { }
+  setSearchType = () => { },
+  isWholesale = false // NEW PROP
 }) {
   const [viewImage, setViewImage] = useState({ isOpen: false, imageUrl: null });
+
+  // ... (keep existing logic unchanged until rendering) ...
+
+  // To avoid rewriting the entire file for just the render map, I will target the map function specifically if possible, 
+  // but since I'm in replace_file_content for a chunk, I have to be careful.
+  // Actually, let's just make the prop available and I'll do a second replace for the render logic if it's too far down.
+  // The user instruction says "Update ProductPanel to support isWholesale mode".
+  // I will do it in two steps or find a way to do it in one if the block is small enough.
+  // The map function is lines 154-218.
+  // The props are lines 57-67.
+  // They are far apart. I should use multi_replace.
+
+
 
   // Calcular stock disponible
   const qtyInCart = useMemo(() => {
@@ -125,6 +139,30 @@ export default function ProductPanel({
           placeholder={searchType === 'code' ? "Escribe código..." : "Buscar producto..."}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              const term = (searchTerm || '').trim().toLowerCase();
+              if (!term) return;
+
+              // 1. Exact Code Match (Highest Priority)
+              const exactMatch = products.find(p =>
+                String(p.codigo || '').toLowerCase() === term ||
+                String(p.codigo_barras || '').toLowerCase() === term
+              );
+
+              if (exactMatch) {
+                onProductClick(exactMatch);
+                setSearchTerm('');
+                return;
+              }
+
+              // 2. Single Filtered Result
+              if (filteredProducts.length === 1) {
+                onProductClick(filteredProducts[0]);
+                setSearchTerm('');
+              }
+            }
+          }}
         />
 
         <FilterButton
@@ -204,14 +242,31 @@ export default function ProductPanel({
                 <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
                   {p.codigo || 'S/C'}
                 </div>
-                {(Number(p.mayorista) > 0 || Number(p.mayoreo) > 0) && (
-                  <div style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px' }}>
-                    <FaTags size={10} /> May: C$ {fmt(p.mayorista || p.mayoreo)}
-                  </div>
+
+                {/* LOGICA DE PRECIOS ADAPTATIVA */}
+                {isWholesale ? (
+                  // MODO MAYORISTA
+                  <>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px', textDecoration: 'line-through' }}>
+                      Det: C$ {fmt(p.precio_venta || p.precio)}
+                    </div>
+                    <div className="price" style={{ fontWeight: 800, color: '#8b5cf6', fontSize: '1.1rem' }}>
+                      C$ {fmt(p.mayorista || p.mayoreo || p.precio_venta)}
+                    </div>
+                  </>
+                ) : (
+                  // MODO NORMAL (Minoreo)
+                  <>
+                    {(Number(p.mayorista) > 0 || Number(p.mayoreo) > 0) && (
+                      <div style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px' }}>
+                        <FaTags size={10} /> May: C$ {fmt(p.mayorista || p.mayoreo)}
+                      </div>
+                    )}
+                    <div className="price" style={{ fontWeight: 800, color: '#2563eb', fontSize: '1.05rem', marginTop: !((Number(p.mayorista) > 0 || Number(p.mayoreo) > 0)) ? 'auto' : 0 }}>
+                      C$ {fmt(p.precio_venta || p.precio)}
+                    </div>
+                  </>
                 )}
-                <div className="price" style={{ fontWeight: 800, color: '#2563eb', fontSize: '1.05rem', marginTop: !((Number(p.mayorista) > 0 || Number(p.mayoreo) > 0)) ? 'auto' : 0 }}>
-                  C$ {fmt(p.precio_venta || p.precio)}
-                </div>
               </div>
             </S.ProductCard>
           );

@@ -518,3 +518,31 @@ export const createOutflow = async (data, token) => {
 export const fetchOutflowHistory = async (token) => {
     return await request('get', '/outflow/history', token);
 };
+
+// ===================================================================
+// === SECCIÓN DE MAYORISTA ===
+// ===================================================================
+
+export const validateWholesalePin = async (pin, token) => {
+    return await request('post', '/wholesale/validate-pin', token, { pin });
+};
+
+export const getPromotions = async (token) => {
+    return await request('get', '/wholesale/promotions', token);
+};
+
+export const createPromotion = async (data, token) => {
+    return await request('post', '/wholesale/promotions', token, data);
+};
+
+export const updatePromotion = async (id, data, token) => {
+    return await request('put', `/wholesale/promotions/${id}`, token, data);
+};
+
+export const togglePromotionStatus = async (id, token) => {
+    return await request('put', `/wholesale/promotions/${id}/toggle`, token);
+};
+
+export const deletePromotion = async (id, token) => {
+    return await request('delete', `/wholesale/promotions/${id}`, token);
+};

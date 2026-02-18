@@ -184,6 +184,8 @@ const SaleListItem = React.memo(function SaleListItem({
     ? <><FaHandHoldingUsd style={{ marginRight: 6 }} /> ABONO</>
     : <>#{sale.id} - {sale.estado.replace('_', ' ')}</>;
 
+  const isWholesale = sale.pagoDetalles?.isWholesale || sale.isWholesale;
+
   return (
     <Row
       onClick={() => onSelect(sale)}
@@ -193,7 +195,10 @@ const SaleListItem = React.memo(function SaleListItem({
     >
       <div className="top">
         <span>{leftLabel}</span>
-        <span>{pay.icon} C${money(Math.abs(totalRaw))}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {isWholesale && <Pill style={{ background: '#8b5cf6', color: 'white', fontSize: '0.7rem' }}>MAYORISTA</Pill>}
+          <span>{pay.icon} C${money(Math.abs(totalRaw))}</span>
+        </div>
       </div>
       <div className="sub">
         {new Date(sale.fecha).toLocaleString('es-NI')} · Cliente: <strong>{clientName}</strong> · Vendedor: {userName}

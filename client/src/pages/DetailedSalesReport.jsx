@@ -6,7 +6,7 @@ import {
     FaShoppingCart, FaUndoAlt, FaBarcode, FaFileInvoice,
     FaUser, FaClock, FaChevronDown, FaChevronUp, FaPrint, FaBoxOpen
 } from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 /* ================== CONFIG ================== */
@@ -385,8 +385,17 @@ export default function DetailedSalesReport() {
     const { token, products: allProducts, clients } = useAuth(); // Use products from Context for instant access
     const navigate = useNavigate();
     const isMobile = useIsMobile();
+    const location = useLocation();
 
     const [activeTab, setActiveTab] = useState('ventas');
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const tab = params.get('tab');
+        if (tab && ['ventas', 'mayorista', 'devoluciones', 'busqueda', 'producto'].includes(tab)) {
+            setActiveTab(tab);
+        }
+    }, [location.search]);
     const [startDate, setStartDate] = useState(todayManagua());
     const [endDate, setEndDate] = useState(todayManagua());
 
@@ -419,6 +428,11 @@ export default function DetailedSalesReport() {
             if (keywordSearch) params.keyword = keywordSearch;
             if (clientId) params.clientId = clientId;
 
+            // WHOLESALE LOGIC
+            if (activeTab === 'mayorista') {
+                params.isWholesale = 'true';
+            }
+
             const res = await axios.get(`${API_URL}/reports/detailed-sales`, { headers: authHeader, params });
             setSales(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
@@ -427,11 +441,12 @@ export default function DetailedSalesReport() {
         } finally {
             setLoading(false);
         }
-    }, [authHeader, startDate, endDate]);
+    }, [authHeader, startDate, endDate, activeTab]);
 
     // Auto-fetch sales when tab changes
     useEffect(() => {
         if (activeTab === 'ventas') fetchSales(null, null, reportClient?.id_cliente);
+        else if (activeTab === 'mayorista') fetchSales(null, null, reportClient?.id_cliente); // Reuse client filter if needed
         else if (activeTab === 'devoluciones') fetchSales('DEVOLUCION');
         else if (activeTab === 'busqueda' && reportKeyword.trim().length >= 3) fetchSales(null, reportKeyword);
     }, [activeTab, startDate, endDate, fetchSales, reportKeyword, reportClient]);
@@ -614,6 +629,9 @@ export default function DetailedSalesReport() {
             <TabBar>
                 <Tab active={activeTab === 'ventas'} onClick={() => setActiveTab('ventas')}>
                     <FaShoppingCart /> Ventas Detalladas
+                </Tab>
+                <Tab active={activeTab === 'mayorista'} onClick={() => setActiveTab('mayorista')} style={{ color: activeTab === 'mayorista' ? 'white' : '#8b5cf6' }}>
+                    <FaBoxOpen /> Ventas Mayorista
                 </Tab>
                 <Tab active={activeTab === 'busqueda'} onClick={() => setActiveTab('busqueda')}>
                     <FaSearch /> Búsqueda por Palabra

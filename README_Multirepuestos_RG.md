@@ -63,7 +63,19 @@ Y desde el frontend:
 https://<tu-sitio>.netlify.app
 ```
 
-## 🆘 Soporte
+## � Nuevas Funcionalidades (Febrero 2026)
+### 🛒 Módulo Mayorista
+- Aislamiento de ventas al por mayor con **PIN de seguridad**.
+- Multi-precios: Detalle vs. Mayorista.
+- Facturación profesional **A4** integrada.
+- Reportes con desglose visual y filtrado avanzado.
+
+### 📦 Gestión de Salidas y Traslados
+- Nuevo módulo para gestionar **Salidas de Inventario** (Mermas, Uso Interno) y **Traslados**.
+- Generación de **Cotizaciones** profesionales en A4.
+- Historial completo de movimientos no comerciales.
+
+## �🆘 Soporte
 Para asistencia técnica futura, mencionar:  
 > Sistema Multirepuestos RG (React + Node + MySQL + Docker + Netlify)
 

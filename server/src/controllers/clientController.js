@@ -96,7 +96,7 @@ const pool = require('../config/db');
 const getAllClients = async (req, res) => {
     try {
         const [clients] = await pool.query(`
-      SELECT c.id_cliente, c.nombre, c.telefono, c.direccion, c.limite_credito,
+      SELECT c.id_cliente, c.nombre, c.telefono, c.direccion, c.limite_credito, c.tipo_cliente,
              COALESCE(c.saldo_pendiente, 0) as saldo_pendiente
       FROM clientes c ORDER BY c.nombre ASC
     `);
@@ -108,12 +108,12 @@ const getAllClients = async (req, res) => {
 };
 
 const createClient = async (req, res) => {
-    const { nombre, telefono, direccion, limite_credito } = req.body;
+    const { nombre, telefono, direccion, limite_credito, tipo_cliente } = req.body;
     if (!nombre) return res.status(400).json({ message: 'El nombre del cliente es obligatorio.' });
     try {
         const [result] = await pool.query(
-            'INSERT INTO clientes (nombre, telefono, direccion, limite_credito) VALUES (?, ?, ?, ?)',
-            [nombre, telefono || null, direccion || null, limite_credito]
+            'INSERT INTO clientes (nombre, telefono, direccion, limite_credito, tipo_cliente) VALUES (?, ?, ?, ?, ?)',
+            [nombre, telefono || null, direccion || null, limite_credito, tipo_cliente || 'General']
         );
         res.status(201).json({ message: 'Cliente creado exitosamente', id: result.insertId });
     } catch (error) {
@@ -124,12 +124,12 @@ const createClient = async (req, res) => {
 
 const updateClient = async (req, res) => {
     const { id } = req.params;
-    const { nombre, telefono, direccion, limite_credito } = req.body;
+    const { nombre, telefono, direccion, limite_credito, tipo_cliente } = req.body;
     if (!nombre) return res.status(400).json({ message: 'El nombre del cliente es obligatorio.' });
     try {
         await pool.query(
-            'UPDATE clientes SET nombre = ?, telefono = ?, direccion = ?, limite_credito = ? WHERE id_cliente = ?',
-            [nombre, telefono || null, direccion || null, limite_credito, id]
+            'UPDATE clientes SET nombre = ?, telefono = ?, direccion = ?, limite_credito = ?, tipo_cliente = ? WHERE id_cliente = ?',
+            [nombre, telefono || null, direccion || null, limite_credito, tipo_cliente || 'General', id]
         );
         res.status(200).json({ message: 'Cliente actualizado exitosamente' });
     } catch (error) {

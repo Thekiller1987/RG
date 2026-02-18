@@ -109,7 +109,12 @@ const SaleDetailView = ({
       <DetailSection>
         <p><strong><FaUser /> Cliente:</strong> {client?.nombre || 'Cliente Genérico'}</p>
         <p><strong><FaRegClock /> Fecha:</strong> {new Date(sale.fecha).toLocaleString('es-NI')}</p>
-        <p><strong>Estado:</strong> <StatusBadge color={currentStatus.color}>{currentStatus.text}</StatusBadge></p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <p style={{ margin: 0 }}><strong>Estado:</strong> <StatusBadge color={currentStatus.color}>{currentStatus.text}</StatusBadge></p>
+          {(sale.pagoDetalles?.isWholesale || sale.isWholesale) && (
+            <StatusBadge color="#8b5cf6">VENTA MAYORISTA</StatusBadge>
+          )}
+        </div>
       </DetailSection>
 
       {/* Productos + resumen solo para ventas (no abonos/devoluciones) */}

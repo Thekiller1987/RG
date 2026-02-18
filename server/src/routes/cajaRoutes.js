@@ -1,8 +1,12 @@
 // CommonJS
 const express = require('express');
 const pool = require('../config/db'); // MySQL Pool
+const { verifyToken } = require('../middleware/authMiddleware');
 
 const router = express.Router();
+
+// ✅ Aplicar autenticación a TODAS las rutas de caja
+router.use(verifyToken);
 
 /* ───────── Utils ───────── */
 function displayName(u) {
@@ -100,6 +104,14 @@ async function ensureSchema() {
     } catch (e) {
       // Ignoramos error si ya es NULL
     }
+
+    // 4. Agregar columnas cerrado_por_id y cerrado_por_nombre si no existen
+    try {
+      await pool.query(`ALTER TABLE cierres_caja ADD COLUMN cerrado_por_id INT NULL DEFAULT NULL AFTER usuario_nombre;`);
+    } catch (e) { /* ya existe */ }
+    try {
+      await pool.query(`ALTER TABLE cierres_caja ADD COLUMN cerrado_por_nombre VARCHAR(255) DEFAULT '' AFTER cerrado_por_id;`);
+    } catch (e) { /* ya existe */ }
 
     console.log('✅ Esquema de caja verificado/creado correctamente.');
   } catch (error) {
@@ -203,6 +215,10 @@ function mapRowToSession(row) {
     details = { transactions: [] };
   }
 
+  // closedBy: usar datos reales del cierre si existen, sino fallback al abridor
+  const closedById = row.cerrado_por_id || row.usuario_id;
+  const closedByName = row.cerrado_por_nombre || row.usuario_nombre;
+
   return {
     id: row.id, // ID numérico de SQL
     sqlId: row.id,
@@ -211,7 +227,7 @@ function mapRowToSession(row) {
     initialAmount: Number(row.monto_inicial || 0),
     transactions: details.transactions || [],
     closedAt: row.fecha_cierre, // Será null si está abierta
-    closedBy: row.fecha_cierre ? { id: row.usuario_id, name: row.usuario_nombre } : null,
+    closedBy: row.fecha_cierre ? { id: closedById, name: closedByName } : null,
     countedAmount: row.final_real ? Number(row.final_real) : null,
     difference: row.diferencia ? Number(row.diferencia) : null,
     tasaDolar: Number(details.tasaDolar || 0),
@@ -437,10 +453,16 @@ router.post('/session/close', async (req, res) => {
     const finalReal = Number(countedAmount);
     const diferencia = finalReal - finalEsperado;
 
-    // 3. Actualizar la fila (Cierre definitivo)
+    // 3. Guardar quién cerró la caja
+    const closerName = displayName(closedBy);
+    const closerId = (closedBy && typeof closedBy === 'object') ? (closedBy.id || closedBy.id_usuario || userId) : userId;
+
+    // 4. Actualizar la fila (Cierre definitivo)
     await pool.query(`
       UPDATE cierres_caja SET
         fecha_cierre = ?,
+        cerrado_por_id = ?,
+        cerrado_por_nombre = ?,
         final_esperado = ?,
         final_real = ?,
         diferencia = ?,
@@ -454,7 +476,8 @@ router.post('/session/close', async (req, res) => {
         observaciones = ?
       WHERE id = ?
     `, [
-      new Date(closedAt), finalEsperado, finalReal, diferencia,
+      new Date(closedAt), closerId, closerName,
+      finalEsperado, finalReal, diferencia,
       totals.totalEfectivo, totals.totalTarjeta, totals.totalTransferencia, totals.totalCredito,
       totals.totalDolares,
       totals.totalIngresos, totals.totalGastos,
@@ -489,7 +512,7 @@ router.get('/reporte', async (req, res) => {
       id: r.id,
       sql: true,
       abierta_por: r.usuario_nombre,
-      cerrada_por: r.usuario_nombre,
+      cerrada_por: r.cerrado_por_nombre || r.usuario_nombre,
       hora_apertura: r.fecha_apertura,
       hora_cierre: r.fecha_cierre,
       monto_inicial: Number(r.monto_inicial),

@@ -180,6 +180,15 @@ const getDetailedSales = async (req, res) => {
             params.push(`%${keyword}%`, `%${keyword}%`);
         }
 
+        // Filter by Wholesale status
+        // Stored as JSON string: {"isWholesale":true, ...}
+        // Using LIKE matching for compatibility
+        if (req.query.isWholesale === 'true') {
+            keywordFilter += ` AND v.pago_detalles LIKE '%"isWholesale":true%'`;
+        } else if (req.query.isWholesale === 'false') {
+            keywordFilter += ` AND (v.pago_detalles NOT LIKE '%"isWholesale":true%' OR v.pago_detalles IS NULL)`;
+        }
+
         // OPTIMIZACIÓN: Rango directo en 'fecha' usa índice.
         const [sales] = await db.query(`
             SELECT 

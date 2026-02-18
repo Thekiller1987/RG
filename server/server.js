@@ -22,7 +22,19 @@ const cajaRoutes = require('./src/routes/cajaRoutes.js');
 // NUEVA RUTA AGREGADA
 const providerInvoiceRoutes = require('./src/routes/providerInvoiceRoutes.js');
 const requestRoutes = require('./src/routes/requestRoutes.js');
-const outflowRoutes = require('./src/routes/outflowRoutes.js'); // FIXED: Missing import
+const outflowRoutes = require('./src/routes/outflowRoutes.js');
+
+// TEMP MIGRATION ROUTE
+app.get('/migrate-promo', async (req, res) => {
+  try {
+    const pool = require('./src/config/db.js');
+    await pool.query("ALTER TABLE promociones_mayorista ADD COLUMN tipo_cliente VARCHAR(50) DEFAULT NULL AFTER id_categoria");
+    await pool.query("ALTER TABLE clientes ADD COLUMN tipo_cliente VARCHAR(50) DEFAULT 'General'");
+    res.send('Migration successful');
+  } catch (e) {
+    res.send('Migration failed: ' + e.message);
+  }
+});
 
 // 2. Crear una instancia de Express
 const app = express();
@@ -94,6 +106,9 @@ app.use('/api/outflow', outflowRoutes);
 
 const settingsRoutes = require('./src/routes/settingsRoutes.js');
 app.use('/api/settings', settingsRoutes);
+
+const wholesaleRoutes = require('./src/routes/wholesaleRoutes.js');
+app.use('/api/wholesale', wholesaleRoutes);
 
 app.get('/', (_req, res) => {
   res.send('¡API de MultirepuestosRG funcionando! 🚀');

@@ -65,7 +65,7 @@ const login = async (req, res) => {
     };
 
     const token = jwt.sign(payload, process.env.JWT_SECRET || 'secret_key_reemplazo_seguro', {
-      expiresIn: '8h', // El token expirará en 8 horas
+      expiresIn: '24h', // El token expirará en 24 horas
     });
 
     // 4. Enviar el token al cliente

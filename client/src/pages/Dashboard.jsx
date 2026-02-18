@@ -10,6 +10,8 @@ import { useAuth } from '../context/AuthContext.jsx';
 
 import ConfirmationModal from './pos/components/ConfirmationModal.jsx';
 import SettingsModal from './pos/components/SettingsModal.jsx';
+import WholesaleAuthModal from '../components/WholesaleAuthModal.jsx';
+
 
 // --- ESTILOS MEJORADOS Y RESPONSIVOS ---
 const PageWrapper = styled.div`
@@ -127,6 +129,7 @@ const Dashboard = () => {
     const { user, logout } = useAuth();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
+    const [showWholesaleModal, setShowWholesaleModal] = useState(false);
 
     if (!user) {
         return (
@@ -209,13 +212,21 @@ const Dashboard = () => {
                         </Card>
                     )}
 
-                    {/* Venta Mayorista (Próximamente) */}
+                    {/* Venta Mayorista */}
                     {canAccessPOS && (
-                        <Card to="#" onClick={(e) => e.preventDefault()} color="#8b5cf6" style={{ opacity: 0.9, cursor: 'not-allowed' }}>
+                        <Card as="div" onClick={() => setShowWholesaleModal(true)} color="#8b5cf6" style={{ cursor: 'pointer' }}>
                             <CardIcon color="#8b5cf6"><FaTags /></CardIcon>
                             <h2>Venta Mayorista</h2>
-                            <p style={{ fontWeight: 'bold', color: '#8b5cf6', marginBottom: '5px' }}>PRÓXIMAMENTE</p>
                             <p>Portal exclusivo para ventas al por mayor.</p>
+                        </Card>
+                    )}
+
+                    {/* Admin Promociones Mayorista */}
+                    {isAdmin && (
+                        <Card to="/admin/wholesale-promotions" color="#8b5cf6" style={{ borderColor: '#8b5cf6', borderStyle: 'dashed', borderWidth: '2px' }}>
+                            <CardIcon color="#8b5cf6"><FaTags /></CardIcon>
+                            <h2>Promociones Mayorista</h2>
+                            <p>Administrar descuentos y ofertas.</p>
                         </Card>
                     )}
 
@@ -338,6 +349,11 @@ const Dashboard = () => {
             <SettingsModal
                 isOpen={showSettings}
                 onClose={() => setShowSettings(false)}
+            />
+
+            <WholesaleAuthModal
+                isOpen={showWholesaleModal}
+                onClose={() => setShowWholesaleModal(false)}
             />
         </PageWrapper >
     );
