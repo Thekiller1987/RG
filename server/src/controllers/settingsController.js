@@ -65,6 +65,9 @@ const updateSettings = async (req, res) => {
         mayorista_pin
     } = req.body;
 
+    console.log('[DEBUG] updateSettings payload:', req.body);
+
+
     // Build dynamic query to avoid overwriting with undefined
     let fields = [];
     let values = [];
