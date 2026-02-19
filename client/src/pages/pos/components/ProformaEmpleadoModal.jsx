@@ -255,8 +255,9 @@ const ProformaEmpleadoModal = ({
     const handleStartSend = async () => {
         if (cart.length === 0) return;
         setIsSending(true);
+        const token = localStorage.getItem('token'); // Get token
         try {
-            const response = await fetchActiveCajaSessions();
+            const response = await fetchActiveCajaSessions(token); // Pass token
             const sessions = response?.abiertas || [];
 
             if (sessions.length === 0) {
@@ -289,9 +290,10 @@ const ProformaEmpleadoModal = ({
         if (!ticketName.trim()) return showAlert("Atención", "Ingrese un nombre para el ticket.", "warning");
 
         setIsSending(true);
+        const token = localStorage.getItem('token'); // Get token
         try {
             // 1. Get current cart of target user
-            const targetCart = await getCart(selectedSessionId) || [];
+            const targetCart = await getCart(selectedSessionId, token) || []; // Pass token
 
             // 2. Create new ticket object
             const newTicket = {
@@ -307,7 +309,7 @@ const ProformaEmpleadoModal = ({
             const validCart = Array.isArray(targetCart) ? targetCart : [];
             const updatedCart = [...validCart, newTicket];
 
-            await saveCart(selectedSessionId, updatedCart);
+            await saveCart(selectedSessionId, updatedCart, token); // Pass token
 
             setShowSessionSelector(false); // Close selector first
             showAlert("Éxito", `✅ Ticket "${ticketName}" enviado exitosamente a la caja.`, "success");
