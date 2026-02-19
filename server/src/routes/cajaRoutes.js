@@ -558,7 +558,7 @@ router.get('/abiertas/activas', async (req, res) => {
     // Consulta SQL directa
     const [rows] = await pool.query(`
       SELECT * FROM cierres_caja 
-      WHERE fecha_cierre IS NULL OR fecha_cierre = '0000-00-00 00:00:00'
+      WHERE fecha_cierre IS NULL
     `);
 
     console.log(`[DEBUG] /abiertas/activas found ${rows.length} sessions.`);
