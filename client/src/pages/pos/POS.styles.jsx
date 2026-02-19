@@ -306,6 +306,56 @@ export const TicketContainer = styled.div`
   &::-webkit-scrollbar { height: 4px; }
 `;
 
+export const OrderTab = styled.div`
+  padding: 6px 12px;
+  border-radius: 8px 8px 0 0;
+  background: ${props => props.active ? 'white' : '#e2e8f0'};
+  color: ${props => props.active ? '#2563eb' : '#64748b'};
+  font-weight: ${props => props.active ? '700' : '600'};
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  border: 1px solid ${props => props.active ? '#e2e8f0' : 'transparent'};
+  border-bottom: none;
+  transition: all 0.2s;
+  min-width: 80px; justify-content: center;
+  position: relative;
+  
+  &:hover {
+    background: ${props => props.active ? 'white' : '#cbd5e1'};
+    color: ${props => props.active ? '#1d4ed8' : '#475569'};
+  }
+
+  /* Active tab looks connected to content below */
+  ${props => props.active && css`
+    box-shadow: 0 -2px 4px rgba(0,0,0,0.05);
+    z-index: 10;
+    &::after {
+      content: ''; position: absolute; bottom: -2px; left: 0; right: 0;
+      height: 4px; background: white;
+    }
+  `}
+`;
+
+export const NewOrderBtn = styled.button`
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: 2px dashed #cbd5e1;
+  background: transparent;
+  color: #64748b;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: 4px;
+  font-size: 0.8rem;
+
+  &:hover {
+    border-color: #3b82f6;
+    color: #3b82f6;
+    background: #eff6ff;
+  }
+`;
+
 /* Modales */
 export const ModalOverlay = styled.div`
   position: fixed; inset: 0; z-index: 5000;
