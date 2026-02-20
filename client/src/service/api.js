@@ -3,7 +3,8 @@ import axios from 'axios';
 // ===================================================================
 // === MODIFICACIÓN OBLIGATORIA: CONEXIÓN DIRECTA A DIGITALOCEAN ===
 // RAW_BASE DEBE TERMINAR SIN SLASH PARA UNIÓN LIMPIA
-const RAW_BASE = 'https://multirepuestosrg.com/api';
+// RAW_BASE DEBE TERMINAR SIN SLASH PARA UNIÓN LIMPIA
+const RAW_BASE = import.meta.env.VITE_API_URL || 'https://multirepuestosrg.com/api';
 // ===================================================================
 
 const API_URL = RAW_BASE; // Simplificado
@@ -110,6 +111,27 @@ export const fetchProducts = async (token) => {
         venta: Number(p.venta ?? p.precio ?? p.price ?? 0),
         raw: p,
     }));
+};
+
+export const createProduct = async (productData, token) => {
+    return await request('post', '/products', token, productData);
+};
+
+export const updateProduct = async (productId, productData, token) => {
+    return await request('put', `/products/${productId}`, token, productData);
+};
+
+export const deleteProduct = async (productId, token) => {
+    return await request('delete', `/products/${productId}`, token);
+};
+
+export const archiveProduct = async (productId, token) => {
+    return await request('patch', `/products/${productId}/archive`, token, {});
+};
+
+export const updateStock = async (productId, stockData, token) => {
+    // stockData = { cantidad, razon }
+    return await request('patch', `/products/${productId}/stock`, token, stockData);
 };
 
 // ===================================================================
