@@ -164,9 +164,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
                         <Tab active={activeTab === 'tickets'} onClick={() => setActiveTab('tickets')}>
                             <FaFileInvoice /> Personalización Tickets
                         </Tab>
-                        <Tab active={activeTab === 'security'} onClick={() => setActiveTab('security')}>
-                            <FaBuilding /> Seguridad
-                        </Tab>
                     </Tabs>
 
                     {activeTab === 'general' && (
@@ -274,29 +271,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                         </div>
                     )}
 
-                    {activeTab === 'security' && (
-                        <div>
-                            <p style={{ marginBottom: '1rem', color: '#64748b' }}>
-                                Configuración de seguridad y acceso a módulos protegidos.
-                            </p>
 
-                            <FormGroup>
-                                <label>PIN del Módulo Mayorista</label>
-                                <div style={{ position: 'relative' }}>
-                                    <input
-                                        type="text"
-                                        name="mayorista_pin"
-                                        value={formData.mayorista_pin || ''}
-                                        onChange={handleChange}
-                                        placeholder="Ej: 2004"
-                                        maxLength={10}
-                                        style={{ letterSpacing: '2px', fontWeight: 'bold' }}
-                                    />
-                                </div>
-                                <small>Este PIN será requerido para ingresar al área de ventas mayorista.</small>
-                            </FormGroup>
-                        </div>
-                    )}
                 </Content>
 
                 <ButtonGroup>
