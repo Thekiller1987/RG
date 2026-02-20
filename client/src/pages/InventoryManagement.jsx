@@ -601,7 +601,7 @@ const InventoryHistoryModal = ({ onClose }) => {
 /* ==================================
   MODAL DE CREACIÓN ACTUALIZADO
 ================================== */
-const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, allProductsRaw }) => {
+const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, allProductsRaw, isWholesaleView }) => {
   const [formData, setFormData] = useState({
     codigo: '', nombre: '', costo: '', venta: '', mayoreo: '', distribuidor: '', taller: '', mayorista: '', id_categoria: '',
     existencia: '', minimo: '', maximo: '', tipo_venta: 'Unidad', id_proveedor: '', descripcion: '', imagen: null
@@ -683,25 +683,29 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
             {modalError && <ModalError>{modalError}</ModalError>}
 
             {/* Image Upload Section */}
-            <ImageUpload currentImage={formData.imagen} onImageChange={handleImageChange} />
+            {!isWholesaleView && <ImageUpload currentImage={formData.imagen} onImageChange={handleImageChange} />}
 
             <InputGrid>
               <FormGroup><Label>Código</Label><Input name="codigo" value={formData.codigo} onChange={handleInputChange} required /></FormGroup>
               <FormGroup><Label>Nombre</Label><Input name="nombre" value={formData.nombre} onChange={handleInputChange} required /></FormGroup>
               <FormGroup><Label>Costo (C$)</Label><Input type="number" step="0.01" name="costo" value={formData.costo} onChange={handleInputChange} required /></FormGroup>
-              <FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup>
-              <FormGroup><Label>Precio Venta (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta} onChange={handleInputChange} required /></FormGroup>
-              <FormGroup><Label>Precio Mayoreo (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} /></FormGroup>
-              <FormGroup><Label>Precio Distribuidor (C$)</Label><Input type="number" step="0.01" name="distribuidor" value={formData.distribuidor} onChange={handleInputChange} /></FormGroup>
-              <FormGroup><Label>Precio Taller (C$)</Label><Input type="number" step="0.01" name="taller" value={formData.taller} onChange={handleInputChange} /></FormGroup>
-              <FormGroup><Label>Precio Mayorista Especial (C$)</Label><Input type="number" step="0.01" name="mayorista" value={formData.mayorista} onChange={handleInputChange} /></FormGroup>
-              <FormGroup><Label>Existencia Inicial</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="existencia" value={formData.existencia} onChange={handleInputChange} required /></FormGroup>
-              <FormGroup><Label>Stock Mínimo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="minimo" value={formData.minimo} onChange={handleInputChange} /></FormGroup>
-              <FormGroup><Label>Stock Máximo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="maximo" value={formData.maximo} onChange={handleInputChange} /></FormGroup>
-              <FormGroup><Label>Descripción</Label><Input name="descripcion" value={formData.descripcion} onChange={handleInputChange} placeholder="Detalles del producto" /></FormGroup>
-              <FormGroup><Label>Categoría</Label><Select name="id_categoria" value={formData.id_categoria} onChange={handleInputChange}><option value="">-- Sin Categoría --</option>{categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}</Select></FormGroup>
-              <FormGroup><Label>Proveedor</Label><Select name="id_proveedor" value={formData.id_proveedor} onChange={handleInputChange}><option value="">-- Sin Proveedor --</option>{providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}</Select></FormGroup>
-              <FormGroup><Label>Tipo de Venta</Label><Select name="tipo_venta" value={formData.tipo_venta} onChange={handleInputChange}><option value="Unidad">Unidad</option><option value="Juego">Juego</option><option value="Kit">Kit</option></Select></FormGroup>
+              {!isWholesaleView && <FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup>}
+              <FormGroup><Label>Precio Tienda (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta} onChange={handleInputChange} required /></FormGroup>
+              <FormGroup><Label>Nivel 1 (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Nivel 2 (C$)</Label><Input type="number" step="0.01" name="distribuidor" value={formData.distribuidor} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Nivel 3 (C$)</Label><Input type="number" step="0.01" name="taller" value={formData.taller} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Especial Mayorista (C$)</Label><Input type="number" step="0.01" name="mayorista" value={formData.mayorista} onChange={handleInputChange} /></FormGroup>
+              {!isWholesaleView && (
+                <>
+                  <FormGroup><Label>Existencia Inicial</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="existencia" value={formData.existencia} onChange={handleInputChange} required /></FormGroup>
+                  <FormGroup><Label>Stock Mínimo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="minimo" value={formData.minimo} onChange={handleInputChange} /></FormGroup>
+                  <FormGroup><Label>Stock Máximo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="maximo" value={formData.maximo} onChange={handleInputChange} /></FormGroup>
+                  <FormGroup><Label>Descripción</Label><Input name="descripcion" value={formData.descripcion} onChange={handleInputChange} placeholder="Detalles del producto" /></FormGroup>
+                  <FormGroup><Label>Categoría</Label><Select name="id_categoria" value={formData.id_categoria} onChange={handleInputChange}><option value="">-- Sin Categoría --</option>{categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}</Select></FormGroup>
+                  <FormGroup><Label>Proveedor</Label><Select name="id_proveedor" value={formData.id_proveedor} onChange={handleInputChange}><option value="">-- Sin Proveedor --</option>{providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}</Select></FormGroup>
+                  <FormGroup><Label>Tipo de Venta</Label><Select name="tipo_venta" value={formData.tipo_venta} onChange={handleInputChange}><option value="Unidad">Unidad</option><option value="Juego">Juego</option><option value="Kit">Kit</option></Select></FormGroup>
+                </>
+              )}
             </InputGrid>
             <ModalActions>
               <CancelButton type="button" onClick={onClose}>Cancelar</CancelButton>
@@ -717,7 +721,7 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
 /* ================================
   MODAL DE EDICIÓN ACTUALIZADO
 ================================ */
-const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, providers, allProductsRaw }) => {
+const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, providers, allProductsRaw, isWholesaleView }) => {
   const [formData, setFormData] = useState({});
   const [profitPercentage, setProfitPercentage] = useState('');
   const [modalError, setModalError] = useState('');
@@ -807,25 +811,30 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
             {modalError && <ModalError>{modalError}</ModalError>}
 
             {/* Image Upload Section */}
-            <ImageUpload currentImage={formData.imagen} onImageChange={handleImageChange} />
+            {!isWholesaleView && <ImageUpload currentImage={formData.imagen} onImageChange={handleImageChange} />}
 
             <InputGrid>
-              <FormGroup><Label>Código</Label><Input name="codigo" value={formData.codigo || ''} onChange={handleInputChange} required /></FormGroup>
-              <FormGroup><Label>Nombre</Label><Input name="nombre" value={formData.nombre || ''} onChange={handleInputChange} required /></FormGroup>
-              <FormGroup><Label>Costo (C$)</Label><Input type="number" step="0.01" name="costo" value={formData.costo || ''} onChange={handleInputChange} required /></FormGroup>
-              <FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage || ''} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup>
-              <FormGroup><Label>Precio Venta (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta || ''} onChange={handleInputChange} required /></FormGroup>
-              <FormGroup><Label>Precio Mayoreo (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo || ''} onChange={handleInputChange} /></FormGroup>
-              <FormGroup><Label>Precio Distribuidor (C$)</Label><Input type="number" step="0.01" name="distribuidor" value={formData.distribuidor || ''} onChange={handleInputChange} /></FormGroup>
-              <FormGroup><Label>Precio Taller (C$)</Label><Input type="number" step="0.01" name="taller" value={formData.taller || ''} onChange={handleInputChange} /></FormGroup>
-              <FormGroup><Label>Precio Mayorista Especial (C$)</Label><Input type="number" step="0.01" name="mayorista" value={formData.mayorista || ''} onChange={handleInputChange} /></FormGroup>
-              <FormGroup><Label>Existencia</Label><Input name="existencia" value={formData.existencia || ''} disabled style={{ backgroundColor: '#f0f0f0' }} /><small style={{ marginTop: '5px', color: '#dc3545', fontWeight: 'bold' }}>¡Ajustar solo con el botón de stock!</small></FormGroup>
-              <FormGroup><Label>Stock Mínimo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="minimo" value={formData.minimo || ''} onChange={handleInputChange} /></FormGroup>
-              <FormGroup><Label>Stock Máximo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="maximo" value={formData.maximo || ''} onChange={handleInputChange} /></FormGroup>
-              <FormGroup><Label>Descripción</Label><Input name="descripcion" value={formData.descripcion || ''} onChange={handleInputChange} placeholder="Detalles del producto" /></FormGroup>
-              <FormGroup><Label>Categoría</Label><Select name="id_categoria" value={formData.id_categoria || ''} onChange={handleInputChange}><option value="">-- Sin Categoría --</option>{categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}</Select></FormGroup>
-              <FormGroup><Label>Proveedor</Label><Select name="id_proveedor" value={formData.id_proveedor || ''} onChange={handleInputChange}><option value="">-- Sin Proveedor --</option>{providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}</Select></FormGroup>
-              <FormGroup><Label>Tipo de Venta</Label><Select name="tipo_venta" value={formData.tipo_venta || 'Unidad'} onChange={handleInputChange}><option value="Unidad">Unidad</option><option value="Juego">Juego</option><option value="Kit">Kit</option></Select></FormGroup>
+              <FormGroup><Label>Código</Label><Input name="codigo" value={formData.codigo} onChange={handleInputChange} required readOnly={isWholesaleView} style={isWholesaleView ? { background: '#f8fafc', color: '#64748b' } : {}} /></FormGroup>
+              <FormGroup><Label>Nombre</Label><Input name="nombre" value={formData.nombre} onChange={handleInputChange} required readOnly={isWholesaleView} style={isWholesaleView ? { background: '#f8fafc', color: '#64748b' } : {}} /></FormGroup>
+              <FormGroup><Label>Costo (C$)</Label><Input type="number" step="0.01" name="costo" value={formData.costo} onChange={handleInputChange} required readOnly={isWholesaleView} style={isWholesaleView ? { background: '#f8fafc', color: '#64748b' } : {}} /></FormGroup>
+              {!isWholesaleView && <FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup>}
+              <FormGroup><Label>Precio Tienda (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta} onChange={handleInputChange} required readOnly={isWholesaleView} style={isWholesaleView ? { background: '#f8fafc', color: '#64748b' } : {}} /></FormGroup>
+              <FormGroup><Label>Nivel 1 (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} readOnly={isWholesaleView} style={isWholesaleView ? { background: '#f8fafc', color: '#64748b' } : {}} /></FormGroup>
+              <FormGroup><Label>Nivel 2 (C$)</Label><Input type="number" step="0.01" name="distribuidor" value={formData.distribuidor} onChange={handleInputChange} style={isWholesaleView ? { border: '2px solid #0891b2' } : {}} /></FormGroup>
+              <FormGroup><Label>Nivel 3 (C$)</Label><Input type="number" step="0.01" name="taller" value={formData.taller} onChange={handleInputChange} style={isWholesaleView ? { border: '2px solid #4f46e5' } : {}} /></FormGroup>
+              <FormGroup><Label>Especial Mayorista (C$)</Label><Input type="number" step="0.01" name="mayorista" value={formData.mayorista} onChange={handleInputChange} style={isWholesaleView ? { border: '2px solid #7c3aed' } : {}} /></FormGroup>
+
+              {!isWholesaleView && (
+                <>
+                  <FormGroup><Label>Existencia</Label><Input type="number" value={formData.existencia} readOnly style={{ background: '#f1f5f9' }} /></FormGroup>
+                  <FormGroup><Label>Stock Mínimo</Label><Input type="number" name="minimo" value={formData.minimo} onChange={handleInputChange} /></FormGroup>
+                  <FormGroup><Label>Stock Máximo</Label><Input type="number" name="maximo" value={formData.maximo} onChange={handleInputChange} /></FormGroup>
+                  <FormGroup><Label>Descripción</Label><Input name="descripcion" value={formData.descripcion} onChange={handleInputChange} /></FormGroup>
+                  <FormGroup><Label>Categoría</Label><Select name="id_categoria" value={formData.id_categoria} onChange={handleInputChange}><option value="">-- Sin Categoría --</option>{categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}</Select></FormGroup>
+                  <FormGroup><Label>Proveedor</Label><Select name="id_proveedor" value={formData.id_proveedor} onChange={handleInputChange}><option value="">-- Sin Proveedor --</option>{providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}</Select></FormGroup>
+                  <FormGroup><Label>Tipo de Venta</Label><Select name="tipo_venta" value={formData.tipo_venta} onChange={handleInputChange}><option value="Unidad">Unidad</option><option value="Juego">Juego</option><option value="Kit">Kit</option></Select></FormGroup>
+                </>
+              )}
             </InputGrid>
             <ModalActions>
               <CancelButton type="button" onClick={onClose}>Cancelar</CancelButton>
@@ -925,6 +934,7 @@ const InventoryManagement = () => {
             mayorista: `C$${Number(p.mayorista || 0).toFixed(2)}`,
             costoTotal: `C$${(costoNum * existenciaNum).toFixed(2)}`
           },
+          costoNum, // Keep raw for styling logic
           q,
           qStarts
         };
@@ -1133,7 +1143,7 @@ const InventoryManagement = () => {
     <PageWrapper>
       <BackButton to="/dashboard"><FaArrowLeft /> Volver al Dashboard</BackButton>
       <HeaderContainer>
-        <Title><FaBoxOpen /> {isWholesaleView ? 'Precios Mayorista (3 Niveles)' : 'Gestión de Inventario'}</Title>
+        <Title><FaBoxOpen /> {isWholesaleView ? 'Precios Mayorista' : 'Gestión de Inventario'}</Title>
         <ButtonGroup>
           <Button primary onClick={openCreateModal}><FaPlus /> Crear Producto</Button>
           <Button secondary onClick={() => setIsCategoryModalOpen(true)}><FaTags /> Categorías</Button>
@@ -1200,10 +1210,11 @@ const InventoryManagement = () => {
               <CardBody>
                 {isWholesaleView ? (
                   <>
-                    <InfoTag style={{ minWidth: '100%', background: '#fffbeb', borderColor: '#fef3c7' }}><span style={{ color: '#b45309' }}>Nivel 1: Mayoreo</span><strong>{p.__fmt.mayoreo}</strong></InfoTag>
-                    <InfoTag><span style={{ color: '#0891b2' }}>Nivel 2: Distribuidor</span><strong>{p.__fmt.distribuidor}</strong></InfoTag>
-                    <InfoTag><span style={{ color: '#4f46e5' }}>Nivel 3: Taller</span><strong>{p.__fmt.taller}</strong></InfoTag>
-                    <InfoTag><span style={{ color: '#7c3aed' }}>Especial: Mayorista</span><strong>{p.__fmt.mayorista}</strong></InfoTag>
+                    <InfoTag style={{ minWidth: '100%', background: '#f1f5f9', borderColor: '#e2e8f0', color: '#475569' }}><FaLock style={{ marginRight: 6, fontSize: '0.7rem' }} /><span>Costo</span><strong>{p.__fmt.costo}</strong></InfoTag>
+                    <InfoTag style={{ minWidth: '100%', background: '#fffbeb', borderColor: '#fef3c7' }}><span style={{ color: '#b45309' }}>Nivel 1</span><strong>{p.__fmt.mayoreo}</strong></InfoTag>
+                    <InfoTag><span style={{ color: '#0891b2' }}>Nivel 2</span><strong>{p.__fmt.distribuidor}</strong></InfoTag>
+                    <InfoTag><span style={{ color: '#4f46e5' }}>Nivel 3</span><strong>{p.__fmt.taller}</strong></InfoTag>
+                    <InfoTag><span style={{ color: '#7c3aed' }}>Especial Mayorista</span><strong>{p.__fmt.mayorista}</strong></InfoTag>
                   </>
                 ) : (
                   <>
@@ -1215,9 +1226,9 @@ const InventoryManagement = () => {
                 )}
               </CardBody>
               <CardFooter>
-                <ActionButton className="adjust" title="Ajustar Stock" onClick={() => setAdjustmentModal({ isOpen: true, product: p })}><FaPlusCircle /><FaMinusCircle style={{ marginLeft: 4 }} /></ActionButton>
-                <ActionButton className="edit" onClick={() => openEditModal(p)}><FaEdit /> Editar</ActionButton>
-                <ActionButton className="delete" onClick={() => openDeleteModal(p)}><FaTrash /> Eliminar</ActionButton>
+                {!isWholesaleView && <ActionButton className="adjust" title="Ajustar Stock" onClick={() => setAdjustmentModal({ isOpen: true, product: p })}><FaPlusCircle /><FaMinusCircle style={{ marginLeft: 4 }} /></ActionButton>}
+                <ActionButton className="edit" onClick={() => openEditModal(p)}><FaEdit /> {isWholesaleView ? 'Editar Precios' : 'Editar'}</ActionButton>
+                {!isWholesaleView && <ActionButton className="delete" onClick={() => openDeleteModal(p)}><FaTrash /> Eliminar</ActionButton>}
               </CardFooter>
             </ProductCard>
           );
@@ -1267,12 +1278,29 @@ const InventoryManagement = () => {
       )}
       <AnimatePresence>
         {isCreateModalOpen && (
-          <CreateProductModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSave={handleCreateProduct} categories={categories} providers={providers} allProductsRaw={allProductsRaw} />
+          <CreateProductModal
+            isOpen={isCreateModalOpen}
+            onClose={() => setIsCreateModalOpen(false)}
+            onSave={handleCreateProduct}
+            categories={categories}
+            providers={providers}
+            allProductsRaw={allProductsRaw}
+            isWholesaleView={isWholesaleView}
+          />
         )}
       </AnimatePresence>
       <AnimatePresence>
         {isEditModalOpen && (
-          <EditProductModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSave={handleUpdateProduct} productToEdit={productToEdit} categories={categories} providers={providers} allProductsRaw={allProductsRaw} />
+          <EditProductModal
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            onSave={handleUpdateProduct}
+            productToEdit={productToEdit}
+            categories={categories}
+            providers={providers}
+            allProductsRaw={allProductsRaw}
+            isWholesaleView={isWholesaleView}
+          />
         )}
       </AnimatePresence>
       <AnimatePresence>

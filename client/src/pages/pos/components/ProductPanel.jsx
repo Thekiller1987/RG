@@ -248,21 +248,21 @@ export default function ProductPanel({
                   // MODO MAYORISTA
                   <>
                     <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px', textDecoration: 'line-through' }}>
-                      Det: C$ {fmt(p.precio_venta || p.precio)}
+                      Tienda: C$ {fmt(p.precio_venta || p.precio)}
                     </div>
                     <div className="price" style={{ fontWeight: 800, color: '#8b5cf6', fontSize: '1.1rem' }}>
-                      C$ {fmt(p.mayorista || p.mayoreo || p.precio_venta)}
+                      C$ {fmt(p.mayorista || p.mayoreo || p.distribuidor || p.taller || p.precio_venta)}
                     </div>
                   </>
                 ) : (
                   // MODO NORMAL (Minoreo)
                   <>
-                    {(Number(p.mayorista) > 0 || Number(p.mayoreo) > 0) && (
+                    {(Number(p.mayorista) > 0 || Number(p.mayoreo) > 0 || Number(p.distribuidor) > 0 || Number(p.taller) > 0) && (
                       <div style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px' }}>
-                        <FaTags size={10} /> May: C$ {fmt(p.mayorista || p.mayoreo)}
+                        <FaTags size={10} /> May: C$ {fmt(p.mayorista || p.mayoreo || p.distribuidor || p.taller)}
                       </div>
                     )}
-                    <div className="price" style={{ fontWeight: 800, color: '#2563eb', fontSize: '1.05rem', marginTop: !((Number(p.mayorista) > 0 || Number(p.mayoreo) > 0)) ? 'auto' : 0 }}>
+                    <div className="price" style={{ fontWeight: 800, color: '#2563eb', fontSize: '1.05rem', marginTop: !((Number(p.mayorista) > 0 || Number(p.mayoreo) > 0 || Number(p.distribuidor) > 0 || Number(p.taller) > 0)) ? 'auto' : 0 }}>
                       C$ {fmt(p.precio_venta || p.precio)}
                     </div>
                   </>

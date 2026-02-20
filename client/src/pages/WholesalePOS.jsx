@@ -636,7 +636,7 @@ const WholesalePOS = () => {
                                         <div style={{ flex: 1 }}>
                                             <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1e293b' }}>{item.nombre}</div>
                                             <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                                {item.isWholesaleApplied ? <span style={{ color: '#8b5cf6', fontWeight: 'bold' }}>Mayorista: </span> : 'Detalle: '}
+                                                {item.isWholesaleApplied ? <span style={{ color: '#8b5cf6', fontWeight: 'bold' }}>Mayorista: </span> : 'Precio Tienda: '}
                                                 C$ {fmt(item.precio_venta)}
                                             </div>
                                             <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#2563eb', marginTop: '2px' }}>
