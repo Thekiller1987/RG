@@ -125,12 +125,7 @@ const CajaModal = ({
     lists: { ventasContado, devoluciones, cancelaciones, entradas, salidas, abonos }
   } = stats;
 
-  return {
-    cajaInicial, netCordobas, netDolares, efectivoEsperado, efectivoEsperadoCordobas, efectivoEsperadoDolares,
-    ventasContado, devoluciones, cancelaciones, entradas, salidas, abonos,
-    totalTarjeta, totalTransferencia, totalCredito, totalNoEfectivo,
-    sumDevolucionesCancelaciones, totalVentasDia, tasaRef, totalHidden
-  };
+
 
   const diferencia = (Number(montoContado || 0) - efectivoEsperado);
   const openedAt = session?.openedAt ? new Date(session.openedAt) : null;
