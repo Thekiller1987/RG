@@ -135,7 +135,7 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
         efectivoEsperado,
         efectivoEsperadoCordobas,
         efectivoEsperadoDolares: netDolares,
-        totalVentasDia,
+        totalVentasDia: tVentasDia,
         totalTarjeta: tTarjeta,
         totalTransferencia: tTransf,
         totalCredito: tCredito,
