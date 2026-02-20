@@ -136,7 +136,7 @@ const WholesaleMenu = () => {
                         <p>Ventas y rendimiento mayorista</p>
                     </MenuCard>
 
-                    <MenuCard to="/inventory">
+                    <MenuCard to="/inventory?view=wholesale">
                         <IconWrapper bg="#fefce8" color="#ca8a04">
                             <FaBoxOpen />
                         </IconWrapper>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredVa
 import styled, { keyframes } from 'styled-components';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   FaPlus, FaBoxOpen, FaTags, FaTruck, FaTrash, FaEdit, FaArrowLeft, FaHistory, FaSpinner,
   FaSearch, FaTimes, FaPlusCircle, FaMinusCircle, FaExclamationTriangle,
@@ -603,7 +603,7 @@ const InventoryHistoryModal = ({ onClose }) => {
 ================================== */
 const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, allProductsRaw }) => {
   const [formData, setFormData] = useState({
-    codigo: '', nombre: '', costo: '', venta: '', mayoreo: '', id_categoria: '',
+    codigo: '', nombre: '', costo: '', venta: '', mayoreo: '', distribuidor: '', taller: '', mayorista: '', id_categoria: '',
     existencia: '', minimo: '', maximo: '', tipo_venta: 'Unidad', id_proveedor: '', descripcion: '', imagen: null
   });
   const [profitPercentage, setProfitPercentage] = useState('');
@@ -663,7 +663,11 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
 
     onSave({
       ...f,
-      mayoreo: f.mayoreo || null, minimo: f.minimo || null, maximo: f.maximo || null,
+      mayoreo: f.mayoreo || null,
+      distribuidor: f.distribuidor || null,
+      taller: f.taller || null,
+      mayorista: f.mayorista || null,
+      minimo: f.minimo || null, maximo: f.maximo || null,
       id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null
     });
   };
@@ -688,6 +692,9 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
               <FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup>
               <FormGroup><Label>Precio Venta (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta} onChange={handleInputChange} required /></FormGroup>
               <FormGroup><Label>Precio Mayoreo (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Precio Distribuidor (C$)</Label><Input type="number" step="0.01" name="distribuidor" value={formData.distribuidor} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Precio Taller (C$)</Label><Input type="number" step="0.01" name="taller" value={formData.taller} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Precio Mayorista Especial (C$)</Label><Input type="number" step="0.01" name="mayorista" value={formData.mayorista} onChange={handleInputChange} /></FormGroup>
               <FormGroup><Label>Existencia Inicial</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="existencia" value={formData.existencia} onChange={handleInputChange} required /></FormGroup>
               <FormGroup><Label>Stock Mínimo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="minimo" value={formData.minimo} onChange={handleInputChange} /></FormGroup>
               <FormGroup><Label>Stock Máximo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="maximo" value={formData.maximo} onChange={handleInputChange} /></FormGroup>
@@ -720,6 +727,9 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
       setFormData({
         ...productToEdit,
         mayoreo: productToEdit.mayoreo ?? '',
+        distribuidor: productToEdit.distribuidor ?? '',
+        taller: productToEdit.taller ?? '',
+        mayorista: productToEdit.mayorista ?? '',
         minimo: productToEdit.minimo ?? '',
         maximo: productToEdit.maximo ?? '',
         id_categoria: productToEdit.id_categoria ?? '',
@@ -772,7 +782,17 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
     );
     if (duplicate) { setModalError(`Ya existe otro producto con ese código o nombre.`); return; }
 
-    const { existencia, ...payload } = { ...f, mayoreo: f.mayoreo || null, minimo: f.minimo || null, maximo: f.maximo || null, id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null };
+    const { existencia, ...payload } = {
+      ...f,
+      mayoreo: f.mayoreo || null,
+      distribuidor: f.distribuidor || null,
+      taller: f.taller || null,
+      mayorista: f.mayorista || null,
+      minimo: f.minimo || null,
+      maximo: f.maximo || null,
+      id_categoria: f.id_categoria || null,
+      id_proveedor: f.id_proveedor || null
+    };
     onSave(payload, productToEdit.id_producto);
   };
 
@@ -796,6 +816,9 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
               <FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage || ''} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup>
               <FormGroup><Label>Precio Venta (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta || ''} onChange={handleInputChange} required /></FormGroup>
               <FormGroup><Label>Precio Mayoreo (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo || ''} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Precio Distribuidor (C$)</Label><Input type="number" step="0.01" name="distribuidor" value={formData.distribuidor || ''} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Precio Taller (C$)</Label><Input type="number" step="0.01" name="taller" value={formData.taller || ''} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Precio Mayorista Especial (C$)</Label><Input type="number" step="0.01" name="mayorista" value={formData.mayorista || ''} onChange={handleInputChange} /></FormGroup>
               <FormGroup><Label>Existencia</Label><Input name="existencia" value={formData.existencia || ''} disabled style={{ backgroundColor: '#f0f0f0' }} /><small style={{ marginTop: '5px', color: '#dc3545', fontWeight: 'bold' }}>¡Ajustar solo con el botón de stock!</small></FormGroup>
               <FormGroup><Label>Stock Mínimo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="minimo" value={formData.minimo || ''} onChange={handleInputChange} /></FormGroup>
               <FormGroup><Label>Stock Máximo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="maximo" value={formData.maximo || ''} onChange={handleInputChange} /></FormGroup>
@@ -820,6 +843,10 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
   COMPONENTE PRINCIPAL: InventoryManagement
 ===================================== */
 const InventoryManagement = () => {
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const isWholesaleView = searchParams.get('view') === 'wholesale';
+
   const [allProductsRaw, setAllProductsRaw] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -892,6 +919,10 @@ const InventoryManagement = () => {
           __fmt: {
             costo: `C$${costoNum.toFixed(2)}`,
             venta: `C$${ventaNum.toFixed(2)}`,
+            mayoreo: `C$${Number(p.mayoreo || 0).toFixed(2)}`,
+            distribuidor: `C$${Number(p.distribuidor || 0).toFixed(2)}`,
+            taller: `C$${Number(p.taller || 0).toFixed(2)}`,
+            mayorista: `C$${Number(p.mayorista || 0).toFixed(2)}`,
             costoTotal: `C$${(costoNum * existenciaNum).toFixed(2)}`
           },
           q,
@@ -1102,7 +1133,7 @@ const InventoryManagement = () => {
     <PageWrapper>
       <BackButton to="/dashboard"><FaArrowLeft /> Volver al Dashboard</BackButton>
       <HeaderContainer>
-        <Title><FaBoxOpen /> Gestión de Inventario</Title>
+        <Title><FaBoxOpen /> {isWholesaleView ? 'Precios Mayorista (3 Niveles)' : 'Gestión de Inventario'}</Title>
         <ButtonGroup>
           <Button primary onClick={openCreateModal}><FaPlus /> Crear Producto</Button>
           <Button secondary onClick={() => setIsCategoryModalOpen(true)}><FaTags /> Categorías</Button>
@@ -1167,10 +1198,21 @@ const InventoryManagement = () => {
                 <CardCode>Código: {p.codigo}</CardCode>
               </CardHeader>
               <CardBody>
-                <InfoTag><span>Costo</span><strong>{p.__fmt.costo}</strong></InfoTag>
-                <InfoTag><span>Venta</span><strong>{p.__fmt.venta}</strong></InfoTag>
-                <StockTag $low={low} $out={out}><span>Existencia</span><strong>{p.existencia}</strong></StockTag>
-                <InfoTag><span>Costo Total</span><strong>{p.__fmt.costoTotal}</strong></InfoTag>
+                {isWholesaleView ? (
+                  <>
+                    <InfoTag style={{ minWidth: '100%', background: '#fffbeb', borderColor: '#fef3c7' }}><span style={{ color: '#b45309' }}>Nivel 1: Mayoreo</span><strong>{p.__fmt.mayoreo}</strong></InfoTag>
+                    <InfoTag><span style={{ color: '#0891b2' }}>Nivel 2: Distribuidor</span><strong>{p.__fmt.distribuidor}</strong></InfoTag>
+                    <InfoTag><span style={{ color: '#4f46e5' }}>Nivel 3: Taller</span><strong>{p.__fmt.taller}</strong></InfoTag>
+                    <InfoTag><span style={{ color: '#7c3aed' }}>Especial: Mayorista</span><strong>{p.__fmt.mayorista}</strong></InfoTag>
+                  </>
+                ) : (
+                  <>
+                    <InfoTag><span>Costo</span><strong>{p.__fmt.costo}</strong></InfoTag>
+                    <InfoTag><span>Venta</span><strong>{p.__fmt.venta}</strong></InfoTag>
+                    <StockTag $low={low} $out={out}><span>Existencia</span><strong>{p.existencia}</strong></StockTag>
+                    <InfoTag><span>Costo Total</span><strong>{p.__fmt.costoTotal}</strong></InfoTag>
+                  </>
+                )}
               </CardBody>
               <CardFooter>
                 <ActionButton className="adjust" title="Ajustar Stock" onClick={() => setAdjustmentModal({ isOpen: true, product: p })}><FaPlusCircle /><FaMinusCircle style={{ marginLeft: 4 }} /></ActionButton>

@@ -72,8 +72,13 @@ const WholesalePOS = () => {
 
     useEffect(() => {
         if (initialProducts) {
-            // FILTER: Only show products with valid wholesale price > 0
-            const validProducts = initialProducts.filter(p => Number(p.precio_mayorista) > 0);
+            // FILTER: Show if any wholesale tier > 0
+            const validProducts = initialProducts.filter(p =>
+                Number(p.mayoreo) > 0 ||
+                Number(p.distribuidor) > 0 ||
+                Number(p.taller) > 0 ||
+                Number(p.mayorista) > 0
+            );
             setProductsState(validProducts);
         }
 
@@ -127,8 +132,16 @@ const WholesalePOS = () => {
         let basePrice = 0;
 
         if (item.isWholesaleApplied) {
-            basePrice = Number(originalProduct.mayorista) > 0 ? originalProduct.mayorista
-                : (Number(originalProduct.mayoreo) > 0 ? originalProduct.mayoreo : originalProduct.precio_venta);
+            // Get price based on client type
+            if (currentClientType === 'Distribuidor' && Number(originalProduct.distribuidor) > 0) {
+                basePrice = originalProduct.distribuidor;
+            } else if (currentClientType === 'Taller' && Number(originalProduct.taller) > 0) {
+                basePrice = originalProduct.taller;
+            } else if (Number(originalProduct.mayorista) > 0) {
+                basePrice = originalProduct.mayorista;
+            } else {
+                basePrice = Number(originalProduct.mayoreo) > 0 ? originalProduct.mayoreo : (originalProduct.precio_venta || originalProduct.precio);
+            }
         } else {
             basePrice = originalProduct.precio_venta || originalProduct.precio;
         }
@@ -188,12 +201,25 @@ const WholesalePOS = () => {
             return;
         }
 
-        // LÓGICA DE PRECIO MAYORISTA
-        // Prioridad: Mayorista -> Mayoreo -> Venta Normal
-        const wholesalePrice = Number(product.mayorista) > 0 ? product.mayorista
-            : (Number(product.mayoreo) > 0 ? product.mayoreo : product.precio_venta);
+        // LÓGICA DE PRECIO MAYORISTA (Prioridad según Tipo de Cliente)
+        let currentClientType = null;
+        if (activeOrder?.clientId) {
+            const c = clients.find(cl => cl.id_cliente === activeOrder.clientId);
+            if (c) currentClientType = c.tipo_cliente;
+        }
 
-        const priceToUse = wholesalePrice || 0;
+        let priceToUse = 0;
+        if (currentClientType === 'Distribuidor' && Number(product.distribuidor) > 0) {
+            priceToUse = product.distribuidor;
+        } else if (currentClientType === 'Taller' && Number(product.taller) > 0) {
+            priceToUse = product.taller;
+        } else if (Number(product.mayorista) > 0) {
+            priceToUse = product.mayorista;
+        } else if (Number(product.mayoreo) > 0) {
+            priceToUse = product.mayoreo;
+        } else {
+            priceToUse = product.precio_venta || product.precio || 0;
+        }
 
         const existingItemIndex = cart.findIndex(item => (item.id_producto || item.id) === (product.id_producto || product.id));
         let newCart = [...cart];
@@ -422,12 +448,27 @@ const WholesalePOS = () => {
 
         if (isCurrentlyWholesale) {
             // Cambiar a Retail
-            newPrice = originalProduct.precio_venta || originalProduct.precio;
+            newPrice = originalProduct.precio_venta || originalProduct.precio || 0;
             newIsWholesale = false;
         } else {
-            // Cambiar a Mayorista
-            newPrice = Number(originalProduct.mayorista) > 0 ? originalProduct.mayorista
-                : (Number(originalProduct.mayoreo) > 0 ? originalProduct.mayoreo : originalProduct.precio_venta);
+            // Cambiar a Mayorista correspondiente al cliente
+            let currentClientType = null;
+            if (activeOrder?.clientId) {
+                const c = clients.find(cl => cl.id_cliente === activeOrder.clientId);
+                if (c) currentClientType = c.tipo_cliente;
+            }
+
+            if (currentClientType === 'Distribuidor' && Number(originalProduct.distribuidor) > 0) {
+                newPrice = originalProduct.distribuidor;
+            } else if (currentClientType === 'Taller' && Number(originalProduct.taller) > 0) {
+                newPrice = originalProduct.taller;
+            } else if (Number(originalProduct.mayorista) > 0) {
+                newPrice = originalProduct.mayorista;
+            } else if (Number(originalProduct.mayoreo) > 0) {
+                newPrice = originalProduct.mayoreo;
+            } else {
+                newPrice = originalProduct.precio_venta || originalProduct.precio || 0;
+            }
             newIsWholesale = true;
         }
 

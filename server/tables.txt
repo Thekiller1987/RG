@@ -1,0 +1,71 @@
+[
+  {
+    "Tables_in_multirepuestosrg": "active_carts"
+  },
+  {
+    "Tables_in_multirepuestosrg": "business_config"
+  },
+  {
+    "Tables_in_multirepuestosrg": "categorias"
+  },
+  {
+    "Tables_in_multirepuestosrg": "cierres_caja"
+  },
+  {
+    "Tables_in_multirepuestosrg": "clientes"
+  },
+  {
+    "Tables_in_multirepuestosrg": "creditos_cliente"
+  },
+  {
+    "Tables_in_multirepuestosrg": "detalle_pedidos"
+  },
+  {
+    "Tables_in_multirepuestosrg": "detalle_ventas"
+  },
+  {
+    "Tables_in_multirepuestosrg": "egresos"
+  },
+  {
+    "Tables_in_multirepuestosrg": "facturas_proveedores"
+  },
+  {
+    "Tables_in_multirepuestosrg": "ingresos"
+  },
+  {
+    "Tables_in_multirepuestosrg": "inventory_outflows"
+  },
+  {
+    "Tables_in_multirepuestosrg": "movimientos_inventario"
+  },
+  {
+    "Tables_in_multirepuestosrg": "pedidos"
+  },
+  {
+    "Tables_in_multirepuestosrg": "productos"
+  },
+  {
+    "Tables_in_multirepuestosrg": "promociones_mayorista"
+  },
+  {
+    "Tables_in_multirepuestosrg": "proveedores"
+  },
+  {
+    "Tables_in_multirepuestosrg": "solicitudes"
+  },
+  {
+    "Tables_in_multirepuestosrg": "ticket_items"
+  },
+  {
+    "Tables_in_multirepuestosrg": "tickets"
+  },
+  {
+    "Tables_in_multirepuestosrg": "usuarios"
+  },
+  {
+    "Tables_in_multirepuestosrg": "ventas"
+  },
+  {
+    "Tables_in_multirepuestosrg": "ventas_from_tickets"
+  }
+]

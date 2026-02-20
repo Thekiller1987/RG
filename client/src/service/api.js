@@ -103,8 +103,11 @@ export const fetchProducts = async (token) => {
         descripcion: p.descripcion || '',
         categoria: p.nombre_categoria || '',
         costo: Number(p.costo || 0),
-        mayorista: Number(p.mayoreo || p.mayorista || 0),
-        venta: Number(p.venta ?? p.precio ?? p.price ?? 0), // <--- AGREGADO: Para compatibilidad con InventoryManagement
+        mayoreo: Number(p.mayoreo || 0),
+        distribuidor: Number(p.distribuidor || 0),
+        taller: Number(p.taller || 0),
+        mayorista: Number(p.mayorista || 0),
+        venta: Number(p.venta ?? p.precio ?? p.price ?? 0),
         raw: p,
     }));
 };
