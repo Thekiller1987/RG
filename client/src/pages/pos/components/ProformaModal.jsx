@@ -122,6 +122,7 @@ const TicketLogo = styled.img`
 
 const Tag = styled.span`
   display: inline-flex; align-items: center; gap: 6px; font-weight: 700; letter-spacing: .4px; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; background: #e8f4ff; color: #0b72b9; border: 1px solid #b9defc;
+  text-transform: uppercase;
 `;
 
 const HeaderBar = styled.div`
@@ -229,7 +230,7 @@ const ProformaModal = ({
       <GlobalPrintStyle />
       <ModalContent className="no-print" style={{ maxWidth: 520, width: '96%', padding: '1.2rem', background: '#fff' }}>
         <HeaderBar>
-          <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}><FaReceipt /> Vista Proforma</h2>
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}><FaReceipt /> Vista Cotización / Proforma</h2>
           <div style={{ display: 'flex', gap: 8 }}>
             <Button onClick={() => doPrint('80')}>Ticket 80mm</Button>
             <Button onClick={() => doPrint('A4')}><FaFileInvoice /> A4</Button>
@@ -252,7 +253,7 @@ const ProformaModal = ({
                 <small>Tel: {companyInfo.phone}</small>
                 <small>{companyInfo.address}</small>
                 <div style={{ marginTop: 8 }}>
-                  <Tag><FaFileInvoice /> PROFORMA</Tag>
+                  <Tag><FaFileInvoice /> COTIZACIÓN / PROFORMA</Tag>
                 </div>
               </div>
             </div>

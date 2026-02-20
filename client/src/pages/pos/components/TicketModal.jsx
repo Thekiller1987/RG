@@ -218,6 +218,7 @@ const Tag = styled.span`
   ${({ $type }) => $type === 'abono' && css`background: #fff3cd; color: #856404; border: 2px solid #856404;`}
   ${({ $type }) => $type === 'venta' && css`background: #e8f7ee; color: #1c7d3a; border: 2px solid #1c7d3a;`}
   ${({ $type }) => $type === 'outflow' && css`background: #fee2e2; color: #991b1b; border: 2px solid #991b1b;`}
+  ${({ $type }) => $type === 'pro' && css`background: #f3e8ff; color: #8b5cf6; border: 2px solid #8b5cf6;`}
 `;
 
 const HeaderBar = styled.div`
@@ -588,7 +589,7 @@ const TicketModal = ({
                 <small><strong>Tel:</strong> {companyInfo.phone}</small>
                 <small>{companyInfo.address}</small>
                 <div style={{ marginTop: 8 }}>
-                  {isProforma ? <Tag $type="proforma" className="ticket-tag">PROFORMA</Tag> : isAbono ? <Tag $type="abono" className="ticket-tag">RECIBO</Tag> : isOutflow ? <Tag $type="outflow" className="ticket-tag">SALIDA</Tag> : <Tag $type="venta" className="ticket-tag">{isDevol ? 'DEVOLUCIÓN' : 'FACTURA'}</Tag>}
+                  {isProforma ? <Tag $type="proforma" className="ticket-tag">PROFORMA</Tag> : isAbono ? <Tag $type="abono" className="ticket-tag">RECIBO</Tag> : isOutflow ? <Tag $type="outflow" className="ticket-tag">SALIDA</Tag> : (tx.isProReceipt || tx.isWholesale) ? <Tag $type="pro" className="ticket-tag">RECIBO PRO</Tag> : <Tag $type="venta" className="ticket-tag">{isDevol ? 'DEVOLUCIÓN' : 'FACTURA'}</Tag>}
                 </div>
               </div>
             </div>

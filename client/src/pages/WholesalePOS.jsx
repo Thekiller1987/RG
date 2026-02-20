@@ -72,12 +72,12 @@ const WholesalePOS = () => {
 
     useEffect(() => {
         if (initialProducts) {
-            // FILTER: Show if any wholesale tier > 0
+            // STRICT FILTER: Show only if at least one wholesale tier > 0
             const validProducts = initialProducts.filter(p =>
+                Number(p.mayorista) > 0 ||
                 Number(p.mayoreo) > 0 ||
                 Number(p.distribuidor) > 0 ||
-                Number(p.taller) > 0 ||
-                Number(p.mayorista) > 0
+                Number(p.taller) > 0
             );
             setProductsState(validProducts);
         }
@@ -296,16 +296,16 @@ const WholesalePOS = () => {
         pagoDetalles.source = 'WholesalePOS';
 
         const saleData = {
-            totalVenta: total,
-            subtotal,
-            descuento: discountAmount,
+            ...pagoDetalles,
             items: payloadItems,
-            pagoDetalles,
-            userId: user?.id || user?.id_usuario,
-            clientId: Number(pagoDetalles.clienteId || 0),
+            vendedorId: currentUser?.id_usuario || currentUser?.id,
+            vendedorNombre: currentUser?.nombre_usuario || currentUser?.nombre,
             tasaDolarAlMomento: tasaDolar,
-            originalOrderId: currentOrder?.serverSaleId || null,
-            isWholesale: true
+            subtotal: subtotal,
+            descuento: discountAmount,
+            totalVenta: total,
+            isWholesale: true,
+            isProReceipt: true // MARK AS PRO RECEIPT FOR WHOLESALE
         };
 
         const isInstant = !pagoDetalles.shouldPrintNow;
@@ -683,10 +683,10 @@ const WholesalePOS = () => {
 
                         <S.Button
                             secondary
-                            style={{ width: '100%', marginTop: '1rem', padding: '10px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}
+                            style={{ width: '100%', marginTop: '1rem', padding: '10px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}
                             onClick={() => openModal('proformaName')}
                         >
-                            <FaFileInvoice /> Crear Proforma
+                            <FaFileInvoice /> Hacer Cotización / Proforma
                         </S.Button>
 
                         <S.Button
