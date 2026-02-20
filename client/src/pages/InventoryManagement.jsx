@@ -6,7 +6,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   FaPlus, FaBoxOpen, FaTags, FaTruck, FaTrash, FaEdit, FaArrowLeft, FaHistory, FaSpinner,
   FaSearch, FaTimes, FaPlusCircle, FaMinusCircle, FaExclamationTriangle,
-  FaBarcode, FaFont, FaImage, FaEye
+  FaBarcode, FaFont, FaImage, FaEye, FaLock
 } from 'react-icons/fa';
 
 /* ================================
