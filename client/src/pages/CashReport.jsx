@@ -1,6 +1,7 @@
 // client/src/pages/CashReport.jsx
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import styled, { keyframes, createGlobalStyle } from 'styled-components';
+import { calculateCajaStats } from '../service/cajaUtils';
 import axios from 'axios';
 import {
   FaCalendarAlt,
@@ -170,8 +171,8 @@ function calculateReportStats(session) {
     // 2. REVENUE IMPACT (Total Accounted)
     let totalAmount = Number(pd.totalVenta !== undefined ? pd.totalVenta : (tx.amount || 0));
 
-    // Corrección de signo para salidas/devoluciones
-    if (t === 'salida' || t.includes('devolucion')) {
+    // Corrección de signo para salidas/devoluciones/cancelaciones
+    if (t === 'salida' || t.includes('devolucion') || t.includes('cancelacion') || t.includes('anulacion')) {
       rawAmount = -Math.abs(rawAmount);
       totalAmount = -Math.abs(totalAmount);
     }
@@ -225,7 +226,7 @@ function calculateReportStats(session) {
     else if (t === 'salida') {
       netCordobas -= Math.abs(rawAmount);
     }
-    else if (t.includes('devolucion')) {
+    else if (t.includes('devolucion') || t.includes('cancelacion') || t.includes('anulacion')) {
       netCordobas += rawAmount; // already negative
     }
     else if (t === 'ajuste') {

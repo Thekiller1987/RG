@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { calculateCajaStats } from '../../../service/cajaUtils';
 import styled from 'styled-components';
 import { ModalOverlay, ModalContent, Button, SearchInput, TotalsRow } from '../POS.styles.jsx';
 import {
@@ -111,142 +112,25 @@ const CajaModal = ({
   const transactions = useMemo(() => Array.isArray(session?.transactions) ? session.transactions : [], [session]);
 
   // --------- Clasificación y totales (Cálculo corregido) ----------
+  const stats = useMemo(() => {
+    const initial = session?.initialAmount || 0;
+    const tasa = session?.tasaDolar || initialTasaDolar || 36.60;
+    return calculateCajaStats(transactions, initial, tasa);
+  }, [transactions, session, initialTasaDolar]);
+
   const {
+    cajaInicial, netCordobas, netDolares, efectivoEsperado, efectivoEsperadoCordobas, efectivoEsperadoDolares,
+    totalVentasDia, totalTarjeta, totalTransferencia, totalCredito, totalNoEfectivo,
+    sumDevolucionesCancelaciones, totalHidden, tasaRef,
+    lists: { ventasContado, devoluciones, cancelaciones, entradas, salidas, abonos }
+  } = stats;
+
+  return {
     cajaInicial, netCordobas, netDolares, efectivoEsperado, efectivoEsperadoCordobas, efectivoEsperadoDolares,
     ventasContado, devoluciones, cancelaciones, entradas, salidas, abonos,
     totalTarjeta, totalTransferencia, totalCredito, totalNoEfectivo,
     sumDevolucionesCancelaciones, totalVentasDia, tasaRef, totalHidden
-  } = useMemo(() => {
-    const cajaInicialN = Number(session?.initialAmount || 0);
-    const tasaRef = Number(session?.tasaDolar || initialTasaDolar || 36.60);
-
-    const cls = { ventasContado: [], devoluciones: [], cancelaciones: [], entradas: [], salidas: [], abonos: [] };
-    let netCordobas = 0, netDolares = 0, tTarjeta = 0, tTransf = 0, tCredito = 0, tVentasDia = 0, sumDevsCancels = 0;
-    let totalHidden = 0; // Track hidden adjustments
-
-    for (const tx of transactions) {
-      const t = (tx?.type || '').toLowerCase();
-      let pd = tx?.pagoDetalles || {};
-      if (typeof pd === 'string') { try { pd = JSON.parse(pd); } catch { pd = {}; } }
-      if (!pd || typeof pd !== 'object') pd = {};
-
-      // 1. CASH IMPACT (Physical Box)
-      // ingresoCaja is the authority on physical money added. If undefined, fallback to tx.amount
-      let rawAmount = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
-
-      // 2. TOTAL REVENUE IMPACT (Accounting)
-      // totalVenta is the authority on total transaction value. If undefined, fallback to tx.amount.
-      let totalAmount = Number(pd.totalVenta !== undefined ? pd.totalVenta : (tx.amount || 0));
-
-      if (t === 'salida' || t.includes('devolucion')) {
-        rawAmount = -Math.abs(rawAmount); // Physical money leaves
-        totalAmount = -Math.abs(totalAmount); // Revenue reversal
-      }
-
-      const montoBase = rawAmount; // Legacy name for Cash Impact
-      const normalizedTx = { ...tx, pagoDetalles: pd, displayAmount: totalAmount };
-
-      // Resolve Client Name for Abonos!
-      if (t.includes('abono')) {
-        const cName = resolveClientName(normalizedTx, clients);
-        if (cName) normalizedTx.resolvedClientName = cName;
-      }
-
-      const txTarjeta = Number(pd.tarjeta || 0);
-      const txTransf = Number(pd.transferencia || 0);
-      const txCredito = Number(pd.credito || 0);
-
-      // --- ACUMULAR NO EFECTIVO (From ANY transaction type that supports it) ---
-      if (t.startsWith('venta') || t.includes('abono') || t.includes('pedido')) {
-        tTarjeta += txTarjeta;
-        tTransf += txTransf;
-        tCredito += txCredito;
-      } else if (t === 'ajuste') {
-        // Ajustes also might have non-cash components
-        if (pd.target === 'tarjeta') tTarjeta += Number(tx.amount || 0);
-        if (pd.target === 'credito') tCredito += Number(tx.amount || 0);
-        if (pd.target === 'transferencia') tTransf += Number(tx.amount || 0);
-      }
-
-      // --- ACUMULAR EFECTIVO FÍSICO (Caja) ---
-      if (t.startsWith('venta') || t === 'venta_contado' || t === 'venta_mixta' || t === 'venta_credito') {
-        if (pd.efectivo !== undefined || pd.dolares !== undefined) {
-          netCordobas += (Number(pd.efectivo || 0) - Number(pd.cambio || 0));
-          netDolares += Number(pd.dolares || 0);
-        } else {
-          // Legacy: if no breakdown, assume rawAmount is net cash
-          netCordobas += (montoBase - txTarjeta - txTransf - txCredito);
-        }
-      } else if (t.includes('abono')) {
-        if (pd.dolares !== undefined) {
-          netDolares += Number(pd.dolares || 0);
-          netCordobas += Number(pd.efectivo || 0);
-        } else {
-          // For Abonos, montoBase (based on ingresoCaja) is the net cash
-          netCordobas += montoBase;
-        }
-      } else if (t === 'entrada') {
-        netCordobas += Math.abs(montoBase);
-      }
-      else if (t === 'salida') {
-        netCordobas -= Math.abs(montoBase);
-      }
-      else if (t.includes('devolucion')) {
-        netCordobas += montoBase; // montoBase is negative
-      }
-      else if (t === 'ajuste') {
-        if (pd.target === 'efectivo') {
-          netCordobas += montoBase;
-          if (pd.hidden) totalHidden += montoBase;
-        }
-        if (pd.target === 'dolares') {
-          netDolares += montoBase; // Add to Net Dollars
-          // We don't track hidden dollars separately yet for "Other Income" derived calc, 
-          // but sticking to C$ for squares is usually enough. 
-        }
-      }
-      else {
-        // Fallback
-        netCordobas += montoBase - txTarjeta - txTransf;
-      }
-
-      // --- TOTAL VENTAS / INGRESOS DEL DIA (Revenue) ---
-      if (t.startsWith('venta') || t.includes('abono') || t === 'entrada') {
-        tVentasDia += Math.abs(totalAmount);
-      }
-      else if (t.includes('devolucion') || t.includes('cancelacion')) {
-        tVentasDia -= Math.abs(totalAmount); // ★ RESTAR devoluciones y cancelaciones del total
-      }
-      else if (t === 'ajuste') {
-        tVentasDia += totalAmount;
-      }
-
-      // Clasificar Listas
-      if (t.startsWith('venta')) cls.ventasContado.push(normalizedTx);
-      else if (t.includes('devolucion')) { cls.devoluciones.push(normalizedTx); sumDevsCancels += Math.abs(totalAmount); }
-      else if (t.includes('cancelacion')) { cls.cancelaciones.push(normalizedTx); sumDevsCancels += Math.abs(totalAmount); }
-      else if (t === 'entrada') cls.entradas.push(normalizedTx);
-      else if (t === 'salida') cls.salidas.push(normalizedTx);
-      else if (t.includes('abono')) cls.abonos.push(normalizedTx);
-    }
-
-    // Calcular Esperado
-    // Formula: CajaInicial + (VentasTotales - NoEfectivo - Salidas) -> Simplificado: CajaInicial + NetCordobasFisicosCalculados
-    // We already calculated netCordobas strictly based on physical cash movement.
-    const efectivoEsperadoCalc = cajaInicialN + netCordobas + (netDolares * tasaRef);
-
-    return {
-      cajaInicial: cajaInicialN,
-      netCordobas, netDolares,
-      efectivoEsperado: efectivoEsperadoCalc,
-      efectivoEsperadoCordobas: cajaInicialN + netCordobas,
-      efectivoEsperadoDolares: netDolares,
-      ventasContado: cls.ventasContado, devoluciones: cls.devoluciones, cancelaciones: cls.cancelaciones, entradas: cls.entradas, salidas: cls.salidas, abonos: cls.abonos,
-      totalTarjeta: tTarjeta, totalTransferencia: tTransf, totalCredito: tCredito, totalNoEfectivo: tTarjeta + tTransf + tCredito,
-      sumDevolucionesCancelaciones: sumDevsCancels, totalVentasDia: tVentasDia, tasaRef,
-      totalHidden
-    };
-  }, [transactions, session, initialTasaDolar, clients]);
+  };
 
   const diferencia = (Number(montoContado || 0) - efectivoEsperado);
   const openedAt = session?.openedAt ? new Date(session.openedAt) : null;

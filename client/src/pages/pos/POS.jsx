@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { calculateCajaStats } from '../../service/cajaUtils';
 import {
   FaArrowLeft, FaShoppingCart, FaPlus, FaMinus, FaTrashAlt, FaLock,
   FaHistory, FaSync, FaKeyboard, FaTimes,
@@ -56,52 +57,14 @@ const POS = () => {
 
   // Calculate Current Stats for Secret Modal
   const currentStats = useMemo(() => {
-    if (!cajaSession?.transactions) return { netCordobas: 0, netDolares: 0 };
-    let netC = 0, netD = 0;
-    const txs = cajaSession.transactions;
-    const initial = Number(cajaSession.initialAmount || 0);
-
-    // Start with initial? Actually expected usually includes initial. 
-    // The user wants to match "What is inside the box". The box includes Initial + Sales.
-    // So yes, include initial.
-    netC += initial;
-
-    for (const tx of txs) {
-      const t = (tx.type || '').toLowerCase();
-      let pd = tx.pagoDetalles || {};
-      if (typeof pd === 'string') { try { pd = JSON.parse(pd); } catch { pd = {}; } }
-
-      let rawAmount = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
-      if (t === 'salida' || t.includes('devolucion')) rawAmount = -Math.abs(rawAmount);
-
-      // Same logic as CajaModal for CASH
-      if (t.startsWith('venta')) {
-        if (pd.efectivo !== undefined || pd.dolares !== undefined) {
-          netC += (Number(pd.efectivo || 0) - Number(pd.cambio || 0));
-          netD += Number(pd.dolares || 0);
-        } else {
-          netC += (rawAmount - Number(pd.tarjeta || 0) - Number(pd.transferencia || 0) - Number(pd.credito || 0));
-        }
-      } else if (t.includes('abono')) {
-        if (pd.dolares !== undefined) {
-          netD += Number(pd.dolares || 0);
-          netC += Number(pd.efectivo || 0);
-        } else {
-          netC += rawAmount;
-        }
-      } else if (t === 'entrada') {
-        netC += Math.abs(rawAmount);
-      } else if (t === 'salida') {
-        netC -= Math.abs(rawAmount);
-      } else if (t === 'ajuste') {
-        if (pd.target === 'efectivo') netC += Number(tx.amount || 0);
-        if (pd.target === 'dolares') netD += Number(tx.amount || 0);
-      } else {
-        netC += rawAmount;
-      }
-    }
-    return { netCordobas: netC, netDolares: netD };
-  }, [cajaSession]);
+    const stats = calculateCajaStats(cajaSession?.transactions, cajaSession?.initialAmount, tasaDolar);
+    return {
+      ...stats,
+      // Map names to match what SecretAdjustModal expects (legacy compatible)
+      netCordobas: stats.efectivoEsperadoCordobas,
+      netDolares: stats.efectivoEsperadoDolares
+    };
+  }, [cajaSession, tasaDolar]);
   const playBeep = useCallback(() => {
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
