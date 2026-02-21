@@ -56,6 +56,9 @@ const WholesalePOS = () => {
     const [alert, setAlert] = useState({ isOpen: false, title: '', message: '' });
     const [confirmation, setConfirmation] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
     const [secretModalOpen, setSecretModalOpen] = useState(false);
+    const [clientSearchOpen, setClientSearchOpen] = useState(false);
+    const [abonoModalOpen, setAbonoModalOpen] = useState(false);
+    const [abonoClient, setAbonoClient] = useState(null);
 
 
     // Promociones

@@ -45,15 +45,21 @@ const fmtMoney = (n) => `C$${Number(n || 0).toFixed(2)}`;
 // Formato dd/mm/yyyy hh:mm AM/PM (Managua)
 const fmtDT = (iso) => {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('es-NI', {
-    timeZone: 'America/Managua',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true
-  });
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleString('es-NI', {
+      timeZone: 'America/Managua',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  } catch (e) {
+    return '—';
+  }
 };
 
 function initialsFromName(name) {
@@ -929,7 +935,7 @@ const CashReport = () => {
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <strong style={{ fontSize: '1.1rem' }}>{resolveName(session.abierta_por)}</strong>
                 <span style={{ fontSize: '0.85rem', color: '#15803d' }}>
-                  Abierta: {new Date(session.hora_apertura).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  Abierta: {fmtDT(session.hora_apertura || session.openedAt)}
                 </span>
               </div>
               <Badge isOpen>Abierta</Badge>

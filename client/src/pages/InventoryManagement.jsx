@@ -976,6 +976,16 @@ const InventoryManagement = () => {
 
     let matched = allProducts;
 
+    // APLICAR FILTRO ESTRICTO SI ES VISTA MAYORISTA / CATALOGO
+    if (isWholesaleView) {
+      matched = matched.filter(p =>
+        Number(p.mayoreo || 0) > 0 ||
+        Number(p.distribuidor || 0) > 0 ||
+        Number(p.taller || 0) > 0 ||
+        Number(p.mayorista || 0) > 0
+      );
+    }
+
     if (cat) matched = matched.filter(p => String(p.id_categoria) === cat);
     if (prov) matched = matched.filter(p => String(p.id_proveedor) === prov);
 
