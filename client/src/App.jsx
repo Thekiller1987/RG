@@ -28,6 +28,7 @@ const SettingsPage = React.lazy(() => import('./pages/SettingsPage.jsx'));
 const WholesalePOS = React.lazy(() => import('./pages/WholesalePOS.jsx'));
 const WholesalePromotions = React.lazy(() => import('./pages/WholesalePromotions.jsx'));
 const WholesaleMenu = React.lazy(() => import('./pages/WholesaleMenu.jsx'));
+const WholesaleCatalog = React.lazy(() => import('./pages/WholesaleCatalog.jsx'));
 
 // Simple fallback component
 const Loading = () => (
@@ -108,6 +109,15 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR]}>
                 <motion.div {...pageTransition}><WholesalePOS /></motion.div>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/wholesale-catalog"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.INVENTARIO]}>
+                <motion.div {...pageTransition}><WholesaleCatalog /></motion.div>
               </ProtectedRoute>
             }
           />
