@@ -428,7 +428,14 @@ const TicketModal = ({
   const saldoAnterior = nuevoSaldo + abonoMonto;
   const compact = items.length <= 2;
 
-  // ====== Uso de Configuración Dinámica ======
+  const logoUrl = useMemo(() => {
+    if (!settings?.empresa_logo_url) return null;
+    if (settings.empresa_logo_url.startsWith('http')) return settings.empresa_logo_url;
+    // Get base URL (remove /api if present)
+    const base = (import.meta.env.VITE_API_URL || 'https://multirepuestosrg.com/api').replace(/\/api$/, '');
+    return `${base}${settings.empresa_logo_url.startsWith('/') ? '' : '/'}${settings.empresa_logo_url}`;
+  }, [settings?.empresa_logo_url]);
+
   const companyInfo = {
     name: settings?.empresa_nombre || 'Multirepuestos RG',
     ruc: settings?.empresa_ruc || '1211812770001E',
