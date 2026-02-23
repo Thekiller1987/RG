@@ -11,7 +11,7 @@ const createProduct = async (req, res) => {
   const {
     codigo, nombre, costo, venta, existencia,
     minimo, maximo, id_categoria, id_proveedor,
-    tipo_venta, mayoreo, distribuidor, taller, mayorista, imagen, descripcion
+    tipo_venta, mayoreo, distribuidor, taller, mayorista, imagen, descripcion, catalogo_mayorista
   } = req.body;
 
   console.log('CREATE PRODUCT REQUEST:', { codigo, nombre, imagenLength: imagen ? imagen.length : 'NULL' });
@@ -37,7 +37,7 @@ const createProduct = async (req, res) => {
     const productData = {
       codigo, nombre, costo, venta, existencia,
       minimo, maximo, id_categoria, id_proveedor,
-      tipo_venta, mayoreo, distribuidor, taller, mayorista, imagen, descripcion
+      tipo_venta, mayoreo, distribuidor, taller, mayorista, imagen, descripcion, catalogo_mayorista
     };
 
     const [result] = await connection.query('INSERT INTO productos SET ?', [productData]);
@@ -183,7 +183,7 @@ const updateProduct = async (req, res) => {
   const {
     codigo, nombre, costo, venta,
     minimo, maximo, id_categoria, id_proveedor,
-    tipo_venta, mayoreo, distribuidor, taller, mayorista, descripcion, imagen // Se añade 'descripcion' e 'imagen'
+    tipo_venta, mayoreo, distribuidor, taller, mayorista, descripcion, imagen, catalogo_mayorista // Se añade 'catalogo_mayorista'
   } = req.body;
 
   console.log('UPDATE PRODUCT REQUEST:', { id, codigo, nombre, imagenLength: imagen ? imagen.length : 'NULL' });
@@ -219,7 +219,7 @@ const updateProduct = async (req, res) => {
     const productData = {
       codigo, nombre, costo, venta,
       minimo, maximo, id_categoria, id_proveedor,
-      tipo_venta, mayoreo, distribuidor, taller, mayorista, descripcion, imagen
+      tipo_venta, mayoreo, distribuidor, taller, mayorista, descripcion, imagen, catalogo_mayorista
     };
 
     // Actualiza el producto en la base de datos

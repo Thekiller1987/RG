@@ -605,14 +605,15 @@ const InventoryHistoryModal = ({ onClose }) => {
 const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, allProductsRaw, isWholesaleView }) => {
   const [formData, setFormData] = useState({
     codigo: '', nombre: '', costo: '', venta: '', mayoreo: '', distribuidor: '', taller: '', mayorista: '', id_categoria: '',
-    existencia: '', minimo: '', maximo: '', tipo_venta: 'Unidad', id_proveedor: '', descripcion: '', imagen: null
+    existencia: '', minimo: '', maximo: '', tipo_venta: 'Unidad', id_proveedor: '', descripcion: '', imagen: null, catalogo_mayorista: 0
   });
   const [profitPercentage, setProfitPercentage] = useState('');
   const [modalError, setModalError] = useState('');
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    const next = { ...formData, [name]: value };
+    const { name, value, type, checked } = e.target;
+    const val = type === 'checkbox' ? (checked ? 1 : 0) : value;
+    const next = { ...formData, [name]: val };
     if (name === 'costo' || name === 'venta') {
       const cost = parseFloat(next.costo);
       const price = parseFloat(next.venta);
@@ -669,7 +670,8 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
       taller: f.taller || null,
       mayorista: f.mayorista || null,
       minimo: f.minimo || null, maximo: f.maximo || null,
-      id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null
+      id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null,
+      catalogo_mayorista: f.catalogo_mayorista ?? 0
     });
   };
 
@@ -692,10 +694,18 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
               <FormGroup><Label>Costo (C$)</Label><Input type="number" step="0.01" name="costo" value={formData.costo} onChange={handleInputChange} required /></FormGroup>
               {!isWholesaleView && <FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup>}
               <FormGroup><Label>Precio Tienda (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta} onChange={handleInputChange} required /></FormGroup>
-              <FormGroup><Label>Nivel 1 (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} /></FormGroup>
-              <FormGroup><Label>Nivel 2 (C$)</Label><Input type="number" step="0.01" name="distribuidor" value={formData.distribuidor} onChange={handleInputChange} /></FormGroup>
-              <FormGroup><Label>Nivel 3 (C$)</Label><Input type="number" step="0.01" name="taller" value={formData.taller} onChange={handleInputChange} /></FormGroup>
-              <FormGroup><Label>Especial Mayorista (C$)</Label><Input type="number" step="0.01" name="mayorista" value={formData.mayorista} onChange={handleInputChange} /></FormGroup>
+              {isWholesaleView && (
+                <>
+                  <FormGroup><Label>Mayoreo (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} /></FormGroup>
+                  <FormGroup><Label>Distribuidor (C$)</Label><Input type="number" step="0.01" name="distribuidor" value={formData.distribuidor} onChange={handleInputChange} /></FormGroup>
+                  <FormGroup><Label>Taller (C$)</Label><Input type="number" step="0.01" name="taller" value={formData.taller} onChange={handleInputChange} /></FormGroup>
+                  <FormGroup><Label>Mayorista (C$)</Label><Input type="number" step="0.01" name="mayorista" value={formData.mayorista} onChange={handleInputChange} /></FormGroup>
+                  <FormGroup style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', background: '#f0f9ff', padding: '10px', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                    <input type="checkbox" name="catalogo_mayorista" id="catalogo_mayorista" checked={!!formData.catalogo_mayorista} onChange={handleInputChange} style={{ width: '20px', height: '20px', cursor: 'pointer' }} />
+                    <Label htmlFor="catalogo_mayorista" style={{ cursor: 'pointer', marginBottom: 0, color: '#0369a1' }}>Mostrar en Catálogo Mayorista</Label>
+                  </FormGroup>
+                </>
+              )}
               {!isWholesaleView && (
                 <>
                   <FormGroup><Label>Existencia Inicial</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="existencia" value={formData.existencia} onChange={handleInputChange} required /></FormGroup>
@@ -730,17 +740,24 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
   useEffect(() => {
     if (productToEdit) {
       setFormData({
-        ...productToEdit,
+        id_producto: productToEdit.id_producto,
+        codigo: productToEdit.codigo ?? '',
+        nombre: productToEdit.nombre ?? '',
+        costo: productToEdit.costo ?? '',
+        venta: productToEdit.venta ?? '',
         mayoreo: productToEdit.mayoreo ?? '',
         distribuidor: productToEdit.distribuidor ?? '',
         taller: productToEdit.taller ?? '',
         mayorista: productToEdit.mayorista ?? '',
+        existencia: productToEdit.existencia ?? 0,
         minimo: productToEdit.minimo ?? '',
         maximo: productToEdit.maximo ?? '',
+        tipo_venta: productToEdit.tipo_venta ?? 'Unidad',
         id_categoria: productToEdit.id_categoria ?? '',
         id_proveedor: productToEdit.id_proveedor ?? '',
         descripcion: productToEdit.descripcion ?? '',
-        imagen: productToEdit.imagen ?? null
+        imagen: productToEdit.imagen ?? null,
+        catalogo_mayorista: productToEdit.catalogo_mayorista ?? 0
       });
       const cost = parseFloat(productToEdit.costo);
       const price = parseFloat(productToEdit.venta);
@@ -750,9 +767,10 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
   }, [productToEdit]);
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     if (name === 'existencia') return;
-    const next = { ...formData, [name]: value };
+    const val = type === 'checkbox' ? (checked ? 1 : 0) : value;
+    const next = { ...formData, [name]: val };
     if (name === 'costo' || name === 'venta') {
       const cost = parseFloat(next.costo);
       const price = parseFloat(next.venta);
@@ -796,7 +814,8 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
       minimo: f.minimo || null,
       maximo: f.maximo || null,
       id_categoria: f.id_categoria || null,
-      id_proveedor: f.id_proveedor || null
+      id_proveedor: f.id_proveedor || null,
+      catalogo_mayorista: f.catalogo_mayorista ?? 0
     };
     onSave(payload, productToEdit.id_producto);
   };
@@ -820,10 +839,18 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
               <FormGroup><Label>Costo (C$)</Label><Input type="number" step="0.01" name="costo" value={formData.costo} onChange={handleInputChange} required readOnly={isWholesaleView} style={isWholesaleView ? { background: '#f8fafc', color: '#64748b' } : {}} /></FormGroup>
               {!isWholesaleView && <FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup>}
               <FormGroup><Label>Precio Tienda (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta} onChange={handleInputChange} required readOnly={isWholesaleView} style={isWholesaleView ? { background: '#f8fafc', color: '#64748b' } : {}} /></FormGroup>
-              <FormGroup><Label>Nivel 1 (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} readOnly={isWholesaleView} style={isWholesaleView ? { background: '#f8fafc', color: '#64748b' } : {}} /></FormGroup>
-              <FormGroup><Label>Nivel 2 (C$)</Label><Input type="number" step="0.01" name="distribuidor" value={formData.distribuidor} onChange={handleInputChange} style={isWholesaleView ? { border: '2px solid #0891b2' } : {}} /></FormGroup>
-              <FormGroup><Label>Nivel 3 (C$)</Label><Input type="number" step="0.01" name="taller" value={formData.taller} onChange={handleInputChange} style={isWholesaleView ? { border: '2px solid #4f46e5' } : {}} /></FormGroup>
-              <FormGroup><Label>Especial Mayorista (C$)</Label><Input type="number" step="0.01" name="mayorista" value={formData.mayorista} onChange={handleInputChange} style={isWholesaleView ? { border: '2px solid #7c3aed' } : {}} /></FormGroup>
+              {isWholesaleView && (
+                <>
+                  <FormGroup><Label>Mayoreo (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} /></FormGroup>
+                  <FormGroup><Label>Distribuidor (C$)</Label><Input type="number" step="0.01" name="distribuidor" value={formData.distribuidor} onChange={handleInputChange} /></FormGroup>
+                  <FormGroup><Label>Taller (C$)</Label><Input type="number" step="0.01" name="taller" value={formData.taller} onChange={handleInputChange} /></FormGroup>
+                  <FormGroup><Label>Mayorista (C$)</Label><Input type="number" step="0.01" name="mayorista" value={formData.mayorista} onChange={handleInputChange} /></FormGroup>
+                  <FormGroup style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', background: '#f0f9ff', padding: '10px', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                    <input type="checkbox" name="catalogo_mayorista" id="edit_catalogo_mayorista" checked={!!formData.catalogo_mayorista} onChange={handleInputChange} style={{ width: '20px', height: '20px', cursor: 'pointer' }} />
+                    <Label htmlFor="edit_catalogo_mayorista" style={{ cursor: 'pointer', marginBottom: 0, color: '#0369a1' }}>Mostrar en Catálogo Mayorista</Label>
+                  </FormGroup>
+                </>
+              )}
 
               {!isWholesaleView && (
                 <>
@@ -978,12 +1005,7 @@ const InventoryManagement = () => {
 
     // APLICAR FILTRO ESTRICTO SI ES VISTA MAYORISTA / CATALOGO
     if (isWholesaleView) {
-      matched = matched.filter(p =>
-        Number(p.mayoreo || 0) > 0 ||
-        Number(p.distribuidor || 0) > 0 ||
-        Number(p.taller || 0) > 0 ||
-        Number(p.mayorista || 0) > 0
-      );
+      matched = matched.filter(p => !!p.catalogo_mayorista);
     }
 
     if (cat) matched = matched.filter(p => String(p.id_categoria) === cat);
@@ -1220,10 +1242,10 @@ const InventoryManagement = () => {
                 {isWholesaleView ? (
                   <>
                     <InfoTag style={{ minWidth: '100%', background: '#f1f5f9', borderColor: '#e2e8f0', color: '#475569' }}><FaLock style={{ marginRight: 6, fontSize: '0.7rem' }} /><span>Costo</span><strong>{p.__fmt.costo}</strong></InfoTag>
-                    <InfoTag style={{ minWidth: '100%', background: '#fffbeb', borderColor: '#fef3c7' }}><span style={{ color: '#b45309' }}>Nivel 1</span><strong>{p.__fmt.mayoreo}</strong></InfoTag>
-                    <InfoTag><span style={{ color: '#0891b2' }}>Nivel 2</span><strong>{p.__fmt.distribuidor}</strong></InfoTag>
-                    <InfoTag><span style={{ color: '#4f46e5' }}>Nivel 3</span><strong>{p.__fmt.taller}</strong></InfoTag>
-                    <InfoTag><span style={{ color: '#7c3aed' }}>Especial Mayorista</span><strong>{p.__fmt.mayorista}</strong></InfoTag>
+                    <InfoTag style={{ minWidth: '100%', background: '#fffbeb', borderColor: '#fef3c7' }}><span style={{ color: '#b45309' }}>Mayoreo</span><strong>{p.__fmt.mayoreo}</strong></InfoTag>
+                    <InfoTag><span style={{ color: '#0891b2' }}>Distribuidor</span><strong>{p.__fmt.distribuidor}</strong></InfoTag>
+                    <InfoTag><span style={{ color: '#4f46e5' }}>Taller</span><strong>{p.__fmt.taller}</strong></InfoTag>
+                    <InfoTag><span style={{ color: '#7c3aed' }}>Mayorista</span><strong>{p.__fmt.mayorista}</strong></InfoTag>
                   </>
                 ) : (
                   <>

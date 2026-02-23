@@ -642,15 +642,29 @@ const TicketModal = ({
             {/* TOTALS */}
             <div className="totals">
               <div className="totals-box">
-                <TotalsRow><span style={{ fontWeight: 700 }}>Subtotal:</span><span style={{ fontWeight: 700 }}>C${fmt(subtotal)}</span></TotalsRow>
-                {descuento > 0 && <TotalsRow style={{ color: '#dc3545' }}><span style={{ fontWeight: 700 }}>Descuento:</span><span style={{ fontWeight: 700 }}>- C${fmt(descuento)}</span></TotalsRow>}
-                <TotalsRow className="grand-total" $bold style={{ fontSize: '1.3em', borderTop: '2px solid #000', marginTop: 5, paddingTop: 5 }}>
-                  <span style={{ fontWeight: 900 }}>TOTAL:</span><span style={{ fontWeight: 900 }}>C${fmt(total)}</span>
-                </TotalsRow>
-                {!isProforma && (
+                {isAbono ? (
                   <>
-                    <TotalsRow style={{ marginTop: 10, fontSize: '0.9em' }}><span style={{ fontWeight: 700 }}>Pagado:</span><span style={{ fontWeight: 700 }}>C${fmt(pagado)}</span></TotalsRow>
-                    {cambio > 0 && <TotalsRow $bold style={{ color: '#dc3545', fontWeight: 900 }}><span>Cambio:</span><span>C${fmt(cambio)}</span></TotalsRow>}
+                    <TotalsRow style={{ marginTop: 5, fontSize: '0.95em' }}><span style={{ fontWeight: 700 }}>Saldo Anterior:</span><span style={{ fontWeight: 700 }}>C${fmt(saldoAnterior)}</span></TotalsRow>
+                    <TotalsRow className="grand-total" $bold style={{ fontSize: '1.3em', borderTop: '2px solid #000', marginTop: 5, paddingTop: 5, color: '#28a745' }}>
+                      <span style={{ fontWeight: 900 }}>ABONÓ:</span><span style={{ fontWeight: 900 }}>C${fmt(abonoMonto)}</span>
+                    </TotalsRow>
+                    <TotalsRow $bold style={{ fontSize: '1.1em', borderTop: '2px dashed #000', marginTop: 5, paddingTop: 5, color: nuevoSaldo > 0 ? '#dc3545' : '#28a745' }}>
+                      <span style={{ fontWeight: 900 }}>Saldo Pendiente:</span><span style={{ fontWeight: 900 }}>C${fmt(nuevoSaldo)}</span>
+                    </TotalsRow>
+                  </>
+                ) : (
+                  <>
+                    <TotalsRow><span style={{ fontWeight: 700 }}>Subtotal:</span><span style={{ fontWeight: 700 }}>C${fmt(subtotal)}</span></TotalsRow>
+                    {descuento > 0 && <TotalsRow style={{ color: '#dc3545' }}><span style={{ fontWeight: 700 }}>Descuento:</span><span style={{ fontWeight: 700 }}>- C${fmt(descuento)}</span></TotalsRow>}
+                    <TotalsRow className="grand-total" $bold style={{ fontSize: '1.3em', borderTop: '2px solid #000', marginTop: 5, paddingTop: 5 }}>
+                      <span style={{ fontWeight: 900 }}>TOTAL:</span><span style={{ fontWeight: 900 }}>C${fmt(total)}</span>
+                    </TotalsRow>
+                    {!isProforma && (
+                      <>
+                        <TotalsRow style={{ marginTop: 10, fontSize: '0.9em' }}><span style={{ fontWeight: 700 }}>Pagado:</span><span style={{ fontWeight: 700 }}>C${fmt(pagado)}</span></TotalsRow>
+                        {cambio > 0 && <TotalsRow $bold style={{ color: '#dc3545', fontWeight: 900 }}><span>Cambio:</span><span>C${fmt(cambio)}</span></TotalsRow>}
+                      </>
+                    )}
                   </>
                 )}
               </div>
