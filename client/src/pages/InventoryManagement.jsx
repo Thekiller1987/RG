@@ -374,6 +374,40 @@ const ImageViewModal = ({ isOpen, imageSrc, onClose }) => {
 
 const norm = (str) => String(str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
+const playSuccessSound = () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1046.50, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+  } catch (e) { }
+};
+
+const playErrorSound = () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.3);
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+  } catch (e) { }
+};
+
 const MAX_RESULTS_SEARCH = 10000; // Aumentado para permitir filtrar todo el inventario
 const ITEMS_PER_PAGE = 50;
 const LARGE_LIST_CUTOFF = 500;
@@ -686,7 +720,8 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
             {modalError && <ModalError>{modalError}</ModalError>}
 
             {/* Image Upload Section */}
-            {!isWholesaleView && <ImageUpload currentImage={formData.imagen} onImageChange={handleImageChange} />}
+            {/* Image Upload Section */}
+            <ImageUpload currentImage={formData.imagen} onImageChange={handleImageChange} />
 
             <InputGrid>
               <FormGroup><Label>Código</Label><Input name="codigo" value={formData.codigo} onChange={handleInputChange} required /></FormGroup>
@@ -694,9 +729,10 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
               <FormGroup><Label>Costo (C$)</Label><Input type="number" step="0.01" name="costo" value={formData.costo} onChange={handleInputChange} required /></FormGroup>
               {!isWholesaleView && <FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup>}
               <FormGroup><Label>Precio Tienda (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta} onChange={handleInputChange} required /></FormGroup>
+
+              <FormGroup><Label>Precio Mayoreo 1 (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} /></FormGroup>
               {isWholesaleView && (
                 <>
-                  <FormGroup><Label>Mayoreo (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} /></FormGroup>
                   <FormGroup><Label>Distribuidor (C$)</Label><Input type="number" step="0.01" name="distribuidor" value={formData.distribuidor} onChange={handleInputChange} /></FormGroup>
                   <FormGroup><Label>Taller (C$)</Label><Input type="number" step="0.01" name="taller" value={formData.taller} onChange={handleInputChange} /></FormGroup>
                   <FormGroup><Label>Mayorista (C$)</Label><Input type="number" step="0.01" name="mayorista" value={formData.mayorista} onChange={handleInputChange} /></FormGroup>
@@ -831,7 +867,8 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
             {modalError && <ModalError>{modalError}</ModalError>}
 
             {/* Image Upload Section */}
-            {!isWholesaleView && <ImageUpload currentImage={formData.imagen} onImageChange={handleImageChange} />}
+            {/* Image Upload Section */}
+            <ImageUpload currentImage={formData.imagen} onImageChange={handleImageChange} />
 
             <InputGrid>
               <FormGroup><Label>Código</Label><Input name="codigo" value={formData.codigo} onChange={handleInputChange} required readOnly={isWholesaleView} style={isWholesaleView ? { background: '#f8fafc', color: '#64748b' } : {}} /></FormGroup>
@@ -839,12 +876,15 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
               <FormGroup><Label>Costo (C$)</Label><Input type="number" step="0.01" name="costo" value={formData.costo} onChange={handleInputChange} required readOnly={isWholesaleView} style={isWholesaleView ? { background: '#f8fafc', color: '#64748b' } : {}} /></FormGroup>
               {!isWholesaleView && <FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup>}
               <FormGroup><Label>Precio Tienda (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta} onChange={handleInputChange} required readOnly={isWholesaleView} style={isWholesaleView ? { background: '#f8fafc', color: '#64748b' } : {}} /></FormGroup>
+
+              <FormGroup><Label>Precio Mayoreo 1 (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} /></FormGroup>
+
               {isWholesaleView && (
                 <>
-                  <FormGroup><Label>Mayoreo (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} /></FormGroup>
                   <FormGroup><Label>Distribuidor (C$)</Label><Input type="number" step="0.01" name="distribuidor" value={formData.distribuidor} onChange={handleInputChange} /></FormGroup>
                   <FormGroup><Label>Taller (C$)</Label><Input type="number" step="0.01" name="taller" value={formData.taller} onChange={handleInputChange} /></FormGroup>
                   <FormGroup><Label>Mayorista (C$)</Label><Input type="number" step="0.01" name="mayorista" value={formData.mayorista} onChange={handleInputChange} /></FormGroup>
+
                   <FormGroup style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', background: '#f0f9ff', padding: '10px', borderRadius: '8px', border: '1px solid #bae6fd' }}>
                     <input type="checkbox" name="catalogo_mayorista" id="edit_catalogo_mayorista" checked={!!formData.catalogo_mayorista} onChange={handleInputChange} style={{ width: '20px', height: '20px', cursor: 'pointer' }} />
                     <Label htmlFor="edit_catalogo_mayorista" style={{ cursor: 'pointer', marginBottom: 0, color: '#0369a1' }}>Mostrar en Catálogo Mayorista</Label>
@@ -1071,10 +1111,12 @@ const InventoryManagement = () => {
     try {
       await api.createProduct(payload, token);
       setIsCreateModalOpen(false);
+      playSuccessSound();
       showAlert({ title: 'Éxito', message: 'Producto creado correctamente.' });
       refreshProducts(); // Use AuthContext's refresh
     } catch (err) {
       console.error('CLIENT CREATE ERROR:', err);
+      playErrorSound();
       showAlert({ title: 'Error', message: err.message || 'Error al crear el producto.', type: 'error' });
     }
   };
@@ -1083,10 +1125,12 @@ const InventoryManagement = () => {
     try {
       await api.updateProduct(productId, payload, token);
       setIsEditModalOpen(false);
+      playSuccessSound();
       showAlert({ title: 'Éxito', message: 'Producto actualizado correctamente.' });
       refreshProducts(); // Use AuthContext's refresh
     } catch (err) {
       console.error('CLIENT UPDATE ERROR:', err);
+      playErrorSound();
       showAlert({ title: 'Error', message: err.message || 'Error al actualizar el producto.', type: 'error' });
     }
   };
@@ -1098,9 +1142,11 @@ const InventoryManagement = () => {
       refreshProducts();
       setIsDeleteModalOpen(false);
       setProductToDelete(null);
+      playSuccessSound();
       showAlert({ title: 'Éxito', message: `El producto ${productToDelete.nombre} fue eliminado.` });
     } catch (err) {
       const msg = err.message || 'No se pudo eliminar el producto.';
+      playErrorSound();
       showAlert({ title: 'Error', message: msg, type: 'error' });
       // Note: Re-enabling archive prompt logic if backend returns reasons in error message
       // (This would need more integration with the Error object if we want to keep it exactly as before)
@@ -1114,8 +1160,10 @@ const InventoryManagement = () => {
       setIsDeleteModalOpen(false);
       setProductToDelete(null);
       refreshProducts();
+      playSuccessSound();
       showAlert({ title: 'Archivado', message: `"${p.nombre}" fue archivado (inactivo).` });
     } catch (e) {
+      playErrorSound();
       showAlert({ title: 'Error', message: e.message || 'No se pudo archivar el producto.', type: 'error' });
     }
   };
@@ -1124,9 +1172,11 @@ const InventoryManagement = () => {
     try {
       await api.updateStock(product.id_producto, { cantidad, razon }, token);
       setAdjustmentModal({ isOpen: false, product: null });
+      playSuccessSound();
       showAlert({ title: 'Éxito', message: 'Stock actualizado correctamente.' });
       refreshProducts();
     } catch (error) {
+      playErrorSound();
       showAlert({ title: 'Error', message: error.message || 'No se pudo ajustar el stock.' });
     }
   };
