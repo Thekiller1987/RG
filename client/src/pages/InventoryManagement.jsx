@@ -705,7 +705,9 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
       mayorista: f.mayorista || null,
       minimo: f.minimo || null, maximo: f.maximo || null,
       id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null,
-      catalogo_mayorista: f.catalogo_mayorista ?? 0
+      catalogo_mayorista: f.catalogo_mayorista ?? 0,
+      descripcion: f.descripcion || '',
+      tipo_venta: f.tipo_venta || 'Unidad'
     });
   };
 
@@ -851,7 +853,9 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
       maximo: f.maximo || null,
       id_categoria: f.id_categoria || null,
       id_proveedor: f.id_proveedor || null,
-      catalogo_mayorista: f.catalogo_mayorista ?? 0
+      catalogo_mayorista: f.catalogo_mayorista ?? 0,
+      descripcion: f.descripcion || '',
+      tipo_venta: f.tipo_venta || 'Unidad'
     };
     onSave(payload, productToEdit.id_producto);
   };
