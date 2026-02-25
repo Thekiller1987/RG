@@ -10,261 +10,315 @@ import {
 } from 'react-icons/fa';
 
 /* ================================
-   STYLED COMPONENTS LOCALES
+   STYLED COMPONENTS — PREMIUM REDESIGN
 ================================ */
+const shimmer = keyframes`
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+`;
+
 const PageWrapper = styled.div`
-  padding: 20px;
-  background-color: #f8fafc; /* Color de fondo más limpio (Slate-50) */
+  padding: 24px 32px;
+  background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 50%, #eef2ff 100%);
   min-height: 100vh;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  
-  @media(max-width: 640px) {
-    padding: 10px;
-  }
+  @media(max-width: 768px) { padding: 12px; }
 `;
 
 const CenteredMessage = styled.div`
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  height: 60vh; opacity: 0.8; font-size: 1.1rem; color: #64748b;
+  height: 60vh; font-size: 1.1rem; color: #64748b;
   text-align: center;
 `;
 
 const Spinner = styled(FaSpinner)`
-  animation: ${keyframes`from {transform:rotate(0deg);} to {transform:rotate(360deg);}`} 0.8s linear infinite;
-  font-size: 2.5rem; margin-bottom: 1.5rem; color: #3b82f6;
+  animation: ${keyframes`from{transform:rotate(0deg);}to{transform:rotate(360deg);}`} 0.8s linear infinite;
+  font-size: 2.5rem; margin-bottom: 1.5rem; color: #6366f1;
 `;
 
 const BackButton = styled(Link)`
   display: inline-flex; align-items: center; gap: 8px;
-  color: #64748b; text-decoration: none; font-weight: 600; font-size: 0.95rem;
-  padding: 8px 12px; margin-bottom: 1rem; border-radius: 8px;
-  transition: all 0.2s;
-  &:hover { color: #3b82f6; background: #eff6ff; transform: translateX(-4px); }
+  color: #64748b; text-decoration: none; font-weight: 600; font-size: 0.9rem;
+  padding: 8px 14px; margin-bottom: 1rem; border-radius: 10px;
+  transition: all 0.25s;
+  &:hover { color: #6366f1; background: rgba(99,102,241,0.08); transform: translateX(-4px); }
 `;
 
 const HeaderContainer = styled.div`
   display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  padding: 1rem 1.5rem;
-  border-radius: 16px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  padding: 1.25rem 1.75rem;
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.06), 0 0 0 1px rgba(255,255,255,0.4);
   position: sticky; top: 10px; z-index: 40;
-  border: 1px solid rgba(255,255,255,0.5);
-
-  @media(min-width: 1024px) { 
-    flex-direction: row; justify-content: space-between; align-items: center; 
-  }
+  border: 1px solid rgba(255,255,255,0.6);
+  @media(min-width: 1024px) { flex-direction: row; justify-content: space-between; align-items: center; }
 `;
 
 const Title = styled.h1`
-  font-size: 1.5rem; color: #1e293b; display: flex; align-items: center; gap: 0.75rem; margin: 0; font-weight: 800;
-  svg { color: #3b82f6; }
+  font-size: 1.6rem; color: #0f172a; display: flex; align-items: center; gap: 0.75rem;
+  margin: 0; font-weight: 800; letter-spacing: -0.02em;
+  svg { color: #6366f1; filter: drop-shadow(0 2px 4px rgba(99,102,241,0.3)); }
 `;
 
 const ButtonGroup = styled.div`
-  display: flex; gap: 0.75rem; flex-wrap: wrap;
+  display: flex; gap: 0.6rem; flex-wrap: wrap;
 `;
 
 const Button = styled.button`
-  border: none;
-  padding: 0.65rem 1.2rem; 
-  border-radius: 99px; /* Pill shape */
-  font-weight: 600; font-size: 0.9rem;
-  cursor: pointer; display: flex; align-items: center; gap: 0.5rem; 
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-
-  /* Variantes de Color */
+  border: none; padding: 0.6rem 1.15rem; border-radius: 12px;
+  font-weight: 600; font-size: 0.85rem; cursor: pointer;
+  display: flex; align-items: center; gap: 0.45rem;
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
   ${p => p.primary && `
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white;
-    &:hover { box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); transform: translateY(-1px); }
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white;
+    box-shadow: 0 4px 14px rgba(99,102,241,0.35);
+    &:hover { box-shadow: 0 6px 20px rgba(99,102,241,0.45); transform: translateY(-2px); }
   `}
   ${p => p.secondary && `
-    background: white; color: #475569; border: 1px solid #cbd5e1;
-    &:hover { border-color: #94a3b8; background: #f8fafc; color: #1e293b; }
+    background: rgba(255,255,255,0.85); color: #475569; border: 1px solid #e2e8f0;
+    backdrop-filter: blur(4px);
+    &:hover { border-color: #6366f1; color: #6366f1; background: rgba(99,102,241,0.05); }
   `}
   ${p => p.tertiary && `
     background: transparent; color: #64748b; border: 1px dashed #cbd5e1;
-    &:hover { color: #3b82f6; border-color: #3b82f6; background: #eff6ff; }
+    &:hover { color: #6366f1; border-color: #6366f1; background: rgba(99,102,241,0.04); }
   `}
-  
-  &:active { transform: translateY(0); }
+  &:active { transform: translateY(0) scale(0.98); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
 `;
 
 const FilterContainer = styled.div`
-  display: flex; flex-direction: column; gap: 1rem; 
-  background: white; padding: 1.25rem; 
-  border-radius: 16px; 
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06); 
-  margin-bottom: 2rem;
-  border: 1px solid #e2e8f0;
-
-  @media(min-width: 1024px) { 
-    flex-direction: row; align-items: center; 
-  }
+  display: flex; flex-direction: column; gap: 0.75rem;
+  background: rgba(255,255,255,0.75); backdrop-filter: blur(12px);
+  padding: 1rem 1.25rem; border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  margin-bottom: 1.5rem; border: 1px solid rgba(226,232,240,0.8);
+  @media(min-width: 1024px) { flex-direction: row; align-items: center; }
 `;
 
 const SearchInputWrapper = styled.div`
-  position: relative; flex: 1; min-width: 250px;
+  position: relative; flex: 1; min-width: 220px;
 `;
 
 const SearchInput = styled.input`
-  width: 100%; padding: 0.75rem 1rem 0.75rem 2.8rem; 
-  border: 1px solid #cbd5e1; border-radius: 12px; 
-  font-size: 0.95rem; background-color: #f8fafc;
-  transition: all 0.2s; outline: none;
-
-  &:focus { 
-    border-color: #3b82f6; background: white; 
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); 
-  }
+  width: 100%; padding: 0.7rem 1rem 0.7rem 2.6rem;
+  border: 1.5px solid #e2e8f0; border-radius: 12px;
+  font-size: 0.9rem; background: rgba(248,250,252,0.9);
+  transition: all 0.25s; outline: none;
+  &:focus { border-color: #6366f1; background: white; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
 `;
 
 const FilterToggleButton = styled.button`
-  width: 42px; height: 42px; flex-shrink: 0;
+  width: 40px; height: 40px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  background: ${p => p.$active ? '#dbeafe' : '#f1f5f9'};
-  color: ${p => p.$active ? '#1d4ed8' : '#64748b'};
-  border: 1px solid ${p => p.$active ? '#bfdbfe' : 'transparent'};
+  background: ${p => p.$active ? 'rgba(99,102,241,0.1)' : '#f1f5f9'};
+  color: ${p => p.$active ? '#4f46e5' : '#64748b'};
+  border: 1.5px solid ${p => p.$active ? 'rgba(99,102,241,0.3)' : 'transparent'};
   border-radius: 10px; cursor: pointer; transition: all 0.2s;
-  &:hover { background: #e2e8f0; }
+  &:hover { background: rgba(99,102,241,0.08); color: #4f46e5; }
 `;
 
 const Select = styled.select`
-  padding: 0.7rem 1rem; border: 1px solid #cbd5e1; border-radius: 12px; 
-  background-color: #f8fafc; color: #334155; outline: none; flex: 1;
-  font-size: 0.9rem; cursor: pointer;
-  &:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); background: white; }
+  padding: 0.65rem 1rem; border: 1.5px solid #e2e8f0; border-radius: 12px;
+  background: rgba(248,250,252,0.9); color: #334155; outline: none; flex: 1;
+  font-size: 0.85rem; cursor: pointer;
+  &:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); background: white; }
 `;
 
+/* ===== DESKTOP TABLE VIEW ===== */
+const DesktopTableWrapper = styled.div`
+  display: none;
+  @media(min-width: 1024px) { display: block; }
+  background: rgba(255,255,255,0.8); backdrop-filter: blur(12px);
+  border-radius: 20px; overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+  border: 1px solid rgba(226,232,240,0.6);
+  margin-bottom: 2rem;
+`;
+
+const StyledTable = styled.table`
+  width: 100%; border-collapse: collapse;
+  th { padding: 14px 16px; text-align: left; font-size: 0.75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; color: #64748b;
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    border-bottom: 2px solid #e2e8f0; position: sticky; top: 0; z-index: 2;
+  }
+  td { padding: 12px 16px; font-size: 0.9rem; color: #334155; border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+  }
+  tbody tr { transition: all 0.2s; cursor: default; }
+  tbody tr:hover { background: rgba(99,102,241,0.03); }
+  tbody tr:last-child td { border-bottom: none; }
+`;
+
+const TableProductInfo = styled.div`
+  display: flex; align-items: center; gap: 12px;
+  .thumb { width: 44px; height: 44px; border-radius: 10px; object-fit: cover;
+    border: 1px solid #e2e8f0; flex-shrink: 0; background: #f8fafc;
+    cursor: pointer; transition: transform 0.2s;
+    &:hover { transform: scale(1.1); }
+  }
+  .thumb-placeholder { width: 44px; height: 44px; border-radius: 10px;
+    background: #f1f5f9; display: flex; align-items: center; justify-content: center;
+    color: #cbd5e1; font-size: 1.1rem; flex-shrink: 0;
+  }
+  .info { display: flex; flex-direction: column; min-width: 0; }
+  .name { font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; max-width: 260px; font-size: 0.9rem; }
+  .code { font-size: 0.75rem; color: #94a3b8; font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.04em; margin-top: 2px; }
+`;
+
+const StockBadge = styled.span`
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700;
+  min-width: 40px;
+  ${p => p.$out ? `background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;`
+    : p.$low ? `background: #fffbeb; color: #d97706; border: 1px solid #fde68a;`
+      : `background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0;`}
+`;
+
+const TableActions = styled.div`
+  display: flex; gap: 6px;
+  button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.2s; font-size: 0.8rem;
+  }
+  .act-adjust { background: #fafafa; border-color: #e2e8f0; color: #64748b;
+    &:hover { border-color: #6366f1; color: #6366f1; background: rgba(99,102,241,0.05); }
+  }
+  .act-edit { background: #f0f9ff; border-color: #bae6fd; color: #0284c7;
+    &:hover { background: #e0f2fe; color: #0369a1; }
+  }
+  .act-delete { background: #fef2f2; border-color: #fecaca; color: #ef4444;
+    &:hover { background: #fee2e2; color: #dc2626; }
+  }
+`;
+
+/* ===== MOBILE CARD VIEW ===== */
 const MobileCardGrid = styled.div`
-  display: grid; 
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); 
-  gap: 1.5rem;
-  padding-bottom: 40px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem; padding-bottom: 40px;
+  @media(min-width: 1024px) { display: none; }
 `;
 
 const ProductCard = styled(motion.div)`
-  background: white; border-radius: 16px; 
-  overflow: hidden; 
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  border: 1px solid #f1f5f9; 
-  display: flex; flex-direction: column; 
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  
-  &:hover { 
-    transform: translateY(-5px); 
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    border-color: #e2e8f0;
+  background: rgba(255,255,255,0.9); backdrop-filter: blur(8px);
+  border-radius: 18px; overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+  border: 1px solid rgba(226,232,240,0.7);
+  display: flex; flex-direction: column;
+  transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+  &:hover { transform: translateY(-4px);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.1);
+    border-color: rgba(99,102,241,0.2);
   }
-  
   .image-placeholder {
-    height: 180px; background: #f8fafc; 
-    display: flex; align-items: center; justify-content: center; 
-    position: relative; cursor: zoom-in; 
-    border-bottom: 1px solid #f1f5f9;
-    
+    height: 180px; background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+    display: flex; align-items: center; justify-content: center;
+    position: relative; cursor: zoom-in; border-bottom: 1px solid #f1f5f9; overflow: hidden;
     img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s; }
-    &:hover img { transform: scale(1.05); }
-    
-    .no-image-text { color: #cbd5e1; font-size: 3rem; }
-    .overlay { 
-      position: absolute; inset: 0; 
-      background: rgba(0,0,0,0.2); 
-      display: flex; align-items: center; justify-content: center; 
-      opacity: 0; transition: opacity 0.2s; 
-      color: white; font-size: 1.5rem; backdrop-filter: blur(2px);
-    }
+    &:hover img { transform: scale(1.08); }
+    .no-image-text { color: #c7d2fe; font-size: 3rem; }
+    .overlay { position: absolute; inset: 0; background: rgba(15,23,42,0.25);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity 0.25s; color: white; font-size: 1.5rem;
+      backdrop-filter: blur(2px); }
     &:hover .overlay { opacity: 1; }
   }
 `;
 
-const CardHeader = styled.div` padding: 1.25rem 1rem 0.5rem; `;
-const CardTitle = styled.h3` font-size: 1.15rem; margin: 0; color: #0f172a; font-weight: 700; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; `;
-const CardCode = styled.div` font-size: 0.85rem; color: #64748b; font-family: monospace; letter-spacing: 0.05em; margin-top: 4px; `;
+const CardHeader = styled.div` padding: 1rem 1rem 0.4rem; `;
+const CardTitle = styled.h3` font-size: 1.05rem; margin: 0; color: #0f172a; font-weight: 700;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; letter-spacing: -0.01em; `;
+const CardCode = styled.div` font-size: 0.78rem; color: #94a3b8; font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.04em; margin-top: 3px; `;
 
-const CardBody = styled.div` padding: 0.5rem 1rem 1.25rem; display: flex; flex-wrap: wrap; gap: 0.5rem; `;
+const CardBody = styled.div` padding: 0.4rem 1rem 1rem; display: flex; flex-wrap: wrap; gap: 0.4rem; `;
 const InfoTag = styled.div`
-  background: white; border: 1px solid #e2e8f0;
-  padding: 6px 10px; border-radius: 8px; 
-  display: flex; flex-direction: column; align-items: flex-start; flex: 1; min-width: 80px;
-  
-  span { font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
-  strong { color: #334155; font-size: 1rem; font-weight: 700; }
+  background: rgba(248,250,252,0.9); border: 1px solid #e2e8f0;
+  padding: 6px 10px; border-radius: 10px;
+  display: flex; flex-direction: column; align-items: flex-start; flex: 1; min-width: 75px;
+  span { font-size: 0.6rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; margin-bottom: 2px; }
+  strong { color: #334155; font-size: 0.95rem; font-weight: 700; }
 `;
 const StockTag = styled(InfoTag)`
   background: ${p => p.$out ? '#fef2f2' : p.$low ? '#fffbeb' : '#f0fdf4'};
   border-color: ${p => p.$out ? '#fecaca' : p.$low ? '#fde68a' : '#bbf7d0'};
-  strong { color: ${p => p.$out ? '#b91c1c' : p.$low ? '#b45309' : '#15803d'}; }
+  strong { color: ${p => p.$out ? '#dc2626' : p.$low ? '#d97706' : '#16a34a'}; }
 `;
 
 const CardFooter = styled.div`
-  margin-top: auto; padding: 1rem; background: #f8fafc; border-top: 1px solid #f1f5f9; display: flex; gap: 0.75rem;
+  margin-top: auto; padding: 0.75rem; background: rgba(248,250,252,0.7);
+  border-top: 1px solid #f1f5f9; display: flex; gap: 0.5rem;
 `;
 
 const ActionButton = styled.button`
-  flex: 1; padding: 0.6rem; 
-  border-radius: 10px; border: 1px solid; cursor: pointer; 
-  font-size: 0.85rem; font-weight: 600; 
-  display: flex; align-items: center; justify-content: center; gap: 6px;
+  flex: 1; padding: 0.55rem; border-radius: 10px; border: 1px solid;
+  cursor: pointer; font-size: 0.8rem; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
   transition: all 0.2s;
-
-  &.adjust { 
-    background: white; border-color: #cbd5e1; color: #475569; 
-    &:hover { background: #f1f5f9; border-color: #94a3b8; color: #1e293b; } 
-  }
-  &.edit { 
-    background: #f0f9ff; border-color: #bae6fd; color: #0284c7; 
-    &:hover { background: #e0f2fe; border-color: #7dd3fc; color: #0369a1; } 
-  }
-  &.delete { 
-    background: #fef2f2; border-color: #fecaca; color: #ef4444; 
-    &:hover { background: #fee2e2; border-color: #fca5a5; color: #dc2626; } 
-  }
+  &.adjust { background: white; border-color: #e2e8f0; color: #475569;
+    &:hover { background: rgba(99,102,241,0.05); border-color: #6366f1; color: #6366f1; } }
+  &.edit { background: #f0f9ff; border-color: #bae6fd; color: #0284c7;
+    &:hover { background: #e0f2fe; color: #0369a1; } }
+  &.delete { background: #fef2f2; border-color: #fecaca; color: #ef4444;
+    &:hover { background: #fee2e2; color: #dc2626; } }
 `;
 
-/* ESTILOS MODAL (Actualizados) */
+/* ESTILOS MODAL (Premium) */
 const ModalOverlay = styled(motion.div)`
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-  background: rgba(15, 23, 42, 0.6); z-index: 50; 
-  display: flex; align-items: center; justify-content: center; padding: 1rem;
-  backdrop-filter: blur(4px);
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(15, 23, 42, 0.5); z-index: 50;
+  display: flex; align-items: center; justify-content: center; padding: 0.75rem;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
 `;
 const ModalContent = styled.div`
-  background: white; width: 100%; max-width: ${p => p.$large ? '800px' : '550px'}; 
-  border-radius: 20px; padding: 2rem; 
-  max-height: 90vh; overflow-y: auto; 
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  background: white; width: 100%; max-width: ${p => p.$large ? '800px' : '550px'};
+  border-radius: 20px; padding: 1.75rem;
+  max-height: 92vh; overflow-y: auto;
+  box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.3);
+  @media(max-width: 640px) { padding: 1.25rem; border-radius: 16px; }
 `;
-const ModalTitle = styled.h2` margin-top: 0; color: #1e293b; margin-bottom: 1.5rem; font-size: 1.5rem; display: flex; align-items: center; gap: 10px; `;
+const ModalTitle = styled.h2`
+  margin-top: 0; color: #0f172a; margin-bottom: 1.25rem; font-size: 1.35rem;
+  display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -0.02em;
+`;
 const ModalError = styled.div`
-  background: #fef2f2; color: #991b1b; padding: 12px; border-radius: 8px; 
-  margin-bottom: 1.5rem; border: 1px solid #fecaca; font-size: 0.9rem; display: flex; gap: 8px; align-items: center;
+  background: #fef2f2; color: #991b1b; padding: 12px; border-radius: 10px;
+  margin-bottom: 1.25rem; border: 1px solid #fecaca; font-size: 0.85rem; display: flex; gap: 8px; align-items: center;
 `;
-const InputGrid = styled.div` display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; margin-bottom: 1.5rem; @media(max-width: 640px){ grid-template-columns: 1fr; } `;
-const FormGroup = styled.div` display: flex; flex-direction: column; gap: 6px; `;
-const Label = styled.label` font-size: 0.9rem; font-weight: 600; color: #475569; `;
+const InputGrid = styled.div`
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.25rem;
+  @media(max-width: 640px) { grid-template-columns: 1fr; gap: 0.75rem; }
+`;
+const FormGroup = styled.div` display: flex; flex-direction: column; gap: 5px; `;
+const Label = styled.label` font-size: 0.82rem; font-weight: 600; color: #475569; `;
 const Input = styled.input`
-  padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 1rem; color: #1e293b;
-  &:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+  padding: 9px 12px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 0.95rem; color: #1e293b;
+  transition: all 0.2s;
+  &:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
   &:disabled { background: #f1f5f9; color: #94a3b8; }
 `;
-const ModalActions = styled.div` display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; border-top: 1px solid #f1f5f9; padding-top: 1.5rem; `;
-const CancelButton = styled.button` 
-  background: white; color: #64748b; border: 1px solid #cbd5e1; 
-  padding: 10px 20px; border-radius: 10px; font-weight: 600; cursor: pointer; 
+const ModalActions = styled.div` display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; border-top: 1px solid #f1f5f9; padding-top: 1.25rem; `;
+const CancelButton = styled.button`
+  background: white; color: #64748b; border: 1.5px solid #e2e8f0;
+  padding: 9px 18px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 0.9rem;
   transition: all 0.2s;
-  &:hover { background: #f8fafc; color: #1e293b; } 
+  &:hover { background: #f8fafc; color: #1e293b; border-color: #cbd5e1; }
 `;
-const SaveButton = styled.button` 
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
-  color: white; border: none; 
-  padding: 10px 24px; border-radius: 10px; font-weight: 600; cursor: pointer; 
-  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+const SaveButton = styled.button`
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: white; border: none;
+  padding: 9px 22px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 0.9rem;
+  box-shadow: 0 4px 12px rgba(99,102,241,0.25);
   transition: all 0.2s;
-  &:hover { opacity: 0.95; transform: translateY(-1px); box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3); } 
+  &:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(99,102,241,0.35); }
 `;
 
 /* ================================
@@ -1156,10 +1210,69 @@ const InventoryManagement = () => {
         </Select>
       </FilterContainer>
 
-      <div style={{ textAlign: 'right', marginBottom: '.5rem', color: '#4a5568', fontWeight: 'bold', fontSize: '0.9rem' }}>
-        Página {currentPage} de {totalPages || 1} | Mostrando {filtered.length} de {totalFilteredCount} productos filtrados
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', padding: '0 4px' }}>
+        <span style={{ color: '#64748b', fontSize: '0.82rem', fontWeight: 500 }}>
+          {totalFilteredCount} producto{totalFilteredCount !== 1 ? 's' : ''} encontrado{totalFilteredCount !== 1 ? 's' : ''}
+        </span>
+        <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
+          Pág. {currentPage}/{totalPages || 1}
+        </span>
       </div>
 
+      {/* ===== DESKTOP TABLE ===== */}
+      <DesktopTableWrapper>
+        <StyledTable>
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Costo</th>
+              <th>Venta</th>
+              <th>Stock</th>
+              <th>Valor Total</th>
+              <th style={{ textAlign: 'center' }}>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(p => {
+              const low = p.existencia > 0 && p.existencia <= (p.minimo || 5);
+              const out = p.existencia <= 0;
+              return (
+                <tr key={p.id_producto}>
+                  <td>
+                    <TableProductInfo>
+                      {p.imagen ? (
+                        <img className="thumb" src={p.imagen} alt="" onClick={() => setViewImage({ isOpen: true, imageUrl: p.imagen })} />
+                      ) : (
+                        <div className="thumb-placeholder"><FaImage /></div>
+                      )}
+                      <div className="info">
+                        <span className="name" title={p.nombre}>{p.nombre}</span>
+                        <span className="code">{p.codigo}</span>
+                      </div>
+                    </TableProductInfo>
+                  </td>
+                  <td style={{ fontWeight: 600 }}>{p.__fmt.costo}</td>
+                  <td style={{ fontWeight: 600 }}>{p.__fmt.venta}</td>
+                  <td><StockBadge $low={low} $out={out}>{p.existencia}</StockBadge></td>
+                  <td style={{ color: '#64748b' }}>{p.__fmt.costoTotal}</td>
+                  <td>
+                    <TableActions>
+                      <button className="act-adjust" title="Ajustar Stock" onClick={() => setAdjustmentModal({ isOpen: true, product: p })}><FaPlusCircle /></button>
+                      <button className="act-edit" title="Editar" onClick={() => openEditModal(p)}><FaEdit /></button>
+                      <button className="act-delete" title="Eliminar" onClick={() => openDeleteModal(p)}><FaTrash /></button>
+                    </TableActions>
+                  </td>
+                </tr>
+              );
+            })}
+            {filtered.length === 0 && (
+              <tr><td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>No se encontraron productos.</td></tr>
+            )}
+          </tbody>
+        </StyledTable>
+      </DesktopTableWrapper>
+
+      {/* ===== MOBILE CARDS ===== */}
       <MobileCardGrid>
         {filtered.map((p) => {
           const cardProps = animationsEnabled ? { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, transition: { duration: .12 } } : {};
@@ -1179,62 +1292,46 @@ const InventoryManagement = () => {
               </div>
               <CardHeader>
                 <CardTitle title={p.nombre}>{p.nombre}</CardTitle>
-                <CardCode>Código: {p.codigo}</CardCode>
+                <CardCode>{p.codigo}</CardCode>
               </CardHeader>
               <CardBody>
                 <InfoTag><span>Costo</span><strong>{p.__fmt.costo}</strong></InfoTag>
                 <InfoTag><span>Venta</span><strong>{p.__fmt.venta}</strong></InfoTag>
-                <StockTag $low={low} $out={out}><span>Existencia</span><strong>{p.existencia}</strong></StockTag>
-                <InfoTag><span>Costo Total</span><strong>{p.__fmt.costoTotal}</strong></InfoTag>
+                <StockTag $low={low} $out={out}><span>Stock</span><strong>{p.existencia}</strong></StockTag>
+                <InfoTag><span>Valor</span><strong>{p.__fmt.costoTotal}</strong></InfoTag>
               </CardBody>
               <CardFooter>
-                <ActionButton className="adjust" title="Ajustar Stock" onClick={() => setAdjustmentModal({ isOpen: true, product: p })}><FaPlusCircle /><FaMinusCircle style={{ marginLeft: 4 }} /></ActionButton>
+                <ActionButton className="adjust" title="Ajustar Stock" onClick={() => setAdjustmentModal({ isOpen: true, product: p })}><FaPlusCircle /><FaMinusCircle style={{ marginLeft: 2 }} /></ActionButton>
                 <ActionButton className="edit" onClick={() => openEditModal(p)}><FaEdit /> Editar</ActionButton>
-                <ActionButton className="delete" onClick={() => openDeleteModal(p)}><FaTrash /> Eliminar</ActionButton>
+                <ActionButton className="delete" onClick={() => openDeleteModal(p)}><FaTrash /></ActionButton>
               </CardFooter>
             </ProductCard>
           );
         })}
       </MobileCardGrid>
 
-      {totalFilteredCount > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1.5rem', marginTop: '2rem', marginBottom: '3rem' }}>
-          <Button
-            secondary
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-          >
-            Anterior
+      {/* ===== PAGINATION ===== */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', marginTop: '1.5rem', marginBottom: '3rem', flexWrap: 'wrap' }}>
+          <Button secondary onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} style={{ fontSize: '0.8rem', padding: '0.5rem 1rem' }}>
+            ← Anterior
           </Button>
-
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {[...Array(totalPages)].map((_, i) => {
-              const pageIdx = i + 1;
-              // Mostrar solo algunas páginas si hay muchas
-              if (totalPages > 7 && (pageIdx > 2 && pageIdx < totalPages - 1 && Math.abs(pageIdx - currentPage) > 1)) {
-                if (pageIdx === 3 || pageIdx === totalPages - 2) return <span key={pageIdx}>...</span>;
-                return null;
-              }
-              return (
-                <Button
-                  key={pageIdx}
-                  secondary={pageIdx !== currentPage}
-                  primary={pageIdx === currentPage}
-                  style={{ minWidth: '40px', padding: '0.5rem' }}
-                  onClick={() => setCurrentPage(pageIdx)}
-                >
-                  {pageIdx}
-                </Button>
-              );
-            })}
-          </div>
-
-          <Button
-            secondary
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-          >
-            Siguiente
+          {[...Array(totalPages)].map((_, i) => {
+            const pg = i + 1;
+            if (totalPages > 7 && pg > 2 && pg < totalPages - 1 && Math.abs(pg - currentPage) > 1) {
+              if (pg === 3 || pg === totalPages - 2) return <span key={pg} style={{ color: '#94a3b8', padding: '0 4px' }}>…</span>;
+              return null;
+            }
+            return (
+              <Button key={pg} primary={pg === currentPage} secondary={pg !== currentPage}
+                style={{ minWidth: '36px', padding: '0.45rem 0.6rem', fontSize: '0.8rem' }}
+                onClick={() => setCurrentPage(pg)}>
+                {pg}
+              </Button>
+            );
+          })}
+          <Button secondary onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} style={{ fontSize: '0.8rem', padding: '0.5rem 1rem' }}>
+            Siguiente →
           </Button>
         </div>
       )}
