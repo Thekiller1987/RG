@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue } from 'react';
 import styled, { keyframes } from 'styled-components';
+import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import * as api from '../service/api';
+import { Link } from 'react-router-dom';
 import {
   FaPlus, FaBoxOpen, FaTags, FaTruck, FaTrash, FaEdit, FaArrowLeft, FaHistory, FaSpinner,
   FaSearch, FaTimes, FaPlusCircle, FaMinusCircle, FaExclamationTriangle,
-  FaBarcode, FaFont, FaImage, FaEye, FaLock
+  FaBarcode, FaFont, FaImage, FaEye
 } from 'react-icons/fa';
 
 /* ================================
@@ -374,40 +373,6 @@ const ImageViewModal = ({ isOpen, imageSrc, onClose }) => {
 
 const norm = (str) => String(str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
-const playSuccessSound = () => {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(523.25, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(1046.50, ctx.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.3);
-  } catch (e) { }
-};
-
-const playErrorSound = () => {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(150, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.3);
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.3);
-  } catch (e) { }
-};
-
 const MAX_RESULTS_SEARCH = 10000; // Aumentado para permitir filtrar todo el inventario
 const ITEMS_PER_PAGE = 50;
 const LARGE_LIST_CUTOFF = 500;
@@ -636,18 +601,17 @@ const InventoryHistoryModal = ({ onClose }) => {
 /* ==================================
   MODAL DE CREACIÓN ACTUALIZADO
 ================================== */
-const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, allProductsRaw, isWholesaleView }) => {
+const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, allProductsRaw }) => {
   const [formData, setFormData] = useState({
-    codigo: '', nombre: '', costo: '', venta: '', mayoreo: '', distribuidor: '', taller: '', mayorista: '', id_categoria: '',
-    existencia: '', minimo: '', maximo: '', tipo_venta: 'Unidad', id_proveedor: '', descripcion: '', imagen: null, catalogo_mayorista: 0
+    codigo: '', nombre: '', costo: '', venta: '', mayoreo: '', id_categoria: '',
+    existencia: '', minimo: '', maximo: '', tipo_venta: 'Unidad', id_proveedor: '', descripcion: '', imagen: null
   });
   const [profitPercentage, setProfitPercentage] = useState('');
   const [modalError, setModalError] = useState('');
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    const val = type === 'checkbox' ? (checked ? 1 : 0) : value;
-    const next = { ...formData, [name]: val };
+    const { name, value } = e.target;
+    const next = { ...formData, [name]: value };
     if (name === 'costo' || name === 'venta') {
       const cost = parseFloat(next.costo);
       const price = parseFloat(next.venta);
@@ -699,15 +663,8 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
 
     onSave({
       ...f,
-      mayoreo: f.mayoreo || null,
-      distribuidor: f.distribuidor || null,
-      taller: f.taller || null,
-      mayorista: f.mayorista || null,
-      minimo: f.minimo || null, maximo: f.maximo || null,
-      id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null,
-      catalogo_mayorista: f.catalogo_mayorista ?? 0,
-      descripcion: f.descripcion || '',
-      tipo_venta: f.tipo_venta || 'Unidad'
+      mayoreo: f.mayoreo || null, minimo: f.minimo || null, maximo: f.maximo || null,
+      id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null
     });
   };
 
@@ -722,39 +679,22 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
             {modalError && <ModalError>{modalError}</ModalError>}
 
             {/* Image Upload Section */}
-            {/* Image Upload Section */}
             <ImageUpload currentImage={formData.imagen} onImageChange={handleImageChange} />
 
             <InputGrid>
               <FormGroup><Label>Código</Label><Input name="codigo" value={formData.codigo} onChange={handleInputChange} required /></FormGroup>
               <FormGroup><Label>Nombre</Label><Input name="nombre" value={formData.nombre} onChange={handleInputChange} required /></FormGroup>
               <FormGroup><Label>Costo (C$)</Label><Input type="number" step="0.01" name="costo" value={formData.costo} onChange={handleInputChange} required /></FormGroup>
-              {!isWholesaleView && <FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup>}
-              <FormGroup><Label>Precio Tienda (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta} onChange={handleInputChange} required /></FormGroup>
-
-              <FormGroup><Label>Precio Mayoreo 1 (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} /></FormGroup>
-              {isWholesaleView && (
-                <>
-                  <FormGroup><Label>Distribuidor (C$)</Label><Input type="number" step="0.01" name="distribuidor" value={formData.distribuidor} onChange={handleInputChange} /></FormGroup>
-                  <FormGroup><Label>Taller (C$)</Label><Input type="number" step="0.01" name="taller" value={formData.taller} onChange={handleInputChange} /></FormGroup>
-                  <FormGroup><Label>Mayorista (C$)</Label><Input type="number" step="0.01" name="mayorista" value={formData.mayorista} onChange={handleInputChange} /></FormGroup>
-                  <FormGroup style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', background: '#f0f9ff', padding: '10px', borderRadius: '8px', border: '1px solid #bae6fd' }}>
-                    <input type="checkbox" name="catalogo_mayorista" id="catalogo_mayorista" checked={!!formData.catalogo_mayorista} onChange={handleInputChange} style={{ width: '20px', height: '20px', cursor: 'pointer' }} />
-                    <Label htmlFor="catalogo_mayorista" style={{ cursor: 'pointer', marginBottom: 0, color: '#0369a1' }}>Mostrar en Catálogo Mayorista</Label>
-                  </FormGroup>
-                </>
-              )}
-              {!isWholesaleView && (
-                <>
-                  <FormGroup><Label>Existencia Inicial</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="existencia" value={formData.existencia} onChange={handleInputChange} required /></FormGroup>
-                  <FormGroup><Label>Stock Mínimo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="minimo" value={formData.minimo} onChange={handleInputChange} /></FormGroup>
-                  <FormGroup><Label>Stock Máximo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="maximo" value={formData.maximo} onChange={handleInputChange} /></FormGroup>
-                  <FormGroup><Label>Descripción</Label><Input name="descripcion" value={formData.descripcion} onChange={handleInputChange} placeholder="Detalles del producto" /></FormGroup>
-                  <FormGroup><Label>Categoría</Label><Select name="id_categoria" value={formData.id_categoria} onChange={handleInputChange}><option value="">-- Sin Categoría --</option>{categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}</Select></FormGroup>
-                  <FormGroup><Label>Proveedor</Label><Select name="id_proveedor" value={formData.id_proveedor} onChange={handleInputChange}><option value="">-- Sin Proveedor --</option>{providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}</Select></FormGroup>
-                  <FormGroup><Label>Tipo de Venta</Label><Select name="tipo_venta" value={formData.tipo_venta} onChange={handleInputChange}><option value="Unidad">Unidad</option><option value="Juego">Juego</option><option value="Kit">Kit</option></Select></FormGroup>
-                </>
-              )}
+              <FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup>
+              <FormGroup><Label>Precio Venta (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta} onChange={handleInputChange} required /></FormGroup>
+              <FormGroup><Label>Precio Mayoreo (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Existencia Inicial</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="existencia" value={formData.existencia} onChange={handleInputChange} required /></FormGroup>
+              <FormGroup><Label>Stock Mínimo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="minimo" value={formData.minimo} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Stock Máximo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="maximo" value={formData.maximo} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Descripción</Label><Input name="descripcion" value={formData.descripcion} onChange={handleInputChange} placeholder="Detalles del producto" /></FormGroup>
+              <FormGroup><Label>Categoría</Label><Select name="id_categoria" value={formData.id_categoria} onChange={handleInputChange}><option value="">-- Sin Categoría --</option>{categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}</Select></FormGroup>
+              <FormGroup><Label>Proveedor</Label><Select name="id_proveedor" value={formData.id_proveedor} onChange={handleInputChange}><option value="">-- Sin Proveedor --</option>{providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}</Select></FormGroup>
+              <FormGroup><Label>Tipo de Venta</Label><Select name="tipo_venta" value={formData.tipo_venta} onChange={handleInputChange}><option value="Unidad">Unidad</option><option value="Juego">Juego</option><option value="Kit">Kit</option></Select></FormGroup>
             </InputGrid>
             <ModalActions>
               <CancelButton type="button" onClick={onClose}>Cancelar</CancelButton>
@@ -770,7 +710,7 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
 /* ================================
   MODAL DE EDICIÓN ACTUALIZADO
 ================================ */
-const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, providers, allProductsRaw, isWholesaleView }) => {
+const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, providers, allProductsRaw }) => {
   const [formData, setFormData] = useState({});
   const [profitPercentage, setProfitPercentage] = useState('');
   const [modalError, setModalError] = useState('');
@@ -778,24 +718,14 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
   useEffect(() => {
     if (productToEdit) {
       setFormData({
-        id_producto: productToEdit.id_producto,
-        codigo: productToEdit.codigo ?? '',
-        nombre: productToEdit.nombre ?? '',
-        costo: productToEdit.costo ?? '',
-        venta: productToEdit.venta ?? '',
+        ...productToEdit,
         mayoreo: productToEdit.mayoreo ?? '',
-        distribuidor: productToEdit.distribuidor ?? '',
-        taller: productToEdit.taller ?? '',
-        mayorista: productToEdit.mayorista ?? '',
-        existencia: productToEdit.existencia ?? 0,
         minimo: productToEdit.minimo ?? '',
         maximo: productToEdit.maximo ?? '',
-        tipo_venta: productToEdit.tipo_venta ?? 'Unidad',
         id_categoria: productToEdit.id_categoria ?? '',
         id_proveedor: productToEdit.id_proveedor ?? '',
         descripcion: productToEdit.descripcion ?? '',
-        imagen: productToEdit.imagen ?? null,
-        catalogo_mayorista: productToEdit.catalogo_mayorista ?? 0
+        imagen: productToEdit.imagen ?? null
       });
       const cost = parseFloat(productToEdit.costo);
       const price = parseFloat(productToEdit.venta);
@@ -805,10 +735,9 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
   }, [productToEdit]);
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
     if (name === 'existencia') return;
-    const val = type === 'checkbox' ? (checked ? 1 : 0) : value;
-    const next = { ...formData, [name]: val };
+    const next = { ...formData, [name]: value };
     if (name === 'costo' || name === 'venta') {
       const cost = parseFloat(next.costo);
       const price = parseFloat(next.venta);
@@ -843,20 +772,7 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
     );
     if (duplicate) { setModalError(`Ya existe otro producto con ese código o nombre.`); return; }
 
-    const { existencia, ...payload } = {
-      ...f,
-      mayoreo: f.mayoreo || null,
-      distribuidor: f.distribuidor || null,
-      taller: f.taller || null,
-      mayorista: f.mayorista || null,
-      minimo: f.minimo || null,
-      maximo: f.maximo || null,
-      id_categoria: f.id_categoria || null,
-      id_proveedor: f.id_proveedor || null,
-      catalogo_mayorista: f.catalogo_mayorista ?? 0,
-      descripcion: f.descripcion || '',
-      tipo_venta: f.tipo_venta || 'Unidad'
-    };
+    const { existencia, ...payload } = { ...f, mayoreo: f.mayoreo || null, minimo: f.minimo || null, maximo: f.maximo || null, id_categoria: f.id_categoria || null, id_proveedor: f.id_proveedor || null };
     onSave(payload, productToEdit.id_producto);
   };
 
@@ -871,42 +787,22 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
             {modalError && <ModalError>{modalError}</ModalError>}
 
             {/* Image Upload Section */}
-            {/* Image Upload Section */}
             <ImageUpload currentImage={formData.imagen} onImageChange={handleImageChange} />
 
             <InputGrid>
-              <FormGroup><Label>Código</Label><Input name="codigo" value={formData.codigo} onChange={handleInputChange} required readOnly={isWholesaleView} style={isWholesaleView ? { background: '#f8fafc', color: '#64748b' } : {}} /></FormGroup>
-              <FormGroup><Label>Nombre</Label><Input name="nombre" value={formData.nombre} onChange={handleInputChange} required readOnly={isWholesaleView} style={isWholesaleView ? { background: '#f8fafc', color: '#64748b' } : {}} /></FormGroup>
-              <FormGroup><Label>Costo (C$)</Label><Input type="number" step="0.01" name="costo" value={formData.costo} onChange={handleInputChange} required readOnly={isWholesaleView} style={isWholesaleView ? { background: '#f8fafc', color: '#64748b' } : {}} /></FormGroup>
-              {!isWholesaleView && <FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup>}
-              <FormGroup><Label>Precio Tienda (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta} onChange={handleInputChange} required readOnly={isWholesaleView} style={isWholesaleView ? { background: '#f8fafc', color: '#64748b' } : {}} /></FormGroup>
-
-              <FormGroup><Label>Precio Mayoreo 1 (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo} onChange={handleInputChange} /></FormGroup>
-
-              {isWholesaleView && (
-                <>
-                  <FormGroup><Label>Distribuidor (C$)</Label><Input type="number" step="0.01" name="distribuidor" value={formData.distribuidor} onChange={handleInputChange} /></FormGroup>
-                  <FormGroup><Label>Taller (C$)</Label><Input type="number" step="0.01" name="taller" value={formData.taller} onChange={handleInputChange} /></FormGroup>
-                  <FormGroup><Label>Mayorista (C$)</Label><Input type="number" step="0.01" name="mayorista" value={formData.mayorista} onChange={handleInputChange} /></FormGroup>
-
-                  <FormGroup style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', background: '#f0f9ff', padding: '10px', borderRadius: '8px', border: '1px solid #bae6fd' }}>
-                    <input type="checkbox" name="catalogo_mayorista" id="edit_catalogo_mayorista" checked={!!formData.catalogo_mayorista} onChange={handleInputChange} style={{ width: '20px', height: '20px', cursor: 'pointer' }} />
-                    <Label htmlFor="edit_catalogo_mayorista" style={{ cursor: 'pointer', marginBottom: 0, color: '#0369a1' }}>Mostrar en Catálogo Mayorista</Label>
-                  </FormGroup>
-                </>
-              )}
-
-              {!isWholesaleView && (
-                <>
-                  <FormGroup><Label>Existencia</Label><Input type="number" value={formData.existencia} readOnly style={{ background: '#f1f5f9' }} /></FormGroup>
-                  <FormGroup><Label>Stock Mínimo</Label><Input type="number" name="minimo" value={formData.minimo} onChange={handleInputChange} /></FormGroup>
-                  <FormGroup><Label>Stock Máximo</Label><Input type="number" name="maximo" value={formData.maximo} onChange={handleInputChange} /></FormGroup>
-                  <FormGroup><Label>Descripción</Label><Input name="descripcion" value={formData.descripcion} onChange={handleInputChange} /></FormGroup>
-                  <FormGroup><Label>Categoría</Label><Select name="id_categoria" value={formData.id_categoria} onChange={handleInputChange}><option value="">-- Sin Categoría --</option>{categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}</Select></FormGroup>
-                  <FormGroup><Label>Proveedor</Label><Select name="id_proveedor" value={formData.id_proveedor} onChange={handleInputChange}><option value="">-- Sin Proveedor --</option>{providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}</Select></FormGroup>
-                  <FormGroup><Label>Tipo de Venta</Label><Select name="tipo_venta" value={formData.tipo_venta} onChange={handleInputChange}><option value="Unidad">Unidad</option><option value="Juego">Juego</option><option value="Kit">Kit</option></Select></FormGroup>
-                </>
-              )}
+              <FormGroup><Label>Código</Label><Input name="codigo" value={formData.codigo || ''} onChange={handleInputChange} required /></FormGroup>
+              <FormGroup><Label>Nombre</Label><Input name="nombre" value={formData.nombre || ''} onChange={handleInputChange} required /></FormGroup>
+              <FormGroup><Label>Costo (C$)</Label><Input type="number" step="0.01" name="costo" value={formData.costo || ''} onChange={handleInputChange} required /></FormGroup>
+              <FormGroup><Label>% Ganancia</Label><Input type="number" step="0.01" value={profitPercentage || ''} onChange={handlePercentageChange} placeholder="ej: 50" /></FormGroup>
+              <FormGroup><Label>Precio Venta (C$)</Label><Input type="number" step="0.01" name="venta" value={formData.venta || ''} onChange={handleInputChange} required /></FormGroup>
+              <FormGroup><Label>Precio Mayoreo (C$)</Label><Input type="number" step="0.01" name="mayoreo" value={formData.mayoreo || ''} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Existencia</Label><Input name="existencia" value={formData.existencia || ''} disabled style={{ backgroundColor: '#f0f0f0' }} /><small style={{ marginTop: '5px', color: '#dc3545', fontWeight: 'bold' }}>¡Ajustar solo con el botón de stock!</small></FormGroup>
+              <FormGroup><Label>Stock Mínimo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="minimo" value={formData.minimo || ''} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Stock Máximo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="maximo" value={formData.maximo || ''} onChange={handleInputChange} /></FormGroup>
+              <FormGroup><Label>Descripción</Label><Input name="descripcion" value={formData.descripcion || ''} onChange={handleInputChange} placeholder="Detalles del producto" /></FormGroup>
+              <FormGroup><Label>Categoría</Label><Select name="id_categoria" value={formData.id_categoria || ''} onChange={handleInputChange}><option value="">-- Sin Categoría --</option>{categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}</Select></FormGroup>
+              <FormGroup><Label>Proveedor</Label><Select name="id_proveedor" value={formData.id_proveedor || ''} onChange={handleInputChange}><option value="">-- Sin Proveedor --</option>{providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}</Select></FormGroup>
+              <FormGroup><Label>Tipo de Venta</Label><Select name="tipo_venta" value={formData.tipo_venta || 'Unidad'} onChange={handleInputChange}><option value="Unidad">Unidad</option><option value="Juego">Juego</option><option value="Kit">Kit</option></Select></FormGroup>
             </InputGrid>
             <ModalActions>
               <CancelButton type="button" onClick={onClose}>Cancelar</CancelButton>
@@ -924,11 +820,6 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
   COMPONENTE PRINCIPAL: InventoryManagement
 ===================================== */
 const InventoryManagement = () => {
-  const { products: authProducts, token, refreshProducts, allUsers } = useAuth();
-  const location = useLocation();
-  const searchParams = new URLSearchParams(location.search);
-  const isWholesaleView = searchParams.get('view') === 'wholesale';
-
   const [allProductsRaw, setAllProductsRaw] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -970,75 +861,54 @@ const InventoryManagement = () => {
   const showAlert = useCallback(({ title, message, type }) => setAlert({ isOpen: true, title, message, type }), []);
   const closeAlert = () => setAlert({ isOpen: false });
 
-  const norm = (s) => (s || '').toLowerCase().replace(/[\W_]+/g, ' ');
+  const fetchProductList = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    const res = await axios.get('/api/products', { headers: { Authorization: `Bearer ${token}` } });
+    return res.data;
+  }, []);
 
   const fetchData = useCallback(async () => {
     try {
-      if (!token) return;
-      const [cats, provs] = await Promise.all([
-        api.fetchCategories(token),
-        api.fetchProviders(token)
+      const token = localStorage.getItem('token');
+      const [full, cats, provs] = await Promise.all([
+        fetchProductList(),
+        axios.get('/api/categories', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/providers', { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
-      setCategories(cats || []);
-      setProviders(provs || []);
+      setAllProductsRaw(full);
 
-      // We'll let authProducts trigger the setAllProducts update via another useEffect
-      if (authProducts && authProducts.length > 0) {
-        processProducts(authProducts);
-        setInitialLoadComplete(true);
-      } else if (authProducts) {
-        // If authProducts is an empty array but not null/undefined
-        setInitialLoadComplete(true);
-      }
+      const indexed = full.map(p => {
+        const nombre = p.nombre ?? '';
+        const codigo = p.codigo ?? '';
+        const descripcion = p.descripcion ?? '';
+        const q = `${norm(nombre)}|${norm(codigo)}|${norm(descripcion)}`;
+        const qStarts = [norm(nombre), norm(codigo)];
+        const costoNum = Number(p.costo || 0);
+        const ventaNum = Number(p.venta || 0);
+        const existenciaNum = Number(p.existencia || 0);
+        return {
+          ...p,
+          __fmt: {
+            costo: `C$${costoNum.toFixed(2)}`,
+            venta: `C$${ventaNum.toFixed(2)}`,
+            costoTotal: `C$${(costoNum * existenciaNum).toFixed(2)}`
+          },
+          q,
+          qStarts
+        };
+      });
+
+      setAllProducts(indexed);
+      setCategories(cats.data);
+      setProviders(provs.data);
+      setInitialLoadComplete(true);
     } catch (e) {
-      console.error("Error loading extra inventory data:", e);
-      setError('Error al cargar datos auxiliares.');
+      setError('Error al cargar los datos.');
     }
-  }, [token, authProducts]);
+  }, [fetchProductList]);
 
-  const processProducts = useCallback((full) => {
-    setAllProductsRaw(full);
-    const indexed = full.map(p => {
-      const nombre = p.nombre ?? '';
-      const codigo = p.codigo ?? '';
-      const descripcion = p.descripcion ?? '';
-      const q = `${norm(nombre)}|${norm(codigo)}|${norm(descripcion)}`;
-      const qStarts = [norm(nombre), norm(codigo)];
-      const costoNum = Number(p.costo || 0);
-      const ventaNum = Number(p.venta || 0);
-      const existenciaNum = Number(p.existencia || 0);
-      return {
-        ...p,
-        __fmt: {
-          costo: `C$${costoNum.toFixed(2)}`,
-          venta: `C$${ventaNum.toFixed(2)}`,
-          mayoreo: `C$${Number(p.mayoreo || 0).toFixed(2)}`,
-          distribuidor: `C$${Number(p.distribuidor || 0).toFixed(2)}`,
-          taller: `C$${Number(p.taller || 0).toFixed(2)}`,
-          mayorista: `C$${Number(p.mayorista || 0).toFixed(2)}`,
-          costoTotal: `C$${(costoNum * existenciaNum).toFixed(2)}`
-        },
-        costoNum,
-        q,
-        qStarts
-      };
-    });
-    setAllProducts(indexed);
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  useEffect(() => {
-    if (authProducts) {
-      processProducts(authProducts);
-      if (authProducts.length > 0 || initialLoadComplete) {
-        setInitialLoadComplete(true);
-      }
-    }
-  }, [authProducts, processProducts, initialLoadComplete]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const { filtered, totalFilteredCount } = useMemo(() => {
     const q = (deferredSearch || '').toLowerCase().trim();
@@ -1046,11 +916,6 @@ const InventoryManagement = () => {
     const prov = String(filterProvider || '');
 
     let matched = allProducts;
-
-    // APLICAR FILTRO ESTRICTO SI ES VISTA MAYORISTA / CATALOGO
-    if (isWholesaleView) {
-      matched = matched.filter(p => !!p.catalogo_mayorista);
-    }
 
     if (cat) matched = matched.filter(p => String(p.id_categoria) === cat);
     if (prov) matched = matched.filter(p => String(p.id_proveedor) === prov);
@@ -1113,108 +978,117 @@ const InventoryManagement = () => {
   // Handlers de Lógica (API calls)
   const handleCreateProduct = async (payload) => {
     try {
-      await api.createProduct(payload, token);
+      console.log('CLIENT SENDING CREATE PAYLOAD:', { ...payload, imagenLength: payload.imagen ? payload.imagen.length : 'NULL' });
+      const token = localStorage.getItem('token');
+      await axios.post('/api/products', payload, { headers: { Authorization: `Bearer ${token}` } });
       setIsCreateModalOpen(false);
-      playSuccessSound();
       showAlert({ title: 'Éxito', message: 'Producto creado correctamente.' });
-      refreshProducts(); // Use AuthContext's refresh
+      await fetchData();
     } catch (err) {
       console.error('CLIENT CREATE ERROR:', err);
-      playErrorSound();
-      showAlert({ title: 'Error', message: err.message || 'Error al crear el producto.', type: 'error' });
+      showAlert({ title: 'Error', message: err.response?.data?.msg || 'Error al crear el producto.', type: 'error' });
     }
   };
 
   const handleUpdateProduct = async (payload, productId) => {
     try {
-      await api.updateProduct(productId, payload, token);
+      console.log('CLIENT SENDING UPDATE PAYLOAD:', { ...payload, imagenLength: payload.imagen ? payload.imagen.length : 'NULL' });
+      const token = localStorage.getItem('token');
+      await axios.put(`/api/products/${productId}`, payload, { headers: { Authorization: `Bearer ${token}` } });
       setIsEditModalOpen(false);
-      playSuccessSound();
       showAlert({ title: 'Éxito', message: 'Producto actualizado correctamente.' });
-      refreshProducts(); // Use AuthContext's refresh
+      await fetchData();
     } catch (err) {
       console.error('CLIENT UPDATE ERROR:', err);
-      playErrorSound();
-      showAlert({ title: 'Error', message: err.message || 'Error al actualizar el producto.', type: 'error' });
+      showAlert({ title: 'Error', message: err.response?.data?.msg || 'Error al actualizar el producto.', type: 'error' });
     }
   };
 
   const confirmDelete = async () => {
     if (!productToDelete) return;
     try {
-      await api.deleteProduct(productToDelete.id_producto, token);
-      refreshProducts();
+      const token = localStorage.getItem('token');
+      await axios.delete(`/api/products/${productToDelete.id_producto}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      await fetchData();
       setIsDeleteModalOpen(false);
       setProductToDelete(null);
-      playSuccessSound();
       showAlert({ title: 'Éxito', message: `El producto ${productToDelete.nombre} fue eliminado.` });
     } catch (err) {
-      const msg = err.message || 'No se pudo eliminar el producto.';
-      playErrorSound();
+      const data = err?.response?.data;
+      const msg = data?.msg || 'No se pudo eliminar el producto.';
       showAlert({ title: 'Error', message: msg, type: 'error' });
-      // Note: Re-enabling archive prompt logic if backend returns reasons in error message
-      // (This would need more integration with the Error object if we want to keep it exactly as before)
+      if (data?.reasons) {
+        setArchivePrompt({ open: true, product: productToDelete, detail: data.reasons });
+      }
     }
   };
 
   const archiveProduct = async (p) => {
     try {
-      await api.archiveProduct(p.id_producto, token);
+      const token = localStorage.getItem('token');
+      await axios.patch(`/api/products/${p.id_producto}/archive`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setArchivePrompt({ open: false, product: null, detail: null });
       setIsDeleteModalOpen(false);
       setProductToDelete(null);
-      refreshProducts();
-      playSuccessSound();
+      await fetchData();
       showAlert({ title: 'Archivado', message: `"${p.nombre}" fue archivado (inactivo).` });
     } catch (e) {
-      playErrorSound();
-      showAlert({ title: 'Error', message: e.message || 'No se pudo archivar el producto.', type: 'error' });
+      showAlert({ title: 'Error', message: e?.response?.data?.msg || 'No se pudo archivar el producto.', type: 'error' });
     }
   };
 
   const executeStockAdjustment = async (product, cantidad, razon) => {
     try {
-      await api.updateStock(product.id_producto, { cantidad, razon }, token);
+      const token = localStorage.getItem('token');
+      await axios.patch(`/api/products/${product.id_producto}/stock`,
+        { cantidad, razon }, { headers: { Authorization: `Bearer ${token}` } }
+      );
       setAdjustmentModal({ isOpen: false, product: null });
-      playSuccessSound();
       showAlert({ title: 'Éxito', message: 'Stock actualizado correctamente.' });
-      refreshProducts();
+      await fetchData();
     } catch (error) {
-      playErrorSound();
-      showAlert({ title: 'Error', message: error.message || 'No se pudo ajustar el stock.' });
+      showAlert({ title: 'Error', message: error.response?.data?.msg || 'No se pudo ajustar el stock.' });
     }
   };
 
   const handleAddCategory = async (name) => {
     try {
-      await api.request('post', '/categories', token, { nombre: name });
-      fetchData();
+      const token = localStorage.getItem('token');
+      await axios.post('/api/categories', { nombre: name }, { headers: { Authorization: `Bearer ${token}` } });
+      await fetchData();
     } catch (error) {
-      showAlert({ title: 'Error', message: error.message || 'No se pudo agregar la categoría.' });
+      showAlert({ title: 'Error', message: error.response?.data?.msg || 'No se pudo agregar la categoría.' });
     }
   };
   const handleDeleteCategory = async (id) => {
     try {
-      await api.request('delete', `/categories/${id}`, token);
-      fetchData();
+      const token = localStorage.getItem('token');
+      await axios.delete(`/api/categories/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      await fetchData();
     } catch (error) {
-      showAlert({ title: 'Error', message: error.message || 'No se pudo eliminar la categoría.' });
+      showAlert({ title: 'Error', message: error.response?.data?.msg || 'No se pudo eliminar la categoría. (Verifique que no esté en uso)' });
     }
   };
   const handleAddProvider = async (name) => {
     try {
-      await api.request('post', '/providers', token, { nombre: name });
-      fetchData();
+      const token = localStorage.getItem('token');
+      await axios.post('/api/providers', { nombre: name }, { headers: { Authorization: `Bearer ${token}` } });
+      await fetchData();
     } catch (error) {
-      showAlert({ title: 'Error', message: error.message || 'No se pudo agregar el proveedor.' });
+      showAlert({ title: 'Error', message: error.response?.data?.msg || 'No se pudo agregar el proveedor.' });
     }
   };
   const handleDeleteProvider = async (id) => {
     try {
-      await api.request('delete', `/providers/${id}`, token);
-      fetchData();
+      const token = localStorage.getItem('token');
+      await axios.delete(`/api/providers/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      await fetchData();
     } catch (error) {
-      showAlert({ title: 'Error', message: error.message || 'No se pudo eliminar el proveedor.' });
+      showAlert({ title: 'Error', message: error.response?.data?.msg || 'No se pudo eliminar el proveedor. (Verifique que no esté en uso)' });
     }
   };
 
@@ -1228,7 +1102,7 @@ const InventoryManagement = () => {
     <PageWrapper>
       <BackButton to="/dashboard"><FaArrowLeft /> Volver al Dashboard</BackButton>
       <HeaderContainer>
-        <Title><FaBoxOpen /> {isWholesaleView ? 'Precios Mayorista' : 'Gestión de Inventario'}</Title>
+        <Title><FaBoxOpen /> Gestión de Inventario</Title>
         <ButtonGroup>
           <Button primary onClick={openCreateModal}><FaPlus /> Crear Producto</Button>
           <Button secondary onClick={() => setIsCategoryModalOpen(true)}><FaTags /> Categorías</Button>
@@ -1293,27 +1167,15 @@ const InventoryManagement = () => {
                 <CardCode>Código: {p.codigo}</CardCode>
               </CardHeader>
               <CardBody>
-                {isWholesaleView ? (
-                  <>
-                    <InfoTag style={{ minWidth: '100%', background: '#f1f5f9', borderColor: '#e2e8f0', color: '#475569' }}><FaLock style={{ marginRight: 6, fontSize: '0.7rem' }} /><span>Costo</span><strong>{p.__fmt.costo}</strong></InfoTag>
-                    <InfoTag style={{ minWidth: '100%', background: '#fffbeb', borderColor: '#fef3c7' }}><span style={{ color: '#b45309' }}>Mayoreo</span><strong>{p.__fmt.mayoreo}</strong></InfoTag>
-                    <InfoTag><span style={{ color: '#0891b2' }}>Distribuidor</span><strong>{p.__fmt.distribuidor}</strong></InfoTag>
-                    <InfoTag><span style={{ color: '#4f46e5' }}>Taller</span><strong>{p.__fmt.taller}</strong></InfoTag>
-                    <InfoTag><span style={{ color: '#7c3aed' }}>Mayorista</span><strong>{p.__fmt.mayorista}</strong></InfoTag>
-                  </>
-                ) : (
-                  <>
-                    <InfoTag><span>Costo</span><strong>{p.__fmt.costo}</strong></InfoTag>
-                    <InfoTag><span>Venta</span><strong>{p.__fmt.venta}</strong></InfoTag>
-                    <StockTag $low={low} $out={out}><span>Existencia</span><strong>{p.existencia}</strong></StockTag>
-                    <InfoTag><span>Costo Total</span><strong>{p.__fmt.costoTotal}</strong></InfoTag>
-                  </>
-                )}
+                <InfoTag><span>Costo</span><strong>{p.__fmt.costo}</strong></InfoTag>
+                <InfoTag><span>Venta</span><strong>{p.__fmt.venta}</strong></InfoTag>
+                <StockTag $low={low} $out={out}><span>Existencia</span><strong>{p.existencia}</strong></StockTag>
+                <InfoTag><span>Costo Total</span><strong>{p.__fmt.costoTotal}</strong></InfoTag>
               </CardBody>
               <CardFooter>
-                {!isWholesaleView && <ActionButton className="adjust" title="Ajustar Stock" onClick={() => setAdjustmentModal({ isOpen: true, product: p })}><FaPlusCircle /><FaMinusCircle style={{ marginLeft: 4 }} /></ActionButton>}
-                <ActionButton className="edit" onClick={() => openEditModal(p)}><FaEdit /> {isWholesaleView ? 'Editar Precios' : 'Editar'}</ActionButton>
-                {!isWholesaleView && <ActionButton className="delete" onClick={() => openDeleteModal(p)}><FaTrash /> Eliminar</ActionButton>}
+                <ActionButton className="adjust" title="Ajustar Stock" onClick={() => setAdjustmentModal({ isOpen: true, product: p })}><FaPlusCircle /><FaMinusCircle style={{ marginLeft: 4 }} /></ActionButton>
+                <ActionButton className="edit" onClick={() => openEditModal(p)}><FaEdit /> Editar</ActionButton>
+                <ActionButton className="delete" onClick={() => openDeleteModal(p)}><FaTrash /> Eliminar</ActionButton>
               </CardFooter>
             </ProductCard>
           );
@@ -1363,29 +1225,12 @@ const InventoryManagement = () => {
       )}
       <AnimatePresence>
         {isCreateModalOpen && (
-          <CreateProductModal
-            isOpen={isCreateModalOpen}
-            onClose={() => setIsCreateModalOpen(false)}
-            onSave={handleCreateProduct}
-            categories={categories}
-            providers={providers}
-            allProductsRaw={allProductsRaw}
-            isWholesaleView={isWholesaleView}
-          />
+          <CreateProductModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSave={handleCreateProduct} categories={categories} providers={providers} allProductsRaw={allProductsRaw} />
         )}
       </AnimatePresence>
       <AnimatePresence>
         {isEditModalOpen && (
-          <EditProductModal
-            isOpen={isEditModalOpen}
-            onClose={() => setIsEditModalOpen(false)}
-            onSave={handleUpdateProduct}
-            productToEdit={productToEdit}
-            categories={categories}
-            providers={providers}
-            allProductsRaw={allProductsRaw}
-            isWholesaleView={isWholesaleView}
-          />
+          <EditProductModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSave={handleUpdateProduct} productToEdit={productToEdit} categories={categories} providers={providers} allProductsRaw={allProductsRaw} />
         )}
       </AnimatePresence>
       <AnimatePresence>
