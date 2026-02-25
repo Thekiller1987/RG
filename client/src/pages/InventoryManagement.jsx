@@ -869,6 +869,7 @@ const InventoryManagement = () => {
 
   const fetchData = useCallback(async () => {
     try {
+      setError(null);
       const token = localStorage.getItem('token');
       const [full, cats, provs] = await Promise.all([
         fetchProductList(),
@@ -902,9 +903,12 @@ const InventoryManagement = () => {
       setAllProducts(indexed);
       setCategories(cats.data);
       setProviders(provs.data);
-      setInitialLoadComplete(true);
+      setError(null);
     } catch (e) {
-      setError('Error al cargar los datos.');
+      console.error('InventoryManagement fetchData error:', e);
+      setError(e?.response?.data?.msg || e?.message || 'Error al cargar los datos. Verifica tu conexión.');
+    } finally {
+      setInitialLoadComplete(true);
     }
   }, [fetchProductList]);
 
@@ -1093,7 +1097,18 @@ const InventoryManagement = () => {
   };
 
   if (!initialLoadComplete) return <PageWrapper><CenteredMessage><Spinner /><p>Cargando Inventario...</p></CenteredMessage></PageWrapper>;
-  if (error) return <PageWrapper><CenteredMessage style={{ color: '#c53030' }}>{error}</CenteredMessage></PageWrapper>;
+  if (error) return (
+    <PageWrapper>
+      <CenteredMessage style={{ color: '#c53030' }}>
+        <FaExclamationTriangle style={{ fontSize: '2.5rem', marginBottom: '1rem', color: '#e53e3e' }} />
+        <p style={{ marginBottom: '0.5rem', fontWeight: 600, fontSize: '1.1rem' }}>{error}</p>
+        <p style={{ color: '#718096', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Verifica tu conexión a internet e intenta nuevamente.</p>
+        <Button primary onClick={() => { setInitialLoadComplete(false); setError(null); fetchData(); }}>
+          Reintentar
+        </Button>
+      </CenteredMessage>
+    </PageWrapper>
+  );
 
   const animationsEnabled = filtered.length <= LARGE_LIST_CUTOFF;
   const totalPages = Math.ceil(totalFilteredCount / ITEMS_PER_PAGE);
