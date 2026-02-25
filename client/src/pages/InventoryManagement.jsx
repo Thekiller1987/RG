@@ -123,7 +123,7 @@ const FilterToggleButton = styled.button`
 const Select = styled.select`
   padding: 0.7rem 1rem; border: 1px solid #cbd5e1; border-radius: 12px; 
   background-color: #f8fafc; color: #334155; outline: none; flex: 1;
-  font-size: 0.9rem; cursor: pointer;
+  font-size: 0.9rem; cursor: pointer; width: 100%; box-sizing: border-box;
   &:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); background: white; }
 `;
 
@@ -201,13 +201,15 @@ const ModalOverlay = styled(motion.div)`
   background: rgba(15, 23, 42, 0.5); z-index: 50;
   display: flex; align-items: center; justify-content: center; padding: 0.75rem;
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  overflow: hidden;
 `;
 const ModalContent = styled.div`
-  background: white; width: 100%; max-width: ${p => p.$large ? '800px' : '550px'};
+  background: white; width: 100%; max-width: ${p => p.$large ? '900px' : '700px'};
   border-radius: 20px; padding: 1.75rem;
-  max-height: 92vh; overflow-y: auto;
+  max-height: 92vh; overflow-y: auto; overflow-x: hidden;
   box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.3);
-  @media(max-width: 640px) { padding: 1.25rem; border-radius: 16px; }
+  box-sizing: border-box;
+  @media(max-width: 640px) { padding: 1.25rem; border-radius: 16px; max-width: 100%; }
 `;
 const ModalTitle = styled.h2`
   margin-top: 0; color: #0f172a; margin-bottom: 1.25rem; font-size: 1.35rem;
@@ -219,17 +221,21 @@ const ModalError = styled.div`
 `;
 const InputGrid = styled.div`
   display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.25rem;
+  overflow: hidden;
+  & > * { min-width: 0; }
+  @media(min-width: 768px) { grid-template-columns: repeat(3, 1fr); }
   @media(max-width: 640px) { grid-template-columns: 1fr; gap: 0.75rem; }
 `;
-const FormGroup = styled.div` display: flex; flex-direction: column; gap: 5px; `;
+const FormGroup = styled.div` display: flex; flex-direction: column; gap: 5px; min-width: 0; `;
 const Label = styled.label` font-size: 0.82rem; font-weight: 600; color: #475569; `;
 const Input = styled.input`
+  width: 100%; box-sizing: border-box;
   padding: 9px 12px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 0.95rem; color: #1e293b;
   transition: all 0.2s;
   &:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
   &:disabled { background: #f1f5f9; color: #94a3b8; }
 `;
-const ModalActions = styled.div` display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; border-top: 1px solid #f1f5f9; padding-top: 1.25rem; `;
+const ModalActions = styled.div` display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; border-top: 1px solid #f1f5f9; padding-top: 1.25rem; flex-wrap: wrap; `;
 const CancelButton = styled.button`
   background: white; color: #64748b; border: 1.5px solid #e2e8f0;
   padding: 9px 18px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 0.9rem;
@@ -650,7 +656,7 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
 
   return (
     <ModalOverlay onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}>
+      <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} style={{ width: '100%', maxWidth: '700px' }}>
         <ModalContent as="div" onClick={(e) => e.stopPropagation()}>
           <form onSubmit={handleSubmit}>
             <ModalTitle>Crear Nuevo Producto</ModalTitle>
@@ -758,7 +764,7 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
 
   return (
     <ModalOverlay onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}>
+      <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} style={{ width: '100%', maxWidth: '550px' }}>
         <ModalContent as="div" onClick={(e) => e.stopPropagation()}>
           <form onSubmit={handleSubmit}>
             <ModalTitle>Editar Producto</ModalTitle>
