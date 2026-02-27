@@ -284,6 +284,9 @@ const CajaModal = ({
                     <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem' }}>(+) Ventas Netas (Ventas + Abonos - Devoluciones)</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem' }}>{money(totalVentasDia)}</td></tr>
                     {sumDevolucionesCancelaciones > 0 && <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.85rem', color: '#856404' }}>    (Devoluciones/Cancel. ya descontadas: {money(sumDevolucionesCancelaciones)})</td><td></td></tr>}
                     <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem', color: '#dc3545' }}>(-) Tarjetas / Transf / Crédito</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem', color: '#dc3545' }}>- {money(totalNoEfectivo)}</td></tr>
+                    {totalTarjeta > 0 && <tr><td style={{ padding: '2px 10px 2px 35px', fontSize: '0.82rem', color: '#6c757d' }}>💳 Tarjeta</td><td className="text-right" style={{ padding: '2px 10px', fontSize: '0.82rem', color: '#6c757d' }}>{money(totalTarjeta)}</td></tr>}
+                    {totalTransferencia > 0 && <tr><td style={{ padding: '2px 10px 2px 35px', fontSize: '0.82rem', color: '#6c757d' }}>🏦 Transferencia</td><td className="text-right" style={{ padding: '2px 10px', fontSize: '0.82rem', color: '#6c757d' }}>{money(totalTransferencia)}</td></tr>}
+                    {totalCredito > 0 && <tr><td style={{ padding: '2px 10px 2px 35px', fontSize: '0.82rem', color: '#6c757d' }}>📋 Crédito</td><td className="text-right" style={{ padding: '2px 10px', fontSize: '0.82rem', color: '#6c757d' }}>{money(totalCredito)}</td></tr>}
                     <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem', color: '#dc3545' }}>(-) Salidas de Efectivo</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem', color: '#dc3545' }}>- {money(salidas.reduce((a, b) => a + Math.abs(b.displayAmount || 0), 0))}</td></tr>
 
                     <tr style={{ borderBottom: '1px solid #f1f1f1', background: '#e8f5e9' }}><td style={{ padding: 10, fontWeight: 'bold', fontSize: '1.1rem' }}>Esperado en Caja</td><td className="text-right" style={{ padding: 10, fontWeight: 'bold', fontSize: '1.1rem', color: '#146c43' }}>{money(efectivoEsperado)}</td></tr>
@@ -456,6 +459,17 @@ const CajaModal = ({
               <TotalsRow style={{ fontSize: '1.3rem' }}><span>Dólares:</span><strong style={{ color: '#198754' }}>$ {Number(efectivoEsperadoDolares).toLocaleString()}</strong></TotalsRow>
               <TotalsRow $bold style={{ marginTop: 10, borderTop: '2px solid #ccc', paddingTop: 10, fontSize: '1.5rem' }}><span>TOTAL (C$):</span><span>{money(efectivoEsperado)}</span></TotalsRow>
             </div>
+
+            {/* Desglose No Efectivo */}
+            {totalNoEfectivo > 0 && (
+              <div style={{ marginTop: 12, padding: '12px 15px', backgroundColor: '#fff3cd', borderRadius: 6, border: '1px solid #ffc107' }}>
+                <div style={{ fontWeight: '800', marginBottom: 8, fontSize: '1rem', color: '#856404' }}>Desglose No Efectivo:</div>
+                {totalTarjeta > 0 && <TotalsRow style={{ fontSize: '1.1rem' }}><span>💳 Tarjeta:</span><strong>{money(totalTarjeta)}</strong></TotalsRow>}
+                {totalTransferencia > 0 && <TotalsRow style={{ fontSize: '1.1rem' }}><span>🏦 Transferencia:</span><strong>{money(totalTransferencia)}</strong></TotalsRow>}
+                {totalCredito > 0 && <TotalsRow style={{ fontSize: '1.1rem' }}><span>📋 Crédito:</span><strong>{money(totalCredito)}</strong></TotalsRow>}
+                <TotalsRow $bold style={{ marginTop: 6, borderTop: '1px dashed #856404', paddingTop: 6, fontSize: '1.15rem', color: '#856404' }}><span>Total No Efectivo:</span><span>{money(totalNoEfectivo)}</span></TotalsRow>
+              </div>
+            )}
 
             <label style={{ display: 'block', marginTop: 20, fontWeight: 800, fontSize: '1.3rem' }}>Monto Contado Físico (C$)</label>
             <SearchInput type="number" step="0.01" value={montoContado} onChange={e => setMontoContado(e.target.value)} autoFocus placeholder="Total Billetes + Monedas" style={{ fontSize: '1.5rem', padding: '12px', height: 'auto' }} />
