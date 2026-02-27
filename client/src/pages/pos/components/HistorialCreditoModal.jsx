@@ -2,15 +2,23 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import styled from "styled-components";
 import { FaTimes, FaMoneyBillWave, FaCreditCard, FaSpinner, FaFileInvoiceDollar, FaArrowLeft, FaPrint, FaCheckCircle, FaClock } from "react-icons/fa";
+import { toast } from "react-hot-toast";
 import * as api from "../../../service/api";
 import TicketModal from "./TicketModal";
+import StatementModal from "./StatementModal";
 import { useAuth } from "../../../context/AuthContext";
 
 const ModalOverlay = styled.div`position: fixed; inset: 0; background-color: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: 1rem;`;
 const ModalContent = styled.div`background: #f4f7f6; color: #333; border-radius: 10px; width: 900px; max-width: 100%; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.1);`;
 const Header = styled.div`padding: 1rem 1.5rem; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;`;
 const Title = styled.h2`margin: 0; font-size: 1.5rem;`;
-const CloseButton = styled.button`background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888; &:hover{color:#333;}`;
+const HeaderActions = styled.div`display: flex; gap: 0.5rem; flex-wrap: wrap;`;
+const HeaderBtn = styled.button`
+  display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; 
+  font-size: 0.85rem; font-weight: 600; border: none; border-radius: 6px; cursor: pointer; color: white;
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+`;
+const CloseButton = styled.button`background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888; margin-left: auto; &:hover{color:#333;}`;
 const Body = styled.div`padding: 1.5rem; overflow-y: auto;`;
 const SummaryContainer = styled.div`display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;`;
 const SummaryCard = styled.div`
@@ -88,6 +96,28 @@ export default function HistorialCreditoModal({ client, onClose, token }) {
     const [showTicket, setShowTicket] = useState(false);
     const [selectedAbono, setSelectedAbono] = useState(null);
 
+    // Estado para la Impresión del Estado de Cuenta
+    const [isFetchingStatement, setIsFetchingStatement] = useState(false);
+    const [statementData, setStatementData] = useState(null);
+    const [statementFilter, setStatementFilter] = useState('ALL');
+
+    const handlePrint = async (filter = 'ALL') => {
+        setIsFetchingStatement(true);
+        const loadingToast = toast.loading('Calculando balance histórico...');
+        try {
+            const data = await api.fetchClientStatement(client.id_cliente, token);
+            setStatementData(data);
+            setStatementFilter(filter);
+            toast.dismiss(loadingToast);
+        } catch (err) {
+            toast.dismiss(loadingToast);
+            toast.error('Error al generar el estado de cuenta.');
+            console.error(err);
+        } finally {
+            setIsFetchingStatement(false);
+        }
+    };
+
     const fetchData = useCallback(async () => {
         if (!client) return;
         setLoading(true); setError(null);
@@ -147,7 +177,20 @@ export default function HistorialCreditoModal({ client, onClose, token }) {
         <ModalOverlay onClick={onClose}>
             <ModalContent onClick={e => e.stopPropagation()}>
                 <Header>
-                    <Title>Historial de {client.nombre}</Title>
+                    <div>
+                        <Title style={{ marginBottom: '8px' }}>Historial de {client.nombre}</Title>
+                        <HeaderActions>
+                            <HeaderBtn style={{ background: '#212529' }} onClick={() => handlePrint('ALL')} disabled={isFetchingStatement}>
+                                <FaFileInvoiceDollar /> Estado Completo
+                            </HeaderBtn>
+                            <HeaderBtn style={{ background: '#dc3545' }} onClick={() => handlePrint('DEBT')} disabled={isFetchingStatement}>
+                                <FaCreditCard /> Solo Deuda
+                            </HeaderBtn>
+                            <HeaderBtn style={{ background: '#28a745' }} onClick={() => handlePrint('PAID')} disabled={isFetchingStatement}>
+                                <FaMoneyBillWave /> Solo Pagos
+                            </HeaderBtn>
+                        </HeaderActions>
+                    </div>
                     <CloseButton onClick={onClose}><FaTimes /></CloseButton>
                 </Header>
                 <Body>
@@ -261,6 +304,14 @@ export default function HistorialCreditoModal({ client, onClose, token }) {
                     clients={[client]}
                     users={allUsers}
                     onClose={() => setShowTicket(false)}
+                />
+            )}
+
+            {statementData && (
+                <StatementModal
+                    statementData={statementData}
+                    filterType={statementFilter}
+                    onClose={() => setStatementData(null)}
                 />
             )}
         </ModalOverlay>

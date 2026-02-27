@@ -77,12 +77,25 @@ const TicketLogo = styled.img`
 
 const StatementModal = ({
     statementData,
+    filterType = 'ALL', // 'ALL', 'DEBT', 'PAID'
     onClose,
 }) => {
     const { settings } = useSettings();
     const { cliente, historial } = statementData;
 
     const fmt = (n) => new Intl.NumberFormat('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n || 0));
+
+    // Filtrar el historial según lo seleccionado
+    const filteredHistorial = historial.filter(tx => {
+        if (filterType === 'DEBT') return tx.impacto > 0; // Solo lo que sumó deuda (créditos)
+        if (filterType === 'PAID') return tx.impacto < 0; // Solo lo que restó deuda (abonos/pagos)
+        return true; // 'ALL'
+    });
+
+    const reportTitle =
+        filterType === 'DEBT' ? 'HISTORIAL DE DEUDAS (CRÉDITOS)' :
+            filterType === 'PAID' ? 'HISTORIAL DE PAGOS (ABONOS)' :
+                'ESTADO DE CUENTA COMPLETO';
 
     const companyInfo = {
         name: settings?.empresa_nombre || 'Multirepuestos RG',
@@ -146,7 +159,7 @@ const StatementModal = ({
 
         const w = window.open('', '_blank', 'width=900,height=700');
         if (!w) return;
-        w.document.write(`<!DOCTYPE html><html><head><title>ESTADO DE CUENTA - ${companyInfo.name}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"><style>${printStyles}</style></head><body>${htmlToPrint}</body></html>`);
+        w.document.write(`<!DOCTYPE html><html><head><title>${reportTitle} - ${companyInfo.name}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"><style>${printStyles}</style></head><body>${htmlToPrint}</body></html>`);
         w.document.close();
         w.focus();
         w.onload = function () {
@@ -165,7 +178,7 @@ const StatementModal = ({
             <ModalContent onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', width: '100%', padding: '0', overflow: 'hidden' }}>
                 <div style={{ padding: '20px 24px', background: '#1e3a8a', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h2 style={{ margin: 0, fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <FaFileInvoiceDollar /> Estado de Cuenta
+                        <FaFileInvoiceDollar /> {reportTitle}
                     </h2>
                     <Button $cancel onClick={onClose} style={{ padding: '6px 12px', minWidth: 'auto' }}>
                         <FaWindowClose size={18} />
@@ -184,7 +197,7 @@ const StatementModal = ({
                                     <small>RUC: {companyInfo.ruc}</small>
                                     <small>Tel: {companyInfo.phone}</small>
                                     <small>{companyInfo.address}</small>
-                                    <small style={{ fontWeight: 'bold', marginTop: '6px', fontSize: '1rem', textTransform: 'uppercase' }}>ESTADO DE CUENTA</small>
+                                    <small style={{ fontWeight: 'bold', marginTop: '6px', fontSize: '1rem', textTransform: 'uppercase' }}>{reportTitle}</small>
                                 </div>
                             </div>
 
@@ -206,7 +219,7 @@ const StatementModal = ({
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {historial.map((tx, idx) => (
+                                    {filteredHistorial.map((tx, idx) => (
                                         <tr key={idx}>
                                             <td>{new Date(tx.fecha).toLocaleDateString('es-NI')}</td>
                                             <td style={{ fontSize: '0.8rem' }}>{tx.descripcion}</td>
@@ -215,10 +228,10 @@ const StatementModal = ({
                                             <td className="right" style={{ fontWeight: 'bold' }}>{fmt(tx.saldo)}</td>
                                         </tr>
                                     ))}
-                                    {historial.length === 0 && (
+                                    {filteredHistorial.length === 0 && (
                                         <tr>
                                             <td colSpan="5" className="center" style={{ padding: '15px' }}>
-                                                Sin movimientos registrados
+                                                Sin movimientos registrados en esta categoría
                                             </td>
                                         </tr>
                                     )}
