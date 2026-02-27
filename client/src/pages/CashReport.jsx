@@ -135,6 +135,22 @@ function calculateReportStats(session) {
 
   const cajaInicialN = Number(session?.initialAmount || session?.monto_inicial || 0);
 
+  // DEDUP: Remove duplicate transactions before calculation
+  const _dedup = (txs) => {
+    const ids = new Set(), fps = new Set(), out = [];
+    for (const tx of txs) {
+      if (tx.id && ids.has(tx.id)) continue;
+      if (tx.id) ids.add(tx.id);
+      const pd = tx.pagoDetalles || {};
+      const fp = `${(tx.type || '').toLowerCase()}|${Number(tx.amount || 0).toFixed(2)}|${Number(pd.totalVenta || 0).toFixed(2)}|${Number(pd.efectivo || 0).toFixed(2)}|${Number(pd.tarjeta || 0).toFixed(2)}|${Number(pd.credito || 0).toFixed(2)}|${Number(pd.transferencia || 0).toFixed(2)}`;
+      if (fps.has(fp)) continue;
+      fps.add(fp);
+      out.push(tx);
+    }
+    return out;
+  };
+  transactions = _dedup(transactions);
+
   const cls = {
     ventasContado: [],
     devoluciones: [],

@@ -3,6 +3,36 @@
  * Handles different transaction types, currency conversion, and hidden adjustments.
  */
 
+/**
+ * Deduplicates transactions before calculation.
+ * Handles both exact ID duplicates and fingerprint-based duplicates
+ * (e.g., PEND-xxx optimistic entries that duplicate real server entries).
+ */
+function deduplicateTransactions(transactions) {
+    if (!Array.isArray(transactions) || transactions.length === 0) return [];
+
+    const seenIds = new Set();
+    const fingerprints = new Set();
+    const cleaned = [];
+
+    for (const tx of transactions) {
+        // 1. Skip exact ID duplicates
+        if (tx.id && seenIds.has(tx.id)) continue;
+        if (tx.id) seenIds.add(tx.id);
+
+        // 2. Skip fingerprint duplicates (catches PEND-xxx vs real ID dupes)
+        const pd = tx.pagoDetalles || {};
+        const fp = `${(tx.type || '').toLowerCase()}|${Number(tx.amount || 0).toFixed(2)}|${Number(pd.totalVenta || 0).toFixed(2)}|${Number(pd.efectivo || 0).toFixed(2)}|${Number(pd.tarjeta || 0).toFixed(2)}|${Number(pd.credito || 0).toFixed(2)}|${Number(pd.transferencia || 0).toFixed(2)}`;
+
+        if (fingerprints.has(fp)) continue;
+        fingerprints.add(fp);
+
+        cleaned.push(tx);
+    }
+
+    return cleaned;
+}
+
 export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 36.60) => {
     const cajaInicialN = Number(initialAmount || 0);
     const tasaRef = Number(tasaDolar || 36.60);
@@ -27,7 +57,8 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
     let tVentasDia = 0; // Total Revenue (Sales + Abonos + Entries - Returns/Cancels)
     let totalHidden = 0;
 
-    const validTransactions = Array.isArray(transactions) ? transactions : [];
+    // CRITICAL: Deduplicate BEFORE processing to prevent inflated totals
+    const validTransactions = deduplicateTransactions(Array.isArray(transactions) ? transactions : []);
 
     for (const tx of validTransactions) {
         const t = (tx?.type || '').toLowerCase();
