@@ -117,7 +117,7 @@ const Wrapper = styled.div`
 
 const TicketLogo = styled.img`
   width: 120px; max-width: 160px; height: auto; display: block; margin: 0 auto 6px; border-radius: 6px;
-  &.a4-logo { margin: 0; max-width: 140px; }
+  .print-a4 & { margin: 0; max-width: 140px; }
 `;
 
 const Tag = styled.span`
@@ -244,7 +244,7 @@ const ProformaModal = ({
             {/* BRAND HEADER */}
             <div className="brand">
               <div className="brand-logo-container">
-                <TicketLogo className="a4-logo" src={companyInfo.logo} alt="Logo" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                <TicketLogo src={companyInfo.logo} alt="Logo" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
               </div>
               <div className="brand-info">
                 <h1>{companyInfo.name}</h1>

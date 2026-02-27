@@ -332,8 +332,9 @@ const POS = () => {
           // Éxito silencioso o pequeño toast (ya mostramos alerta abajo si era instant)
         }
 
-        // Registrar en Caja (Background)
-        if (isCajaOpen && cajaSession) {
+        // Registrar en Caja (Background) — SOLO para modo NO instantáneo
+        // En modo instantáneo, la caja se registra FUERA de esta promesa para evitar duplicados.
+        if (!isInstant && isCajaOpen && cajaSession) {
           const details = { ...pagoDetalles };
           const isCash = !details.tarjeta && !details.transferencia && !details.credito;
           if (isCash && details.efectivo === undefined) details.efectivo = saleData.totalVenta;
@@ -352,27 +353,20 @@ const POS = () => {
             id: savedSale.id
           };
 
-          // Enviar a servidor sin esperar en UI
+          // Enviar a servidor
           api.addCajaTx({ userId, tx: newTransaction }, token).catch(console.error);
 
-          // Actualizar sesión local (si no lo hicimos antes)
-          // Nota: Si ya lo hicimos antes, esto podría duplicar visualmente si no tenemos cuidado, 
-          // pero como estamos en la promesa, esto corre "después".
-          // Mejor: Actualizar la sesión local SOLO si es await. Si es instant, lo hacemos afuera.
-          if (!isInstant) {
-            const updatedSession = { ...cajaSession, transactions: [newTransaction, ...(cajaSession.transactions || [])] };
-            setCajaSession(updatedSession);
-          }
+          // Actualizar sesión local
+          const updatedSession = { ...cajaSession, transactions: [newTransaction, ...(cajaSession.transactions || [])] };
+          setCajaSession(updatedSession);
         }
 
       } catch (err) {
         console.error("CRITICAL: Error saving sale in background:", err);
-        // ★ NOTIFICACIÓN DE FALLO (User Request)
         showAlert({
           title: "⚠️ Error de Sincronización",
           message: `La venta por C$ ${fmt(total)} NO se guardó en el servidor.\nError: ${err.message}.\n\nPor favor, anote los detalles o reintente.`
         });
-        // TODO: En un sistema real, guardaríamos esto en IndexedDB para reintento automático.
       }
     };
 
@@ -387,12 +381,13 @@ const POS = () => {
         return p;
       }));
 
-      // Actualizar Caja Localmente (Optimistic)
+      // Actualizar Caja Localmente (Optimistic) + Enviar a servidor
       if (isCajaOpen && cajaSession) {
         const details = { ...pagoDetalles };
         const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
         const totalSale = Number(saleData.totalVenta || 0);
-        // ... (Logic duplicated largely for local show) ...
+        details.efectivo = Number(details.efectivo || 0);
+
         const tempTx = {
           type: 'venta',
           amount: totalSale,
@@ -402,6 +397,10 @@ const POS = () => {
           pagoDetalles: details,
           id: 'PEND-' + Date.now()
         };
+
+        // Enviar a servidor (única vez, no se repite en processSalePromise)
+        api.addCajaTx({ userId, tx: tempTx }, token).catch(console.error);
+
         const updatedSession = { ...cajaSession, transactions: [tempTx, ...(cajaSession.transactions || [])] };
         setCajaSession(updatedSession);
       }
@@ -706,7 +705,16 @@ const POS = () => {
           <S.Button secondary onClick={() => openModal('cashExit')} title="Salida de Dinero">
             <FaArrowUp color="#ef4444" />
           </S.Button>
-          <S.Button secondary onClick={() => openModal('caja')}>
+          <S.Button secondary onClick={async () => {
+            // Auto-limpiar duplicados antes de abrir
+            if (isCajaOpen && userId) {
+              try {
+                await api.dedupCajaSession(userId, token);
+                await refreshSession();
+              } catch (e) { console.error('dedup error:', e); }
+            }
+            openModal('caja');
+          }}>
             <FaLock /> {currentUser?.nombre_usuario || 'Caja'}
           </S.Button>
         </div>

@@ -363,6 +363,10 @@ export const closeCajaSession = async (closeData, token) => {
     return await request('post', '/caja/session/close', token, closeData);
 };
 
+export const dedupCajaSession = async (userId, token) => {
+    return await request('post', '/caja/session/dedup', token, { userId });
+};
+
 
 /**
  * NUEVO: Obtiene el reporte de cierres de caja para una fecha específica.

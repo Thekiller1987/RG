@@ -358,9 +358,17 @@ router.post('/session/tx', async (req, res) => {
 
     if (!details.transactions) details.transactions = [];
 
-    // 2. Agregar transacción
+    // 2. Deduplicación: Si ya existe una transacción con el mismo ID, no agregar de nuevo
+    const txId = tx.id || `tx-${Date.now()}`;
+    const alreadyExists = details.transactions.some(existing => existing.id && existing.id === txId);
+    if (alreadyExists) {
+      console.warn(`[addCajaTx] Transacción duplicada ignorada: ${txId}`);
+      return res.status(200).json(mapRowToSession({ ...row, detalles_json: details }));
+    }
+
+    // 3. Agregar transacción
     details.transactions.push({
-      id: tx.id || `tx-${Date.now()}`,
+      id: txId,
       type: tx.type,
       amount: Number(tx.amount || 0),
       note: tx.note || '',
@@ -397,6 +405,100 @@ router.post('/session/tx', async (req, res) => {
   } catch (error) {
     console.error('Error POST /session/tx:', error);
     res.status(500).json({ message: 'Error guardando transacción: ' + error.message });
+  }
+});
+
+// POST /api/caja/session/dedup — Limpia transacciones duplicadas de la sesión abierta
+router.post('/session/dedup', async (req, res) => {
+  const { userId } = req.body || {};
+  if (!userId) return res.status(400).json({ message: 'Falta userId' });
+
+  try {
+    const [rows] = await pool.query(`
+      SELECT * FROM cierres_caja 
+      WHERE usuario_id = ? AND fecha_cierre IS NULL 
+      LIMIT 1
+    `, [userId]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'No hay sesión abierta para limpiar' });
+    }
+
+    const row = rows[0];
+    let details = {};
+    try {
+      details = (typeof row.detalles_json === 'string')
+        ? JSON.parse(row.detalles_json)
+        : (row.detalles_json || {});
+    } catch { details = {}; }
+
+    const original = details.transactions || [];
+    const originalCount = original.length;
+
+    // Deduplicar: mantener solo la primera aparición de cada ID
+    // Para IDs tipo PEND-xxx que podrían tener un duplicado con ID real,
+    // comparar por (type + amount + pagoDetalles.totalVenta) como fingerprint
+    const seen = new Set();
+    const fingerprints = new Set();
+    const cleaned = [];
+
+    for (const tx of original) {
+      // 1. Dedup por ID exacto
+      if (tx.id && seen.has(tx.id)) continue;
+      if (tx.id) seen.add(tx.id);
+
+      // 2. Dedup por fingerprint (para detectar PEND-xxx duplicados de IDs reales)
+      const pd = tx.pagoDetalles || {};
+      const fp = `${tx.type}|${Number(tx.amount || 0).toFixed(2)}|${Number(pd.totalVenta || 0).toFixed(2)}|${Number(pd.efectivo || 0).toFixed(2)}|${Number(pd.tarjeta || 0).toFixed(2)}|${Number(pd.credito || 0).toFixed(2)}`;
+
+      if (fingerprints.has(fp)) {
+        console.log(`[dedup] Removiendo TX duplicada (fingerprint): ${tx.id} - ${tx.note}`);
+        continue;
+      }
+      fingerprints.add(fp);
+
+      cleaned.push(tx);
+    }
+
+    details.transactions = cleaned;
+    const removedCount = originalCount - cleaned.length;
+
+    // Recalcular totales
+    const totals = calcularTotalesSesion(cleaned, details);
+
+    await pool.query(`
+      UPDATE cierres_caja 
+      SET detalles_json = ?,
+          total_ventas_efectivo = ?,
+          total_ventas_tarjeta = ?,
+          total_ventas_transferencia = ?,
+          total_ventas_credito = ?,
+          total_dolares = ?,
+          total_entradas = ?,
+          total_salidas = ?
+      WHERE id = ?
+    `, [
+      JSON.stringify(details),
+      totals.totalEfectivo, totals.totalTarjeta, totals.totalTransferencia,
+      totals.totalCredito, totals.totalDolares,
+      totals.totalIngresos, totals.totalGastos,
+      row.id
+    ]);
+
+    console.log(`[dedup] Sesión ${row.id}: ${originalCount} TX → ${cleaned.length} TX (${removedCount} duplicadas removidas)`);
+
+    res.json({
+      success: true,
+      message: `Limpieza completada: ${removedCount} transacciones duplicadas removidas de ${originalCount} totales.`,
+      originalCount,
+      cleanedCount: cleaned.length,
+      removedCount,
+      session: mapRowToSession({ ...row, detalles_json: details })
+    });
+
+  } catch (error) {
+    console.error('Error POST /session/dedup:', error);
+    res.status(500).json({ message: 'Error limpiando sesión: ' + error.message });
   }
 });
 
