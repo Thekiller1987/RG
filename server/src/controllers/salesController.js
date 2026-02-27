@@ -62,7 +62,10 @@ const createSale = async (req, res) => {
 
     // ─── SOCKET.IO EMIT ───
     const io = req.app.get('io');
-    if (io) io.emit('inventory_update');
+    if (io) {
+      io.emit('inventory_update');
+      if (montoCredito > 0 && clientId) io.emit('clients:update');
+    }
 
     const [newSale] = await connection.query('SELECT * FROM ventas WHERE id_venta = ?', [saleId]);
 
@@ -117,7 +120,10 @@ const cancelSale = async (req, res) => {
 
     // ─── SOCKET.IO EMIT ───
     const io = req.app.get('io');
-    if (io) io.emit('inventory_update');
+    if (io) {
+      io.emit('inventory_update');
+      if (montoCredito > 0 && clientId) io.emit('clients:update');
+    }
 
     res.status(200).json({ message: 'Venta cancelada exitosamente.' });
   } catch (error) {
@@ -254,7 +260,10 @@ const createReturn = async (req, res) => {
 
     // ─── SOCKET.IO EMIT ───
     const io = req.app.get('io');
-    if (io) io.emit('inventory_update');
+    if (io) {
+      io.emit('inventory_update');
+      if (esCreditoDevolucion) io.emit('clients:update');
+    }
 
     res.status(201).json({
       message: 'Devolución procesada. Ticket original actualizado.',

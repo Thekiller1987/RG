@@ -334,19 +334,37 @@ const ProformaModal = ({
         #print-wrapper-proforma .totals { display: flex !important; justify-content: flex-end !important; margin-top: 20px !important; border-top: none !important; }
         #print-wrapper-proforma .totals-box { width: 300px !important; background: #f8fafc !important; padding: 15px !important; border: 1px solid #e2e8f0 !important; border-radius: 8px !important; }
       ` : `
-        #print-wrapper-proforma .brand { text-align: center !important; border-bottom: 2px solid #111 !important; }
-        #print-wrapper-proforma .brand-logo-container { display: flex !important; justify-content: center !important; }
-        #print-wrapper-proforma .meta p { display: flex !important; justify-content: space-between !important; }
+        #print-wrapper-proforma, #print-wrapper-proforma * {
+          color: #000 !important;
+          font-weight: 800 !important;
+          font-size: 10pt !important;
+        }
+        #print-wrapper-proforma .brand { text-align: center !important; border-bottom: 2px solid #000 !important; padding-bottom: 6px !important; margin-bottom: 6px !important; }
+        #print-wrapper-proforma .brand h1 { font-size: 18pt !important; letter-spacing: 0.5px !important; margin: 0 0 4px !important; }
+        #print-wrapper-proforma .brand-logo-container { display: flex !important; justify-content: center !important; margin-bottom: 4px !important; }
+        #print-wrapper-proforma .meta p { display: flex !important; justify-content: space-between !important; margin: 2px 0 !important; }
+        #print-wrapper-proforma .totals .grand-total { font-size: 14pt !important; border-top: 2px solid #000 !important; margin-top: 6px !important; padding-top: 4px !important; }
+        #print-wrapper-proforma table.items th { border-bottom: 2px solid #000 !important; font-size: 9pt !important; }
+        #print-wrapper-proforma table.items td { border-bottom: 1px dashed #000 !important; font-size: 9pt !important; }
+        #print-wrapper-proforma .badge { border: 2px solid #000 !important; padding: 4px 8px !important; }
       `}
     `;
 
     const w = window.open('', '_blank', 'width=900,height=700');
     if (!w) return;
-    w.document.write(`<!DOCTYPE html><html><head><title>PROFORMA - ${companyInfo.name}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>${printStyles}</style></head><body>${htmlToPrint}</body></html>`);
+    w.document.write(`<!DOCTYPE html><html><head><title>PROFORMA - ${companyInfo.name}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"><style>${printStyles}</style></head><body>${htmlToPrint}</body></html>`);
     w.document.close();
     w.focus();
-    w.onload = function () { setTimeout(() => { w.print(); }, 400); };
-  }, [companyInfo]);
+    w.onload = function () {
+      setTimeout(() => {
+        w.print();
+        setTimeout(() => {
+          w.close();
+          if (onClose) onClose();
+        }, 500);
+      }, 400);
+    };
+  }, [companyInfo, onClose]);
 
   const compact = cart.length <= 2;
 

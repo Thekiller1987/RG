@@ -217,6 +217,11 @@ const addCreditPayment = async (req, res) => {
         }
 
         await connection.commit();
+
+        // ─── SOCKET.IO EMIT ───
+        const io = req.app.get('io');
+        if (io) io.emit('clients:update');
+
         res.status(200).json({ message: 'Abono registrado exitosamente.', abonoId });
     } catch (error) {
         await connection.rollback();
