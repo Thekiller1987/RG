@@ -305,12 +305,12 @@ const ProformaModal = ({
 
       #print-wrapper-proforma .brand h1 {
         font-family: 'League Spartan', 'Inter', sans-serif !important;
-        font-weight: 800 !important;
+        font-weight: 900 !important;
       }
 
       #print-wrapper-proforma .brand-logo-container img {
-        width: ${mode === 'A4' ? '130px' : '80px'} !important;
-        height: ${mode === 'A4' ? 'auto' : '80px'} !important;
+        width: ${mode === 'A4' ? '130px' : '110px'} !important;
+        height: ${mode === 'A4' ? 'auto' : '110px'} !important;
         object-fit: contain !important;
       }
 
@@ -336,17 +336,17 @@ const ProformaModal = ({
       ` : `
         #print-wrapper-proforma, #print-wrapper-proforma * {
           color: #000 !important;
-          font-weight: 800 !important;
-          font-size: 10pt !important;
+          font-weight: 900 !important;
+          font-size: 10.5pt !important;
         }
         #print-wrapper-proforma .brand { text-align: center !important; border-bottom: 2px solid #000 !important; padding-bottom: 6px !important; margin-bottom: 6px !important; }
-        #print-wrapper-proforma .brand h1 { font-size: 18pt !important; letter-spacing: 0.5px !important; margin: 0 0 4px !important; }
+        #print-wrapper-proforma .brand h1 { font-size: 19pt !important; letter-spacing: 0.5px !important; margin: 0 0 4px !important; }
         #print-wrapper-proforma .brand-logo-container { display: flex !important; justify-content: center !important; margin-bottom: 4px !important; }
         #print-wrapper-proforma .meta p { display: flex !important; justify-content: space-between !important; margin: 2px 0 !important; }
-        #print-wrapper-proforma .totals .grand-total { font-size: 14pt !important; border-top: 2px solid #000 !important; margin-top: 6px !important; padding-top: 4px !important; }
-        #print-wrapper-proforma table.items th { border-bottom: 2px solid #000 !important; font-size: 9pt !important; }
-        #print-wrapper-proforma table.items td { border-bottom: 1px dashed #000 !important; font-size: 9pt !important; }
-        #print-wrapper-proforma .badge { border: 2px solid #000 !important; padding: 4px 8px !important; }
+        #print-wrapper-proforma .totals .grand-total { font-size: 15pt !important; border-top: 2px solid #000 !important; margin-top: 6px !important; padding-top: 4px !important; text-transform: uppercase !important; }
+        #print-wrapper-proforma table.items th { border-bottom: 2px solid #000 !important; font-size: 9.5pt !important; }
+        #print-wrapper-proforma table.items td { border-bottom: 1px dashed #000 !important; font-size: 9.5pt !important; }
+        #print-wrapper-proforma .badge { border: 2px solid #000 !important; padding: 4px 8px !important; font-size: 9.5pt !important; }
       `}
     `;
 
