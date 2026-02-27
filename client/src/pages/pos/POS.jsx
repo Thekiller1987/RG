@@ -281,6 +281,20 @@ const POS = () => {
       return false;
     }
 
+    // GUARD: Verificar si hay suficiente efectivo en caja para dar cambio
+    const cambioRequerido = Number(pagoDetalles.cambio || 0);
+    if (cambioRequerido > 0.01 && isCajaOpen && cajaSession) {
+      const cajaDisponible = currentStats.efectivoEsperadoCordobas || 0;
+      if (cambioRequerido > cajaDisponible) {
+        showAlert({
+          title: "⚠️ Efectivo Insuficiente",
+          message: `No hay suficiente efectivo en caja para dar cambio.\n\nCambio requerido: C$${cambioRequerido.toFixed(2)}\nEfectivo disponible: C$${cajaDisponible.toFixed(2)}\n\nPida al cliente un monto exacto o use otro método de pago.`,
+          type: 'error'
+        });
+        return false;
+      }
+    }
+
     const payloadItems = cart.map(i => ({
       id_producto: i.id_producto || i.id,
       quantity: i.quantity,
@@ -1047,8 +1061,23 @@ const POS = () => {
             }}
             onReturnItem={async (sale, item, qty) => {
               try {
-                // 1. Call Backend API to process return logic (Inventory, Status update)
-                // FIXED: Payload to match server expectation: { originalSaleId, item, quantity, userId }
+                // GUARD: Verificar si hay suficiente efectivo para la devolución
+                const unitPrice = item.precio || item.precio_venta || 0;
+                const refundAmount = unitPrice * qty;
+
+                if (isCajaOpen && cajaSession) {
+                  const cajaDisponible = currentStats.efectivoEsperadoCordobas || 0;
+                  if (refundAmount > cajaDisponible) {
+                    showAlert({
+                      title: "⚠️ No se puede devolver",
+                      message: `No hay suficiente efectivo en caja para esta devolución.\n\nMonto a devolver: C$${refundAmount.toFixed(2)}\nEfectivo disponible: C$${cajaDisponible.toFixed(2)}`,
+                      type: 'error'
+                    });
+                    return;
+                  }
+                }
+
+                // 1. Call Backend API to process return logic
                 const payload = {
                   originalSaleId: sale.id,
                   item: item,
@@ -1057,9 +1086,7 @@ const POS = () => {
                 };
                 await api.returnItem(payload, token);
 
-                // 2. Calculate refund amount for Cash Register
-                const unitPrice = item.precio || item.precio_venta || 0;
-                const refundAmount = unitPrice * qty;
+                // 2. refundAmount ya calculado arriba en el guard
 
                 // 3. Update Caja Session locally to reflect cash outflow (Return)
                 if (isCajaOpen && cajaSession) {
