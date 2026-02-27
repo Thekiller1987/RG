@@ -1032,12 +1032,9 @@ const POS = () => {
                       id: 'CANCEL-' + Date.now()
                     };
 
-                    const updatedSession = {
-                      ...cajaSession,
-                      transactions: [cancelTx, ...(cajaSession.transactions || [])]
-                    };
-                    setCajaSession(updatedSession);
-                    console.log("Caja actualizada por cancelación:", cancelTx);
+                    // Persistir en servidor + refrescar
+                    api.addCajaTx({ userId, tx: cancelTx }, token).catch(console.error);
+                    await refreshSession();
                   }
                 }
                 // -----------------------------------------------------
@@ -1076,11 +1073,9 @@ const POS = () => {
                     pagoDetalles: { efectivo: -refundAmount, ingresoCaja: -refundAmount, totalVenta: -refundAmount },
                     id: 'REFUND-' + Date.now()
                   };
-                  const updatedSession = {
-                    ...cajaSession,
-                    transactions: [refundTransaction, ...(cajaSession.transactions || [])]
-                  };
-                  setCajaSession(updatedSession);
+                  // Persistir en servidor + refrescar
+                  api.addCajaTx({ userId, tx: refundTransaction }, token).catch(console.error);
+                  await refreshSession();
 
                   showAlert({ title: "Devolución Exitosa", message: `Devolución registrada en sistema y C$${refundAmount.toFixed(2)} descontados de caja.` });
                 } else {

@@ -4,9 +4,9 @@ import styled, { css, createGlobalStyle } from 'styled-components';
 import { ModalOverlay, ModalContent, Button, TotalsRow } from '../POS.styles.jsx';
 import AlertModal from './AlertModal.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
-import { useSettings } from '../../../context/SettingsContext.jsx'; // NEW hook
+import { useSettings } from '../../../context/SettingsContext.jsx';
 
-/* ========= ESTILO GLOBAL (NO usa @import) ========= */
+/* ========= ESTILO GLOBAL ========= */
 const GlobalPrintStyle = createGlobalStyle`
   @media print {
     body { visibility: hidden; margin: 0; padding: 0; }
@@ -29,85 +29,188 @@ const GlobalPrintStyle = createGlobalStyle`
   }
 `;
 
-/* ======================= ESTILOS DE TICKET/VISUALIZACIÓN ======================= */
+/* ======================= ESTILOS DE TICKET ======================= */
 const PrintWrapper = styled.div`
-  font-family: 'Consolas','Courier New',monospace;
+  font-family: 'League Spartan', 'Inter', system-ui, -apple-system, sans-serif;
   color: #000;
   background: #fff;
   width: 310px;
   margin: 0 auto;
-  padding: 12px 10px;
+  padding: 14px 12px;
   box-shadow: 0 0 10px rgba(0,0,0,.08);
   border: 1px solid #eee;
   border-radius: 8px;
 
-  &.compact { padding: 8px 6px; }
-
-  /* Encabezado */
+  /* ===== 80mm TICKET STYLES ===== */
   .brand {
     text-align: center;
-    border-bottom: 1px dashed #333;
-    padding-bottom: 10px;
-    margin-bottom: 10px;
+    border-bottom: 2px solid #1a1a1a;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
   }
-  .brand h1 { margin: 6px 0 2px; font-size: 1.35rem; font-weight: 700; color: #0b72b9; line-height: 1.25; }
-  .brand small { color: #555; display: block; margin: 3px 0; line-height: 1.35; white-space: normal; word-break: break-word; }
+  .brand-logo-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 8px;
+  }
+  .brand-info { text-align: center; }
+  .brand h1 {
+    margin: 4px 0 3px;
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #0b0b0b;
+    line-height: 1.2;
+    letter-spacing: -0.3px;
+    font-family: 'League Spartan', 'Inter', sans-serif;
+  }
+  .brand small {
+    color: #444;
+    display: block;
+    margin: 2px 0;
+    line-height: 1.3;
+    font-size: 0.78rem;
+    white-space: normal;
+    word-break: break-word;
+  }
 
   /* Meta */
-  .meta { font-size: .9rem; margin-bottom: 12px; border-bottom: 1px dashed #ccc; padding-bottom: 8px; }
-  .meta p { margin: 2px 0; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 4px 8px; font-weight: 400; }
-  .meta-label { font-weight: 700; }
-  .meta-value { font-weight: 400; }
+  .meta {
+    font-size: .88rem;
+    margin-bottom: 12px;
+    border-bottom: 1px dashed #aaa;
+    padding-bottom: 8px;
+  }
+  .meta p {
+    margin: 3px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    font-weight: 400;
+  }
+  .meta-label { font-weight: 700; color: #111; }
+  .meta-value { font-weight: 400; color: #333; }
 
   /* Tabla */
-  table.items { width: 100%; border-collapse: collapse; font-size: .9rem; table-layout: fixed; }
+  table.items { width: 100%; border-collapse: collapse; font-size: .88rem; table-layout: fixed; }
   table.items th, table.items td { padding: 6px 4px; vertical-align: top; word-wrap: break-word; }
-  table.items th { border-bottom: 2px solid #333; font-weight: 700; text-transform: uppercase; font-size: 0.75rem; color: #1e3a8a; }
-  &.compact table.items th, &.compact table.items td { padding: 4px 2px; }
+  table.items th {
+    border-bottom: 2px solid #222;
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    color: #111;
+    letter-spacing: 0.3px;
+  }
   .text-right { text-align: right; }
-  .col-qty { width: 15%; text-align: center; }
-  .col-unit { width: 25%; text-align: right; }
-  .col-total { width: 25%; text-align: right; }
+  .col-qty { width: 14%; text-align: center; }
+  .col-unit { width: 24%; text-align: right; }
+  .col-total { width: 24%; text-align: right; }
   table.items td:nth-child(2) { white-space: normal; text-align: left; }
 
   /* Totales */
-  .totals { border-top: 2px solid #333; padding-top: 6px; margin-top: 12px; }
-  .badge { display: inline-block; font-weight: 700; letter-spacing: .5px; padding: 6px 10px; border: 2px solid #0b72b9; border-radius: 4px; margin: 10px auto; text-align: center; color: #0b72b9; font-size: 0.8rem; }
-  .thanks { text-align: center; font-size: .85rem; border-top: 1px dashed #333; padding-top: 10px; margin-top: 12px; color: #444; line-height: 1.4; }
+  .totals { border-top: 2px solid #222; padding-top: 6px; margin-top: 12px; }
+  .badge {
+    display: inline-block;
+    font-weight: 800;
+    letter-spacing: .6px;
+    padding: 6px 12px;
+    border: 2px solid #111;
+    border-radius: 4px;
+    margin: 10px auto;
+    text-align: center;
+    color: #111;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+  }
+  .thanks {
+    text-align: center;
+    font-size: .82rem;
+    border-top: 1px dashed #888;
+    padding-top: 10px;
+    margin-top: 12px;
+    color: #555;
+    line-height: 1.4;
+  }
+  .proforma-tag {
+    display: inline-block;
+    font-weight: 800;
+    letter-spacing: 1px;
+    padding: 5px 14px;
+    border: 2px solid #0b72b9;
+    border-radius: 4px;
+    color: #0b72b9;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
 
-  /* ====== A4 SPECIFIC LAYOUT ====== */
+  /* ====== A4 LAYOUT ====== */
   &.print-a4 {
-    .brand { display: flex; justify-content: space-between; align-items: flex-start; text-align: left; border-bottom: 3px solid #1e3a8a; margin-bottom: 2rem; padding-bottom: 1rem; }
-    .brand-logo-container { width: 150px; }
+    .brand {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      text-align: left; border-bottom: 3px solid #1e3a8a;
+      margin-bottom: 2rem; padding-bottom: 1rem;
+    }
+    .brand-logo-container { width: 140px; justify-content: flex-start; }
     .brand-info { text-align: right; max-width: 60%; }
     .brand h1 { font-size: 20pt; color: #1e3a8a; margin-bottom: 5px; }
     .brand small { font-size: 9pt; color: #444; margin: 1px 0; }
-    
-    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; border: 1px solid #ddd; padding: 15px; background: #f8fafc; border-radius: 6px; margin-bottom: 25px; }
+
+    .meta {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+      border: 1px solid #ddd; padding: 15px; background: #f8fafc;
+      border-radius: 6px; margin-bottom: 25px;
+    }
     .meta-col { display: flex; flex-direction: column; gap: 5px; }
-    .meta-title { font-weight: bold; text-transform: uppercase; color: #1e3a8a; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 6px; font-size: 9pt; }
-    .meta p { justify-content: flex-start; gap: 8px; border-bottom: none; width: 100%; display: grid; grid-template-columns: 100px 1fr; }
-    
-    table.items th { background: #f1f5f9; color: #334155; padding: 10px; border-bottom: 2px solid #cbd5e1; font-size: 9pt; }
+    .meta-title {
+      font-weight: bold; text-transform: uppercase; color: #1e3a8a;
+      border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 6px; font-size: 9pt;
+    }
+    .meta p {
+      justify-content: flex-start; gap: 8px; border-bottom: none;
+      width: 100%; display: grid; grid-template-columns: 100px 1fr;
+    }
+
+    table.items th {
+      background: #f1f5f9; color: #334155; padding: 10px;
+      border-bottom: 2px solid #cbd5e1; font-size: 9pt;
+    }
     table.items td { padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 10pt; color: #334155; }
     .col-qty { width: 10%; }
     .col-unit { width: 15%; }
     .col-total { width: 15%; }
-    
-    .totals { border-top: none; margin-top: 0; display: flex; justify-content: flex-end; padding-top: 20px; }
+
+    .totals {
+      border-top: none; margin-top: 0;
+      display: flex; justify-content: flex-end; padding-top: 20px;
+    }
     .totals-box { width: 250px; }
-    
+
     .thanks { border-top: none; margin-top: 50px; font-style: italic; color: #94a3b8; }
   }
 
   @media print {
     &.print-80 {
-      width: 80mm !important; font-family: 'Consolas', monospace !important; padding: 6px 4px !important; border: none !important; box-shadow: none !important; font-size: 8pt;
+      width: 80mm !important;
+      font-family: 'League Spartan', 'Inter', sans-serif !important;
+      padding: 6px 4px !important;
+      border: none !important;
+      box-shadow: none !important;
+      font-size: 8pt;
     }
     &.print-a4 {
-      width: 190mm !important; font-size: 10pt !important; padding: 0 !important; margin: 0 !important; border: none !important; box-shadow: none !important; max-height: 277mm !important; overflow: hidden !important; font-family: 'Inter', Helvetica, Arial, sans-serif !important;
+      width: 190mm !important;
+      font-size: 10pt !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+      max-height: 277mm !important;
+      overflow: hidden !important;
+      font-family: 'League Spartan', 'Inter', Helvetica, Arial, sans-serif !important;
     }
-    &.compact { font-size: 7.5pt; }
   }
 `;
 
@@ -116,17 +219,25 @@ const Wrapper = styled.div`
 `;
 
 const TicketLogo = styled.img`
-  width: 120px; max-width: 160px; height: auto; display: block; margin: 0 auto 6px; border-radius: 6px;
-  .print-a4 & { margin: 0; max-width: 140px; }
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  display: block;
+  border-radius: 6px;
+  .print-a4 & { width: 130px; height: auto; }
 `;
 
 const Tag = styled.span`
-  display: inline-flex; align-items: center; gap: 6px; font-weight: 700; letter-spacing: .4px; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; background: #e8f4ff; color: #0b72b9; border: 1px solid #b9defc;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-weight: 700; letter-spacing: .4px; padding: 4px 8px;
+  border-radius: 4px; font-size: 0.85rem;
+  background: #e8f4ff; color: #0b72b9; border: 1px solid #b9defc;
   text-transform: uppercase;
 `;
 
 const HeaderBar = styled.div`
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #eee; padding-bottom: .75rem;
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 1rem; border-bottom: 1px solid #eee; padding-bottom: .75rem;
 `;
 
 /* =================================================================
@@ -143,56 +254,69 @@ const ProformaModal = ({
   client
 }) => {
   const { user: authUser } = (typeof useAuth === 'function' ? useAuth() : { user: null });
-  const { settings } = useSettings(); // Hook config
+  const { settings } = useSettings();
 
-  // Resolver nombre de quien emite
   const getName = (u) => u?.usuarioNombre || u?.nombre_usuario || u?.name || u?.nombre || u?.username || null;
   let lsUser = null;
   try { lsUser = JSON.parse(localStorage.getItem('authUser') || 'null'); } catch { }
   const userName = getName(currentUser) || getName(authUser) || getName(lsUser) || 'Cajero POS';
 
-  // Datos cliente
   const clientName = client?.nombre || 'Consumidor Final';
-  const clientCedula = client?.cedula || ''; // CEDULA SUPPORT
+  const clientCedula = client?.cedula || '';
   const proformaDate = new Date().toLocaleString('es-NI');
 
-  // Helpers de formato
   const fmt = (n) => new Intl.NumberFormat('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n || 0));
 
-  // ====== Configuración Dinámica ======
   const companyInfo = {
     name: settings?.empresa_nombre || 'Multirepuestos RG',
     ruc: settings?.empresa_ruc || '1211812770001E',
     phone: settings?.empresa_telefono || '84031936 / 84058142',
     address: settings?.empresa_direccion || 'Del portón de la normal 75 varas al este. Juigalpa, Chontales.',
-    slogan: settings?.empresa_eslogan || 'Tu mejor opción en repuestos', // Fallback slogan slightly diff for variety but uses settings first
+    slogan: settings?.empresa_eslogan || 'Tu mejor opción en repuestos',
     logo: settings?.empresa_logo_url || new URL('/icons/logo.png', window.location.origin).toString()
   };
 
-  // Lógica Imprimir
   const doPrint = useCallback((mode = '80') => {
     const node = document.getElementById('print-wrapper-proforma');
     if (!node) return;
     const htmlToPrint = node.outerHTML;
 
+    const fontImport = `@import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700;800&display=swap');`;
+
     const printStyles = `
       @charset "UTF-8";
+      ${fontImport}
       @page { size: ${mode === 'A4' ? 'A4 portrait' : '80mm auto'}; margin: ${mode === 'A4' ? '12mm' : '0'}; }
       html, body {
-        background: #fff; margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color: #000 !important; font-family: ${mode === 'A4' ? "'Inter', Helvetica, Arial, sans-serif" : "'Consolas', monospace"};
+        background: #fff; margin: 0 !important; padding: 0 !important;
+        -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+        color: #000 !important;
+        font-family: 'League Spartan', 'Inter', system-ui, -apple-system, sans-serif;
       }
       
       #print-wrapper-proforma {
         box-shadow: none !important; border: none !important; margin: 0 !important;
+        font-family: 'League Spartan', 'Inter', system-ui, sans-serif !important;
         ${mode === 'A4'
         ? `width: 100% !important; padding: 0 !important; font-size: 10pt !important;`
-        : `width: 80mm !important; padding: 6px 4px !important; font-size: 8pt !important;`
+        : `width: 80mm !important; padding: 6px 4px !important; font-size: 9pt !important;`
       }
+      }
+
+      #print-wrapper-proforma .brand h1 {
+        font-family: 'League Spartan', 'Inter', sans-serif !important;
+        font-weight: 800 !important;
+      }
+
+      #print-wrapper-proforma .brand-logo-container img {
+        width: ${mode === 'A4' ? '130px' : '80px'} !important;
+        height: ${mode === 'A4' ? 'auto' : '80px'} !important;
+        object-fit: contain !important;
       }
 
       ${mode === 'A4' ? `
         #print-wrapper-proforma .brand { display: flex !important; justify-content: space-between !important; align-items: flex-start !important; text-align: left !important; border-bottom: 3px solid #1e3a8a !important; margin-bottom: 25px !important; padding-bottom: 15px !important; }
-        #print-wrapper-proforma .brand-logo-container { width: 140px !important; order: 1 !important; }
+        #print-wrapper-proforma .brand-logo-container { width: 140px !important; justify-content: flex-start !important; order: 1 !important; }
         #print-wrapper-proforma .brand-info { flex: 1 !important; text-align: right !important; order: 2 !important; }
         #print-wrapper-proforma .brand h1 { font-size: 22pt !important; color: #1e3a8a !important; margin: 0 0 5px 0 !important; }
         #print-wrapper-proforma .brand small { display: block !important; font-size: 9pt !important; margin: 2px 0 !important; color: #334155 !important; }
@@ -210,17 +334,18 @@ const ProformaModal = ({
         #print-wrapper-proforma .totals { display: flex !important; justify-content: flex-end !important; margin-top: 20px !important; border-top: none !important; }
         #print-wrapper-proforma .totals-box { width: 300px !important; background: #f8fafc !important; padding: 15px !important; border: 1px solid #e2e8f0 !important; border-radius: 8px !important; }
       ` : `
-        #print-wrapper-proforma .brand { text-align: center !important; border-bottom: 1px dashed #333 !important; }
+        #print-wrapper-proforma .brand { text-align: center !important; border-bottom: 2px solid #111 !important; }
+        #print-wrapper-proforma .brand-logo-container { display: flex !important; justify-content: center !important; }
         #print-wrapper-proforma .meta p { display: flex !important; justify-content: space-between !important; }
       `}
     `;
 
     const w = window.open('', '_blank', 'width=900,height=700');
     if (!w) return;
-    w.document.write(`<html><head><title>PROFORMA - ${companyInfo.name}</title><style>${printStyles}</style></head><body>${htmlToPrint}</body></html>`);
+    w.document.write(`<!DOCTYPE html><html><head><title>PROFORMA - ${companyInfo.name}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>${printStyles}</style></head><body>${htmlToPrint}</body></html>`);
     w.document.close();
     w.focus();
-    w.onload = function () { setTimeout(() => { w.print(); }, 250); };
+    w.onload = function () { setTimeout(() => { w.print(); }, 400); };
   }, [companyInfo]);
 
   const compact = cart.length <= 2;
@@ -244,7 +369,11 @@ const ProformaModal = ({
             {/* BRAND HEADER */}
             <div className="brand">
               <div className="brand-logo-container">
-                <TicketLogo src={companyInfo.logo} alt="Logo" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                <TicketLogo
+                  src={companyInfo.logo}
+                  alt="Logo"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
               </div>
               <div className="brand-info">
                 <h1>{companyInfo.name}</h1>
@@ -252,8 +381,8 @@ const ProformaModal = ({
                 <small>RUC: {companyInfo.ruc}</small>
                 <small>Tel: {companyInfo.phone}</small>
                 <small>{companyInfo.address}</small>
-                <div style={{ marginTop: 8 }}>
-                  <Tag><FaFileInvoice /> COTIZACIÓN / PROFORMA</Tag>
+                <div style={{ marginTop: 6 }}>
+                  <span className="proforma-tag"><FaFileInvoice style={{ marginRight: 4, verticalAlign: 'middle' }} /> COTIZACIÓN / PROFORMA</span>
                 </div>
               </div>
             </div>
@@ -315,7 +444,7 @@ const ProformaModal = ({
 
                 <div style={{ marginTop: 12, textAlign: 'center' }}>
                   <span className="badge">DOCUMENTO NO VÁLIDO COMO FACTURA</span>
-                  <p style={{ margin: '5px 0 0', fontSize: '0.75rem', color: '#666' }}>Precios sujetos a cambio. Válido por 3 días.</p>
+                  <p style={{ margin: '5px 0 0', fontSize: '0.72rem', color: '#666' }}>Precios sujetos a cambio. Válido por 3 días.</p>
                 </div>
               </div>
             </div>
