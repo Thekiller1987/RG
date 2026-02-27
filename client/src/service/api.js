@@ -156,6 +156,10 @@ export const fetchProviders = async (token) => {
     return await request('get', '/providers', token);
 };
 
+export const fetchClientStatement = async (clientId, token) => {
+    return await request('get', `/clients/${clientId}/statement`, token);
+};
+
 // ===================================================================
 // ==================== TERMINA SECCIÓN CLIENTES =====================
 // ===================================================================

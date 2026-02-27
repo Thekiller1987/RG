@@ -10,6 +10,7 @@ const {
     getCreditosByClient,
     getAbonosByClient,
     getCreditosPendientes,
+    getAccountStatement,
 } = require('../controllers/clientController');
 
 const { verifyToken } = require('../middleware/authMiddleware');
@@ -28,5 +29,6 @@ router.post('/:id/abono', addCreditPayment);
 router.get('/:id/creditos', getCreditosByClient);
 router.get('/:id/abonos', getAbonosByClient);
 router.get('/:id/creditos-pendientes', getCreditosPendientes);
+router.get('/:id/statement', getAccountStatement);
 
 module.exports = router;

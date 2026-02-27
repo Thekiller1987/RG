@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import styled from 'styled-components';
-import { FaUsers, FaCreditCard, FaTrashAlt, FaEdit, FaPlus, FaMoneyBillWave, FaArrowLeft, FaRedo, FaHistory } from 'react-icons/fa';
+import { FaUsers, FaCreditCard, FaTrashAlt, FaEdit, FaPlus, FaMoneyBillWave, FaArrowLeft, FaRedo, FaHistory, FaFileInvoiceDollar } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +12,7 @@ import HistorialCreditoModal from './pos/components/HistorialCreditoModal';
 import SalesHistoryModal from './pos/components/SalesHistoryModal';
 import TicketModal from './pos/components/TicketModal';
 import AlertModal from './pos/components/AlertModal';
+import StatementModal from './pos/components/StatementModal';
 
 const PageWrapper = styled.div`
     padding: 2rem 4rem;
@@ -190,6 +191,23 @@ export default function ClientesYCreditos() {
     const [modal, setModal] = useState({ name: null, data: null });
     const [ticketToPrint, setTicketToPrint] = useState(null);
     const [alertState, setAlertState] = useState({ open: false, title: '', message: '' });
+    const [isFetchingStatement, setIsFetchingStatement] = useState(false);
+
+    const handlePrintStatement = async (client) => {
+        setIsFetchingStatement(true);
+        const loadingToast = toast.loading('Generando estado de cuenta...');
+        try {
+            const data = await api.fetchClientStatement(client.id_cliente, token);
+            setModal({ name: 'statement', data });
+            toast.dismiss(loadingToast);
+        } catch (err) {
+            toast.dismiss(loadingToast);
+            toast.error('Error al generar el estado de cuenta.');
+            console.error(err);
+        } finally {
+            setIsFetchingStatement(false);
+        }
+    };
 
     const showAlert = useCallback(({ title, message }) => {
         setAlertState({ open: true, title: title || 'Aviso', message: message || '' });
@@ -252,6 +270,7 @@ export default function ClientesYCreditos() {
                             <td>
                                 <ButtonGroup>
                                     <Button $abono disabled={!isCajaOpen || c.saldo_pendiente <= 0} onClick={() => handleOpenModal('abono', c)} title="Realizar Abono"><FaMoneyBillWave /></Button>
+                                    <Button onClick={() => handlePrintStatement(c)} disabled={isFetchingStatement} title="Imprimir Estado de Cuenta" style={{ background: '#212529', color: 'white' }}><FaFileInvoiceDollar /></Button>
                                     <Button onClick={() => handleOpenModal('client', c)} title="Editar Cliente"><FaEdit /></Button>
                                     <Button primary onClick={() => handleOpenModal('historial', c)} title="Ver Historial"><FaHistory /></Button>
                                     <Button $refresh style={{ background: '#6f42c1' }} onClick={() => handleOpenModal('tickets', c)} title="Ver Tickets"><FaMoneyBillWave /></Button>
@@ -296,6 +315,9 @@ export default function ClientesYCreditos() {
                             <Button $abono disabled={!isCajaOpen || c.saldo_pendiente <= 0} onClick={() => handleOpenModal('abono', c)}>
                                 <FaMoneyBillWave /> Abonar
                             </Button>
+                            <Button style={{ background: '#212529', color: 'white' }} disabled={isFetchingStatement} onClick={() => handlePrintStatement(c)}>
+                                <FaFileInvoiceDollar /> Estado Cuenta
+                            </Button>
                             <Button onClick={() => handleOpenModal('client', c)}>
                                 <FaEdit /> Editar
                             </Button>
@@ -316,6 +338,7 @@ export default function ClientesYCreditos() {
             {modal.name === 'client' && <ClientFormModal client={modal.data} onClose={handleCloseModal} onSave={refreshClients} />}
             {modal.name === 'abono' && <AbonoCreditoModal client={modal.data} onClose={handleCloseModal} onAbonoSuccess={() => { refreshClients(); toast.success('Abono registrado correctamente.'); }} showAlert={showAlert} />}
             {modal.name === 'historial' && <HistorialCreditoModal client={modal.data} onClose={handleCloseModal} token={token} />}
+            {modal.name === 'statement' && <StatementModal statementData={modal.data} onClose={handleCloseModal} />}
 
             {/* Modal de Tickets (SalesHistoryModal) Integrado */}
             {modal.name === 'tickets' && (

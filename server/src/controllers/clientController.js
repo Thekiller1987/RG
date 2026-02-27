@@ -307,6 +307,101 @@ const getCreditosPendientes = async (req, res) => {
     }
 };
 
+// NUEVO: Estado de Cuenta (Account Statement)
+const getAccountStatement = async (req, res) => {
+    const { id } = req.params;
+    try {
+        // 1. Get Client Info
+        const [clientRows] = await pool.query('SELECT * FROM clientes WHERE id_cliente = ?', [id]);
+        if (clientRows.length === 0) return res.status(404).json({ message: 'Cliente no encontrado' });
+        const client = clientRows[0];
+
+        // 2. Get All relevant transactions (Créditos, Abonos, Devoluciones de Crédito)
+        const [sales] = await pool.query(`
+            SELECT id_venta, fecha, total_venta, estado, tipo_venta, pago_detalles, referencia_pedido 
+            FROM ventas 
+            WHERE id_cliente = ? 
+              AND estado != 'CANCELADA'
+              AND (tipo_venta = 'CREDITO' OR estado = 'ABONO_CREDITO' OR estado = 'DEVOLUCION')
+            ORDER BY fecha ASC, id_venta ASC
+        `, [id]);
+
+        let runningBalance = 0;
+        const ledger = [];
+
+        sales.forEach(sale => {
+            let pd = {};
+            if (typeof sale.pago_detalles === 'string') {
+                try { pd = JSON.parse(sale.pago_detalles); } catch { pd = {}; }
+            } else if (sale.pago_detalles) {
+                pd = sale.pago_detalles;
+            }
+
+            let creditImpact = 0;
+            let type = '';
+            let description = '';
+
+            if (sale.estado === 'ABONO_CREDITO') {
+                // Abonos are stored with negative total_venta (-monto)
+                creditImpact = Number(sale.total_venta);
+                type = 'ABONO';
+                description = pd.referencia ? `Abono (${pd.referencia})` : 'Abono a cuenta';
+            } else if (sale.estado === 'DEVOLUCION') {
+                // Returns on credit have negative pd.credito
+                const creditoDevuelto = Number(pd.credito || 0);
+                if (creditoDevuelto < 0) {
+                    creditImpact = creditoDevuelto; // negative value decreases balance
+                    type = 'DEVOLUCION';
+                    description = pd.nota || `Devolución Ticket #${pd.originalSaleId || ''}`;
+                } else {
+                    return; // Skip cash returns
+                }
+            } else if (sale.tipo_venta === 'CREDITO') {
+                const creditoOtorgado = Number(pd.credito || sale.total_venta || 0);
+                if (creditoOtorgado > 0) {
+                    creditImpact = creditoOtorgado; // positive value increases balance
+                    type = 'CREDITO';
+                    description = `Venta a crédito Ticket #${sale.id_venta}`;
+                } else {
+                    return; // Skip if no credit actually given
+                }
+            }
+
+            if (creditImpact !== 0) {
+                runningBalance += creditImpact;
+                ledger.push({
+                    id_venta: sale.id_venta,
+                    fecha: sale.fecha,
+                    tipo: type,
+                    descripcion: description,
+                    monto: Math.abs(creditImpact),
+                    impacto: creditImpact,
+                    saldo: runningBalance,
+                    pagoDetalles: pd
+                });
+            }
+        });
+
+        const response = {
+            cliente: {
+                id: client.id_cliente,
+                nombre: client.nombre,
+                telefono: client.telefono,
+                direccion: client.direccion,
+                limite_credito: client.limite_credito,
+                saldo_pendiente_db: Number(client.saldo_pendiente),
+                saldo_calculado: parseFloat(runningBalance.toFixed(2)) // Should conceptually match DB
+            },
+            historial: ledger
+        };
+
+        res.json(response);
+    } catch (error) {
+        console.error("Error al obtener estado de cuenta:", error);
+        res.status(500).json({ message: "Error al obtener estado de cuenta del cliente" });
+    }
+};
+
 module.exports = {
     getAllClients,
     createClient,
@@ -316,4 +411,5 @@ module.exports = {
     getCreditosByClient,
     getAbonosByClient,
     getCreditosPendientes,
+    getAccountStatement,
 };
