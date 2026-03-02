@@ -143,7 +143,7 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
         } else if (t.includes('devolucion') || t.includes('cancelacion') || t.includes('anulacion')) {
             tVentasDia -= Math.abs(totalRevenue);
         } else if (t === 'ajuste') {
-            tVentasDia += totalRevenue;
+            // God Mode (ajustes) no debe alterar las Ventas Totales (tVentasDia). No sumamos nada.
         }
 
         // 4. CLASSIFICATION for Lists

@@ -270,14 +270,14 @@ function calculateReportStats(session) {
     if (t.startsWith('venta') || t.includes('abono') || t === 'entrada') {
       tVentasDia += Math.abs(totalAmount);
     } else if (t === 'ajuste') {
-      tVentasDia += totalAmount;
+      // AJUSTES NO DEBEN INFLAR LAS VENTAS. Es solo movimiento de caja física.
     }
 
     // Listas
     const esDevolucion = t === 'devolucion' || t.includes('devolucion');
     const esCancelacion = t === 'cancelacion' || t === 'anulacion';
 
-    if (t === 'venta_contado' || t === 'venta_mixta' || t === 'venta_credito') {
+    if (t.startsWith('venta')) {
       cls.ventasContado.push(normalizedTx);
     }
     else if (esDevolucion) {

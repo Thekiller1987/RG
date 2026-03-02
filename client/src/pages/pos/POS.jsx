@@ -128,6 +128,29 @@ const POS = () => {
     }
   }, []);
 
+  // Sonido de eliminación de producto del carrito
+  const playDeleteSound = useCallback(() => {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, now);
+      osc.frequency.exponentialRampToValueAtTime(50, now + 0.15);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.start(now);
+      osc.stop(now + 0.15);
+    } catch (e) {
+      // Ignore audio errors
+    }
+  }, []);
+
   // Cálculos del Carrito Activo
   const cart = activeOrder?.items || [];
   const subtotal = cart.reduce((s, i) => s + (i.precio_venta * i.quantity), 0);
@@ -256,6 +279,7 @@ const POS = () => {
 
     let q = parseInt(qty, 10) || 0;
     if (q <= 0) {
+      playDeleteSound();
       updateActiveCart(cart.filter(i => (i.id_producto || i.id) !== pid));
       return;
     }
@@ -839,7 +863,7 @@ const POS = () => {
                         <span style={{ fontWeight: 700, minWidth: 24, textAlign: 'center', fontSize: '0.9rem' }}>{item.quantity}</span>
                         <S.RoundBtn onClick={() => handleUpdateCartQuantity(item.id_producto || item.id, item.quantity + 1)}><FaPlus size={8} /></S.RoundBtn>
                       </S.QtyControl>
-                      <S.RoundBtn onClick={() => updateActiveCart(cart.filter(x => (x.id_producto || x.id) !== (item.id_producto || item.id)))} style={{ color: '#ef4444' }}><FaTrashAlt size={12} /></S.RoundBtn>
+                      <S.RoundBtn onClick={() => { playDeleteSound(); updateActiveCart(cart.filter(x => (x.id_producto || x.id) !== (item.id_producto || item.id))); }} style={{ color: '#ef4444' }}><FaTrashAlt size={12} /></S.RoundBtn>
                     </div>
                   </S.CartItemWrapper>
                 ))
