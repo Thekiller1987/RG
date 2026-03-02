@@ -374,11 +374,14 @@ const POS = () => {
         // En modo instantáneo, la caja se registra FUERA de esta promesa para evitar duplicados.
         if (!isInstant && isCajaOpen && cajaSession) {
           const details = { ...pagoDetalles };
+          const totalSale = Number(saleData.totalVenta || 0);
           const isCash = !details.tarjeta && !details.transferencia && !details.credito;
-          if (isCash && details.efectivo === undefined) details.efectivo = saleData.totalVenta;
+          if (isCash && details.efectivo === undefined) {
+            details.efectivo = totalSale;
+            details.ingresoCaja = totalSale;
+          }
 
           const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
-          const totalSale = Number(saleData.totalVenta || 0);
           details.efectivo = Number(details.efectivo || 0);
 
           const newTransaction = {
@@ -422,8 +425,15 @@ const POS = () => {
       // Actualizar Caja Localmente (Optimistic) + Enviar a servidor
       if (isCajaOpen && cajaSession) {
         const details = { ...pagoDetalles };
-        const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
+        const isCash = !details.tarjeta && !details.transferencia && !details.credito;
         const totalSale = Number(saleData.totalVenta || 0);
+
+        if (isCash && details.efectivo === undefined) {
+          details.efectivo = totalSale;
+          details.ingresoCaja = totalSale;
+        }
+
+        const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
         details.efectivo = Number(details.efectivo || 0);
 
         const tempTx = {
