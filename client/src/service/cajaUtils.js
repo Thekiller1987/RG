@@ -103,7 +103,12 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
 
         // 2. PHYSICAL CASH CALCULATIONS
         if (t.startsWith('venta')) {
-            if (pd.efectivo !== undefined || pd.dolares !== undefined) {
+            // ingresoCaja = net physical cash entering drawer (efectivo - cambio)
+            // This is the MOST RELIABLE field from PaymentModal
+            if (pd.ingresoCaja !== undefined) {
+                netCordobas += Number(pd.ingresoCaja);
+                netDolares += Number(pd.dolares || 0);
+            } else if (pd.efectivo !== undefined || pd.dolares !== undefined) {
                 netCordobas += (Number(pd.efectivo || 0) - Number(pd.cambio || 0));
                 netDolares += Number(pd.dolares || 0);
             } else {

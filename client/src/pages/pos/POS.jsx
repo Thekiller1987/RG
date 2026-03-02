@@ -367,22 +367,37 @@ const POS = () => {
           setShouldAutoTriggerPrint(true);
           setTicketData(savedSale); // Abre Modal Ticket con ID real
         } else {
-          // Éxito silencioso o pequeño toast (ya mostramos alerta abajo si era instant)
+          // Confirmación visual exitosa en segundo plano
+          showAlert({ title: "✅ Venta Sincronizada", message: `La venta #${savedSale.id} fue guardada en el servidor.` });
         }
 
-        // Registrar en Caja (Background) — SOLO para modo NO instantáneo
-        // En modo instantáneo, la caja se registra FUERA de esta promesa para evitar duplicados.
-        if (!isInstant && isCajaOpen && cajaSession) {
+        // Registrar en Caja (Background) — PARA TODOS
+        if (isCajaOpen && cajaSession) {
           const details = { ...pagoDetalles };
           const totalSale = Number(saleData.totalVenta || 0);
+
+          // SIEMPRE calcular efectivo e ingresoCaja correctamente
+          details.efectivo = Number(details.efectivo || 0);
+          details.tarjeta = Number(details.tarjeta || 0);
+          details.transferencia = Number(details.transferencia || 0);
+          details.credito = Number(details.credito || 0);
+          details.cambio = Number(details.cambio || 0);
+          details.dolares = Number(details.dolares || 0);
+          details.totalVenta = totalSale;
+
+          // Si no viene ingresoCaja del PaymentModal, calcularlo
+          if (details.ingresoCaja === undefined || details.ingresoCaja === null) {
+            details.ingresoCaja = Math.max(0, details.efectivo - details.cambio);
+          }
+
+          // Si es venta puramente de efectivo y efectivo es 0, asumir totalVenta
           const isCash = !details.tarjeta && !details.transferencia && !details.credito;
-          if (isCash && details.efectivo === undefined) {
+          if (isCash && details.efectivo === 0) {
             details.efectivo = totalSale;
             details.ingresoCaja = totalSale;
           }
 
           const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
-          details.efectivo = Number(details.efectivo || 0);
 
           const newTransaction = {
             type: 'venta',
@@ -394,12 +409,11 @@ const POS = () => {
             id: savedSale.id
           };
 
-          // Enviar a servidor
-          api.addCajaTx({ userId, tx: newTransaction }, token).catch(console.error);
+          // Enviar a servidor SIEMPRE con el ID real
+          await api.addCajaTx({ userId, tx: newTransaction }, token);
 
-          // Actualizar sesión local
-          const updatedSession = { ...cajaSession, transactions: [newTransaction, ...(cajaSession.transactions || [])] };
-          setCajaSession(updatedSession);
+          // Refrescar sesión para actualizar la lista local con el tx real
+          refreshSession();
         }
 
       } catch (err) {
@@ -422,33 +436,45 @@ const POS = () => {
         return p;
       }));
 
-      // Actualizar Caja Localmente (Optimistic) + Enviar a servidor
+      // Actualizar Caja Localmente (Optimistic) SIN mandar al servidor
       if (isCajaOpen && cajaSession) {
         const details = { ...pagoDetalles };
-        const isCash = !details.tarjeta && !details.transferencia && !details.credito;
         const totalSale = Number(saleData.totalVenta || 0);
 
-        if (isCash && details.efectivo === undefined) {
+        // SIEMPRE calcular efectivo e ingresoCaja correctamente
+        details.efectivo = Number(details.efectivo || 0);
+        details.tarjeta = Number(details.tarjeta || 0);
+        details.transferencia = Number(details.transferencia || 0);
+        details.credito = Number(details.credito || 0);
+        details.cambio = Number(details.cambio || 0);
+        details.dolares = Number(details.dolares || 0);
+        details.totalVenta = totalSale;
+
+        // Si no viene ingresoCaja del PaymentModal, calcularlo
+        if (details.ingresoCaja === undefined || details.ingresoCaja === null) {
+          details.ingresoCaja = Math.max(0, details.efectivo - details.cambio);
+        }
+
+        // Si es venta puramente de efectivo y efectivo es 0, asumir totalVenta
+        const isCash = !details.tarjeta && !details.transferencia && !details.credito;
+        if (isCash && details.efectivo === 0) {
           details.efectivo = totalSale;
           details.ingresoCaja = totalSale;
         }
 
         const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
-        details.efectivo = Number(details.efectivo || 0);
 
         const tempTx = {
           type: 'venta',
           amount: totalSale,
           at: new Date().toISOString(),
           userId,
-          note: `Venta (Pendiente) - ${clientNameFound}`,
+          note: `Venta (Sincronizando...) - ${clientNameFound}`,
           pagoDetalles: details,
           id: 'PEND-' + Date.now()
         };
 
-        // Enviar a servidor (única vez, no se repite en processSalePromise)
-        api.addCajaTx({ userId, tx: tempTx }, token).catch(console.error);
-
+        // Sólo actualizamos localmente para fluidez, el background hace el API Call
         const updatedSession = { ...cajaSession, transactions: [tempTx, ...(cajaSession.transactions || [])] };
         setCajaSession(updatedSession);
       }

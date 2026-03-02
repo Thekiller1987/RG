@@ -345,16 +345,34 @@ const WholesalePOS = () => {
                 if (pagoDetalles.shouldPrintNow) {
                     setShouldAutoTriggerPrint(true);
                     setTicketData(savedSale);
+                } else {
+                    showAlert({ title: "✅ Venta Sincronizada", message: `La venta mayorista #${savedSale.id} fue guardada en el servidor.` });
                 }
 
                 if (isCajaOpen && cajaSession) {
                     const details = { ...pagoDetalles };
+                    const totalSale = Number(saleData.totalVenta || 0);
+
+                    // SIEMPRE calcular efectivo e ingresoCaja correctamente
+                    details.efectivo = Number(details.efectivo || 0);
+                    details.tarjeta = Number(details.tarjeta || 0);
+                    details.transferencia = Number(details.transferencia || 0);
+                    details.credito = Number(details.credito || 0);
+                    details.cambio = Number(details.cambio || 0);
+                    details.dolares = Number(details.dolares || 0);
+                    details.totalVenta = totalSale;
+
+                    if (details.ingresoCaja === undefined || details.ingresoCaja === null) {
+                        details.ingresoCaja = Math.max(0, details.efectivo - details.cambio);
+                    }
+
                     const isCash = !details.tarjeta && !details.transferencia && !details.credito;
-                    if (isCash && details.efectivo === undefined) details.efectivo = saleData.totalVenta;
+                    if (isCash && details.efectivo === 0) {
+                        details.efectivo = totalSale;
+                        details.ingresoCaja = totalSale;
+                    }
 
                     const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
-                    const totalSale = Number(saleData.totalVenta || 0);
-                    details.efectivo = Number(details.efectivo || 0);
 
                     const newTransaction = {
                         type: 'venta',
@@ -366,11 +384,8 @@ const WholesalePOS = () => {
                         id: savedSale.id
                     };
 
-                    api.addCajaTx({ userId: user?.id || user?.id_usuario, tx: newTransaction }, token).catch(console.error);
-
-                    if (!isInstant) {
-                        refreshSession();
-                    }
+                    await api.addCajaTx({ userId: user?.id || user?.id_usuario, tx: newTransaction }, token);
+                    refreshSession();
                 }
 
                 refreshProducts();
