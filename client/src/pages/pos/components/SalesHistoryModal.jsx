@@ -358,11 +358,13 @@ function SalesHistoryModal({
   /* ========== Acciones ========== */
 
   // Cancelar
-  const handleCancel = useCallback((saleIdParam) => {
-    const saleId = saleIdParam || selectedSale?.id;
-    if (!saleId || !selectedSale) return;
+  const handleCancel = useCallback((saleObjOrId) => {
+    // Accept both a full sale object or just an ID
+    const saleId = (typeof saleObjOrId === 'object' && saleObjOrId?.id) ? saleObjOrId.id : (saleObjOrId || selectedSale?.id);
+    const saleObj = (typeof saleObjOrId === 'object' && saleObjOrId) ? saleObjOrId : selectedSale;
+    if (!saleId || !saleObj) return;
 
-    if (selectedSale.estado === 'CANCELADA') {
+    if (saleObj.estado === 'CANCELADA') {
       openAlert('Venta ya cancelada', `La venta #${saleId} ya fue cancelada.`);
       return;
     }
@@ -377,8 +379,8 @@ function SalesHistoryModal({
       async () => {
         closeConfirm();
         try {
-          // Changed: Passing the full sale object instead of just ID
-          await onCancelSale(selectedSale);
+          // Pass the full sale object so POS can access pagoDetalles for caja reversal
+          await onCancelSale(saleObj);
           openAlert('Éxito', `Venta #${saleId} cancelada.`);
           await afterMutationRefresh(null);
         } catch (error) {

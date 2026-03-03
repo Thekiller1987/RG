@@ -78,11 +78,8 @@ const SaleDetailView = ({
       showAlert?.({ title: 'Config', message: 'Falta onCancelSale en props.', type: 'error' });
       return;
     }
-    showConfirmation?.({
-      title: 'Cancelar Venta',
-      message: `Esta acción revertirá stock y (si aplica) crédito del cliente.\n\n¿Cancelar la venta #${sale.id}?`,
-      onConfirm: () => onCancelSale(sale.id)
-    });
+    // Pass full sale object (not just ID) so POS can access pagoDetalles for caja reversal
+    onCancelSale(sale);
   };
 
   return (

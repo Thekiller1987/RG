@@ -1,7 +1,11 @@
 /**
  * Centralized logic for cash register (Caja) statistics and totals.
  * Handles different transaction types, currency conversion, and hidden adjustments.
+ * ★ BLINDADO: Cada campo es parseado con safe() para prevenir NaN/undefined/Infinity.
  */
+
+// ★ SAFE: Helper antiNaN para parsear cualquier valor numérico
+const safe = (v) => { const n = Number(v); return (isNaN(n) || !isFinite(n)) ? 0 : n; };
 
 /**
  * Deduplicates transactions before calculation.
@@ -22,7 +26,7 @@ function deduplicateTransactions(transactions) {
 
         // 2. Skip fingerprint duplicates (catches PEND-xxx vs real ID dupes)
         const pd = tx.pagoDetalles || {};
-        const fp = `${(tx.type || '').toLowerCase()}|${Number(tx.amount || 0).toFixed(2)}|${Number(pd.totalVenta || 0).toFixed(2)}|${Number(pd.efectivo || 0).toFixed(2)}|${Number(pd.tarjeta || 0).toFixed(2)}|${Number(pd.credito || 0).toFixed(2)}|${Number(pd.transferencia || 0).toFixed(2)}`;
+        const fp = `${(tx.type || '').toLowerCase()}|${safe(tx.amount).toFixed(2)}|${safe(pd.totalVenta).toFixed(2)}|${safe(pd.efectivo).toFixed(2)}|${safe(pd.tarjeta).toFixed(2)}|${safe(pd.credito).toFixed(2)}|${safe(pd.transferencia).toFixed(2)}`;
 
         if (fingerprints.has(fp)) continue;
         fingerprints.add(fp);
@@ -34,8 +38,8 @@ function deduplicateTransactions(transactions) {
 }
 
 export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 36.60) => {
-    const cajaInicialN = Number(initialAmount || 0);
-    const tasaRef = Number(tasaDolar || 36.60);
+    const cajaInicialN = Math.max(0, safe(initialAmount));
+    const tasaRef = safe(tasaDolar) || 36.60;
 
     const cls = {
         ventasContado: [],
@@ -54,14 +58,14 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
     let tCredito = 0;
 
     let sumDevsCancels = 0;
-    let tVentasDia = 0; // Total Revenue (Sales + Abonos + Entries - Returns/Cancels)
+    let tVentasDia = 0;
     let totalHidden = 0;
 
     // CRITICAL: Deduplicate BEFORE processing to prevent inflated totals
     const validTransactions = deduplicateTransactions(Array.isArray(transactions) ? transactions : []);
 
     for (const tx of validTransactions) {
-        const t = (tx?.type || '').toLowerCase();
+        const t = (tx?.type || '').toLowerCase().trim();
 
         // Robust parsing of pagoDetalles
         let pd = tx?.pagoDetalles || {};
@@ -70,94 +74,128 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
         }
         if (!pd || typeof pd !== 'object') pd = {};
 
-        // Fundamental Amounts
-        // ingresoCaja: Physical cash movement. If missing, fallback to tx.amount
-        let rawImpact = Number(pd.ingresoCaja !== undefined ? pd.ingresoCaja : (tx.amount || 0));
-        // totalVenta: Accounting revenue. If missing, fallback to tx.amount
-        let totalRevenue = Number(pd.totalVenta !== undefined ? pd.totalVenta : (tx.amount || 0));
+        // ── Fundamental Amounts (all safe-parsed) ──
+        const txAmount = safe(tx.amount);
+        const txTotalVenta = safe(pd.totalVenta) || txAmount;
+        const txEfectivo = safe(pd.efectivo);
+        const txDolares = safe(pd.dolares);
+        const txCambio = safe(pd.cambio);
+        const txIngresoCaja = safe(pd.ingresoCaja);
+        const txTarjeta = safe(pd.tarjeta);
+        const txTransf = safe(pd.transferencia);
+        const txCredito = safe(pd.credito);
+
+        // ── Revenue amount (for display/classification) ──
+        let totalRevenue = txTotalVenta || txAmount;
 
         // Force negative sign for money-leaving transactions
         const isNegativeType = t === 'salida' || t.includes('devolucion') || t.includes('cancelacion') || t.includes('anulacion');
         if (isNegativeType) {
-            rawImpact = -Math.abs(rawImpact);
             totalRevenue = -Math.abs(totalRevenue);
         }
 
         const normalizedTx = { ...tx, pagoDetalles: pd, displayAmount: totalRevenue };
 
+        // ══════════════════════════════════════════════════════
         // 1. ACCOUNTING TOTALS (Revenue Summary)
-        const txTarjeta = Number(pd.tarjeta || 0);
-        const txTransf = Number(pd.transferencia || 0);
-        const txCredito = Number(pd.credito || 0);
-
-        // Only add to non-cash totals if it's a type that generates revenue
+        // ══════════════════════════════════════════════════════
         if (t.startsWith('venta') || t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
             tTarjeta += txTarjeta;
             tTransf += txTransf;
             tCredito += txCredito;
         } else if (t === 'ajuste') {
-            if (pd.target === 'tarjeta') tTarjeta += Number(tx.amount || 0);
-            if (pd.target === 'credito') tCredito += Number(tx.amount || 0);
-            if (pd.target === 'transferencia') tTransf += Number(tx.amount || 0);
+            if (pd.target === 'tarjeta') tTarjeta += txAmount;
+            if (pd.target === 'credito') tCredito += txAmount;
+            if (pd.target === 'transferencia') tTransf += txAmount;
         }
 
-        // 2. PHYSICAL CASH CALCULATIONS
+        // ══════════════════════════════════════════════════════
+        // 2. PHYSICAL CASH CALCULATIONS (blindado con 3 niveles de fallback)
+        // ══════════════════════════════════════════════════════
         if (t.startsWith('venta')) {
-            // SIEMPRE separar córdobas y dólares para evitar doble conteo
-            const efvo = Number(pd.efectivo || 0);
-            const dlrs = Number(pd.dolares || 0);
-            const cmb = Number(pd.cambio || 0);
+            // ── TIER 1: Campos desglosados del PaymentModal ──
+            if (txEfectivo > 0.001 || txDolares > 0.001 || txCambio > 0.001) {
+                netCordobas += (txEfectivo - txCambio);
+                netDolares += txDolares;
+            }
+            // ── TIER 2: ingresoCaja (ya calculado por PaymentModal, incluye dólares convertidos) ──
+            else if (txIngresoCaja > 0.001) {
+                netCordobas += txIngresoCaja;
+                // NO sumar dólares aquí para evitar doble conteo
+            }
+            // ── TIER 3: Calcular residual (totalVenta - lo no-efectivo) ──
+            else {
+                const noEfectivoSum = txTarjeta + txTransf + txCredito;
+                const residual = txTotalVenta - noEfectivoSum;
+                if (residual > 0.001) {
+                    netCordobas += residual;
+                }
+                // Si residual <= 0, fue todo tarjeta/transferencia/crédito → no cash
+            }
 
-            if (efvo > 0 || dlrs > 0 || cmb > 0) {
-                // Camino principal: campos desglosados del PaymentModal
-                netCordobas += (efvo - cmb);
-                netDolares += dlrs;
-            } else if (pd.ingresoCaja !== undefined && Number(pd.ingresoCaja) > 0) {
-                // Fallback: si solo viene ingresoCaja (sin efectivo ni dolares)
-                // ingresoCaja YA incluye dolares convertidos, así que va todo a córdobas
-                netCordobas += Number(pd.ingresoCaja);
-                // NO sumar dolares aquí para evitar doble conteo
-            } else {
-                // Fallback final: tx.amount menos lo no-efectivo
-                netCordobas += (rawImpact - txTarjeta - txTransf - txCredito);
-            }
         } else if (t.includes('abono')) {
-            if (pd.dolares !== undefined) {
-                netDolares += Number(pd.dolares || 0);
-                netCordobas += Number(pd.efectivo || 0);
+            if (txDolares > 0.001) {
+                netDolares += txDolares;
+                netCordobas += txEfectivo;
+            } else if (txEfectivo > 0.001) {
+                netCordobas += txEfectivo;
+            } else if (txIngresoCaja > 0.001) {
+                netCordobas += txIngresoCaja;
             } else {
-                netCordobas += rawImpact;
+                const noEfectivo = txTarjeta + txTransf;
+                netCordobas += Math.max(0, txAmount - noEfectivo);
             }
+
         } else if (t === 'entrada') {
-            netCordobas += Math.abs(rawImpact);
+            netCordobas += Math.abs(txAmount);
+
         } else if (t === 'salida') {
-            netCordobas -= Math.abs(rawImpact);
+            netCordobas -= Math.abs(txAmount);
+
         } else if (t.includes('devolucion') || t.includes('cancelacion') || t.includes('anulacion')) {
-            // For reversions, we assume rawImpact (already negative) is the net cash reversal
-            // If we had more detail we could reverse card/cash specifically, but usually it's cash.
-            netCordobas += rawImpact;
+            // Reversiones: sacar cash de la caja
+            if (pd.ingresoCaja !== undefined && pd.ingresoCaja !== null) {
+                netCordobas += safe(pd.ingresoCaja); // Será negativo para devoluciones
+            } else if (txEfectivo > 0.001) {
+                netCordobas -= txEfectivo;
+            } else {
+                const noEfectivo = txTarjeta + txTransf + txCredito;
+                const cashPart = Math.abs(txAmount) - noEfectivo;
+                if (cashPart > 0.001) {
+                    netCordobas -= cashPart;
+                }
+            }
+
         } else if (t === 'ajuste') {
             if (pd.target === 'efectivo') {
-                netCordobas += rawImpact;
-                if (pd.hidden) totalHidden += rawImpact;
+                netCordobas += txAmount;
+                if (pd.hidden) totalHidden += txAmount;
             } else if (pd.target === 'dolares') {
-                netDolares += rawImpact;
+                netDolares += txAmount;
             }
+
         } else {
-            // Fallback for any other type
-            netCordobas += rawImpact;
+            // Fallback para cualquier otro tipo desconocido
+            const noEfectivo = txTarjeta + txTransf + txCredito;
+            const cashPart = txAmount - noEfectivo;
+            if (Math.abs(cashPart) > 0.001) {
+                netCordobas += cashPart;
+            }
         }
 
+        // ══════════════════════════════════════════════════════
         // 3. GLOBAL SALES TOTAL
+        // ══════════════════════════════════════════════════════
         if (t.startsWith('venta') || t.includes('abono') || t === 'entrada') {
             tVentasDia += Math.abs(totalRevenue);
         } else if (t.includes('devolucion') || t.includes('cancelacion') || t.includes('anulacion')) {
             tVentasDia -= Math.abs(totalRevenue);
-        } else if (t === 'ajuste') {
-            // God Mode (ajustes) no debe alterar las Ventas Totales (tVentasDia). No sumamos nada.
         }
+        // ajustes NO afectan ventas totales (God Mode invisible)
 
+        // ══════════════════════════════════════════════════════
         // 4. CLASSIFICATION for Lists
+        // ══════════════════════════════════════════════════════
         if (t.startsWith('venta')) cls.ventasContado.push(normalizedTx);
         else if (t.includes('devolucion')) { cls.devoluciones.push(normalizedTx); sumDevsCancels += Math.abs(totalRevenue); }
         else if (t.includes('cancelacion') || t.includes('anulacion')) { cls.cancelaciones.push(normalizedTx); sumDevsCancels += Math.abs(totalRevenue); }
@@ -167,6 +205,16 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
         else if (t === 'ajuste') cls.ajustes.push(normalizedTx);
     }
 
+    // ★ BLINDAJE FINAL: Clamp contra NaN en todos los totales
+    netCordobas = safe(netCordobas);
+    netDolares = safe(netDolares);
+    tTarjeta = safe(tTarjeta);
+    tTransf = safe(tTransf);
+    tCredito = safe(tCredito);
+    tVentasDia = safe(tVentasDia);
+    totalHidden = safe(totalHidden);
+    sumDevsCancels = safe(sumDevsCancels);
+
     const efectivoEsperadoCordobas = cajaInicialN + netCordobas;
     const efectivoEsperado = efectivoEsperadoCordobas + (netDolares * tasaRef);
 
@@ -174,14 +222,14 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
         cajaInicial: cajaInicialN,
         netCordobas,
         netDolares,
-        efectivoEsperado,
-        efectivoEsperadoCordobas,
+        efectivoEsperado: safe(efectivoEsperado),
+        efectivoEsperadoCordobas: safe(efectivoEsperadoCordobas),
         efectivoEsperadoDolares: netDolares,
-        totalVentasDia: tVentasDia,
+        totalVentasDia: safe(tVentasDia),
         totalTarjeta: tTarjeta,
         totalTransferencia: tTransf,
         totalCredito: tCredito,
-        totalNoEfectivo: tTarjeta + tTransf + tCredito,
+        totalNoEfectivo: safe(tTarjeta + tTransf + tCredito),
         sumDevolucionesCancelaciones: sumDevsCancels,
         totalHidden,
         tasaRef,

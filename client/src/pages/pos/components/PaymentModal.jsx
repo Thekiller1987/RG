@@ -249,14 +249,14 @@ const PaymentModal = ({
       tasaDolarAlMomento: Number(tasaDolar),
       referenciaTarjeta: referenciaTarjeta.trim(),
       referenciaTransferencia: referenciaTransferencia.trim(),
-      credito,                           // shorthand
+      credito,                           // monto numérico
       clienteId: finalClienteId,
       tipoVenta: computeTipoVenta({
         efectivo: numEfectivo,
         tarjeta: numTarjeta,
         transferencia: numTransferencia,
         dolaresLocal: dolaresEnMonedaLocal,
-        credito: tipoPagoPrincipal === 'credito',
+        credito: credito,                // ★ FIXED: monto en vez de boolean
       }),
       cambio: Number(cambio),
       ingresoCaja: Number(ingresoRealEnCaja),

@@ -122,74 +122,111 @@ async function ensureSchema() {
 // Ejecutar corrección al cargar el archivo
 ensureSchema();
 
-// ───────── Helper: Calcular totales de sesión desde transacciones ─────────
+// ───────── Helper: Calcular totales de sesión desde transacciones (★ BLINDADO) ─────────
 function calcularTotalesSesion(transactions, details) {
+  // Helper anti-NaN
+  const safe = (v) => { const n = Number(v); return (isNaN(n) || !isFinite(n)) ? 0 : n; };
+
   let totalEfectivo = 0, totalTarjeta = 0, totalTransferencia = 0, totalCredito = 0;
   let totalDolares = 0, totalIngresos = 0, totalGastos = 0;
   let movimientoNetoEfectivo = 0;
 
+  const tasaDefault = safe(details?.tasaDolar) || 36.60;
+
   (transactions || []).forEach(tx => {
-    const tipo = (tx.type || '').toLowerCase();
-    const d = tx.pagoDetalles || {};
+    const tipo = (tx.type || '').toLowerCase().trim();
+    let d = tx.pagoDetalles || {};
+    if (typeof d === 'string') { try { d = JSON.parse(d); } catch { d = {}; } }
+    if (!d || typeof d !== 'object') d = {};
+
+    const txEfectivo = safe(d.efectivo);
+    const txTarjeta = safe(d.tarjeta);
+    const txTransf = safe(d.transferencia);
+    const txCredito = safe(d.credito);
+    const txDolares = safe(d.dolares);
+    const txCambio = safe(d.cambio);
+    const txIngresoCaja = safe(d.ingresoCaja);
+    const txAmount = safe(tx.amount);
+    const txTotalVenta = safe(d.totalVenta) || txAmount;
+    const txTasa = safe(d.tasaDolarAlMomento) || tasaDefault;
 
     // VENTAS
     if (tipo.startsWith('venta')) {
-      totalEfectivo += Number(d.efectivo || 0);
-      totalTarjeta += Number(d.tarjeta || 0);
-      totalTransferencia += Number(d.transferencia || 0);
-      totalCredito += Number(d.credito || 0);
-      totalDolares += Number(d.dolares || 0);
+      totalEfectivo += txEfectivo;
+      totalTarjeta += txTarjeta;
+      totalTransferencia += txTransf;
+      totalCredito += txCredito;
+      totalDolares += txDolares;
 
-      // Cálculo efectivo neto
-      const cashIn = Number(d.efectivo || 0);
-      const dolaresVal = Number(d.dolares || 0);
-      const tasa = Number(d.tasaDolarAlMomento || details?.tasaDolar || 1);
-      const cashOut = Number(d.cambio || 0);
-      if (!d.efectivo && !d.dolares) {
-        movimientoNetoEfectivo += Number(d.ingresoCaja || 0);
+      // Movimiento neto efectivo (3 tiers de fallback)
+      if (txEfectivo > 0.001 || txDolares > 0.001 || txCambio > 0.001) {
+        // TIER 1: Campos desglosados
+        movimientoNetoEfectivo += (txEfectivo + (txDolares * txTasa)) - txCambio;
+      } else if (txIngresoCaja > 0.001) {
+        // TIER 2: ingresoCaja ya calculado
+        movimientoNetoEfectivo += txIngresoCaja;
       } else {
-        movimientoNetoEfectivo += (cashIn + (dolaresVal * tasa)) - cashOut;
+        // TIER 3: Residual (totalVenta - no-efectivo)
+        const noEfectivo = txTarjeta + txTransf + txCredito;
+        const residual = txTotalVenta - noEfectivo;
+        if (residual > 0.001) {
+          movimientoNetoEfectivo += residual;
+        }
       }
     }
     // ABONOS
     else if (tipo.includes('abono')) {
-      if (d.efectivo) totalEfectivo += Number(d.efectivo || 0);
-      else if (d.ingresoCaja > 0) totalEfectivo += Number(d.ingresoCaja || 0);
-      if (d.tarjeta) totalTarjeta += Number(d.tarjeta || 0);
-      if (d.transferencia) totalTransferencia += Number(d.transferencia || 0);
-      if (d.dolares) {
-        totalDolares += Number(d.dolares || 0);
-        movimientoNetoEfectivo += (Number(d.efectivo || 0) + (Number(d.dolares || 0) * Number(details?.tasaDolar || 1)));
+      if (txEfectivo > 0.001) totalEfectivo += txEfectivo;
+      else if (txIngresoCaja > 0) totalEfectivo += txIngresoCaja;
+      if (txTarjeta > 0.001) totalTarjeta += txTarjeta;
+      if (txTransf > 0.001) totalTransferencia += txTransf;
+      if (txDolares > 0.001) {
+        totalDolares += txDolares;
+        movimientoNetoEfectivo += txEfectivo + (txDolares * txTasa);
+      } else if (txEfectivo > 0.001) {
+        movimientoNetoEfectivo += txEfectivo;
+      } else if (txIngresoCaja > 0.001) {
+        movimientoNetoEfectivo += txIngresoCaja;
       } else {
-        movimientoNetoEfectivo += Number(d.ingresoCaja || 0);
+        const noEfectivo = txTarjeta + txTransf;
+        movimientoNetoEfectivo += Math.max(0, txAmount - noEfectivo);
       }
     }
     // ENTRADAS
     else if (tipo === 'entrada') {
-      const m = Number(tx.amount || 0);
+      const m = Math.abs(txAmount);
       totalIngresos += m;
       movimientoNetoEfectivo += m;
     }
     // SALIDAS
     else if (tipo === 'salida') {
-      const m = Number(tx.amount || 0);
+      const m = Math.abs(txAmount);
       totalGastos += m;
       movimientoNetoEfectivo -= m;
     }
     // DEVOLUCIONES / CANCELACIONES
-    else if (tipo === 'devolucion' || tipo === 'cancelacion') {
-      totalEfectivo -= Number(d.efectivo || 0);
-      totalTarjeta -= Number(d.tarjeta || 0);
-      totalTransferencia -= Number(d.transferencia || 0);
-      totalCredito -= Number(d.credito || 0);
-      totalDolares -= Number(d.dolares || 0);
-      let impacto = Number(d.ingresoCaja || tx.amount || 0);
-      if (impacto > 0) impacto = -impacto;
-      movimientoNetoEfectivo += impacto;
+    else if (tipo.includes('devolucion') || tipo.includes('cancelacion') || tipo.includes('anulacion')) {
+      totalEfectivo -= txEfectivo;
+      totalTarjeta -= txTarjeta;
+      totalTransferencia -= txTransf;
+      totalCredito -= txCredito;
+      totalDolares -= txDolares;
+
+      if (d.ingresoCaja !== undefined && d.ingresoCaja !== null) {
+        movimientoNetoEfectivo += safe(d.ingresoCaja); // Será negativo
+      } else if (txEfectivo > 0.001) {
+        movimientoNetoEfectivo -= txEfectivo;
+      } else {
+        const noEfectivo = txTarjeta + txTransf + txCredito;
+        const cashPart = Math.abs(txAmount) - noEfectivo;
+        if (cashPart > 0.001) {
+          movimientoNetoEfectivo -= cashPart;
+        }
+      }
     }
     // AJUSTES SECRETOS
     else if (tipo === 'ajuste') {
-      const monto = Number(tx.amount || 0);
+      const monto = txAmount;
       if (d.target === 'efectivo') movimientoNetoEfectivo += monto;
       else if (d.target === 'credito') totalCredito += monto;
       else if (d.target === 'tarjeta') totalTarjeta += monto;
@@ -198,7 +235,17 @@ function calcularTotalesSesion(transactions, details) {
     }
   });
 
-  return { totalEfectivo, totalTarjeta, totalTransferencia, totalCredito, totalDolares, totalIngresos, totalGastos, movimientoNetoEfectivo };
+  // ★ BLINDAJE FINAL
+  return {
+    totalEfectivo: safe(totalEfectivo),
+    totalTarjeta: safe(totalTarjeta),
+    totalTransferencia: safe(totalTransferencia),
+    totalCredito: safe(totalCredito),
+    totalDolares: safe(totalDolares),
+    totalIngresos: safe(totalIngresos),
+    totalGastos: safe(totalGastos),
+    movimientoNetoEfectivo: safe(movimientoNetoEfectivo)
+  };
 }
 
 // ───────── Sesiones de Caja (SQL ONLY) ─────────

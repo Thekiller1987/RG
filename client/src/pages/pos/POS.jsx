@@ -350,37 +350,59 @@ const POS = () => {
     const isInstant = !pagoDetalles.shouldPrintNow;
 
     // Helper: Construir los detalles de pago normalizados para la caja
+    // ★ BLINDADO: Cada campo se parsea con Number() y se protege contra NaN/undefined
     const buildCajaDetails = () => {
       const details = { ...pagoDetalles };
-      const totalSale = Number(saleData.totalVenta || 0);
+      const totalSale = Math.max(0, Number(saleData.totalVenta) || 0);
 
-      // Normalizar TODOS los campos numéricos
-      details.efectivo = Number(details.efectivo || 0);
-      details.tarjeta = Number(details.tarjeta || 0);
-      details.transferencia = Number(details.transferencia || 0);
-      details.credito = Number(details.credito || 0);
-      details.cambio = Number(details.cambio || 0);
-      details.dolares = Number(details.dolares || 0);
+      // ── PASO 1: Normalizar TODOS los campos numéricos (anti-NaN) ──
+      details.efectivo = Math.max(0, Number(details.efectivo) || 0);
+      details.tarjeta = Math.max(0, Number(details.tarjeta) || 0);
+      details.transferencia = Math.max(0, Number(details.transferencia) || 0);
+      details.credito = Math.max(0, Number(details.credito) || 0);
+      details.cambio = Math.max(0, Number(details.cambio) || 0);
+      details.dolares = Math.max(0, Number(details.dolares) || 0);
       details.totalVenta = totalSale;
 
-      // Calcular ingresoCaja si falta
-      if (details.ingresoCaja === undefined || details.ingresoCaja === null) {
-        details.ingresoCaja = Math.max(0, details.efectivo - details.cambio);
-      }
-      details.ingresoCaja = Number(details.ingresoCaja);
+      // Tasa de dólar segura
+      const tasaSafe = Number(details.tasaDolarAlMomento || tasaDolar) || 36.60;
+      details.tasaDolarAlMomento = tasaSafe;
 
-      // Si es contado puro pero efectivo quedó en 0, asumir el total
-      const isCash = !details.tarjeta && !details.transferencia && !details.credito;
-      if (isCash && details.efectivo === 0) {
+      // ── PASO 2: Calcular ingresoCaja (dinero FÍSICO que entra a la caja) ──
+      // ingresoCaja = efectivo córdobas + dólares convertidos - cambio entregado
+      const dolaresConvertidos = details.dolares * tasaSafe;
+      if (details.ingresoCaja === undefined || details.ingresoCaja === null || isNaN(details.ingresoCaja)) {
+        details.ingresoCaja = Math.max(0, details.efectivo + dolaresConvertidos - details.cambio);
+      }
+      details.ingresoCaja = Math.max(0, Number(details.ingresoCaja) || 0);
+
+      // ── PASO 3: Detección inteligente de contado puro ──
+      // Solo forzar efectivo=total si NO hay tarjeta, NO transferencia, NO crédito, Y NO dólares
+      const hayTarjeta = details.tarjeta > 0.001;
+      const hayTransferencia = details.transferencia > 0.001;
+      const hayCredito = details.credito > 0.001;
+      const hayDolares = details.dolares > 0.001;
+      const hayEfectivo = details.efectivo > 0.001;
+      const esContadoPuro = !hayTarjeta && !hayTransferencia && !hayCredito && !hayDolares;
+
+      if (esContadoPuro && !hayEfectivo && totalSale > 0.001) {
+        // Nadie especificó cómo se pagó → asumir efectivo C$
         details.efectivo = totalSale;
         details.ingresoCaja = totalSale;
+      }
+
+      // ── PASO 4: Validación de coherencia ──
+      // El total de los montos no debe exceder el total de la venta (con margen para redondeo)
+      const sumaPagos = details.efectivo + details.tarjeta + details.transferencia + details.credito + dolaresConvertidos;
+      if (sumaPagos < totalSale - 1 && totalSale > 0.01) {
+        console.warn('[POS CAJA] ⚠ Suma de pagos menor que total:', { sumaPagos, totalSale, details });
       }
 
       console.log('[POS CAJA DEBUG] buildCajaDetails resultado:', JSON.stringify({
         totalSale, efectivo: details.efectivo, tarjeta: details.tarjeta,
         transferencia: details.transferencia, credito: details.credito,
-        cambio: details.cambio, dolares: details.dolares,
-        ingresoCaja: details.ingresoCaja, isCash
+        cambio: details.cambio, dolares: details.dolares, dolaresConvertidos,
+        ingresoCaja: details.ingresoCaja, esContadoPuro
       }));
 
       return { details, totalSale };
@@ -409,29 +431,38 @@ const POS = () => {
           showAlert({ title: "✅ Venta Sincronizada", message: `Venta #${savedSale.id} guardada correctamente.` });
         }
 
-        // Registrar en Caja — SIEMPRE
+        // Registrar en Caja — SIEMPRE (con protección extra para que un error de caja no mate la venta)
         console.log('[POS CAJA DEBUG] isCajaOpen:', isCajaOpen, 'cajaSession:', !!cajaSession);
         if (isCajaOpen && cajaSession) {
-          const { details, totalSale } = buildCajaDetails();
-          const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
+          try {
+            const { details, totalSale } = buildCajaDetails();
+            const clientNameFound = clients?.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
 
-          const newTransaction = {
-            type: 'venta',
-            amount: totalSale,
-            at: new Date().toISOString(),
-            userId,
-            note: `Venta #${savedSale.id} - ${clientNameFound}`,
-            pagoDetalles: details,
-            id: savedSale.id
-          };
+            const newTransaction = {
+              type: 'venta',
+              amount: totalSale,
+              at: new Date().toISOString(),
+              userId,
+              note: `Venta #${savedSale.id} - ${clientNameFound}`,
+              pagoDetalles: details,
+              id: savedSale.id
+            };
 
-          console.log('[POS CAJA DEBUG] Enviando addCajaTx:', JSON.stringify(newTransaction));
-          const cajaTxResult = await api.addCajaTx({ userId, tx: newTransaction }, token);
-          console.log('[POS CAJA DEBUG] addCajaTx respuesta:', cajaTxResult);
+            console.log('[POS CAJA DEBUG] Enviando addCajaTx:', JSON.stringify(newTransaction));
+            const cajaTxResult = await api.addCajaTx({ userId, tx: newTransaction }, token);
+            console.log('[POS CAJA DEBUG] addCajaTx respuesta:', cajaTxResult);
+          } catch (cajaErr) {
+            // ★ BLINDAJE: Error de caja NO debe matar la venta
+            console.error('[POS CAJA] Error registrando en caja (venta ya guardada):', cajaErr);
+          }
 
-          // Refrescar sesión desde servidor para tener datos reales
-          await refreshSession();
-          console.log('[POS CAJA DEBUG] refreshSession completado');
+          // Refrescar sesión SIEMPRE, incluso si addCajaTx falló
+          try {
+            await refreshSession();
+            console.log('[POS CAJA DEBUG] refreshSession completado');
+          } catch (refreshErr) {
+            console.error('[POS CAJA] Error en refreshSession:', refreshErr);
+          }
         } else {
           console.warn('[POS CAJA DEBUG] ⚠️ NO se registró en caja porque isCajaOpen=' + isCajaOpen + ' cajaSession=' + !!cajaSession);
         }
@@ -446,40 +477,49 @@ const POS = () => {
     };
 
     if (isInstant) {
-      // --- MODO INSTANTÁNEO ---
+      // --- MODO INSTANTÁNEO (BLINDADO) ---
       handleRemoveOrder(orderToCloseId);
 
       setProductsState(prev => prev.map(p => {
         const sold = payloadItems.find(i => i.id_producto === (p.id_producto || p.id));
-        if (sold) return { ...p, existencia: Math.max(0, p.existencia - sold.quantity) };
+        if (sold) return { ...p, existencia: Math.max(0, (p.existencia || 0) - (sold.quantity || 0)) };
         return p;
       }));
 
       // Actualizar Caja Localmente (Optimistic) para que la UI refleje inmediatamente
       if (isCajaOpen && cajaSession) {
-        const { details, totalSale } = buildCajaDetails();
-        const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
+        try {
+          const { details, totalSale } = buildCajaDetails();
+          const clientNameFound = clients?.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
 
-        const tempTx = {
-          type: 'venta',
-          amount: totalSale,
-          at: new Date().toISOString(),
-          userId,
-          note: `Venta (Sincronizando...) - ${clientNameFound}`,
-          pagoDetalles: details,
-          id: 'PEND-' + Date.now()
-        };
+          // ★ BLINDAJE: Crear fingerprint consistente para que dedup funcione
+          // Los detalles normalizados son idénticos a los que enviará processSalePromise
+          const pendId = 'PEND-' + Date.now();
+          const tempTx = {
+            type: 'venta',
+            amount: totalSale,
+            at: new Date().toISOString(),
+            userId,
+            note: `Venta (Sincronizando...) - ${clientNameFound}`,
+            pagoDetalles: { ...details }, // Copia para no mutar
+            id: pendId
+          };
 
-        console.log('[POS CAJA DEBUG] tempTx optimista:', JSON.stringify(tempTx));
-        const updatedSession = { ...cajaSession, transactions: [tempTx, ...(cajaSession.transactions || [])] };
-        setCajaSession(updatedSession);
+          console.log('[POS CAJA DEBUG] tempTx optimista:', JSON.stringify(tempTx));
+          const updatedSession = { ...cajaSession, transactions: [tempTx, ...(cajaSession.transactions || [])] };
+          setCajaSession(updatedSession);
+        } catch (e) {
+          console.error('[POS CAJA] Error en optimistic update (no afecta la venta):', e);
+        }
       }
 
       playSuccessSound();
       showAlert({ title: "¡Éxito!", message: "Venta procesada." });
 
-      // 2. Ejecutar proceso en background
-      processSalePromise(); // No awaits
+      // 2. Ejecutar proceso en background con protección extra
+      processSalePromise().catch(err => {
+        console.error('[POS CAJA] Error en background sale:', err);
+      });
 
       return true;
 
