@@ -332,6 +332,22 @@ const WholesalePOS = () => {
             }
         }
 
+        // GUARD: Verificar si hay suficiente efectivo en caja para dar cambio
+        const cambioRequerido = Number(pagoDetalles.cambio || 0);
+        if (cambioRequerido > 0.01 && isCajaOpen && cajaSession) {
+            const stats = calculateCajaStats(cajaSession?.transactions, cajaSession?.initialAmount, tasaDolar);
+            const cajaDisponible = stats.efectivoEsperadoCordobas || 0;
+            if (cambioRequerido > cajaDisponible) {
+                showAlert({
+                    title: "⚠️ Efectivo Insuficiente",
+                    message: `No hay suficiente efectivo en caja para dar cambio.\n\nCambio requerido: C$${cambioRequerido.toFixed(2)}\nEfectivo disponible: C$${cajaDisponible.toFixed(2)}\n\nPida al cliente un monto exacto o use otro método de pago.`,
+                    type: 'error'
+                });
+                audioError.play().catch(e => console.warn(e));
+                return false;
+            }
+        }
+
         try {
             if (isInstant) {
                 showAlert({ title: "Procesando...", message: "Guardando venta mayorista en el servidor..." });
@@ -363,17 +379,8 @@ const WholesalePOS = () => {
                 const tasaSafe = Number(details.tasaDolarAlMomento || tasaDolar) || 36.60;
 
                 // FIXED: ingresoCaja debe incluir dólares convertidos - cambio
-                if (details.ingresoCaja === undefined || details.ingresoCaja === null || isNaN(details.ingresoCaja)) {
-                    const dolaresEnLocal = details.dolares * tasaSafe;
-                    details.ingresoCaja = Math.max(0, details.efectivo + dolaresEnLocal - details.cambio);
-                }
-
-                // Fallback para contado puro si no se especificó nada
-                const isPuroContado = !details.tarjeta && !details.transferencia && !details.credito && !details.dolares;
-                if (isPuroContado && details.efectivo === 0 && totalSale > 0) {
-                    details.efectivo = totalSale;
-                    details.ingresoCaja = totalSale;
-                }
+                const dolaresEnLocal = (details.dolares || 0) * tasaSafe;
+                details.ingresoCaja = Math.max(0, details.efectivo + dolaresEnLocal - details.cambio);
 
                 const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
 
@@ -403,7 +410,7 @@ const WholesalePOS = () => {
             handleRemoveOrder(orderToCloseId);
             setProductsState(prev => prev.map(p => {
                 const sold = payloadItems.find(i => i.id_producto === (p.id_producto || p.id));
-                if (sold) return { ...p, existencia: Math.max(0, p.existencia - sold.quantity) };
+                if (sold) return { ...p, existencia: Math.max(0, (p.existencia || 0) - (sold.quantity || 0)) };
                 return p;
             }));
 

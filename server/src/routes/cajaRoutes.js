@@ -370,6 +370,12 @@ router.post('/session/open', async (req, res) => {
       closedAt: null
     };
 
+    // 3. Emitir evento por socket
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('caja:session_update', { userId, status: 'open', timestamp: openedAt });
+    }
+
     res.status(201).json(newSession);
 
   } catch (error) {
@@ -448,6 +454,13 @@ router.post('/session/tx', async (req, res) => {
     ]);
 
     // 5. Devolver sesión actualizada
+    // 6. Emitir evento por socket
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('caja:transaction_new', { userId, tx: { id: txId, type: tx.type, amount: Number(tx.amount || 0) } });
+      io.emit('caja:session_update', { userId });
+    }
+
     res.status(201).json(mapRowToSession({ ...row, detalles_json: details }));
 
   } catch (error) {
@@ -636,7 +649,13 @@ router.post('/session/close', async (req, res) => {
     ]);
 
     // Responder éxito
-    res.json({ success: true, message: 'Cierre guardado en BD', id: row.id, ...mapRowToSession({ ...row, fecha_cierre: closedAt }) });
+    // 5. Emitir evento por socket
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('caja:session_update', { userId, status: 'closed', timestamp: closedAt });
+    }
+
+    res.json({ success: true, message: 'Sesión cerrada correctamente.', session: mapRowToSession({ ...row, fecha_cierre: closedAt }) });
 
   } catch (error) {
     console.error('Error POST /session/close:', error);
