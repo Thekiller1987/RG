@@ -65,7 +65,8 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
     const validTransactions = deduplicateTransactions(Array.isArray(transactions) ? transactions : []);
 
     for (const tx of validTransactions) {
-        const t = (tx?.type || '').toLowerCase().trim();
+        let t = (tx?.type || '').toLowerCase().trim();
+        t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
         // Robust parsing of pagoDetalles
         let pd = tx?.pagoDetalles || {};
@@ -133,7 +134,7 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
                 // Si residual <= 0, fue todo tarjeta/transferencia/crédito → no cash
             }
 
-        } else if (t.includes('abono')) {
+        } else if (t.includes('abono') || t.includes('liquidación') || t.includes('liquidacion') || t.includes('pedido')) {
             if (txDolares > 0.001) {
                 netDolares += txDolares;
                 netCordobas += txEfectivo;
@@ -186,7 +187,7 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
         // ══════════════════════════════════════════════════════
         // 3. GLOBAL SALES TOTAL
         // ══════════════════════════════════════════════════════
-        if (t.startsWith('venta') || t.includes('abono') || t === 'entrada') {
+        if (t.startsWith('venta') || t.includes('abono') || t.includes('liquid') || t.includes('pedido') || t === 'entrada') {
             tVentasDia += Math.abs(totalRevenue);
         } else if (t.includes('devolucion') || t.includes('cancelacion') || t.includes('anulacion')) {
             tVentasDia -= Math.abs(totalRevenue);

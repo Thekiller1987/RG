@@ -134,7 +134,8 @@ function calcularTotalesSesion(transactions, details) {
   const tasaDefault = safe(details?.tasaDolar) || 36.60;
 
   (transactions || []).forEach(tx => {
-    const tipo = (tx.type || '').toLowerCase().trim();
+    let tipo = (tx.type || '').toLowerCase().trim();
+    tipo = tipo.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     let d = tx.pagoDetalles || {};
     if (typeof d === 'string') { try { d = JSON.parse(d); } catch { d = {}; } }
     if (!d || typeof d !== 'object') d = {};
@@ -174,8 +175,8 @@ function calcularTotalesSesion(transactions, details) {
         }
       }
     }
-    // ABONOS
-    else if (tipo.includes('abono')) {
+    // ABONOS Y LIQUIDACIONES
+    else if (tipo.includes('abono') || tipo.includes('liquid') || tipo.includes('pedido')) {
       if (txEfectivo > 0.001) totalEfectivo += txEfectivo;
       else if (txIngresoCaja > 0) totalEfectivo += txIngresoCaja;
       if (txTarjeta > 0.001) totalTarjeta += txTarjeta;
