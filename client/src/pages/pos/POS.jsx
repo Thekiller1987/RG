@@ -477,14 +477,8 @@ const POS = () => {
     };
 
     if (isInstant) {
-      // --- MODO INSTANTÁNEO (BLINDADO) ---
-      handleRemoveOrder(orderToCloseId);
-
-      setProductsState(prev => prev.map(p => {
-        const sold = payloadItems.find(i => i.id_producto === (p.id_producto || p.id));
-        if (sold) return { ...p, existencia: Math.max(0, (p.existencia || 0) - (sold.quantity || 0)) };
-        return p;
-      }));
+      // --- MODO INSTANTÁNEO ---
+      // Fix: Await instead of detaching promise to guarantee 'addCajaTx' finishes before any context unmount or stale closures.
 
       // Actualizar Caja Localmente (Optimistic) para que la UI refleje inmediatamente
       if (isCajaOpen && cajaSession) {
@@ -492,8 +486,6 @@ const POS = () => {
           const { details, totalSale } = buildCajaDetails();
           const clientNameFound = clients?.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
 
-          // ★ BLINDAJE: Crear fingerprint consistente para que dedup funcione
-          // Los detalles normalizados son idénticos a los que enviará processSalePromise
           const pendId = 'PEND-' + Date.now();
           const tempTx = {
             type: 'venta',
@@ -501,11 +493,10 @@ const POS = () => {
             at: new Date().toISOString(),
             userId,
             note: `Venta (Sincronizando...) - ${clientNameFound}`,
-            pagoDetalles: { ...details }, // Copia para no mutar
+            pagoDetalles: { ...details },
             id: pendId
           };
 
-          console.log('[POS CAJA DEBUG] tempTx optimista:', JSON.stringify(tempTx));
           const updatedSession = { ...cajaSession, transactions: [tempTx, ...(cajaSession.transactions || [])] };
           setCajaSession(updatedSession);
         } catch (e) {
@@ -514,21 +505,25 @@ const POS = () => {
       }
 
       playSuccessSound();
-      showAlert({ title: "¡Éxito!", message: "Venta procesada." });
+      showAlert({ title: "¡Éxito!", message: "Venta procesada. Sincronizando..." });
 
-      // 2. Ejecutar proceso en background con protección extra
-      processSalePromise().catch(err => {
-        console.error('[POS CAJA] Error en background sale:', err);
-      });
+      // Esperar que la DB registre ventas y caja de forma secuencial segura
+      await processSalePromise();
+
+      // Limpiar despues de sincronizar
+      handleRemoveOrder(orderToCloseId);
+      setProductsState(prev => prev.map(p => {
+        const sold = payloadItems.find(i => i.id_producto === (p.id_producto || p.id));
+        if (sold) return { ...p, existencia: Math.max(0, (p.existencia || 0) - (sold.quantity || 0)) };
+        return p;
+      }));
 
       return true;
 
     } else {
       // --- MODO CON ESPERA (IMPRESIÓN) ---
-      // Debemos esperar para tener el ID y mostrar el ticket
       await processSalePromise();
 
-      // Limpiar carrito y stock después de venta exitosa (igual que modo instantáneo)
       handleRemoveOrder(orderToCloseId);
       setProductsState(prev => prev.map(p => {
         const sold = payloadItems.find(i => i.id_producto === (p.id_producto || p.id));

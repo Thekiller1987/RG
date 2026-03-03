@@ -401,15 +401,20 @@ const WholesalePOS = () => {
         };
 
         if (isInstant) {
+            showAlert({ title: "Guardando...", message: "Procesando venta mayorista." });
+
+            await processSalePromise();
+
             handleRemoveOrder(orderToCloseId);
             setProductsState(prev => prev.map(p => {
                 const sold = payloadItems.find(i => i.id_producto === (p.id_producto || p.id));
                 if (sold) return { ...p, existencia: Math.max(0, p.existencia - sold.quantity) };
                 return p;
             }));
+
             showAlert({ title: "¡Éxito!", message: "Venta Mayorista procesada." });
             audioBeep.play().catch(e => console.warn(e));
-            processSalePromise();
+
             return true;
         } else {
             await processSalePromise();
