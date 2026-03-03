@@ -340,22 +340,14 @@ const POS = () => {
       originalOrderId: currentOrder?.serverSaleId || null
     };
 
-    // --- LÓGICA DE COBRO INSTANTÁNEO ---
-
-    // 1. Preparar datos
-    // ... (payloadItems y saleData ya definidos) ...
-
-    // 2. Si se requiere IMPRESIÓN, debemos esperar (Await) para tener el ID real
-    //    Si NO se requiere, hacemos "Fire and Forget" para ser instantáneos.
+    // --- LÓGICA DE COBRO (SIEMPRE SINCRONIZADA CON SERVIDOR) ---
     const isInstant = !pagoDetalles.shouldPrintNow;
 
     // Helper: Construir los detalles de pago normalizados para la caja
-    // ★ BLINDADO: Cada campo se parsea con Number() y se protege contra NaN/undefined
     const buildCajaDetails = () => {
       const details = { ...pagoDetalles };
       const totalSale = Math.max(0, Number(saleData.totalVenta) || 0);
 
-      // ── PASO 1: Normalizar TODOS los campos numéricos (anti-NaN) ──
       details.efectivo = Math.max(0, Number(details.efectivo) || 0);
       details.tarjeta = Math.max(0, Number(details.tarjeta) || 0);
       details.transferencia = Math.max(0, Number(details.transferencia) || 0);
@@ -364,20 +356,15 @@ const POS = () => {
       details.dolares = Math.max(0, Number(details.dolares) || 0);
       details.totalVenta = totalSale;
 
-      // Tasa de dólar segura
       const tasaSafe = Number(details.tasaDolarAlMomento || tasaDolar) || 36.60;
       details.tasaDolarAlMomento = tasaSafe;
 
-      // ── PASO 2: Calcular ingresoCaja (dinero FÍSICO que entra a la caja) ──
-      // ingresoCaja = efectivo córdobas + dólares convertidos - cambio entregado
       const dolaresConvertidos = details.dolares * tasaSafe;
       if (details.ingresoCaja === undefined || details.ingresoCaja === null || isNaN(details.ingresoCaja)) {
         details.ingresoCaja = Math.max(0, details.efectivo + dolaresConvertidos - details.cambio);
       }
       details.ingresoCaja = Math.max(0, Number(details.ingresoCaja) || 0);
 
-      // ── PASO 3: Detección inteligente de contado puro ──
-      // Solo forzar efectivo=total si NO hay tarjeta, NO transferencia, NO crédito, Y NO dólares
       const hayTarjeta = details.tarjeta > 0.001;
       const hayTransferencia = details.transferencia > 0.001;
       const hayCredito = details.credito > 0.001;
@@ -386,131 +373,54 @@ const POS = () => {
       const esContadoPuro = !hayTarjeta && !hayTransferencia && !hayCredito && !hayDolares;
 
       if (esContadoPuro && !hayEfectivo && totalSale > 0.001) {
-        // Nadie especificó cómo se pagó → asumir efectivo C$
         details.efectivo = totalSale;
         details.ingresoCaja = totalSale;
       }
-
-      // ── PASO 4: Validación de coherencia ──
-      // El total de los montos no debe exceder el total de la venta (con margen para redondeo)
-      const sumaPagos = details.efectivo + details.tarjeta + details.transferencia + details.credito + dolaresConvertidos;
-      if (sumaPagos < totalSale - 1 && totalSale > 0.01) {
-        console.warn('[POS CAJA] ⚠ Suma de pagos menor que total:', { sumaPagos, totalSale, details });
-      }
-
-      console.log('[POS CAJA DEBUG] buildCajaDetails resultado:', JSON.stringify({
-        totalSale, efectivo: details.efectivo, tarjeta: details.tarjeta,
-        transferencia: details.transferencia, credito: details.credito,
-        cambio: details.cambio, dolares: details.dolares, dolaresConvertidos,
-        ingresoCaja: details.ingresoCaja, esContadoPuro
-      }));
-
       return { details, totalSale };
     };
 
-    const processSalePromise = async () => {
-      try {
-        console.log('[POS CAJA DEBUG] Iniciando createSale...');
-        const response = await api.createSale(saleData, token);
-        console.log('[POS CAJA DEBUG] createSale respuesta:', response);
-
-        // Background refresh inventory
-        refreshProducts().catch(console.error);
-
-        const responseData = response.data || response || {};
-        const savedSale = { ...saleData, ...responseData };
-        savedSale.id = responseData.id || responseData.saleId || responseData._id || 'N/A';
-        savedSale.items = payloadItems;
-        savedSale.pagoDetalles = pagoDetalles;
-        savedSale.fecha = new Date().toISOString();
-
-        if (pagoDetalles.shouldPrintNow) {
-          setShouldAutoTriggerPrint(true);
-          setTicketData(savedSale);
-        } else {
-          showAlert({ title: "✅ Venta Sincronizada", message: `Venta #${savedSale.id} guardada correctamente.` });
-        }
-
-        // Registrar en Caja — SIEMPRE (con protección extra para que un error de caja no mate la venta)
-        console.log('[POS CAJA DEBUG] isCajaOpen:', isCajaOpen, 'cajaSession:', !!cajaSession);
-        if (isCajaOpen && cajaSession) {
-          try {
-            const { details, totalSale } = buildCajaDetails();
-            const clientNameFound = clients?.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
-
-            const newTransaction = {
-              type: 'venta',
-              amount: totalSale,
-              at: new Date().toISOString(),
-              userId,
-              note: `Venta #${savedSale.id} - ${clientNameFound}`,
-              pagoDetalles: details,
-              id: savedSale.id
-            };
-
-            console.log('[POS CAJA DEBUG] Enviando addCajaTx:', JSON.stringify(newTransaction));
-            const cajaTxResult = await api.addCajaTx({ userId, tx: newTransaction }, token);
-            console.log('[POS CAJA DEBUG] addCajaTx respuesta:', cajaTxResult);
-          } catch (cajaErr) {
-            // ★ BLINDAJE: Error de caja NO debe matar la venta
-            console.error('[POS CAJA] Error registrando en caja (venta ya guardada):', cajaErr);
-          }
-
-          // Refrescar sesión SIEMPRE, incluso si addCajaTx falló
-          try {
-            await refreshSession();
-            console.log('[POS CAJA DEBUG] refreshSession completado');
-          } catch (refreshErr) {
-            console.error('[POS CAJA] Error en refreshSession:', refreshErr);
-          }
-        } else {
-          console.warn('[POS CAJA DEBUG] ⚠️ NO se registró en caja porque isCajaOpen=' + isCajaOpen + ' cajaSession=' + !!cajaSession);
-        }
-
-      } catch (err) {
-        console.error("[POS CAJA DEBUG] CRITICAL ERROR:", err);
-        showAlert({
-          title: "⚠️ Error de Sincronización",
-          message: `La venta por C$ ${fmt(total)} NO se guardó en el servidor.\nError: ${err.message}.\n\nPor favor, anote los detalles o reintente.`
-        });
+    try {
+      if (isInstant) {
+        showAlert({ title: "Procesando...", message: "Guardando venta en el servidor..." });
       }
-    };
 
-    if (isInstant) {
-      // --- MODO INSTANTÁNEO ---
-      // Fix: Await instead of detaching promise to guarantee 'addCajaTx' finishes before any context unmount or stale closures.
+      // 1. Guardar Venta
+      const response = await api.createSale(saleData, token);
+      const responseData = response.data || response || {};
+      const savedSale = { ...saleData, ...responseData };
+      savedSale.id = responseData.id || responseData.saleId || responseData._id || 'N/A';
+      savedSale.items = payloadItems;
+      savedSale.pagoDetalles = pagoDetalles;
+      savedSale.fecha = new Date().toISOString();
 
-      // Actualizar Caja Localmente (Optimistic) para que la UI refleje inmediatamente
+      // 2. Registrar en Caja (SIEMPRE que esté abierta)
       if (isCajaOpen && cajaSession) {
-        try {
-          const { details, totalSale } = buildCajaDetails();
-          const clientNameFound = clients?.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
+        const { details, totalSale } = buildCajaDetails();
+        const clientNameFound = clients?.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
 
-          const pendId = 'PEND-' + Date.now();
-          const tempTx = {
-            type: 'venta',
-            amount: totalSale,
-            at: new Date().toISOString(),
-            userId,
-            note: `Venta (Sincronizando...) - ${clientNameFound}`,
-            pagoDetalles: { ...details },
-            id: pendId
-          };
+        const newTransaction = {
+          type: 'venta',
+          amount: totalSale,
+          at: new Date().toISOString(),
+          userId,
+          note: `Venta #${savedSale.id} - ${clientNameFound}`,
+          pagoDetalles: details,
+          id: savedSale.id
+        };
 
-          const updatedSession = { ...cajaSession, transactions: [tempTx, ...(cajaSession.transactions || [])] };
-          setCajaSession(updatedSession);
-        } catch (e) {
-          console.error('[POS CAJA] Error en optimistic update (no afecta la venta):', e);
-        }
+        await api.addCajaTx({ userId, tx: newTransaction }, token);
+        await refreshSession(); // Sincronizar estado real desde el servidor
       }
 
-      playSuccessSound();
-      showAlert({ title: "¡Éxito!", message: "Venta procesada. Sincronizando..." });
+      // 3. Acciones Finales según tipo de venta
+      if (pagoDetalles.shouldPrintNow) {
+        setShouldAutoTriggerPrint(true);
+        setTicketData(savedSale);
+      } else {
+        showAlert({ title: "✅ Éxito", message: `Venta #${savedSale.id} procesada y caja actualizada.` });
+      }
 
-      // Esperar que la DB registre ventas y caja de forma secuencial segura
-      await processSalePromise();
-
-      // Limpiar despues de sincronizar
+      // 4. Limpiar UI solamente al finalizar con éxito total
       handleRemoveOrder(orderToCloseId);
       setProductsState(prev => prev.map(p => {
         const sold = payloadItems.find(i => i.id_producto === (p.id_producto || p.id));
@@ -518,21 +428,18 @@ const POS = () => {
         return p;
       }));
 
-      return true;
-
-    } else {
-      // --- MODO CON ESPERA (IMPRESIÓN) ---
-      await processSalePromise();
-
-      handleRemoveOrder(orderToCloseId);
-      setProductsState(prev => prev.map(p => {
-        const sold = payloadItems.find(i => i.id_producto === (p.id_producto || p.id));
-        if (sold) return { ...p, existencia: Math.max(0, p.existencia - sold.quantity) };
-        return p;
-      }));
-
       playSuccessSound();
+      refreshProducts().catch(console.error);
       return true;
+
+    } catch (err) {
+      console.error("[POS] Error en venta:", err);
+      showAlert({
+        title: "⚠️ Fallo de Sincronización",
+        message: `La venta NO pudo completarse. Verifique su conexión.\nError: ${err.message}`,
+        type: 'error'
+      });
+      return false;
     }
   };
 
@@ -1138,7 +1045,7 @@ const POS = () => {
                     };
 
                     // Persistir en servidor + refrescar
-                    api.addCajaTx({ userId, tx: cancelTx }, token).catch(console.error);
+                    await api.addCajaTx({ userId, tx: cancelTx }, token);
                     await refreshSession();
                   }
                 }
@@ -1192,7 +1099,7 @@ const POS = () => {
                     id: 'REFUND-' + Date.now()
                   };
                   // Persistir en servidor + refrescar
-                  api.addCajaTx({ userId, tx: refundTransaction }, token).catch(console.error);
+                  await api.addCajaTx({ userId, tx: refundTransaction }, token);
                   await refreshSession();
 
                   showAlert({ title: "Devolución Exitosa", message: `Devolución registrada en sistema y C$${refundAmount.toFixed(2)} descontados de caja.` });

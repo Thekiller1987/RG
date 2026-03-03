@@ -332,79 +332,74 @@ const WholesalePOS = () => {
             }
         }
 
-        const processSalePromise = async () => {
-            try {
-                const response = await api.createSale(saleData, token);
-                const responseData = response.data || response || {};
-                const savedSale = { ...saleData, ...responseData };
-                savedSale.id = responseData.id || responseData.saleId || responseData._id || 'N/A';
-                savedSale.items = payloadItems;
-                savedSale.pagoDetalles = pagoDetalles;
-                savedSale.fecha = new Date().toISOString();
-
-                if (pagoDetalles.shouldPrintNow) {
-                    setShouldAutoTriggerPrint(true);
-                    setTicketData(savedSale);
-                } else {
-                    showAlert({ title: "✅ Venta Sincronizada", message: `La venta mayorista #${savedSale.id} fue guardada en el servidor.` });
-                }
-
-                if (isCajaOpen && cajaSession) {
-                    const details = { ...pagoDetalles };
-                    const totalSale = Number(saleData.totalVenta || 0);
-
-                    // SIEMPRE calcular efectivo e ingresoCaja correctamente
-                    details.efectivo = Number(details.efectivo || 0);
-                    details.tarjeta = Number(details.tarjeta || 0);
-                    details.transferencia = Number(details.transferencia || 0);
-                    details.credito = Number(details.credito || 0);
-                    details.cambio = Number(details.cambio || 0);
-                    details.dolares = Number(details.dolares || 0);
-                    details.totalVenta = totalSale;
-
-                    if (details.ingresoCaja === undefined || details.ingresoCaja === null) {
-                        details.ingresoCaja = Math.max(0, details.efectivo - details.cambio);
-                    }
-
-                    const isCash = !details.tarjeta && !details.transferencia && !details.credito;
-                    if (isCash && details.efectivo === 0) {
-                        details.efectivo = totalSale;
-                        details.ingresoCaja = totalSale;
-                    }
-
-                    const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
-
-                    const newTransaction = {
-                        type: 'venta',
-                        amount: totalSale,
-                        at: new Date().toISOString(),
-                        userId: user?.id || user?.id_usuario,
-                        note: `Venta Mayorista #${savedSale.id} - ${clientNameFound}`,
-                        pagoDetalles: details,
-                        id: savedSale.id
-                    };
-
-                    await api.addCajaTx({ userId: user?.id || user?.id_usuario, tx: newTransaction }, token);
-                    refreshSession();
-                }
-
-                refreshProducts();
-
-            } catch (err) {
-                console.error("CRITICAL: Error saving sale:", err);
-                showAlert({
-                    title: "⚠️ Error de Sincronización",
-                    message: `La venta NO se guardó en el servidor.\nError: ${err.message}.`
-                });
-                audioError.play().catch(e => console.warn(e));
+        try {
+            if (isInstant) {
+                showAlert({ title: "Procesando...", message: "Guardando venta mayorista en el servidor..." });
             }
-        };
 
-        if (isInstant) {
-            showAlert({ title: "Guardando...", message: "Procesando venta mayorista." });
+            // 1. Guardar Venta
+            const response = await api.createSale(saleData, token);
+            const responseData = response.data || response || {};
+            const savedSale = { ...saleData, ...responseData };
+            savedSale.id = responseData.id || responseData.saleId || responseData._id || 'N/A';
+            savedSale.items = payloadItems;
+            savedSale.pagoDetalles = pagoDetalles;
+            savedSale.fecha = new Date().toISOString();
 
-            await processSalePromise();
+            // 2. Registrar en Caja (SIEMPRE que esté abierta)
+            if (isCajaOpen && cajaSession) {
+                const details = { ...pagoDetalles };
+                const totalSale = Number(saleData.totalVenta || 0);
 
+                // Normalización y cálculo de ingreso real (FÍSICO)
+                details.efectivo = Number(details.efectivo || 0);
+                details.tarjeta = Number(details.tarjeta || 0);
+                details.transferencia = Number(details.transferencia || 0);
+                details.credito = Number(details.credito || 0);
+                details.cambio = Number(details.cambio || 0);
+                details.dolares = Number(details.dolares || 0);
+                details.totalVenta = totalSale;
+
+                const tasaSafe = Number(details.tasaDolarAlMomento || tasaDolar) || 36.60;
+
+                // FIXED: ingresoCaja debe incluir dólares convertidos - cambio
+                if (details.ingresoCaja === undefined || details.ingresoCaja === null || isNaN(details.ingresoCaja)) {
+                    const dolaresEnLocal = details.dolares * tasaSafe;
+                    details.ingresoCaja = Math.max(0, details.efectivo + dolaresEnLocal - details.cambio);
+                }
+
+                // Fallback para contado puro si no se especificó nada
+                const isPuroContado = !details.tarjeta && !details.transferencia && !details.credito && !details.dolares;
+                if (isPuroContado && details.efectivo === 0 && totalSale > 0) {
+                    details.efectivo = totalSale;
+                    details.ingresoCaja = totalSale;
+                }
+
+                const clientNameFound = clients.find(c => c.id_cliente === Number(pagoDetalles.clienteId))?.nombre || "Consumidor Final";
+
+                const newTransaction = {
+                    type: 'venta',
+                    amount: totalSale,
+                    at: new Date().toISOString(),
+                    userId: user?.id || user?.id_usuario,
+                    note: `Venta Mayorista #${savedSale.id} - ${clientNameFound}`,
+                    pagoDetalles: details,
+                    id: savedSale.id
+                };
+
+                await api.addCajaTx({ userId: user?.id || user?.id_usuario, tx: newTransaction }, token);
+                await refreshSession();
+            }
+
+            // 3. Acciones Finales
+            if (pagoDetalles.shouldPrintNow) {
+                setShouldAutoTriggerPrint(true);
+                setTicketData(savedSale);
+            } else {
+                showAlert({ title: "✅ Éxito", message: `Venta mayorista #${savedSale.id} procesada y sincronizada.` });
+            }
+
+            // 4. Limpiar UI
             handleRemoveOrder(orderToCloseId);
             setProductsState(prev => prev.map(p => {
                 const sold = payloadItems.find(i => i.id_producto === (p.id_producto || p.id));
@@ -412,19 +407,18 @@ const WholesalePOS = () => {
                 return p;
             }));
 
-            showAlert({ title: "¡Éxito!", message: "Venta Mayorista procesada." });
             audioBeep.play().catch(e => console.warn(e));
+            refreshProducts().catch(console.error);
+            return true;
 
-            return true;
-        } else {
-            await processSalePromise();
-            handleRemoveOrder(orderToCloseId);
-            setProductsState(prev => prev.map(p => {
-                const sold = payloadItems.find(i => i.id_producto === (p.id_producto || p.id));
-                if (sold) return { ...p, existencia: Math.max(0, p.existencia - sold.quantity) };
-                return p;
-            }));
-            return true;
+        } catch (err) {
+            console.error("CRITICAL: Error saving wholesale sale:", err);
+            showAlert({
+                title: "⚠️ Error de Sincronización",
+                message: `La venta NO se guardó en el servidor.\nError: ${err.message}.`
+            });
+            audioError.play().catch(e => console.warn(e));
+            return false;
         }
     };
 

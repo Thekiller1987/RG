@@ -109,8 +109,8 @@ export default function AbonoCreditoModal({ client, onClose, onAbonoSuccess, sho
         token
       );
 
-      // Registrar en caja del día
-      addCajaTransaction({
+      // 2. Registrar en caja del día (Y esperar al servidor)
+      await addCajaTransaction({
         tipo: 'Abono Crédito',
         cliente: client.nombre,
         idCliente: client.id_cliente,
@@ -119,7 +119,7 @@ export default function AbonoCreditoModal({ client, onClose, onAbonoSuccess, sho
         referencia: 'Abono a crédito'
       });
 
-      showAlert({ title: "Éxito", message: "Abono registrado correctamente." });
+      showAlert({ title: "Éxito", message: "Abono registrado y caja sincronizada correctamente." });
       onAbonoSuccess();
       onClose();
     } catch (err) {

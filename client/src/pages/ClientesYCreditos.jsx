@@ -314,7 +314,7 @@ export default function ClientesYCreditos() {
             </MobileContainer>
 
             {modal.name === 'client' && <ClientFormModal client={modal.data} onClose={handleCloseModal} onSave={refreshClients} />}
-            {modal.name === 'abono' && <AbonoCreditoModal client={modal.data} onClose={handleCloseModal} onAbonoSuccess={() => { refreshClients(); toast.success('Abono registrado correctamente.'); }} showAlert={showAlert} />}
+            {modal.name === 'abono' && <AbonoCreditoModal client={modal.data} onClose={handleCloseModal} onAbonoSuccess={() => { refreshClients(); refreshSession(); toast.success('Abono registrado correctamente.'); }} showAlert={showAlert} />}
             {modal.name === 'historial' && <HistorialCreditoModal client={modal.data} onClose={handleCloseModal} token={token} />}
 
             {/* Modal de Tickets (SalesHistoryModal) Integrado */}

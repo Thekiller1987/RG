@@ -221,20 +221,15 @@ export const AuthProvider = ({ children, socket }) => {
         if (!user) return;
         const userId = user.id_usuario || user.id;
 
-        // 1. Actualización Local (Optimista)
-        const session = loadCajaSession(userId);
-        if (session && !session.closedAt) {
-            session.transactions = [...(session.transactions || []), transaction];
-            saveCajaSession(userId, session);
-            setCajaSession(session);
-        }
-
-        // 2. Sincronización con Servidor
+        // --- LÓGICA 100% SERVIDOR ---
+        // Se elimina la actualización local (optimista) para evitar desincronización.
+        // La verdad absoluta reside ahora únicamente en el servidor.
         try {
             await api.addCajaTx({ userId, tx: transaction }, token);
             // console.log("✅ Transacción de caja sincronizada con servidor");
         } catch (error) {
             console.error("❌ Error sincronizando transacción de caja:", error);
+            throw error; // Propagar para que el modal/UI sepa que falló
         }
     }, [user, token]);
 
