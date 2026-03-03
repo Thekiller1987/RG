@@ -103,16 +103,22 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
 
         // 2. PHYSICAL CASH CALCULATIONS
         if (t.startsWith('venta')) {
-            // ingresoCaja = net physical cash entering drawer (efectivo - cambio)
-            // This is the MOST RELIABLE field from PaymentModal
-            if (pd.ingresoCaja !== undefined) {
+            // SIEMPRE separar córdobas y dólares para evitar doble conteo
+            const efvo = Number(pd.efectivo || 0);
+            const dlrs = Number(pd.dolares || 0);
+            const cmb = Number(pd.cambio || 0);
+
+            if (efvo > 0 || dlrs > 0 || cmb > 0) {
+                // Camino principal: campos desglosados del PaymentModal
+                netCordobas += (efvo - cmb);
+                netDolares += dlrs;
+            } else if (pd.ingresoCaja !== undefined && Number(pd.ingresoCaja) > 0) {
+                // Fallback: si solo viene ingresoCaja (sin efectivo ni dolares)
+                // ingresoCaja YA incluye dolares convertidos, así que va todo a córdobas
                 netCordobas += Number(pd.ingresoCaja);
-                netDolares += Number(pd.dolares || 0);
-            } else if (pd.efectivo !== undefined || pd.dolares !== undefined) {
-                netCordobas += (Number(pd.efectivo || 0) - Number(pd.cambio || 0));
-                netDolares += Number(pd.dolares || 0);
+                // NO sumar dolares aquí para evitar doble conteo
             } else {
-                // Fallback for legacy or un-broken down sales
+                // Fallback final: tx.amount menos lo no-efectivo
                 netCordobas += (rawImpact - txTarjeta - txTransf - txCredito);
             }
         } else if (t.includes('abono')) {
