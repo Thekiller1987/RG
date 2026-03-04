@@ -160,93 +160,115 @@ function calcularTotalesSesion(transactions, details) {
       totalDolares += txDolares;
 
       // Movimiento neto efectivo (3 tiers de fallback)
-      if (txEfectivo > 0.001 || txDolares > 0.001 || txCambio > 0.001) {
-        // TIER 1: Campos desglosados
-        movimientoNetoEfectivo += (txEfectivo + (txDolares * txTasa)) - txCambio;
-      } else if (txIngresoCaja > 0.001) {
+      const cashIn = txEfectivo + (txDolares * txTasa);
+      const cashOut = txCambio;
+      const calculatedNet = cashIn - cashOut;
+
+      if (Math.abs(calculatedNet) > 0.001) {
+        // TIER 1: Campos desglosados (efectivo/dólares/cambio)
+        movimientoNetoEfectivo += calculatedNet;
+      } else if (Math.abs(txIngresoCaja) > 0.001) {
         // TIER 2: ingresoCaja ya calculado
         movimientoNetoEfectivo += txIngresoCaja;
       } else {
         // TIER 3: Residual (totalVenta - no-efectivo)
         const noEfectivo = txTarjeta + txTransf + txCredito;
         const residual = txTotalVenta - noEfectivo;
+        // Solo sumamos el residual si es mayor a 0 para evitar ruidos
         if (residual > 0.001) {
           movimientoNetoEfectivo += residual;
         }
       }
     }
     // ABONOS Y LIQUIDACIONES
-    else if (tipo.includes('abono') || tipo.includes('liquid') || tipo.includes('pedido')) {
-      if (txEfectivo > 0.001) totalEfectivo += txEfectivo;
-      else if (txIngresoCaja > 0) totalEfectivo += txIngresoCaja;
-      if (txTarjeta > 0.001) totalTarjeta += txTarjeta;
-      if (txTransf > 0.001) totalTransferencia += txTransf;
-      if (txDolares > 0.001) {
-        totalDolares += txDolares;
-        movimientoNetoEfectivo += txEfectivo + (txDolares * txTasa);
-      } else if (txEfectivo > 0.001) {
-        movimientoNetoEfectivo += txEfectivo;
-      } else if (txIngresoCaja > 0.001) {
+    else if (tipo.includes('abono') || tipo.includes('liquid') || tipo.includes('pedido') || tipo.includes('apartado')) {
+      const netAbonoCash = (txEfectivo + (txDolares * txTasa)) - txCambio;
+
+      if (Math.abs(netAbonoCash) > 0.001) {
+        totalEfectivo += netAbonoCash;
+        movimientoNetoEfectivo += netAbonoCash;
+      } else if (Math.abs(txIngresoCaja) > 0.001) {
+        totalEfectivo += txIngresoCaja;
         movimientoNetoEfectivo += txIngresoCaja;
       } else {
         const noEfectivo = txTarjeta + txTransf;
-        movimientoNetoEfectivo += Math.max(0, txAmount - noEfectivo);
+        const residual = Math.max(0, txAmount - noEfectivo);
+        totalEfectivo += residual;
+        movimientoNetoEfectivo += residual;
       }
+
+      if (txTarjeta > 0.001) totalTarjeta += txTarjeta;
+      if (txTransf > 0.001) totalTransferencia += txTransf;
+      if (txDolares > 0.001) totalDolares += txDolares;
     }
+    if (txTarjeta > 0.001) totalTarjeta += txTarjeta;
+    if (txTransf > 0.001) totalTransferencia += txTransf;
+    if (txDolares > 0.001) {
+      totalDolares += txDolares;
+      movimientoNetoEfectivo += txEfectivo + (txDolares * txTasa);
+    } else if (txEfectivo > 0.001) {
+      movimientoNetoEfectivo += txEfectivo;
+    } else if (txIngresoCaja > 0.001) {
+      movimientoNetoEfectivo += txIngresoCaja;
+    } else {
+      const noEfectivo = txTarjeta + txTransf;
+      movimientoNetoEfectivo += Math.max(0, txAmount - noEfectivo);
+    }
+  }
     // ENTRADAS
     else if (tipo === 'entrada') {
-      const m = Math.abs(txAmount);
-      totalIngresos += m;
-      movimientoNetoEfectivo += m;
-    }
-    // SALIDAS
-    else if (tipo === 'salida') {
-      const m = Math.abs(txAmount);
-      totalGastos += m;
-      movimientoNetoEfectivo -= m;
-    }
-    // DEVOLUCIONES / CANCELACIONES
-    else if (tipo.includes('devolucion') || tipo.includes('cancelacion') || tipo.includes('anulacion')) {
-      totalEfectivo -= txEfectivo;
-      totalTarjeta -= txTarjeta;
-      totalTransferencia -= txTransf;
-      totalCredito -= txCredito;
-      totalDolares -= txDolares;
+    const m = Math.abs(txAmount);
+    totalIngresos += m;
+    movimientoNetoEfectivo += m;
+  }
+  // SALIDAS
+  else if (tipo === 'salida') {
+    const m = Math.abs(txAmount);
+    totalGastos += m;
+    movimientoNetoEfectivo -= m;
+  }
+  // DEVOLUCIONES / CANCELACIONES
+  else if (tipo.includes('devolucion') || tipo.includes('cancelacion') || tipo.includes('anulacion')) {
+    totalEfectivo -= txEfectivo;
+    totalTarjeta -= txTarjeta;
+    totalTransferencia -= txTransf;
+    totalCredito -= txCredito;
+    totalDolares -= txDolares;
 
-      if (d.ingresoCaja !== undefined && d.ingresoCaja !== null) {
-        movimientoNetoEfectivo += safe(d.ingresoCaja); // Será negativo
-      } else if (txEfectivo > 0.001) {
-        movimientoNetoEfectivo -= txEfectivo;
-      } else {
-        const noEfectivo = txTarjeta + txTransf + txCredito;
-        const cashPart = Math.abs(txAmount) - noEfectivo;
-        if (cashPart > 0.001) {
-          movimientoNetoEfectivo -= cashPart;
-        }
+    if (d.ingresoCaja !== undefined && d.ingresoCaja !== null) {
+      movimientoNetoEfectivo += safe(d.ingresoCaja); // Será negativo
+    } else if (txEfectivo > 0.001) {
+      movimientoNetoEfectivo -= txEfectivo;
+    } else {
+      const noEfectivo = txTarjeta + txTransf + txCredito;
+      const cashPart = Math.abs(txAmount) - noEfectivo;
+      if (cashPart > 0.001) {
+        movimientoNetoEfectivo -= cashPart;
       }
     }
-    // AJUSTES SECRETOS
-    else if (tipo === 'ajuste') {
-      const monto = txAmount;
-      if (d.target === 'efectivo') movimientoNetoEfectivo += monto;
-      else if (d.target === 'credito') totalCredito += monto;
-      else if (d.target === 'tarjeta') totalTarjeta += monto;
-      else if (d.target === 'transferencia') totalTransferencia += monto;
-      else if (d.target === 'dolares') totalDolares += monto;
-    }
-  });
+  }
+  // AJUSTES SECRETOS
+  else if (tipo === 'ajuste') {
+    const monto = txAmount;
+    if (d.target === 'efectivo') movimientoNetoEfectivo += monto;
+    else if (d.target === 'credito') totalCredito += monto;
+    else if (d.target === 'tarjeta') totalTarjeta += monto;
+    else if (d.target === 'transferencia') totalTransferencia += monto;
+    else if (d.target === 'dolares') totalDolares += monto;
+  }
+});
 
-  // ★ BLINDAJE FINAL
-  return {
-    totalEfectivo: safe(totalEfectivo),
-    totalTarjeta: safe(totalTarjeta),
-    totalTransferencia: safe(totalTransferencia),
-    totalCredito: safe(totalCredito),
-    totalDolares: safe(totalDolares),
-    totalIngresos: safe(totalIngresos),
-    totalGastos: safe(totalGastos),
-    movimientoNetoEfectivo: safe(movimientoNetoEfectivo)
-  };
+// ★ BLINDAJE FINAL
+return {
+  totalEfectivo: safe(totalEfectivo),
+  totalTarjeta: safe(totalTarjeta),
+  totalTransferencia: safe(totalTransferencia),
+  totalCredito: safe(totalCredito),
+  totalDolares: safe(totalDolares),
+  totalIngresos: safe(totalIngresos),
+  totalGastos: safe(totalGastos),
+  movimientoNetoEfectivo: safe(movimientoNetoEfectivo)
+};
 }
 
 // ───────── Sesiones de Caja (SQL ONLY) ─────────
@@ -280,7 +302,22 @@ function mapRowToSession(row) {
     difference: row.diferencia ? Number(row.diferencia) : null,
     tasaDolar: Number(details.tasaDolar || 0),
     totalDolares: Number(row.total_dolares || 0),
-    notes: row.observaciones || ''
+    notes: row.observaciones || '',
+
+    // Stats pre-calculadas para evitar lógica en el cliente
+    stats: calcularTotalesSesion(details.transactions || [], details),
+
+    // Campos oficiales de SQL para sincronización perfecta
+    sqlTotals: {
+      efectivo: Number(row.total_ventas_efectivo || 0),
+      tarjeta: Number(row.total_ventas_tarjeta || 0),
+      transferencia: Number(row.total_ventas_transferencia || 0),
+      credito: Number(row.total_ventas_credito || 0),
+      dolares: Number(row.total_dolares || 0),
+      entradas: Number(row.total_entradas || 0),
+      salidas: Number(row.total_salidas || 0),
+      esperado: Number(row.final_esperado || 0)
+    }
   };
 }
 
@@ -433,6 +470,8 @@ router.post('/session/tx', async (req, res) => {
     // 3. Recalcular totales corridos desde TODAS las transacciones
     const totals = calcularTotalesSesion(details.transactions, details);
 
+    const finalEsperado = Number(row.monto_inicial || 0) + totals.movimientoNetoEfectivo;
+
     // 4. Guardar JSON + totales actualizados en BD (cada tx actualiza las columnas)
     await pool.query(`
       UPDATE cierres_caja 
@@ -443,13 +482,15 @@ router.post('/session/tx', async (req, res) => {
           total_ventas_credito = ?,
           total_dolares = ?,
           total_entradas = ?,
-          total_salidas = ?
+          total_salidas = ?,
+          final_esperado = ?
       WHERE id = ?
     `, [
       JSON.stringify(details),
       totals.totalEfectivo, totals.totalTarjeta, totals.totalTransferencia,
       totals.totalCredito, totals.totalDolares,
       totals.totalIngresos, totals.totalGastos,
+      finalEsperado,
       row.id
     ]);
 
@@ -497,26 +538,13 @@ router.post('/session/dedup', async (req, res) => {
     const originalCount = original.length;
 
     // Deduplicar: mantener solo la primera aparición de cada ID
-    // Para IDs tipo PEND-xxx que podrían tener un duplicado con ID real,
-    // comparar por (type + amount + pagoDetalles.totalVenta) como fingerprint
     const seen = new Set();
-    const fingerprints = new Set();
     const cleaned = [];
 
     for (const tx of original) {
-      // 1. Dedup por ID exacto
+      // Dedup solo por ID exacto. El fingerprint causaba problemas con ventas idénticas legítimas.
       if (tx.id && seen.has(tx.id)) continue;
       if (tx.id) seen.add(tx.id);
-
-      // 2. Dedup por fingerprint (para detectar PEND-xxx duplicados de IDs reales)
-      const pd = tx.pagoDetalles || {};
-      const fp = `${tx.type}|${Number(tx.amount || 0).toFixed(2)}|${Number(pd.totalVenta || 0).toFixed(2)}|${Number(pd.efectivo || 0).toFixed(2)}|${Number(pd.tarjeta || 0).toFixed(2)}|${Number(pd.credito || 0).toFixed(2)}`;
-
-      if (fingerprints.has(fp)) {
-        console.log(`[dedup] Removiendo TX duplicada (fingerprint): ${tx.id} - ${tx.note}`);
-        continue;
-      }
-      fingerprints.add(fp);
 
       cleaned.push(tx);
     }
@@ -526,6 +554,7 @@ router.post('/session/dedup', async (req, res) => {
 
     // Recalcular totales
     const totals = calcularTotalesSesion(cleaned, details);
+    const finalEsperado = Number(row.monto_inicial || 0) + totals.movimientoNetoEfectivo;
 
     await pool.query(`
       UPDATE cierres_caja 
@@ -536,13 +565,15 @@ router.post('/session/dedup', async (req, res) => {
           total_ventas_credito = ?,
           total_dolares = ?,
           total_entradas = ?,
-          total_salidas = ?
+          total_salidas = ?,
+          final_esperado = ?
       WHERE id = ?
     `, [
       JSON.stringify(details),
       totals.totalEfectivo, totals.totalTarjeta, totals.totalTransferencia,
       totals.totalCredito, totals.totalDolares,
       totals.totalIngresos, totals.totalGastos,
+      finalEsperado,
       row.id
     ]);
 
@@ -677,26 +708,31 @@ router.get('/reporte', async (req, res) => {
       ORDER BY fecha_cierre DESC
     `, [dateStr]);
 
-    const cerradas = rows.map(r => ({
-      id: r.id,
-      sql: true,
-      abierta_por: r.usuario_nombre,
-      cerrada_por: r.cerrado_por_nombre || r.usuario_nombre,
-      hora_apertura: r.fecha_apertura,
-      hora_cierre: r.fecha_cierre,
-      monto_inicial: Number(r.monto_inicial),
-      esperado: Number(r.final_esperado),
-      contado: Number(r.final_real),
-      diferencia: Number(r.diferencia),
-      total_efectivo: Number(r.total_ventas_efectivo),
-      total_tarjeta: Number(r.total_ventas_tarjeta),
-      total_transferencia: Number(r.total_ventas_transferencia),
-      total_credito: Number(r.total_ventas_credito),
-      total_dolares: Number(r.total_dolares || 0),
-      total_gastos: Number(r.total_salidas),
-      total_ingresos: Number(r.total_entradas),
-      detalles_json: r.detalles_json
-    }));
+    const cerradas = rows.map(r => {
+      const session = mapRowToSession(r);
+      return {
+        ...session,
+        // Mantener compatibilidad con campos esperados por el frontend legacy
+        id: r.id,
+        sql: true,
+        abierta_por: r.usuario_nombre,
+        cerrada_por: r.cerrado_por_nombre || r.usuario_nombre,
+        hora_apertura: r.fecha_apertura,
+        hora_cierre: r.fecha_cierre,
+        monto_inicial: Number(r.monto_inicial),
+        esperado: Number(r.final_esperado),
+        contado: Number(r.final_real),
+        diferencia: Number(r.diferencia),
+        total_efectivo: Number(r.total_ventas_efectivo),
+        total_tarjeta: Number(r.total_ventas_tarjeta),
+        total_transferencia: Number(r.total_ventas_transferencia),
+        total_credito: Number(r.total_ventas_credito),
+        total_dolares: Number(r.total_dolares || 0),
+        total_gastos: Number(r.total_salidas),
+        total_ingresos: Number(r.total_entradas),
+        detalles_json: r.detalles_json
+      };
+    });
 
     // 2. Obtener Sesiones ABIERTAS desde SQL
     const [activeRows] = await pool.query(`
@@ -705,12 +741,15 @@ router.get('/reporte', async (req, res) => {
       AND DATE(DATE_SUB(fecha_apertura, INTERVAL 6 HOUR)) = ?
     `, [dateStr]);
 
-    const abiertas = activeRows.map(r => ({
-      id: r.id,
-      abierta_por: r.usuario_nombre,
-      hora_apertura: r.fecha_apertura,
-      monto_inicial: Number(r.monto_inicial || 0)
-    }));
+    const abiertas = activeRows.map(r => {
+      const session = mapRowToSession(r);
+      return {
+        ...session,
+        abierta_por: r.usuario_nombre,
+        hora_apertura: r.fecha_apertura,
+        monto_inicial: Number(r.monto_inicial || 0)
+      };
+    });
 
     // Retorno limpio, SIN legacy JSON merging.
     res.json({ abiertas, cerradas });

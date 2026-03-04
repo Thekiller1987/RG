@@ -135,21 +135,8 @@ function calculateReportStats(session) {
 
   const cajaInicialN = Number(session?.initialAmount || session?.monto_inicial || 0);
 
-  // DEDUP: Remove duplicate transactions before calculation
-  const _dedup = (txs) => {
-    const ids = new Set(), fps = new Set(), out = [];
-    for (const tx of txs) {
-      if (tx.id && ids.has(tx.id)) continue;
-      if (tx.id) ids.add(tx.id);
-      const pd = tx.pagoDetalles || {};
-      const fp = `${(tx.type || '').toLowerCase()}|${Number(tx.amount || 0).toFixed(2)}|${Number(pd.totalVenta || 0).toFixed(2)}|${Number(pd.efectivo || 0).toFixed(2)}|${Number(pd.tarjeta || 0).toFixed(2)}|${Number(pd.credito || 0).toFixed(2)}|${Number(pd.transferencia || 0).toFixed(2)}`;
-      if (fps.has(fp)) continue;
-      fps.add(fp);
-      out.push(tx);
-    }
-    return out;
-  };
-  transactions = _dedup(transactions);
+  // DEDUP: Eliminado para permitir ventas idénticas (especialmente menores a C$70)
+  // transactions = _dedup(transactions);
 
   const cls = {
     ventasContado: [],
@@ -675,7 +662,8 @@ const CashReport = () => {
 
   // Función para imprimir (A4 Profesional + Configuración Dinámica)
   const handlePrintDetail = (session) => {
-    const stats = calculateReportStats(session); // Recalcular con lógica "Bank Level"
+    // Al final del mapeo de sesiones
+    const stats = session.stats || calculateReportStats(session); // Fallback solo si el server no mandó nada
 
     // Configurar ventana de impresión
     const win = window.open('', '_blank');

@@ -1,0 +1,42 @@
+--- LATEST CAJA SESSIONS ---
+ID: 80 | User: waskar | Opened: Wed Mar 04 2026 14:04:21 GMT-0600 (hora estándar central) | Closed: null
+Initial: 1000.00 | Expected: 0.00 | Real: 0.00 | Cash Sales: 935.00
+Transactions Count: 5
+Last 2 transactions:
+  - Type: venta | Amount: 70 | Note: Venta #4974 - Contado
+    PagoDetalles: {"cambio":0,"credito":0,"dolares":0,"tarjeta":0,"efectivo":70,"clienteId":1,"tipoVenta":"contado","totalVenta":70,"ingresoCaja":70,"transferencia":0,"shouldPrintNow":false,"referenciaTarjeta":"","tasaDolarAlMomento":36.55,"referenciaTransferencia":""}
+  - Type: venta | Amount: 305 | Note: Venta #4975 - Contado
+    PagoDetalles: {"cambio":0,"credito":0,"dolares":0,"tarjeta":0,"efectivo":305,"clienteId":1,"tipoVenta":"contado","totalVenta":305,"ingresoCaja":305,"transferencia":0,"shouldPrintNow":false,"referenciaTarjeta":"","tasaDolarAlMomento":36.55,"referenciaTransferencia":""}
+----------------------------
+ID: 79 | User: waskar | Opened: Tue Mar 03 2026 14:21:31 GMT-0600 (hora estándar central) | Closed: Tue Mar 03 2026 23:50:14 GMT-0600 (hora estándar central)
+Initial: 1000.00 | Expected: 20863.50 | Real: 20863.50 | Cash Sales: 19000.55
+Transactions Count: 65
+Last 2 transactions:
+  - Type: venta | Amount: 30 | Note: Venta #4967 - Contado
+    PagoDetalles: {"cambio":0,"credito":0,"dolares":0,"tarjeta":0,"efectivo":30,"clienteId":1,"tipoVenta":"contado","totalVenta":30,"ingresoCaja":30,"transferencia":0,"shouldPrintNow":false,"referenciaTarjeta":"","tasaDolarAlMomento":36.55,"referenciaTransferencia":""}
+  - Type: ajuste | Amount: 599.5 | Note: Ajuste Interno (efectivo)
+    PagoDetalles: {"amount":599.5,"hidden":true,"target":"efectivo","credito":0,"dolares":0,"tarjeta":0,"efectivo":599.5}
+----------------------------
+ID: 78 | User: waskar | Opened: Tue Mar 03 2026 00:14:05 GMT-0600 (hora estándar central) | Closed: Tue Mar 03 2026 00:19:28 GMT-0600 (hora estándar central)
+Initial: 0.00 | Expected: 1000.00 | Real: 1000.00 | Cash Sales: 1000.00
+Transactions Count: 1
+Last 2 transactions:
+  - Type: venta | Amount: 1750 | Note: Venta (Pendiente) - Contado
+    PagoDetalles: {"cambio":0,"credito":0,"dolares":0,"tarjeta":0,"efectivo":1000,"clienteId":1,"tipoVenta":"contado","totalVenta":1750,"ingresoCaja":1000,"transferencia":750,"shouldPrintNow":false,"referenciaTarjeta":"","tasaDolarAlMomento":36.55,"referenciaTransferencia":"BILLETERA MOVIL"}
+----------------------------
+ID: 77 | User: waskar | Opened: Mon Mar 02 2026 13:50:23 GMT-0600 (hora estándar central) | Closed: Tue Mar 03 2026 00:11:34 GMT-0600 (hora estándar central)
+Initial: 1000.00 | Expected: 22392.55 | Real: 19692.00 | Cash Sales: 21477.00
+Transactions Count: 76
+Last 2 transactions:
+  - Type: ajuste | Amount: -1 | Note: Ajuste Interno (dolares)
+    PagoDetalles: {"amount":-1,"hidden":true,"target":"dolares","credito":0,"dolares":-1,"tarjeta":0,"efectivo":0}
+  - Type: ajuste | Amount: -50 | Note: Ajuste Interno (efectivo)
+    PagoDetalles: {"amount":-50,"hidden":true,"target":"efectivo","credito":0,"dolares":0,"tarjeta":0,"efectivo":-50}
+----------------------------
+ID: 76 | User: multirepuestorg | Opened: Sun Mar 01 2026 18:46:24 GMT-0600 (hora estándar central) | Closed: null
+Initial: 0.00 | Expected: 0.00 | Real: 0.00 | Cash Sales: 1000.00
+Transactions Count: 1
+Last 2 transactions:
+  - Type: abono | Amount: 1000 | Note: Abono Cliente: WASKAR (Efectivo) 
+    PagoDetalles: {"metodo":"Efectivo","credito":0,"tarjeta":0,"efectivo":1000,"clienteId":21,"referencia":"","ingresoCaja":1000,"clienteNombre":"WASKAR","transferencia":0}
+----------------------------

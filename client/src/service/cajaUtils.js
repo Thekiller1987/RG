@@ -16,20 +16,12 @@ function deduplicateTransactions(transactions) {
     if (!Array.isArray(transactions) || transactions.length === 0) return [];
 
     const seenIds = new Set();
-    const fingerprints = new Set();
     const cleaned = [];
 
     for (const tx of transactions) {
-        // 1. Skip exact ID duplicates
+        // Only skip if it has an ID and we've seen it (avoiding server duplicates)
         if (tx.id && seenIds.has(tx.id)) continue;
         if (tx.id) seenIds.add(tx.id);
-
-        // 2. Skip fingerprint duplicates (catches PEND-xxx vs real ID dupes)
-        const pd = tx.pagoDetalles || {};
-        const fp = `${(tx.type || '').toLowerCase()}|${safe(tx.amount).toFixed(2)}|${safe(pd.totalVenta).toFixed(2)}|${safe(pd.efectivo).toFixed(2)}|${safe(pd.tarjeta).toFixed(2)}|${safe(pd.credito).toFixed(2)}|${safe(pd.transferencia).toFixed(2)}`;
-
-        if (fingerprints.has(fp)) continue;
-        fingerprints.add(fp);
 
         cleaned.push(tx);
     }

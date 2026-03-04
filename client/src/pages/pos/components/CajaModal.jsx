@@ -111,11 +111,39 @@ const CajaModal = ({
 
   const transactions = useMemo(() => Array.isArray(session?.transactions) ? session.transactions : [], [session]);
 
-  // --------- Clasificación y totales (Cálculo corregido) ----------
+  // --------- Clasificación y totales (AUTORIDAD DEL SERVIDOR) ----------
   const stats = useMemo(() => {
-    const initial = session?.initialAmount || 0;
-    const tasa = session?.tasaDolar || initialTasaDolar || 36.60;
-    return calculateCajaStats(transactions, initial, tasa);
+    // 1. Prioridad: Stats pre-calculadas por el servidor
+    if (session?.stats && typeof session.stats === 'object') {
+      return {
+        ...session.stats,
+        lists: session.stats.lists || calculateCajaStats(transactions, (session?.initialAmount || 0), (session?.tasaDolar || initialTasaDolar)).lists
+      };
+    }
+
+    // 2. Fallback: sqlTotals (si el server mandó totales directos pero no el breakdown)
+    if (session?.sqlTotals) {
+      const sql = session.sqlTotals;
+      const initial = session?.initialAmount || 0;
+      return {
+        cajaInicial: initial,
+        netCordobas: sql.efectivo,
+        netDolares: sql.dolares,
+        movimientoNetoEfectivo: sql.esperado - initial,
+        efectivoEsperado: sql.esperado,
+        efectivoEsperadoCordobas: sql.efectivo + initial,
+        efectivoEsperadoDolares: sql.dolares,
+        totalTarjeta: sql.tarjeta,
+        totalTransferencia: sql.transferencia,
+        totalCredito: sql.credito,
+        totalNoEfectivo: sql.tarjeta + sql.transferencia + sql.credito,
+        tasaRef: session?.tasaDolar || initialTasaDolar,
+        lists: calculateCajaStats(transactions, initial, (session?.tasaDolar || initialTasaDolar)).lists
+      };
+    }
+
+    // 3. Último recurso (Offline/Legacy)
+    return calculateCajaStats(transactions, (session?.initialAmount || 0), (session?.tasaDolar || initialTasaDolar));
   }, [transactions, session, initialTasaDolar]);
 
   const {
