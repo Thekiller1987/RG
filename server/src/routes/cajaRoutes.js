@@ -201,74 +201,60 @@ function calcularTotalesSesion(transactions, details) {
       if (txTransf > 0.001) totalTransferencia += txTransf;
       if (txDolares > 0.001) totalDolares += txDolares;
     }
-    if (txTarjeta > 0.001) totalTarjeta += txTarjeta;
-    if (txTransf > 0.001) totalTransferencia += txTransf;
-    if (txDolares > 0.001) {
-      totalDolares += txDolares;
-      movimientoNetoEfectivo += txEfectivo + (txDolares * txTasa);
-    } else if (txEfectivo > 0.001) {
-      movimientoNetoEfectivo += txEfectivo;
-    } else if (txIngresoCaja > 0.001) {
-      movimientoNetoEfectivo += txIngresoCaja;
-    } else {
-      const noEfectivo = txTarjeta + txTransf;
-      movimientoNetoEfectivo += Math.max(0, txAmount - noEfectivo);
-    }
-  }
     // ENTRADAS
     else if (tipo === 'entrada') {
-    const m = Math.abs(txAmount);
-    totalIngresos += m;
-    movimientoNetoEfectivo += m;
-  }
-  // SALIDAS
-  else if (tipo === 'salida') {
-    const m = Math.abs(txAmount);
-    totalGastos += m;
-    movimientoNetoEfectivo -= m;
-  }
-  // DEVOLUCIONES / CANCELACIONES
-  else if (tipo.includes('devolucion') || tipo.includes('cancelacion') || tipo.includes('anulacion')) {
-    totalEfectivo -= txEfectivo;
-    totalTarjeta -= txTarjeta;
-    totalTransferencia -= txTransf;
-    totalCredito -= txCredito;
-    totalDolares -= txDolares;
+      const m = Math.abs(txAmount);
+      totalIngresos += m;
+      movimientoNetoEfectivo += m;
+    }
+    // SALIDAS
+    else if (tipo === 'salida') {
+      const m = Math.abs(txAmount);
+      totalGastos += m;
+      movimientoNetoEfectivo -= m;
+    }
+    // DEVOLUCIONES / CANCELACIONES
+    else if (tipo.includes('devolucion') || tipo.includes('cancelacion') || tipo.includes('anulacion')) {
+      totalEfectivo -= txEfectivo;
+      totalTarjeta -= txTarjeta;
+      totalTransferencia -= txTransf;
+      totalCredito -= txCredito;
+      totalDolares -= txDolares;
 
-    if (d.ingresoCaja !== undefined && d.ingresoCaja !== null) {
-      movimientoNetoEfectivo += safe(d.ingresoCaja); // Será negativo
-    } else if (txEfectivo > 0.001) {
-      movimientoNetoEfectivo -= txEfectivo;
-    } else {
-      const noEfectivo = txTarjeta + txTransf + txCredito;
-      const cashPart = Math.abs(txAmount) - noEfectivo;
-      if (cashPart > 0.001) {
-        movimientoNetoEfectivo -= cashPart;
+      if (d.ingresoCaja !== undefined && d.ingresoCaja !== null) {
+        movimientoNetoEfectivo += safe(d.ingresoCaja); // Será negativo
+      } else if (txEfectivo > 0.001) {
+        movimientoNetoEfectivo -= txEfectivo;
+      } else {
+        const noEfectivo = txTarjeta + txTransf + txCredito;
+        const cashPart = Math.abs(txAmount) - noEfectivo;
+        if (cashPart > 0.001) {
+          movimientoNetoEfectivo -= cashPart;
+        }
       }
     }
-  }
-  // AJUSTES SECRETOS
-  else if (tipo === 'ajuste') {
-    const monto = txAmount;
-    if (d.target === 'efectivo') movimientoNetoEfectivo += monto;
-    else if (d.target === 'credito') totalCredito += monto;
-    else if (d.target === 'tarjeta') totalTarjeta += monto;
-    else if (d.target === 'transferencia') totalTransferencia += monto;
-    else if (d.target === 'dolares') totalDolares += monto;
-  }
-});
+    // AJUSTES SECRETOS
+    else if (tipo === 'ajuste') {
+      const monto = txAmount;
+      if (d.target === 'efectivo') movimientoNetoEfectivo += monto;
+      else if (d.target === 'credito') totalCredito += monto;
+      else if (d.target === 'tarjeta') totalTarjeta += monto;
+      else if (d.target === 'transferencia') totalTransferencia += monto;
+      else if (d.target === 'dolares') totalDolares += monto;
+    }
+  });
 
-// ★ BLINDAJE FINAL
-return {
-  totalEfectivo: safe(totalEfectivo),
-  totalTarjeta: safe(totalTarjeta),
-  totalTransferencia: safe(totalTransferencia),
-  totalCredito: safe(totalCredito),
-  totalDolares: safe(totalDolares),
-  totalIngresos: safe(totalIngresos),
-  totalGastos: safe(totalGastos),
-  movimientoNetoEfectivo: safe(movimientoNetoEfectivo)
-};
+  // ★ BLINDAJE FINAL
+  return {
+    totalEfectivo: safe(totalEfectivo),
+    totalTarjeta: safe(totalTarjeta),
+    totalTransferencia: safe(totalTransferencia),
+    totalCredito: safe(totalCredito),
+    totalDolares: safe(totalDolares),
+    totalIngresos: safe(totalIngresos),
+    totalGastos: safe(totalGastos),
+    movimientoNetoEfectivo: safe(movimientoNetoEfectivo)
+  };
 }
 
 // ───────── Sesiones de Caja (SQL ONLY) ─────────
