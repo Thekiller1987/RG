@@ -244,13 +244,28 @@ function calcularTotalesSesion(transactions, details) {
     }
   });
 
-  // ★ BLINDAJE FINAL
+  // ★ BLINDAJE FINAL: Mapeo exacto para el Frontend
+  const cajaInicial = safe(details?.initialAmount || 0);
+  const efectivoEsperadoCordobas = cajaInicial + movimientoNetoEfectivo;
+  const efectivoEsperado = efectivoEsperadoCordobas + (totalDolares * tasaDefault);
+
   return {
-    totalEfectivo: safe(totalEfectivo),
+    cajaInicial,
+    netCordobas: safe(movimientoNetoEfectivo),
+    netDolares: safe(totalDolares),
+    efectivoEsperado: safe(efectivoEsperado),
+    efectivoEsperadoCordobas: safe(efectivoEsperadoCordobas),
+    efectivoEsperadoDolares: safe(totalDolares),
+    totalVentasDia: safe(totalEfectivo + totalTarjeta + totalTransferencia + totalCredito), // Aproximación
     totalTarjeta: safe(totalTarjeta),
     totalTransferencia: safe(totalTransferencia),
     totalCredito: safe(totalCredito),
-    totalDolares: safe(totalDolares),
+    totalNoEfectivo: safe(totalTarjeta + totalTransferencia + totalCredito),
+    sumDevolucionesCancelaciones: 0,
+    totalHidden: 0,
+    tasaRef: tasaDefault,
+    // Métricas originales del servidor para debug
+    totalEfectivo: safe(totalEfectivo),
     totalIngresos: safe(totalIngresos),
     totalGastos: safe(totalGastos),
     movimientoNetoEfectivo: safe(movimientoNetoEfectivo)
@@ -291,7 +306,7 @@ function mapRowToSession(row) {
     notes: row.observaciones || '',
 
     // Stats pre-calculadas para evitar lógica en el cliente
-    stats: calcularTotalesSesion(details.transactions || [], details),
+    stats: calcularTotalesSesion(details.transactions || [], { ...details, initialAmount: row.monto_inicial }),
 
     // Campos oficiales de SQL para sincronización perfecta
     sqlTotals: {
