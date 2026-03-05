@@ -307,7 +307,7 @@ const getCreditosPendientes = async (req, res) => {
     }
 };
 
-// NUEVO: Estado de Cuenta (Account Statement)
+// NUEVO: Estado de Cuenta (Account Statement) — CON PRODUCTOS
 const getAccountStatement = async (req, res) => {
     const { id } = req.params;
     try {
@@ -326,6 +326,35 @@ const getAccountStatement = async (req, res) => {
             ORDER BY fecha ASC, id_venta ASC
         `, [id]);
 
+        // 3. Get product details for ALL credit sales in one query
+        const creditSaleIds = sales
+            .filter(s => s.tipo_venta === 'CREDITO' && s.estado !== 'ABONO_CREDITO')
+            .map(s => s.id_venta);
+
+        let productsMap = {};
+        if (creditSaleIds.length > 0) {
+            const [productRows] = await pool.query(`
+                SELECT dv.id_venta, dv.cantidad, dv.precio_unitario,
+                       COALESCE(p.nombre, CONCAT('Producto #', dv.id_producto)) AS nombre_producto,
+                       p.codigo
+                FROM detalle_ventas dv
+                LEFT JOIN productos p ON dv.id_producto = p.id_producto
+                WHERE dv.id_venta IN (?)
+                ORDER BY dv.id_venta, dv.id_producto
+            `, [creditSaleIds]);
+
+            productRows.forEach(row => {
+                if (!productsMap[row.id_venta]) productsMap[row.id_venta] = [];
+                productsMap[row.id_venta].push({
+                    nombre: row.nombre_producto,
+                    codigo: row.codigo || '',
+                    cantidad: Number(row.cantidad),
+                    precioUnitario: Number(row.precio_unitario),
+                    subtotal: Number(row.cantidad) * Number(row.precio_unitario)
+                });
+            });
+        }
+
         let runningBalance = 0;
         const ledger = [];
 
@@ -342,28 +371,26 @@ const getAccountStatement = async (req, res) => {
             let description = '';
 
             if (sale.estado === 'ABONO_CREDITO') {
-                // Abonos are stored with negative total_venta (-monto)
                 creditImpact = Number(sale.total_venta);
                 type = 'ABONO';
                 description = pd.referencia ? `Abono (${pd.referencia})` : 'Abono a cuenta';
             } else if (sale.estado === 'DEVOLUCION') {
-                // Returns on credit have negative pd.credito
                 const creditoDevuelto = Number(pd.credito || 0);
                 if (creditoDevuelto < 0) {
-                    creditImpact = creditoDevuelto; // negative value decreases balance
+                    creditImpact = creditoDevuelto;
                     type = 'DEVOLUCION';
                     description = pd.nota || `Devolución Ticket #${pd.originalSaleId || ''}`;
                 } else {
-                    return; // Skip cash returns
+                    return;
                 }
             } else if (sale.tipo_venta === 'CREDITO') {
                 const creditoOtorgado = Number(pd.credito || sale.total_venta || 0);
                 if (creditoOtorgado > 0) {
-                    creditImpact = creditoOtorgado; // positive value increases balance
+                    creditImpact = creditoOtorgado;
                     type = 'CREDITO';
                     description = `Venta a crédito Ticket #${sale.id_venta}`;
                 } else {
-                    return; // Skip if no credit actually given
+                    return;
                 }
             }
 
@@ -377,7 +404,8 @@ const getAccountStatement = async (req, res) => {
                     monto: Math.abs(creditImpact),
                     impacto: creditImpact,
                     saldo: runningBalance,
-                    pagoDetalles: pd
+                    pagoDetalles: pd,
+                    productos: productsMap[sale.id_venta] || null
                 });
             }
         });
@@ -390,7 +418,7 @@ const getAccountStatement = async (req, res) => {
                 direccion: client.direccion,
                 limite_credito: client.limite_credito,
                 saldo_pendiente_db: Number(client.saldo_pendiente),
-                saldo_calculado: parseFloat(runningBalance.toFixed(2)) // Should conceptually match DB
+                saldo_calculado: parseFloat(runningBalance.toFixed(2))
             },
             historial: ledger
         };
@@ -402,12 +430,88 @@ const getAccountStatement = async (req, res) => {
     }
 };
 
+/* ═══════════════════════════════════════════════════════════════
+   CANCELAR ABONO — Revierte un abono erróneo
+   ═══════════════════════════════════════════════════════════════ */
+const cancelCreditPayment = async (req, res) => {
+    const { id, abonoId } = req.params; // id = id_cliente, abonoId = id_venta del abono
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.beginTransaction();
+
+        // 1. Verificar que el abono existe y pertenece a este cliente
+        const [abonoRows] = await connection.query(
+            `SELECT id_venta, total_venta, pago_detalles FROM ventas 
+             WHERE id_venta = ? AND id_cliente = ? AND estado = 'ABONO_CREDITO' FOR UPDATE`,
+            [abonoId, id]
+        );
+
+        if (abonoRows.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: 'Abono no encontrado o ya fue cancelado.' });
+        }
+
+        const abono = abonoRows[0];
+        const montoAbono = Math.abs(Number(abono.total_venta)); // total_venta es negativo
+
+        // 2. Restaurar saldo_pendiente del cliente
+        await connection.query(
+            'UPDATE clientes SET saldo_pendiente = saldo_pendiente + ? WHERE id_cliente = ?',
+            [montoAbono, id]
+        );
+
+        // 3. Restaurar saldo en creditos_cliente (FIFO inverso: del más reciente al más antiguo)
+        let remaining = montoAbono;
+        const [creditosYaPagados] = await connection.query(
+            `SELECT id, monto_original, saldo_restante FROM creditos_cliente 
+             WHERE id_cliente = ? ORDER BY fecha DESC FOR UPDATE`,
+            [id]
+        );
+
+        for (const ticket of creditosYaPagados) {
+            if (remaining <= 0) break;
+            const pagado = Number(ticket.monto_original) - Number(ticket.saldo_restante);
+            if (pagado <= 0) continue;
+
+            const restaurar = Math.min(remaining, pagado);
+            const nuevoSaldo = Number(ticket.saldo_restante) + restaurar;
+            await connection.query(
+                'UPDATE creditos_cliente SET saldo_restante = ?, estado = ? WHERE id = ?',
+                [nuevoSaldo, nuevoSaldo > 0 ? 'PENDIENTE' : 'PAGADO', ticket.id]
+            );
+            remaining -= restaurar;
+        }
+
+        // 4. Marcar el abono como cancelado
+        await connection.query(
+            `UPDATE ventas SET estado = 'CANCELADA' WHERE id_venta = ?`,
+            [abonoId]
+        );
+
+        await connection.commit();
+
+        // 5. Emitir evento de actualización
+        const io = req.app.get('io');
+        if (io) io.emit('clients:update');
+
+        res.json({ message: 'Abono cancelado exitosamente.', montoCancelado: montoAbono });
+    } catch (error) {
+        await connection.rollback();
+        console.error('ERROR en cancelCreditPayment:', error);
+        res.status(500).json({ message: 'Error al cancelar el abono.', error: error.message });
+    } finally {
+        if (connection) connection.release();
+    }
+};
+
 module.exports = {
     getAllClients,
     createClient,
     updateClient,
     deleteClient,
     addCreditPayment,
+    cancelCreditPayment,
     getCreditosByClient,
     getAbonosByClient,
     getCreditosPendientes,

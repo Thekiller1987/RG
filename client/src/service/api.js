@@ -310,6 +310,9 @@ export const getAbonosByClient = (clientId, token) => {
 export const getCreditosPendientes = (clientId, token) => {
     return request('GET', `/clients/${clientId}/creditos-pendientes`, token);
 };
+export const cancelCreditPayment = (clientId, abonoId, token) => {
+    return request('DELETE', `/clients/${clientId}/abonos/${abonoId}`, token);
+};
 
 
 // ===================================================================

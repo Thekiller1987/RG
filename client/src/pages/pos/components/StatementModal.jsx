@@ -220,13 +220,26 @@ const StatementModal = ({
                                 </thead>
                                 <tbody>
                                     {filteredHistorial.map((tx, idx) => (
-                                        <tr key={idx}>
-                                            <td>{new Date(tx.fecha).toLocaleDateString('es-NI')}</td>
-                                            <td style={{ fontSize: '0.8rem' }}>{tx.descripcion}</td>
-                                            <td className="right" style={{ color: '#d32f2f' }}>{tx.impacto > 0 ? fmt(tx.monto) : ''}</td>
-                                            <td className="right" style={{ color: '#388e3c' }}>{tx.impacto < 0 ? fmt(tx.monto) : ''}</td>
-                                            <td className="right" style={{ fontWeight: 'bold' }}>{fmt(tx.saldo)}</td>
-                                        </tr>
+                                        <React.Fragment key={idx}>
+                                            <tr>
+                                                <td>{new Date(tx.fecha).toLocaleDateString('es-NI')}</td>
+                                                <td style={{ fontSize: '0.8rem' }}>{tx.descripcion}</td>
+                                                <td className="right" style={{ color: '#d32f2f' }}>{tx.impacto > 0 ? fmt(tx.monto) : ''}</td>
+                                                <td className="right" style={{ color: '#388e3c' }}>{tx.impacto < 0 ? fmt(tx.monto) : ''}</td>
+                                                <td className="right" style={{ fontWeight: 'bold' }}>{fmt(tx.saldo)}</td>
+                                            </tr>
+                                            {/* Products detail for credit sales */}
+                                            {tx.productos && tx.productos.length > 0 && tx.productos.map((prod, pIdx) => (
+                                                <tr key={`${idx}-p-${pIdx}`} style={{ background: '#f8f9fa', fontSize: '0.75rem' }}>
+                                                    <td></td>
+                                                    <td colSpan="2" style={{ paddingLeft: '1.5rem', color: '#495057' }}>
+                                                        ↳ {prod.nombre} {prod.codigo ? `(${prod.codigo})` : ''} × {prod.cantidad}
+                                                    </td>
+                                                    <td className="right" style={{ color: '#495057', fontSize: '0.75rem' }}>@ C${fmt(prod.precioUnitario)}</td>
+                                                    <td className="right" style={{ color: '#495057', fontWeight: '600', fontSize: '0.75rem' }}>C${fmt(prod.subtotal)}</td>
+                                                </tr>
+                                            ))}
+                                        </React.Fragment>
                                     ))}
                                     {filteredHistorial.length === 0 && (
                                         <tr>

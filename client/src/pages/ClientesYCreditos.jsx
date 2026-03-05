@@ -186,7 +186,7 @@ const CardActions = styled.div`
 
 export default function ClientesYCreditos() {
     const { clients, user, token, isLoading, refreshClients, allUsers } = useAuth();
-    const { isCajaOpen, cajaSession, setCajaSession } = useCaja();
+    const { isCajaOpen, cajaSession, setCajaSession, refreshSession } = useCaja();
     const [modal, setModal] = useState({ name: null, data: null });
     const [ticketToPrint, setTicketToPrint] = useState(null);
     const [alertState, setAlertState] = useState({ open: false, title: '', message: '' });

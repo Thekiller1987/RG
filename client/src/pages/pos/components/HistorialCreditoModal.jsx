@@ -1,7 +1,7 @@
 // HistorialCreditoModal.jsx — Vista de historial por ticket individual
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import styled from "styled-components";
-import { FaTimes, FaMoneyBillWave, FaCreditCard, FaSpinner, FaFileInvoiceDollar, FaArrowLeft, FaPrint, FaCheckCircle, FaClock } from "react-icons/fa";
+import { FaTimes, FaMoneyBillWave, FaCreditCard, FaSpinner, FaFileInvoiceDollar, FaArrowLeft, FaPrint, FaCheckCircle, FaClock, FaBan } from "react-icons/fa";
 import { toast } from "react-hot-toast";
 import * as api from "../../../service/api";
 import TicketModal from "./TicketModal";
@@ -70,6 +70,12 @@ const TimelineItem = styled.div`
   .content { flex: 1; }
   .amount { font-weight: 700; color: ${p => p.$type === 'credito' ? '#dc3545' : '#28a745'}; }
   .meta { font-size: 0.8rem; color: #6c757d; }
+  .cancel-btn {
+    margin-left: auto; padding: 4px 10px; background: #dc3545; color: white; border: none;
+    border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;
+    &:hover { background: #c82333; }
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
+  }
 `;
 
 const formatCurrency = (amount) => `C$${Number(amount || 0).toFixed(2)}`;
@@ -95,6 +101,7 @@ export default function HistorialCreditoModal({ client, onClose, token }) {
     const { allUsers } = useAuth();
     const [showTicket, setShowTicket] = useState(false);
     const [selectedAbono, setSelectedAbono] = useState(null);
+    const [cancellingId, setCancellingId] = useState(null);
 
     // Estado para la Impresión del Estado de Cuenta
     const [isFetchingStatement, setIsFetchingStatement] = useState(false);
@@ -162,6 +169,21 @@ export default function HistorialCreditoModal({ client, onClose, token }) {
     }, [client, token]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
+
+    const handleCancelAbono = useCallback(async (abonoIdVenta) => {
+        if (!window.confirm('¿Estás seguro de cancelar este abono? Se restaurará el saldo del cliente.')) return;
+        setCancellingId(abonoIdVenta);
+        try {
+            await api.cancelCreditPayment(client.id_cliente, abonoIdVenta, token);
+            toast.success('Abono cancelado exitosamente.');
+            await fetchData(); // Refresh data from server
+        } catch (err) {
+            console.error('Error cancelando abono:', err);
+            toast.error(err.message || 'Error al cancelar el abono.');
+        } finally {
+            setCancellingId(null);
+        }
+    }, [client, token, fetchData]);
 
     const summary = useMemo(() => {
         const totalCredito = historial.filter(h => h.tipo === 'credito').reduce((s, h) => s + h.monto, 0);
@@ -282,6 +304,16 @@ export default function HistorialCreditoModal({ client, onClose, token }) {
                                                         {fmtDateTime(item.fecha)} por <strong>{user?.nombre_usuario || 'Sistema'}</strong>
                                                     </span>
                                                 </div>
+                                                {item.tipo === 'abono' && (
+                                                    <button
+                                                        className="cancel-btn"
+                                                        onClick={() => handleCancelAbono(item.id.split('-')[1])}
+                                                        disabled={cancellingId === item.id.split('-')[1]}
+                                                        title="Cancelar este abono"
+                                                    >
+                                                        <FaBan /> {cancellingId === item.id.split('-')[1] ? '...' : 'Cancelar'}
+                                                    </button>
+                                                )}
                                             </TimelineItem>
                                         );
                                     })

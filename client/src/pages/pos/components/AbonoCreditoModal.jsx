@@ -173,6 +173,42 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
     }
   };
 
+  const printAbonoReceipt = useCallback((montoNum, metodo, ref, saldoAntes) => {
+    const saldoDespues = Math.max(0, saldoAntes - montoNum);
+    const now = new Date().toLocaleString('es-NI', { timeZone: 'America/Managua' });
+    const ticketRef = selectedTicket ? `Venta #${selectedTicket.idVenta}` : 'Cuenta General';
+
+    const html = `
+      <div style="font-family:'League Spartan','Inter',system-ui,sans-serif;width:80mm;padding:6px 4px;font-size:9pt;color:#000;">
+        <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:6px;">
+          <h1 style="margin:4px 0;font-size:14pt;font-weight:900;">COMPROBANTE DE ABONO</h1>
+        </div>
+        <div style="margin-bottom:8px;border-bottom:1px dashed #000;padding-bottom:6px;">
+          <p style="margin:2px 0;display:flex;justify-content:space-between;"><strong>Cliente:</strong><span>${client?.nombre || 'N/A'}</span></p>
+          <p style="margin:2px 0;display:flex;justify-content:space-between;"><strong>Fecha:</strong><span>${now}</span></p>
+          <p style="margin:2px 0;display:flex;justify-content:space-between;"><strong>Aplicado a:</strong><span>${ticketRef}</span></p>
+          <p style="margin:2px 0;display:flex;justify-content:space-between;"><strong>Método:</strong><span>${metodo}</span></p>
+          ${ref ? `<p style="margin:2px 0;display:flex;justify-content:space-between;"><strong>Ref:</strong><span>${ref}</span></p>` : ''}
+        </div>
+        <div style="border-top:2px solid #000;padding-top:8px;margin-top:8px;">
+          <p style="display:flex;justify-content:space-between;margin:4px 0;font-size:11pt;"><strong>Saldo Anterior:</strong><span>C$${saldoAntes.toFixed(2)}</span></p>
+          <p style="display:flex;justify-content:space-between;margin:4px 0;font-size:14pt;font-weight:900;color:#28a745;"><strong>ABONO:</strong><span>C$${montoNum.toFixed(2)}</span></p>
+          <p style="display:flex;justify-content:space-between;margin:4px 0;font-size:14pt;font-weight:900;color:#dc3545;border-top:2px solid #000;padding-top:6px;"><strong>SALDO RESTANTE:</strong><span>C$${saldoDespues.toFixed(2)}</span></p>
+        </div>
+        <div style="text-align:center;margin-top:12px;font-size:8pt;font-style:italic;color:#555;border-top:1px dashed #000;padding-top:8px;">
+          Documento no válido como factura.<br/>Gracias por su pago.
+        </div>
+      </div>
+    `;
+
+    const w = window.open('', '_blank', 'width=400,height=600');
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html><html><head><title>Comprobante Abono</title><link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;700;900&display=swap" rel="stylesheet"><style>@page{size:80mm auto;margin:0;}body{margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}*{font-weight:800!important;color:#000!important;}</style></head><body>${html}</body></html>`);
+    w.document.close();
+    w.focus();
+    w.onload = function () { setTimeout(() => { w.print(); setTimeout(() => w.close(), 500); }, 400); };
+  }, [client, selectedTicket]);
+
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     const montoNum = parseFloat(monto);
@@ -224,6 +260,10 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
       };
 
       await addCajaTransaction(txCaja);
+
+      // 3. Imprimir comprobante de abono
+      printAbonoReceipt(montoNum, metodoPago, referencia, saldoPendiente);
+
       onAbonoSuccess?.(txCaja);
       onClose?.();
     } catch (err) {
@@ -232,7 +272,7 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [monto, metodoPago, referencia, errorMonto, client, user, selectedTicket, addCajaTransaction, onAbonoSuccess, onClose, showAlert]);
+  }, [monto, metodoPago, referencia, errorMonto, client, user, selectedTicket, addCajaTransaction, onAbonoSuccess, onClose, showAlert, printAbonoReceipt, saldoPendiente]);
 
   const isSubmitDisabled = isLoading || saldoPendiente <= 0 || !!errorMonto || !monto;
 

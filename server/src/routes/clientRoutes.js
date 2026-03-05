@@ -7,6 +7,7 @@ const {
     updateClient,
     deleteClient,
     addCreditPayment,
+    cancelCreditPayment,
     getCreditosByClient,
     getAbonosByClient,
     getCreditosPendientes,
@@ -26,6 +27,7 @@ router.route('/:id')
     .delete(deleteClient);
 
 router.post('/:id/abono', addCreditPayment);
+router.delete('/:id/abonos/:abonoId', cancelCreditPayment);
 router.get('/:id/creditos', getCreditosByClient);
 router.get('/:id/abonos', getAbonosByClient);
 router.get('/:id/creditos-pendientes', getCreditosPendientes);
