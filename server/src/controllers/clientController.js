@@ -435,6 +435,7 @@ const getAccountStatement = async (req, res) => {
    ═══════════════════════════════════════════════════════════════ */
 const cancelCreditPayment = async (req, res) => {
     const { id, abonoId } = req.params; // id = id_cliente, abonoId = id_venta del abono
+    const { id: userId } = req.user;
     const connection = await pool.getConnection();
 
     try {
@@ -442,7 +443,7 @@ const cancelCreditPayment = async (req, res) => {
 
         // 1. Verificar que el abono existe y pertenece a este cliente
         const [abonoRows] = await connection.query(
-            `SELECT id_venta, total_venta, pago_detalles FROM ventas 
+            `SELECT id_venta, total_venta, pago_detalles, id_usuario FROM ventas 
              WHERE id_venta = ? AND id_cliente = ? AND estado = 'ABONO_CREDITO' FOR UPDATE`,
             [abonoId, id]
         );
@@ -454,6 +455,9 @@ const cancelCreditPayment = async (req, res) => {
 
         const abono = abonoRows[0];
         const montoAbono = Math.abs(Number(abono.total_venta)); // total_venta es negativo
+        let pd = {};
+        if (typeof abono.pago_detalles === 'string') { try { pd = JSON.parse(abono.pago_detalles); } catch { pd = {}; } }
+        else if (abono.pago_detalles) { pd = abono.pago_detalles; }
 
         // 2. Restaurar saldo_pendiente del cliente
         await connection.query(
@@ -461,7 +465,7 @@ const cancelCreditPayment = async (req, res) => {
             [montoAbono, id]
         );
 
-        // 3. Restaurar saldo en creditos_cliente (FIFO inverso: del más reciente al más antiguo)
+        // 3. Restaurar saldo en creditos_cliente (FIFO inverso: del m\u00e1s reciente al m\u00e1s antiguo)
         let remaining = montoAbono;
         const [creditosYaPagados] = await connection.query(
             `SELECT id, monto_original, saldo_restante FROM creditos_cliente 
@@ -489,11 +493,83 @@ const cancelCreditPayment = async (req, res) => {
             [abonoId]
         );
 
+        // 5. Revertir la transacci\u00f3n de caja — agregar tx de reversa a la sesi\u00f3n abierta
+        const cajaUserId = abono.id_usuario || userId;
+        const [cajaRows] = await connection.query(
+            `SELECT id, detalles_json, monto_inicial FROM cierres_caja 
+             WHERE usuario_id = ? AND fecha_cierre IS NULL LIMIT 1`,
+            [cajaUserId]
+        );
+
+        // Obtener nombre del cliente
+        const [clienteRows] = await connection.query(
+            'SELECT nombre FROM clientes WHERE id_cliente = ?', [id]
+        );
+        const clienteNombre = clienteRows[0]?.nombre || 'Desconocido';
+
+        if (cajaRows.length > 0) {
+            const cajaRow = cajaRows[0];
+            let details = {};
+            if (typeof cajaRow.detalles_json === 'string') { try { details = JSON.parse(cajaRow.detalles_json); } catch { details = {}; } }
+            else if (cajaRow.detalles_json) { details = cajaRow.detalles_json; }
+
+            if (!details.transactions) details.transactions = [];
+
+            const metodo = pd.metodo || 'Efectivo';
+            const esEfectivo = metodo === 'Efectivo';
+
+            // Agregar transacci\u00f3n de reversa (resta de caja)
+            details.transactions.push({
+                id: `cancel-abono-${abonoId}-${Date.now()}`,
+                type: 'cancel_abono',
+                amount: montoAbono * -1,
+                note: `Cancelaci\u00f3n de Abono #${abonoId} - Cliente: ${clienteNombre}`,
+                at: new Date().toISOString(),
+                pagoDetalles: {
+                    clienteId: Number(id),
+                    clienteNombre: clienteNombre,
+                    metodo: metodo,
+                    referencia: pd.referencia || '',
+                    ingresoCaja: esEfectivo ? (montoAbono * -1) : 0,
+                    efectivo: esEfectivo ? (montoAbono * -1) : 0,
+                    tarjeta: metodo === 'Tarjeta' ? (montoAbono * -1) : 0,
+                    transferencia: metodo === 'Transferencia' ? (montoAbono * -1) : 0,
+                    credito: 0
+                }
+            });
+
+            // Recalcular totales
+            let totalEfectivo = 0, totalTarjeta = 0, totalTransferencia = 0, movNeto = 0;
+            for (const tx of details.transactions) {
+                const amt = Number(tx.amount || 0);
+                const txPd = tx.pagoDetalles || {};
+                totalEfectivo += Number(txPd.efectivo || 0);
+                totalTarjeta += Number(txPd.tarjeta || 0);
+                totalTransferencia += Number(txPd.transferencia || 0);
+                movNeto += Number(txPd.ingresoCaja ?? (txPd.efectivo || 0));
+            }
+
+            const finalEsperado = Number(cajaRow.monto_inicial || 0) + movNeto;
+
+            await connection.query(`
+                UPDATE cierres_caja 
+                SET detalles_json = ?,
+                    total_efectivo = ?,
+                    total_tarjeta = ?,
+                    total_transferencia = ?,
+                    efectivo_esperado = ?
+                WHERE id = ?
+            `, [JSON.stringify(details), totalEfectivo, totalTarjeta, totalTransferencia, finalEsperado, cajaRow.id]);
+        }
+
         await connection.commit();
 
-        // 5. Emitir evento de actualización
+        // 6. Emitir eventos de actualizaci\u00f3n
         const io = req.app.get('io');
-        if (io) io.emit('clients:update');
+        if (io) {
+            io.emit('clients:update');
+            io.emit('caja:session_update', { userId: cajaUserId });
+        }
 
         res.json({ message: 'Abono cancelado exitosamente.', montoCancelado: montoAbono });
     } catch (error) {

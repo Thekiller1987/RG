@@ -22,13 +22,15 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
         efectivo: '',
         credito: '',
         tarjeta: '',
-        dolares: '' // For manual dollar adjustment if needed
+        dolares: '',
+        ventas_totales: ''
     });
 
     // Override Mode States
     const [override, setOverride] = useState({
         cordobas: '',
-        dolares: ''
+        dolares: '',
+        ventas_totales: ''
     });
 
     const handleChange = (field, val) => {
@@ -46,14 +48,14 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
             if (parseFloat(adjustments.efectivo)) activeAdjustments.push({ target: 'efectivo', amount: parseFloat(adjustments.efectivo) });
             if (parseFloat(adjustments.credito)) activeAdjustments.push({ target: 'credito', amount: parseFloat(adjustments.credito) });
             if (parseFloat(adjustments.tarjeta)) activeAdjustments.push({ target: 'tarjeta', amount: parseFloat(adjustments.tarjeta) });
-            // Manual adjustment for dollars not requested but easy to add if needed.
+            if (parseFloat(adjustments.ventas_totales)) activeAdjustments.push({ target: 'ventas_totales', amount: parseFloat(adjustments.ventas_totales) });
         } else {
             // OVERRIDE MODE (Magic Fix)
             const targetC = parseFloat(override.cordobas);
             const targetD = parseFloat(override.dolares);
+            const targetVT = parseFloat(override.ventas_totales);
 
             if (!isNaN(targetC)) {
-                // Diff = Target - Current => If I have 100, want 500, I need +400.
                 const currentC = Number(currentStats?.netCordobas || 0);
                 const diffC = targetC - currentC;
                 if (Math.abs(diffC) > 0.01) {
@@ -66,6 +68,14 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
                 const diffD = targetD - currentD;
                 if (Math.abs(diffD) > 0.01) {
                     activeAdjustments.push({ target: 'dolares', amount: diffD });
+                }
+            }
+
+            if (!isNaN(targetVT)) {
+                const currentVT = Number(currentStats?.totalVentasDia || 0);
+                const diffVT = targetVT - currentVT;
+                if (Math.abs(diffVT) > 0.01) {
+                    activeAdjustments.push({ target: 'ventas_totales', amount: diffVT });
                 }
             }
         }
@@ -120,6 +130,10 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
                             <label style={{ color: '#fff' }}>Tarjeta</label>
                             <SearchInput type="number" step="0.01" placeholder="+/- 0.00" value={adjustments.tarjeta} onChange={e => handleChange('tarjeta', e.target.value)} style={{ background: '#495057', color: '#fff' }} />
                         </AdjustRow>
+                        <AdjustRow style={{ background: '#2a1a00', border: '1px solid #ffc107' }}>
+                            <label style={{ color: '#ffc107' }}>Ventas Totales</label>
+                            <SearchInput type="number" step="0.01" placeholder="+/- 0.00" value={adjustments.ventas_totales} onChange={e => handleChange('ventas_totales', e.target.value)} style={{ background: '#495057', color: '#ffc107', border: '1px solid #ffc107' }} />
+                        </AdjustRow>
                     </>
                 ) : (
                     <>
@@ -145,6 +159,17 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
                             <AdjustRow style={{ background: 'transparent', padding: 0, marginBottom: 0 }}>
                                 <label style={{ color: '#fff' }}>Real en Caja ($)</label>
                                 <SearchInput type="number" step="0.01" placeholder="0.00" value={override.dolares} onChange={e => handleOverrideChange('dolares', e.target.value)} style={{ background: '#495057', color: '#fff', border: '1px solid #ffc107' }} />
+                            </AdjustRow>
+                        </div>
+
+                        <div style={{ background: '#2a1a00', padding: 10, borderRadius: 6, border: '1px solid #ffc107', marginTop: 10 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#ffc107', marginBottom: 5 }}>
+                                <span>Sistema Actual:</span>
+                                <span>C$ {Number(currentStats?.totalVentasDia || 0).toFixed(2)}</span>
+                            </div>
+                            <AdjustRow style={{ background: 'transparent', padding: 0, marginBottom: 0 }}>
+                                <label style={{ color: '#ffc107' }}>Ventas Totales (C$)</label>
+                                <SearchInput type="number" step="0.01" placeholder="0.00" value={override.ventas_totales} onChange={e => handleOverrideChange('ventas_totales', e.target.value)} style={{ background: '#495057', color: '#ffc107', border: '1px solid #ffc107' }} />
                             </AdjustRow>
                         </div>
                     </>

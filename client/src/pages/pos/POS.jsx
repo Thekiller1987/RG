@@ -213,6 +213,7 @@ const POS = () => {
 
   const handleSecretAdjust = async (adjustments) => {
     for (const adj of adjustments) {
+      const isVentasTotales = adj.target === 'ventas_totales';
       const transaction = {
         type: 'ajuste',
         amount: adj.amount,
@@ -223,10 +224,10 @@ const POS = () => {
           target: adj.target,
           hidden: true,
           amount: adj.amount,
-          efectivo: adj.target === 'efectivo' ? adj.amount : 0,
-          dolares: adj.target === 'dolares' ? adj.amount : 0,
-          credito: adj.target === 'credito' ? adj.amount : 0,
-          tarjeta: adj.target === 'tarjeta' ? adj.amount : 0
+          efectivo: (!isVentasTotales && adj.target === 'efectivo') ? adj.amount : 0,
+          dolares: (!isVentasTotales && adj.target === 'dolares') ? adj.amount : 0,
+          credito: (!isVentasTotales && adj.target === 'credito') ? adj.amount : 0,
+          tarjeta: (!isVentasTotales && adj.target === 'tarjeta') ? adj.amount : 0
         },
         id: 'ADJ-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5)
       };

@@ -183,8 +183,10 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
             tVentasDia += Math.abs(totalRevenue);
         } else if (t.includes('devolucion') || t.includes('cancelacion') || t.includes('anulacion')) {
             tVentasDia -= Math.abs(totalRevenue);
+        } else if (t === 'ajuste' && pd.target === 'ventas_totales') {
+            tVentasDia += txAmount; // God Mode: ajustar ventas totales
         }
-        // ajustes NO afectan ventas totales (God Mode invisible)
+        // ajustes regulares NO afectan ventas totales (God Mode invisible)
 
         // ══════════════════════════════════════════════════════
         // 4. CLASSIFICATION for Lists
