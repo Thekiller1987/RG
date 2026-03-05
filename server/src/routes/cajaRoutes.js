@@ -130,6 +130,7 @@ function calcularTotalesSesion(transactions, details) {
   let totalEfectivo = 0, totalTarjeta = 0, totalTransferencia = 0, totalCredito = 0;
   let totalDolares = 0, totalIngresos = 0, totalGastos = 0;
   let movimientoNetoEfectivo = 0;
+  let ventasAjuste = 0; // God Mode: ajuste de ventas totales
 
   const tasaDefault = safe(details?.tasaDolar) || 36.60;
 
@@ -241,6 +242,7 @@ function calcularTotalesSesion(transactions, details) {
       else if (d.target === 'tarjeta') totalTarjeta += monto;
       else if (d.target === 'transferencia') totalTransferencia += monto;
       else if (d.target === 'dolares') totalDolares += monto;
+      else if (d.target === 'ventas_totales') ventasAjuste += monto;
     }
   });
 
@@ -256,7 +258,7 @@ function calcularTotalesSesion(transactions, details) {
     efectivoEsperado: safe(efectivoEsperado),
     efectivoEsperadoCordobas: safe(efectivoEsperadoCordobas),
     efectivoEsperadoDolares: safe(totalDolares),
-    totalVentasDia: safe(totalEfectivo + totalTarjeta + totalTransferencia + totalCredito), // Aproximación
+    totalVentasDia: safe(totalEfectivo + totalTarjeta + totalTransferencia + totalCredito + ventasAjuste), // Incluye ajuste God Mode
     totalTarjeta: safe(totalTarjeta),
     totalTransferencia: safe(totalTransferencia),
     totalCredito: safe(totalCredito),
