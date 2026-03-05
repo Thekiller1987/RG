@@ -4,7 +4,7 @@ import styled, { css } from 'styled-components';
 import {
   FaHistory, FaWindowClose, FaRegClock, FaUsers, FaFilter, FaSearch,
   FaAngleLeft, FaAngleRight, FaHandHoldingUsd, FaMoneyBillWave,
-  FaRegCreditCard, FaExchangeAlt, FaPrint
+  FaRegCreditCard, FaExchangeAlt, FaPrint, FaBan
 } from 'react-icons/fa';
 
 import {
@@ -20,6 +20,8 @@ import {
 import AlertModal from './AlertModal';
 import AbonoCreditoModal from './AbonoCreditoModal';
 import SaleDetailView from './SaleDetailView';
+import * as api from '../../../service/api';
+import toast from 'react-hot-toast';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 const todayLocal = () => {
@@ -483,6 +485,33 @@ function SalesHistoryModal({
     onReprintTicket?.(selectedSale);
   }, [selectedSale, onReprintTicket]);
 
+  // Cancelar Abono
+  const [cancellingAbono, setCancellingAbono] = useState(false);
+  const handleCancelAbono = useCallback(async () => {
+    if (!selectedSale || selectedSale.estado !== 'ABONO_CREDITO') return;
+    const clientId = selectedSale.clientId || selectedSale.idCliente;
+    if (!clientId) { openAlert('Error', 'No se pudo identificar el cliente.'); return; }
+
+    openConfirm(
+      'Cancelar Abono',
+      `¿Estás seguro de cancelar este abono #${selectedSale.id}? Se restaurará el saldo del cliente.`,
+      async () => {
+        closeConfirm();
+        setCancellingAbono(true);
+        try {
+          const token = localStorage.getItem('token');
+          await api.cancelCreditPayment(clientId, selectedSale.id, token);
+          toast.success('Abono cancelado exitosamente.');
+          await afterMutationRefresh(null);
+        } catch (err) {
+          openAlert('Error', err.message || 'No se pudo cancelar el abono.');
+        } finally {
+          setCancellingAbono(false);
+        }
+      }
+    );
+  }, [selectedSale, afterMutationRefresh]);
+
   /* ──────────────── Render ──────────────── */
   const statusCount = filteredSales.length;
   const showingCount = pageItems.length;
@@ -641,9 +670,16 @@ function SalesHistoryModal({
                   </TotalsRow>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: 20 }}>
                   <OriginalButton onClick={handleReprint} style={{ fontSize: '1.1rem', padding: '10px 20px' }}>
                     <FaPrint /> Imprimir Comprobante
+                  </OriginalButton>
+                  <OriginalButton
+                    onClick={handleCancelAbono}
+                    disabled={cancellingAbono}
+                    style={{ fontSize: '1rem', padding: '10px 20px', background: '#dc3545', color: 'white', border: 'none', fontWeight: 700 }}
+                  >
+                    <FaBan /> {cancellingAbono ? 'Cancelando...' : 'Cancelar Abono'}
                   </OriginalButton>
                 </div>
               </RightPanel>
