@@ -90,7 +90,7 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
 
     return (
         <ModalOverlay style={{ background: 'rgba(0,0,0,0.95)', zIndex: 9999 }}>
-            <ModalContent style={{ maxWidth: '450px', background: '#212529', color: '#fff', border: '1px solid #495057' }}>
+            <ModalContent style={{ maxWidth: '450px', background: '#212529', color: '#fff', border: '1px solid #495057', maxHeight: '90vh', overflowY: 'auto' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                     <h2 style={{ margin: 0, color: '#ffc107', display: 'flex', alignItems: 'center', gap: 10 }}>
                         <FaUserSecret /> GOD MODE
