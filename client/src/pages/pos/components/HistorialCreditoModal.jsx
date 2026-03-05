@@ -64,15 +64,18 @@ const StatusBadge = styled.span`
 const Timeline = styled.div`padding: 0; margin: 0.75rem 0 0;`;
 const TimelineItem = styled.div`
   display: flex; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid #f1f5f9;
+  align-items: center;
   &:last-child { border-bottom: none; }
   .icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; flex-shrink: 0;
     background: ${p => p.$type === 'credito' ? '#dc3545' : '#28a745'}; font-size: 0.8rem; }
-  .content { flex: 1; }
+  .content { flex: 1; min-width: 0; }
   .amount { font-weight: 700; color: ${p => p.$type === 'credito' ? '#dc3545' : '#28a745'}; }
   .meta { font-size: 0.8rem; color: #6c757d; }
   .cancel-btn {
-    margin-left: auto; padding: 4px 10px; background: #dc3545; color: white; border: none;
-    border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;
+    flex-shrink: 0; align-self: center; margin-left: 8px;
+    padding: 6px 12px; background: #dc3545; color: white !important; border: none;
+    border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
     &:hover { background: #c82333; }
     &:disabled { opacity: 0.5; cursor: not-allowed; }
   }
