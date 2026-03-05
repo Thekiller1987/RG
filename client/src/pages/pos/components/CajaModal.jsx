@@ -111,13 +111,15 @@ const CajaModal = ({
 
   const transactions = useMemo(() => Array.isArray(session?.transactions) ? session.transactions : [], [session]);
 
-  // --------- Clasificación y totales (AUTORIDAD DEL SERVIDOR) ----------
+  // --------- Clasificación y totales (100% AUTORIDAD DEL SERVIDOR) ----------
   const stats = useMemo(() => {
+    const fallbackStats = calculateCajaStats(transactions, (session?.initialAmount || 0), (session?.tasaDolar || initialTasaDolar));
+
     // 1. Prioridad: Stats pre-calculadas por el servidor
     if (session?.stats && typeof session.stats === 'object') {
       return {
         ...session.stats,
-        lists: session.stats.lists || calculateCajaStats(transactions, (session?.initialAmount || 0), (session?.tasaDolar || initialTasaDolar)).lists
+        lists: session.stats.lists || fallbackStats.lists
       };
     }
 
@@ -138,12 +140,12 @@ const CajaModal = ({
         totalCredito: sql.credito,
         totalNoEfectivo: sql.tarjeta + sql.transferencia + sql.credito,
         tasaRef: session?.tasaDolar || initialTasaDolar,
-        lists: calculateCajaStats(transactions, initial, (session?.tasaDolar || initialTasaDolar)).lists
+        lists: fallbackStats.lists
       };
     }
 
     // 3. Último recurso (Offline/Legacy)
-    return calculateCajaStats(transactions, (session?.initialAmount || 0), (session?.tasaDolar || initialTasaDolar));
+    return fallbackStats;
   }, [transactions, session, initialTasaDolar]);
 
   const {
