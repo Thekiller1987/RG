@@ -811,6 +811,7 @@ const InventoryManagement = () => {
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchType, setSearchType] = useState('description'); // <--- AGREGADO: ESTADO PARA TIPO BÚSQUEDA
+  const [sortBy, setSortBy] = useState('name-asc'); // <--- AGREGADO: ESTADO PARA ORDENAMIENTO
   const deferredSearch = useDeferredValue(searchTerm);
   const searchRef = useRef(null);
   const [filterCategory, setFilterCategory] = useState('');
@@ -839,7 +840,7 @@ const InventoryManagement = () => {
   // Resetear a página 1 cuando cambian filtros o búsqueda
   useEffect(() => {
     setCurrentPage(1);
-  }, [deferredSearch, filterCategory, filterProvider, searchType]);
+  }, [deferredSearch, filterCategory, filterProvider, searchType, sortBy]);
 
   // Scroll al inicio cuando cambia la página
   useEffect(() => {
@@ -926,23 +927,40 @@ const InventoryManagement = () => {
       }
     });
 
-    // SORTING: StartsWith Priority
+    // SORTING: StartsWith Priority + Selected Sort
     results.sort((a, b) => {
-      if (!q) return 0;
+      // 1. Si hay búsqueda, priorizar coincidencias al inicio del nombre/código
+      if (q) {
+        // Starts with Name
+        const aNameStart = (a.nombre || '').toLowerCase().startsWith(q);
+        const bNameStart = (b.nombre || '').toLowerCase().startsWith(q);
+        if (aNameStart && !bNameStart) return -1;
+        if (!aNameStart && bNameStart) return 1;
 
-      // 1. Starts with Name
-      const aNameStart = (a.nombre || '').toLowerCase().startsWith(q);
-      const bNameStart = (b.nombre || '').toLowerCase().startsWith(q);
-      if (aNameStart && !bNameStart) return -1;
-      if (!aNameStart && bNameStart) return 1;
+        // Starts with Code
+        const aCodeStart = (a.codigo || '').toLowerCase().startsWith(q);
+        const bCodeStart = (b.codigo || '').toLowerCase().startsWith(q);
+        if (aCodeStart && !bCodeStart) return -1;
+        if (!aCodeStart && bCodeStart) return 1;
+      }
 
-      // 2. Starts with Code
-      const aCodeStart = (a.codigo || '').toLowerCase().startsWith(q);
-      const bCodeStart = (b.codigo || '').toLowerCase().startsWith(q);
-      if (aCodeStart && !bCodeStart) return -1;
-      if (!aCodeStart && bCodeStart) return 1;
-
-      return 0; // standard order
+      // 2. Aplicar ordenamiento seleccionado
+      switch (sortBy) {
+        case 'name-asc':
+          return (a.nombre || '').localeCompare(b.nombre || '');
+        case 'name-desc':
+          return (b.nombre || '').localeCompare(a.nombre || '');
+        case 'stock-asc':
+          return (a.existencia || 0) - (b.existencia || 0);
+        case 'stock-desc':
+          return (b.existencia || 0) - (a.existencia || 0);
+        case 'price-asc':
+          return (a.venta || 0) - (b.venta || 0);
+        case 'price-desc':
+          return (b.venta || 0) - (a.venta || 0);
+        default:
+          return 0;
+      }
     });
 
     // Pagination
@@ -954,7 +972,7 @@ const InventoryManagement = () => {
       filtered: paginatedResults,
       totalFilteredCount: totalCount
     };
-  }, [allProducts, deferredSearch, filterCategory, filterProvider, currentPage, searchType]);
+  }, [allProducts, deferredSearch, filterCategory, filterProvider, currentPage, searchType, sortBy]);
 
   // Handlers para abrir modales
   const openCreateModal = () => setIsCreateModalOpen(true);
@@ -1149,6 +1167,21 @@ const InventoryManagement = () => {
         <Select value={filterProvider} onChange={(e) => setFilterProvider(e.target.value)}>
           <option value="">Todos los proveedores</option>
           {providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}
+        </Select>
+
+        <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ border: '1px solid #6366f1', background: '#f5f3ff' }}>
+          <optgroup label="Nombre">
+            <option value="name-asc">Nombre (A-Z)</option>
+            <option value="name-desc">Nombre (Z-A)</option>
+          </optgroup>
+          <optgroup label="Existencia">
+            <option value="stock-asc">Existencia (Menor a Mayor)</option>
+            <option value="stock-desc">Existencia (Mayor a Menor)</option>
+          </optgroup>
+          <optgroup label="Precio">
+            <option value="price-asc">Precio (Menor a Mayor)</option>
+            <option value="price-desc">Precio (Mayor a Menor)</option>
+          </optgroup>
         </Select>
       </FilterContainer>
 

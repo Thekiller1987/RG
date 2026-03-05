@@ -31,16 +31,16 @@ exports.createInvoice = async (req, res) => {
 // Registrar abono
 exports.registerPayment = async (req, res) => {
   const { id } = req.params;
-  const { amount } = req.body; 
+  const { amount } = req.body;
 
   try {
     // 1. Buscar la factura
     const [invoices] = await db.query('SELECT * FROM facturas_proveedores WHERE id = ?', [id]);
     if (invoices.length === 0) return res.status(404).json({ message: 'Factura no encontrada' });
-    
+
     const invoice = invoices[0];
     const nuevoAbonado = Number(invoice.monto_abonado) + Number(amount);
-    
+
     // 2. Calcular si ya se pagó completa
     let nuevoEstado = invoice.estado;
     if (nuevoAbonado >= invoice.monto_total) {
@@ -49,8 +49,8 @@ exports.registerPayment = async (req, res) => {
 
     // 3. Actualizar BD
     await db.query(
-      'UPDATE facturas_proveedores SET monto_abonado = ?, estado = ? WHERE id = ?',
-      [nuevoAbonado, nuevoEstado, id]
+      'UPDATE facturas_proveedores SET monto_abonado = ?, estado = ?, referencia_pago = ? WHERE id = ?',
+      [nuevoAbonado, nuevoEstado, req.body.reference || null, id]
     );
 
     res.json({ message: 'Abono registrado', nuevoAbonado, nuevoEstado });

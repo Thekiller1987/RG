@@ -248,6 +248,29 @@ const TabButton = styled.button`
     }
 `;
 
+// --- BI SUMMARY TABLE STYLES ---
+const BISummaryContainer = styled.div`
+    background: white; border-radius: 24px; border: 1px solid #e2e8f0; overflow: hidden;
+    animation: ${fadeIn} 0.4s ease-out; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+`;
+
+const BITable = styled.table`
+    width: 100%; border-collapse: collapse; text-align: left;
+    th { background: #f8fafc; padding: 1rem 1.5rem; font-size: 0.85rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #f1f5f9; }
+    td { padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; font-size: 0.95rem; color: #334155; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fbfcfd; }
+    .provider-name { font-weight: 800; color: #1e293b; }
+    .amount { font-family: 'Inter', sans-serif; font-weight: 700; text-align: right; }
+    .count-badge { background: #e2e8f0; color: #475569; padding: 2px 8px; border-radius: 6px; font-weight: 800; font-size: 0.8rem; }
+`;
+
+const BISummaryHeader = styled.div`
+    padding: 1.5rem 2rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;
+    h3 { margin: 0; font-size: 1.25rem; font-weight: 800; color: #1e293b; display: flex; align-items: center; gap: 0.75rem; }
+    .date-range { font-size: 0.9rem; color: #64748b; font-weight: 600; background: #f1f5f9; padding: 0.4rem 1rem; border-radius: 99px; }
+`;
+
 const SearchAndFilters = styled.div`
     display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between;
 `;
@@ -562,8 +585,35 @@ const FacturasProveedores = () => {
             if (status !== 'PAGADA') totalDebt += deuda;
         });
 
-        return { pend, venc, pag, prox, totalDebt };
+        return { pend, venc, pag, prox, totalDebt, totalCount: invoices.length };
     }, [invoices, getEffectiveStatus]);
+
+    // --- BI SUMMARY LOGIC ---
+    const biSummary = useMemo(() => {
+        // Filtrar por fecha para el resumen BI
+        let data = invoices;
+        if (filterDateFrom && filterDateTo) {
+            const start = new Date(filterDateFrom).getTime();
+            const end = new Date(filterDateTo).getTime() + 86400000;
+            data = data.filter(i => {
+                const em = new Date(i.fecha_emision).getTime();
+                return em >= start && em < end;
+            });
+        }
+
+        const summaryMap = {};
+        data.forEach(inv => {
+            const name = inv.proveedor || 'Sin Proveedor';
+            if (!summaryMap[name]) {
+                summaryMap[name] = { provider: name, count: 0, totalAmount: 0, totalPaid: 0 };
+            }
+            summaryMap[name].count += 1;
+            summaryMap[name].totalAmount += (parseFloat(inv.monto_total) || 0);
+            summaryMap[name].totalPaid += (parseFloat(inv.monto_abonado) || 0);
+        });
+
+        return Object.values(summaryMap).sort((a, b) => b.totalAmount - a.totalAmount);
+    }, [invoices, filterDateFrom, filterDateTo]);
 
     const filteredInvoices = useMemo(() => {
         let data = invoices.map(inv => ({ ...inv, effectiveStatus: getEffectiveStatus(inv) }));
@@ -662,6 +712,12 @@ const FacturasProveedores = () => {
                     <div className="value">{stats.prox}</div>
                     <div className="sub">En los próx. 5 días</div>
                 </StatCard>
+                <StatCard color="#6366f1" bg="#eef2ff">
+                    <div className="icon-wrapper"><FaFileInvoiceDollar /></div>
+                    <div className="label">Total Facturas</div>
+                    <div className="value">{stats.totalCount}</div>
+                    <div className="sub">Registradas en sistema</div>
+                </StatCard>
                 <StatCard color="#3b82f6" bg="#eff6ff">
                     <div className="icon-wrapper"><FaClock /></div>
                     <div className="label">Pendientes</div>
@@ -683,6 +739,7 @@ const FacturasProveedores = () => {
                         { id: 'PENDIENTE', label: 'Por Pagar (Prox)', icon: FaClock, color: '#3b82f6', bg: '#eff6ff', count: stats.pend + stats.prox },
                         { id: 'VENCIDA', label: 'Vencidas', icon: FaExclamationCircle, color: '#dc2626', bg: '#fef2f2', count: stats.venc },
                         { id: 'PAGADA', label: 'Pagadas', icon: FaCheckCircle, color: '#16a34a', bg: '#f0fdf4', count: stats.pag },
+                        { id: 'BI', label: 'Resumen BI', icon: FaFilter, color: '#6366f1', bg: '#eef2ff', count: null },
                         { id: 'TODAS', label: 'Todas', icon: FaList, color: '#64748b', bg: '#f1f5f9', count: null },
                     ].map(tab => (
                         <TabButton
@@ -829,6 +886,60 @@ const FacturasProveedores = () => {
                         );
                     })}
                 </InvoicesGrid>
+            ) : filter === 'BI' ? (
+                <BISummaryContainer>
+                    <BISummaryHeader>
+                        <h3><FaFilter /> Resumen de Razonamiento de Negocio</h3>
+                        {filterDateFrom && filterDateTo && (
+                            <span className="date-range">
+                                {formatDateManagua(filterDateFrom)} - {formatDateManagua(filterDateTo)}
+                            </span>
+                        )}
+                    </BISummaryHeader>
+                    <BITable>
+                        <thead>
+                            <tr>
+                                <th>Proveedor</th>
+                                <th style={{ textAlign: 'center' }}>Facturas</th>
+                                <th style={{ textAlign: 'right' }}>Total Comprado</th>
+                                <th style={{ textAlign: 'right' }}>Pagado</th>
+                                <th style={{ textAlign: 'right' }}>Saldo Pendiente</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {biSummary.map(item => (
+                                <tr key={item.provider}>
+                                    <td className="provider-name">{item.provider}</td>
+                                    <td style={{ textAlign: 'center' }}>
+                                        <span className="count-badge">{item.count}</span>
+                                    </td>
+                                    <td className="amount">C${item.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                    <td className="amount" style={{ color: '#16a34a' }}>C${item.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                    <td className="amount" style={{ color: (item.totalAmount - item.totalPaid) > 0.1 ? '#ef4444' : '#16a34a' }}>
+                                        C${(item.totalAmount - item.totalPaid).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </td>
+                                </tr>
+                            ))}
+                            {biSummary.length === 0 && (
+                                <tr>
+                                    <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                                        No hay datos para el período seleccionado.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                        {biSummary.length > 0 && (
+                            <tfoot>
+                                <tr style={{ background: '#f8fafc', fontWeight: '900' }}>
+                                    <td colSpan="2" style={{ textAlign: 'right', textTransform: 'uppercase', fontSize: '0.8rem', color: '#64748b' }}>Totales Globales:</td>
+                                    <td className="amount">C${biSummary.reduce((acc, curr) => acc + curr.totalAmount, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                    <td className="amount">C${biSummary.reduce((acc, curr) => acc + curr.totalPaid, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                    <td className="amount" style={{ color: '#ef4444' }}>C${(biSummary.reduce((acc, curr) => acc + curr.totalAmount, 0) - biSummary.reduce((acc, curr) => acc + curr.totalPaid, 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                </tr>
+                            </tfoot>
+                        )}
+                    </BITable>
+                </BISummaryContainer>
             ) : (
                 <div style={{
                     textAlign: 'center', padding: '4rem', color: '#94a3b8',

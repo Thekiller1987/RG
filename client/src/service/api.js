@@ -411,8 +411,8 @@ export const createProviderInvoice = async (invoiceData, token) => {
     return await request('post', '/facturas-proveedores', token, invoiceData);
 };
 
-export const payProviderInvoice = async (invoiceId, amount, token) => {
-    return await request('post', `/facturas-proveedores/${invoiceId}/pagar`, token, { amount });
+export const payProviderInvoice = async (invoiceId, amount, reference, status, token) => {
+    return await request('post', `/facturas-proveedores/${invoiceId}/pagar`, token, { amount, reference, status });
 };
 export const deleteProviderInvoice = async (invoiceId, token) => {
     return await request('delete', `/facturas-proveedores/${invoiceId}`, token);
