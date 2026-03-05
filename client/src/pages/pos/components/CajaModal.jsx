@@ -326,9 +326,21 @@ const CajaModal = ({
               </div>
 
               {/* Movimientos Web */}
-              {(abonos.length > 0 || salidas.length > 0) && (
+              {(abonos.length > 0 || entradas.length > 0 || salidas.length > 0) && (
                 <div style={{ background: '#fff', padding: 20, borderRadius: 8, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
                   <h4 style={{ margin: '0 0 15px', borderBottom: '1px solid #eee', paddingBottom: 10 }}>Detalle de Movimientos</h4>
+
+                  {entradas.length > 0 && (
+                    <div style={{ marginBottom: 15 }}>
+                      <h5 style={{ color: '#28a745', margin: '0 0 5px' }}>Entradas de Caja</h5>
+                      {entradas.map((x, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #eee' }}>
+                          <div>{x.note || 'Entrada Varia'}</div>
+                          <div style={{ fontWeight: 'bold', color: '#28a745' }}>+ {money(Math.abs(x.amount))}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {abonos.length > 0 && (
                     <div style={{ marginBottom: 15 }}>
