@@ -426,8 +426,8 @@ export const fetchCajaReportById = async (sessionId, token) => {
 };
 
 // --- FACTURAS PROVEEDORES ---
-export const fetchProviderInvoices = async (token) => {
-    return await request('get', '/facturas-proveedores', token);
+export const fetchProviderInvoices = async (token, params) => {
+    return await request('get', '/facturas-proveedores', token, null, { params });
 };
 
 export const createProviderInvoice = async (invoiceData, token) => {

@@ -422,8 +422,12 @@ const FacturasProveedores = () => {
         const loadData = async () => {
             setLoading(true);
             try {
-                // 1. Cargar Facturas
-                const invResponse = await api.fetchProviderInvoices(token);
+                // 1. Cargar Facturas con filtro de fechas desde el servidor
+                const params = {};
+                if (filterDateFrom) params.startDate = filterDateFrom;
+                if (filterDateTo) params.endDate = filterDateTo;
+
+                const invResponse = await api.fetchProviderInvoices(token, Object.keys(params).length ? params : undefined);
                 // Aseguramos que sea array
                 const invData = Array.isArray(invResponse) ? invResponse : (invResponse?.data || []);
                 setInvoices(invData);
@@ -443,7 +447,7 @@ const FacturasProveedores = () => {
             }
         };
         if (token) loadData();
-    }, [token, refreshTrigger]);
+    }, [token, refreshTrigger, filterDateFrom, filterDateTo]);
 
     // --- LÓGICA DE PAGO (ADMINISTRATIVO) ---
     // Esta función NO valida si la caja está abierta, ya que es un proceso administrativo
@@ -592,14 +596,6 @@ const FacturasProveedores = () => {
     const biSummary = useMemo(() => {
         // Filtrar por fecha para el resumen BI
         let data = invoices;
-        if (filterDateFrom && filterDateTo) {
-            const start = new Date(filterDateFrom).getTime();
-            const end = new Date(filterDateTo).getTime() + 86400000;
-            data = data.filter(i => {
-                const em = new Date(i.fecha_emision).getTime();
-                return em >= start && em < end;
-            });
-        }
 
         const summaryMap = {};
         data.forEach(inv => {
@@ -643,15 +639,7 @@ const FacturasProveedores = () => {
             data = data.filter(i => i.proveedor === filterProvider);
         }
 
-        // 3. Filtro Fechas
-        if (filterDateFrom && filterDateTo) {
-            const start = new Date(filterDateFrom).getTime();
-            const end = new Date(filterDateTo).getTime() + 86400000;
-            data = data.filter(i => {
-                const em = new Date(i.fecha_emision).getTime();
-                return em >= start && em < end;
-            });
-        }
+
 
         // 4. Búsqueda Texto
         if (searchTerm) {

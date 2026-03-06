@@ -3,7 +3,18 @@ const db = require('../config/db');
 // Obtener todas las facturas
 exports.getInvoices = async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM facturas_proveedores ORDER BY created_at DESC');
+    const { startDate, endDate } = req.query;
+    let query = 'SELECT * FROM facturas_proveedores';
+    const queryParams = [];
+
+    if (startDate && endDate) {
+      query += ' WHERE fecha_emision BETWEEN ? AND ?';
+      queryParams.push(startDate, endDate);
+    }
+
+    query += ' ORDER BY created_at DESC';
+
+    const [rows] = await db.query(query, queryParams);
     res.json(rows);
   } catch (error) {
     console.error(error);
