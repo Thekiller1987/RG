@@ -344,35 +344,32 @@ const Finances = () => {
     }
 
     try {
-      const apiBaseUrl = '/api/reports';
-      const headers = { 'Authorization': `Bearer ${token}` };
-      const query = `?startDate=${startDate}&endDate=${endDate}`;
+      const { default: api } = await import('../service/api'); // Lazy load api to avoid circular dependencies locally
+      const query = { params: { startDate, endDate } };
 
-      // Promise.all para cargar todo paralelo
       const [resSum, resInv, resUser, resProd, resChart] = await Promise.all([
-        fetch(`${apiBaseUrl}/sales-summary${query}`, { headers }),
-        fetch(`${apiBaseUrl}/inventory-value`, { headers }), // Inventario suele ser snapshot actual
-        fetch(`${apiBaseUrl}/sales-by-user${query}`, { headers }),
-        fetch(`${apiBaseUrl}/top-products${query}`, { headers }),
-        fetch(`${apiBaseUrl}/sales-chart${query}`, { headers }),
+        api.get('/reports/sales-summary', query).catch(() => ({ data: { ventas_brutas: 0, ganancia_total: 0 } })),
+        api.get('/reports/inventory-value').catch(() => ({ data: { valor_total_inventario: 0 } })),
+        api.get('/reports/sales-by-user', query).catch(() => ({ data: [] })),
+        api.get('/reports/top-products', query).catch(() => ({ data: [] })),
+        api.get('/reports/sales-chart', query).catch(() => ({ data: [] })),
       ]);
 
-      const dataSum = await resSum.json();
-      const dataInv = await resInv.json();
-      const dataUser = await resUser.json();
-      const dataProd = await resProd.json();
-      const dataChart = await resChart.json();
+      const dataSum = resSum.data || { ventas_brutas: 0, ganancia_total: 0 };
+      const dataInv = resInv.data || { valor_total_inventario: 0 };
+      const dataUser = Array.isArray(resUser.data) ? resUser.data : [];
+      const dataProd = Array.isArray(resProd.data) ? resProd.data : [];
+      const dataChart = Array.isArray(resChart.data) ? resChart.data : [];
 
       setSalesSummary(dataSum);
-      setInventoryValue(dataInv.valor_total_inventario);
+      setInventoryValue(dataInv.valor_total_inventario || 0);
       setSalesByUser(dataUser);
       setTopProducts(dataProd);
 
       // Configurar Gráfico
       setChartData({
         labels: dataChart.map(d => {
-          // Formatear fecha para el eje X
-          const date = new Date(d.dia + 'T12:00:00'); // Evitar desfase horario
+          const date = new Date(d.dia + 'T12:00:00');
           return new Intl.DateTimeFormat('es-NI', { day: '2-digit', month: 'short' }).format(date);
         }),
         datasets: [{
@@ -388,7 +385,7 @@ const Finances = () => {
 
     } catch (error) {
       console.error("Error fetching reports:", error);
-      setAlertInfo({ isOpen: true, title: 'Error de Conexión', message: 'No se pudieron cargar los datos.' });
+      setAlertInfo({ isOpen: true, title: 'Error de Conexión', message: 'No se pudieron cargar los datos del servidor.' });
     } finally {
       setIsLoading(false);
     }

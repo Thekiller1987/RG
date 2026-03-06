@@ -15,13 +15,13 @@ const getDateRange = (start, end) => {
         const endDateObj = new Date(end);
         endDateObj.setDate(endDateObj.getDate() + 1);
         const nextDayStr = endDateObj.toISOString().split('T')[0];
-        toDate = `${nextDayStr} 05: 59: 59`;
+        toDate = `${nextDayStr} 05:59:59`;
     } else {
         const today = new Date();
         const yyyy = today.getFullYear();
         const mm = String(today.getMonth() + 1).padStart(2, '0');
         const dd = String(today.getDate()).padStart(2, '0');
-        const dateStr = `${yyyy} -${mm} -${dd} `;
+        const dateStr = `${yyyy}-${mm}-${dd}`;
 
         fromDate = `${dateStr} 06:00:00`;
         const tomorrow = new Date(today);
@@ -29,7 +29,7 @@ const getDateRange = (start, end) => {
         const tyyyy = tomorrow.getFullYear();
         const tmm = String(tomorrow.getMonth() + 1).padStart(2, '0');
         const tdd = String(tomorrow.getDate()).padStart(2, '0');
-        toDate = `${tyyyy} -${tmm} -${tdd} 05: 59: 59`;
+        toDate = `${tyyyy}-${tmm}-${tdd} 05:59:59`;
     }
     return { from: fromDate, to: toDate };
 };
