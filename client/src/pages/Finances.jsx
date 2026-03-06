@@ -377,10 +377,15 @@ const Finances = () => {
       setSalesByUser(dataUser);
       setTopProducts(dataProd);
 
-      // Configurar Gráfico
       setChartData({
         labels: dataChart.map(d => {
-          const date = new Date(d.dia + 'T12:00:00');
+          // Si d.dia ya viene como timestamp ISO desde MySQL:
+          let dateStr = d.dia;
+          // Si solo viene "YYYY-MM-DD", le agregamos T12 para evitar auto-ajustes UTC a horas locativas
+          if (typeof dateStr === 'string' && dateStr.length === 10) {
+            dateStr += 'T12:00:00';
+          }
+          const date = new Date(dateStr);
           return new Intl.DateTimeFormat('es-NI', { day: '2-digit', month: 'short' }).format(date);
         }),
         datasets: [{
