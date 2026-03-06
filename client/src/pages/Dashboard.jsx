@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import {
     FaSignOutAlt, FaShoppingCart, FaBoxOpen, FaFileInvoice,
     FaCreditCard, FaCloudUploadAlt, FaChartPie, FaChartLine, FaChartBar, FaUserLock, FaMapMarkerAlt,
-    FaBox, FaTruck, FaClock, FaClipboardList, FaAddressCard
+    FaBox, FaTruck, FaClock, FaClipboardList, FaAddressCard, FaTags
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext.jsx';
 
