@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
   FaCreditCard, FaWindowClose, FaMoneyBillWave, FaDollarSign, FaCheckCircle,
   FaHashtag, FaExchangeAlt, FaUserTag, FaCoins, FaMinusCircle, FaBalanceScale,
-  FaCashRegister, FaHandshake, FaCreditCard as FaCreditCardIcon, FaPrint
+  FaCashRegister, FaHandshake, FaCreditCard as FaCreditCardIcon, FaPrint, FaUserTie
 } from 'react-icons/fa';
 
 import {

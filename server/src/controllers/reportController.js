@@ -84,16 +84,20 @@ const getSalesByUserReport = async (req, res) => {
         const { from, to } = getDateRange(startDate, endDate);
         const sql = `
 SELECT
-u.nombre_usuario,
+    CASE 
+        WHEN v.id_empleado IS NOT NULL THEN CONCAT('Vendedor: ', COALESCE(e.nombre, 'Desconocido'))
+        ELSE CONCAT('Caja: ', u.nombre_usuario)
+    END AS nombre_usuario,
     COUNT(v.id_venta) AS cantidad_ventas,
-        SUM(v.total_venta) AS total_vendido
-            FROM ventas AS v
-            JOIN usuarios AS u ON v.id_usuario = u.id_usuario
+    SUM(v.total_venta) AS total_vendido
+FROM ventas AS v
+JOIN usuarios AS u ON v.id_usuario = u.id_usuario
+LEFT JOIN empleados AS e ON v.id_empleado = e.id_empleado
 WHERE
-v.estado = 'COMPLETADA' 
-                AND v.fecha >= ? AND v.fecha <= ?
-    GROUP BY u.nombre_usuario 
-            ORDER BY total_vendido DESC;
+    v.estado = 'COMPLETADA' 
+    AND v.fecha >= ? AND v.fecha <= ?
+GROUP BY nombre_usuario 
+ORDER BY total_vendido DESC;
 `;
         const [results] = await db.query(sql, [from, to]);
         res.json(results);
