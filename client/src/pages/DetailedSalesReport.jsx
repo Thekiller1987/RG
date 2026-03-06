@@ -4,7 +4,7 @@ import axios from 'axios';
 import {
     FaArrowLeft, FaSyncAlt, FaCalendarAlt, FaSearch,
     FaShoppingCart, FaUndoAlt, FaBarcode, FaFileInvoice,
-    FaUser, FaClock, FaChevronDown, FaChevronUp, FaPrint, FaBoxOpen
+    FaUser, FaClock, FaChevronDown, FaChevronUp, FaPrint, FaBoxOpen, FaUserTie
 } from 'react-icons/fa';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -401,6 +401,7 @@ export default function DetailedSalesReport() {
 
     // Sales Data
     const [sales, setSales] = useState([]);
+    const [employeeSales, setEmployeeSales] = useState([]); // NUEVO: Estado para ventas por empleado
     const [loading, setLoading] = useState(false);
     const [expandedRows, setExpandedRows] = useState({});
 
@@ -446,10 +447,22 @@ export default function DetailedSalesReport() {
     // Auto-fetch sales when tab changes
     useEffect(() => {
         if (activeTab === 'ventas') fetchSales(null, null, reportClient?.id_cliente);
-        else if (activeTab === 'mayorista') fetchSales(null, null, reportClient?.id_cliente); // Reuse client filter if needed
+        else if (activeTab === 'mayorista') fetchSales(null, null, reportClient?.id_cliente);
         else if (activeTab === 'devoluciones') fetchSales('DEVOLUCION');
         else if (activeTab === 'busqueda' && reportKeyword.trim().length >= 3) fetchSales(null, reportKeyword);
-    }, [activeTab, startDate, endDate, fetchSales, reportKeyword, reportClient]);
+        else if (activeTab === 'empleados') {
+            setLoading(true);
+            axios.get(`${API_URL}/reports/sales-by-employee`, {
+                headers: authHeader,
+                params: { startDate, endDate }
+            }).then(res => {
+                setEmployeeSales(Array.isArray(res.data) ? res.data : []);
+            }).catch(err => {
+                console.error('Error fetching employee sales:', err);
+                setEmployeeSales([]);
+            }).finally(() => setLoading(false));
+        }
+    }, [activeTab, startDate, endDate, fetchSales, reportKeyword, reportClient, authHeader]);
 
     // Derived state for Product List (filtered)
     const filteredProducts = useMemo(() => {
@@ -577,7 +590,7 @@ export default function DetailedSalesReport() {
                 <table>
                     <thead>
                         <tr>
-                             <th>#</th><th>Fecha</th><th>Estado</th><th>Cliente</th><th>Total</th>
+                             <th>#</th><th>Fecha</th><th>Estado</th><th>Cliente</th><th>Atendido Por</th><th>Total</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -587,11 +600,13 @@ export default function DetailedSalesReport() {
                                 <td>${fmtDT(s.fecha)}</td>
                                 <td>${s.estado}</td>
                                 <td>${s.clienteNombre || 'PG'}</td>
+                                <td>${s.empleado_nombre || '—'}</td>
                                 <td class="num">${fmtMoney(s.totalVenta)}</td>
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
+
             `;
         }
 
@@ -639,12 +654,16 @@ export default function DetailedSalesReport() {
                 <Tab active={activeTab === 'producto'} onClick={() => setActiveTab('producto')}>
                     <FaBarcode /> Buscar por Producto
                 </Tab>
+                <Tab active={activeTab === 'empleados'} onClick={() => setActiveTab('empleados')}>
+                    <FaUserTie /> Ventas por Empleado
+                </Tab>
             </TabBar>
 
-            {(activeTab === 'ventas' || activeTab === 'devoluciones' || activeTab === 'busqueda') && (
+            {(activeTab === 'ventas' || activeTab === 'devoluciones' || activeTab === 'busqueda' || activeTab === 'empleados') && (
                 <>
                     <FilterBar>
                         <FaCalendarAlt style={{ color: theme.primary }} />
+
                         <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
                         <span style={{ color: theme.textLight }}>a</span>
                         <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
@@ -744,10 +763,33 @@ export default function DetailedSalesReport() {
                             <p>
                                 {activeTab === 'busqueda'
                                     ? `No se encontraron resultados para "${reportKeyword}"`
-                                    : `No se encontraron ${activeTab === 'devoluciones' ? 'devoluciones' : 'ventas'} en este rango.`
+                                    : activeTab === 'empleados' ? 'No se encontraron ventas de empleados en este rango.'
+                                        : `No se encontraron ${activeTab === 'devoluciones' ? 'devoluciones' : 'ventas'} en este rango.`
                                 }
                             </p>
                         </EmptyState>
+                    ) : activeTab === 'empleados' ? (
+                        /* ================== TABLA DE EMPLEADOS ================== */
+                        <Table>
+                            <thead>
+                                <tr>
+                                    <th>Empleado</th>
+                                    <th className="center">Facturas Realizadas</th>
+                                    <th className="num">Ventas Totales</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {employeeSales.map((emp, i) => (
+                                    <tr key={i}>
+                                        <td style={{ fontWeight: 600 }}>{emp.empleado}</td>
+                                        <td className="center">{emp.total_facturas}</td>
+                                        <td className="num" style={{ fontWeight: 'bold', color: theme.success }}>
+                                            {fmtMoney(emp.total_ventas)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </Table>
                     ) : isMobile ? (
                         /* ================== MOBILE VIEW (Ventas/Devoluciones/Busqueda) ================== */
                         <MobileGrid>
@@ -822,7 +864,8 @@ export default function DetailedSalesReport() {
                                             <td><Badge type={sale.estado}>{sale.estado}</Badge></td>
                                             <td>
                                                 <div style={{ fontSize: '0.9rem' }}>{sale.clienteNombre || <span style={{ color: theme.textLight }}>Público Gral.</span>}</div>
-                                                <div style={{ fontSize: '0.75rem', color: theme.textLight }}>Vendedor: {sale.vendedorNombre || '—'}</div>
+                                                <div style={{ fontSize: '0.75rem', color: theme.textLight }}>Cajero: {sale.vendedorNombre || '—'}</div>
+                                                <div style={{ fontSize: '0.75rem', color: theme.info, fontWeight: 'bold' }}>Vendedor Piso: {sale.empleado_nombre || '—'}</div>
                                             </td>
                                             <td>
                                                 <ItemsList>

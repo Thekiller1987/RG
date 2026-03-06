@@ -27,6 +27,7 @@ const createSale = async (req, res) => {
       estado: 'COMPLETADA',
       id_usuario: userId,
       id_cliente: clientId,
+      id_empleado: req.body.empleadoId || null,
       pago_detalles: JSON.stringify({ ...pagoDetalles, tasaDolarAlMomento: req.body.tasaDolarAlMomento }),
       tipo_venta: montoCredito > 0 ? 'CREDITO' : 'CONTADO',
       referencia_pedido: req.body.referencia_pedido

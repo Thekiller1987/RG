@@ -8,6 +8,7 @@ const {
     getSalesSummaryReport,
     getInventoryValueReport,
     getSalesByUserReport,
+    getSalesByEmployeeReport,
     getTopProductsReport,
     getSalesChartReport,
     getDetailedSales,
@@ -24,6 +25,10 @@ router.get('/inventory-value', verifyToken, getInventoryValueReport);
 
 // GET /api/reports/sales-by-user?startDate=...&endDate=...
 router.get('/sales-by-user', verifyToken, getSalesByUserReport);
+
+// GET /api/reports/sales-by-employee?startDate=...&endDate=...
+router.get('/sales-by-employee', verifyToken, getSalesByEmployeeReport);
+
 
 // GET /api/reports/top-products?startDate=...&endDate=...
 router.get('/top-products', verifyToken, getTopProductsReport);

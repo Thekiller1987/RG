@@ -22,6 +22,8 @@ const InventoryUpload = React.lazy(() => import('./pages/InventoryUpload.jsx'));
 const CashReport = React.lazy(() => import('./pages/CashReport.jsx'));
 const FacturasProveedores = React.lazy(() => import('./pages/FacturasProveedores.jsx'));
 const Solicitudes = React.lazy(() => import('./pages/Solicitudes.jsx'));
+const Empleados = React.lazy(() => import('./pages/Empleados.jsx'));
+
 const InventoryOutflowPage = React.lazy(() => import('./pages/InventoryOutflowPage.jsx'));
 const DetailedSalesReport = React.lazy(() => import('./pages/DetailedSalesReport.jsx'));
 const SettingsPage = React.lazy(() => import('./pages/SettingsPage.jsx'));
@@ -238,6 +240,13 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Nueva ruta de Empleados */}
+          <Route path="/empleados" element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE]}>
+              <motion.div {...pageTransition}><Empleados /></motion.div>
+            </ProtectedRoute>
+          } />
 
           <Route
             path="/settings"

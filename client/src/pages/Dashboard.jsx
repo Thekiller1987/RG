@@ -3,14 +3,15 @@ import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import {
     FaSignOutAlt, FaShoppingCart, FaBoxOpen, FaFileInvoice,
-    FaCreditCard, FaCloudUploadAlt, FaChartBar, FaBriefcase, FaUsers,
-    FaFileInvoiceDollar, FaClipboardList, FaTruck, FaTags, FaCog
+    FaCreditCard, FaCloudUploadAlt, FaChartPie, FaChartLine, FaChartBar, FaUserLock, FaMapMarkerAlt,
+    FaBox, FaTruck, FaClock, FaClipboardList, FaAddressCard
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext.jsx';
 
 import ConfirmationModal from './pos/components/ConfirmationModal.jsx';
 import SettingsModal from './pos/components/SettingsModal.jsx';
 import WholesaleAuthModal from '../components/WholesaleAuthModal.jsx';
+import ProtectedRoute from '../components/ProtectedRoute.jsx'; // Assuming ProtectedRoute is in this path
 
 
 // --- ESTILOS MEJORADOS Y RESPONSIVOS ---
@@ -185,6 +186,8 @@ const Dashboard = () => {
             case '/credits': import('./ClientesYCreditos.jsx'); break;
             case '/invoices': import('./FacturasProveedores.jsx'); break;
             case '/orders': import('./PedidosYApartados.jsx'); break;
+            case '/finances': import('./Finances.jsx'); break; // Corrected path
+            case '/empleados': import('./Empleados.jsx'); break; // Corrected path
             default: break;
         }
     };
@@ -249,6 +252,23 @@ const Dashboard = () => {
                             <p>Gestiona clientes, saldos pendientes y abonos.</p>
                         </Card>
                     )}
+                    {/* TARJETA: Finanzas (Admin/Gerente) */}
+                    <ProtectedRoute allowedRoles={['Administrador', 'Gerente']}>
+                        <Card to="/finances" color="#10b981" onMouseEnter={() => prefetch('/finances')}>
+                            <CardIcon color="#10b981"><FaChartPie /></CardIcon>
+                            <h2>Finanzas</h2>
+                            <p>Control de ingresos, gastos y reportes financieros.</p>
+                        </Card>
+                    </ProtectedRoute>
+
+                    {/* TARJETA: Empleados (Admin/Gerente) */}
+                    <ProtectedRoute allowedRoles={['Administrador', 'Gerente']}>
+                        <Card to="/empleados" color="#6366f1" onMouseEnter={() => prefetch('/empleados')}>
+                            <CardIcon color="#6366f1"><FaAddressCard /></CardIcon>
+                            <h2>Empleados</h2>
+                            <p>Gestión de vendedores y comisiones.</p>
+                        </Card>
+                    </ProtectedRoute>
 
                     {/* 4. Inventario */}
                     {canAccessInventory && (

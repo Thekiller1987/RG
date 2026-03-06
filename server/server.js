@@ -23,6 +23,7 @@ const cajaRoutes = require('./src/routes/cajaRoutes.js');
 const providerInvoiceRoutes = require('./src/routes/providerInvoiceRoutes.js');
 const requestRoutes = require('./src/routes/requestRoutes.js');
 const outflowRoutes = require('./src/routes/outflowRoutes.js');
+const employeeRoutes = require('./src/routes/employeeRoutes.js');
 
 // 2. Crear una instancia de Express
 const app = express();
@@ -91,6 +92,7 @@ app.use('/api/caja', cajaRoutes);
 app.use('/api/facturas-proveedores', providerInvoiceRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/outflow', outflowRoutes);
+app.use('/api/employees', employeeRoutes);
 
 const settingsRoutes = require('./src/routes/settingsRoutes.js');
 app.use('/api/settings', settingsRoutes);

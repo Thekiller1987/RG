@@ -26,7 +26,9 @@ const PaymentModal = ({
   onClose,
   onFinishSale,       // el padre (POS.jsx) guarda la venta y maneja la impresión
   clientes = [],
+  empleados = [],     // NUEVO: lista de empleados
   users = [],         // opcional: solo para mostrar info si quisieras
+
   showAlert,
   initialClientId = '0',
 
@@ -45,7 +47,9 @@ const PaymentModal = ({
   const [referenciaTransferencia, setReferenciaTransferencia] = useState('');
   const [tipoPagoPrincipal, setTipoPagoPrincipal] = useState('contado');
   const [clienteSeleccionado, setClienteSeleccionado] = useState(initialClientId ?? '0');
+  const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState(''); // NUEVO: Estado del empleado
   const [saving, setSaving] = useState(false);
+
 
   // hover del botón pagar
   const [isHovering, setIsHovering] = useState(false);
@@ -251,6 +255,7 @@ const PaymentModal = ({
       referenciaTransferencia: referenciaTransferencia.trim(),
       credito,                           // monto numérico
       clienteId: finalClienteId,
+      empleadoId: empleadoSeleccionado || null, // NUEVO: Venta referida al empleado
       tipoVenta: computeTipoVenta({
         efectivo: numEfectivo,
         tarjeta: numTarjeta,
@@ -393,6 +398,28 @@ const PaymentModal = ({
                   <FaWindowClose style={{ marginRight: 4 }} /> No puedes vender sin seleccionar un cliente.
                 </p>
               )}
+
+              <div style={{ marginTop: 20 }}>
+                <label style={{ display: 'block', fontWeight: '700', marginBottom: 8, color: '#475569', fontSize: '0.9rem' }}>
+                  <FaUserTie /> Atendido por (opcional):
+                </label>
+                <select
+                  value={empleadoSeleccionado}
+                  onChange={(e) => setEmpleadoSeleccionado(e.target.value)}
+                  style={{
+                    width: '100%', padding: '10px 12px', fontSize: '1rem',
+                    borderRadius: 8, border: '1px solid #cbd5e1', background: '#f8fafc',
+                    height: 42
+                  }}
+                >
+                  <option value="">-- Sin Empleado --</option>
+                  {(empleados || []).map((emp) => (
+                    <option key={emp.id_empleado} value={emp.id_empleado}>
+                      {emp.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Medios de pago */}

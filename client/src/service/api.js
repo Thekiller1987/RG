@@ -135,6 +135,26 @@ export const updateStock = async (productId, stockData, token) => {
 };
 
 // ===================================================================
+// =================== SECCIÓN DE EMPLEADOS ==========================
+// ===================================================================
+
+export const getEmpleados = async (token) => {
+    return await request('get', '/employees', token);
+};
+
+export const createEmpleado = async (data, token) => {
+    return await request('post', '/employees', token, data);
+};
+
+export const updateEmpleado = async (id, data, token) => {
+    return await request('put', `/employees/${id}`, token, data);
+};
+
+export const deleteEmpleado = async (id, token) => {
+    return await request('delete', `/employees/${id}`, token);
+};
+
+// ===================================================================
 // =================== SECCIÓN DE CLIENTES ===========================
 // ===================================================================
 

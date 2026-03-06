@@ -9,19 +9,29 @@ const db = require('../config/db');
  * @returns {{ from: string, to: string }}
  */
 const getDateRange = (start, end) => {
-    // Si start=2023-10-25, rango inicia 2023-10-25 06:00:00
-    // Si end=2023-10-25, rango termina 2023-10-26 05:59:59
-    const from = `${start} 06:00:00`;
+    let fromDate, toDate;
+    if (start && end) {
+        fromDate = `${start} 06:00:00`;
+        const endDateObj = new Date(end);
+        endDateObj.setDate(endDateObj.getDate() + 1);
+        const nextDayStr = endDateObj.toISOString().split('T')[0];
+        toDate = `${nextDayStr} 05: 59: 59`;
+    } else {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const dateStr = `${yyyy} -${mm} -${dd} `;
 
-    // Calcular siguiente día para el end
-    const dateEnd = new Date(end);
-    dateEnd.setDate(dateEnd.getDate() + 1);
-    const year = dateEnd.getFullYear();
-    const month = String(dateEnd.getMonth() + 1).padStart(2, '0');
-    const day = String(dateEnd.getDate()).padStart(2, '0');
-    const to = `${year}-${month}-${day} 05:59:59`;
-
-    return { from, to };
+        fromDate = `${dateStr} 06:00:00`;
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tyyyy = tomorrow.getFullYear();
+        const tmm = String(tomorrow.getMonth() + 1).padStart(2, '0');
+        const tdd = String(tomorrow.getDate()).padStart(2, '0');
+        toDate = `${tyyyy} -${tmm} -${tdd} 05: 59: 59`;
+    }
+    return { from: fromDate, to: toDate };
 };
 
 // --- OBTENER RESUMEN DE VENTAS Y GANANCIAS ---
@@ -33,16 +43,16 @@ const getSalesSummaryReport = async (req, res) => {
     try {
         const { from, to } = getDateRange(startDate, endDate);
         const sql = `
-            SELECT
-                COALESCE(SUM(dv.cantidad * dv.precio_unitario), 0) AS ventas_brutas,
-                COALESCE(SUM(dv.cantidad * (dv.precio_unitario - p.costo)), 0) AS ganancia_total
+SELECT
+COALESCE(SUM(dv.cantidad * dv.precio_unitario), 0) AS ventas_brutas,
+    COALESCE(SUM(dv.cantidad * (dv.precio_unitario - p.costo)), 0) AS ganancia_total
             FROM ventas AS v
             JOIN detalle_ventas AS dv ON v.id_venta = dv.id_venta
             JOIN productos AS p ON dv.id_producto = p.id_producto
-            WHERE 
-                v.estado = 'COMPLETADA' 
+WHERE
+v.estado = 'COMPLETADA' 
                 AND v.fecha >= ? AND v.fecha <= ?;
-        `;
+`;
         const [results] = await db.query(sql, [from, to]);
         res.json(results[0]);
     } catch (error) {
@@ -57,7 +67,7 @@ const getInventoryValueReport = async (req, res) => {
         const sql = `
             SELECT SUM(p.costo * p.existencia) AS valor_total_inventario
             FROM productos AS p;
-        `;
+`;
         const [results] = await db.query(sql);
         res.json(results[0]);
     } catch (error) {
@@ -73,23 +83,50 @@ const getSalesByUserReport = async (req, res) => {
     try {
         const { from, to } = getDateRange(startDate, endDate);
         const sql = `
-            SELECT 
-                u.nombre_usuario, 
-                COUNT(v.id_venta) AS cantidad_ventas, 
-                SUM(v.total_venta) AS total_vendido
+SELECT
+u.nombre_usuario,
+    COUNT(v.id_venta) AS cantidad_ventas,
+        SUM(v.total_venta) AS total_vendido
             FROM ventas AS v
             JOIN usuarios AS u ON v.id_usuario = u.id_usuario
-            WHERE 
-                v.estado = 'COMPLETADA' 
+WHERE
+v.estado = 'COMPLETADA' 
                 AND v.fecha >= ? AND v.fecha <= ?
-            GROUP BY u.nombre_usuario 
+    GROUP BY u.nombre_usuario 
             ORDER BY total_vendido DESC;
-        `;
+`;
         const [results] = await db.query(sql, [from, to]);
         res.json(results);
     } catch (error) {
         console.error('Error en reporte de ventas por usuario:', error);
         res.status(500).json({ msg: 'Error en el servidor.' });
+    }
+};
+
+// --- OBTENER VENTAS POR EMPLEADO ---
+const getSalesByEmployeeReport = async (req, res) => {
+    const { startDate, endDate } = req.query;
+    const { from, to } = getDateRange(startDate, endDate);
+
+    try {
+        const [rows] = await db.query(`
+SELECT
+COALESCE(e.nombre, 'Sin asignar') AS empleado,
+    COUNT(v.id_venta) as total_facturas,
+    SUM(v.total_venta) as total_ventas
+            FROM ventas v
+            LEFT JOIN empleados e ON v.id_empleado = e.id_empleado
+            WHERE v.fecha BETWEEN ? AND ?
+    AND v.estado != 'DEVOLUCION' 
+            AND v.estado != 'CANCELADA'
+            GROUP BY v.id_empleado
+            ORDER BY total_ventas DESC
+    `, [from, to]);
+
+        res.json(rows);
+    } catch (error) {
+        console.error("Error al obtener reporte de ventas por empleado:", error);
+        res.status(500).json({ message: "Error al obtener datos." });
     }
 };
 
@@ -104,13 +141,13 @@ const getTopProductsReport = async (req, res) => {
             FROM detalle_ventas AS dv
             JOIN productos AS p ON dv.id_producto = p.id_producto
             JOIN ventas AS v ON dv.id_venta = v.id_venta
-            WHERE 
-                v.estado = 'COMPLETADA' 
+WHERE
+v.estado = 'COMPLETADA' 
                 AND v.fecha >= ? AND v.fecha <= ?
-            GROUP BY p.nombre 
+    GROUP BY p.nombre 
             ORDER BY total_unidades_vendidas DESC 
             LIMIT 10;
-        `;
+`;
         const [results] = await db.query(sql, [from, to]);
         res.json(results);
     } catch (error) {
@@ -127,16 +164,16 @@ const getSalesChartReport = async (req, res) => {
         const { from, to } = getDateRange(startDate, endDate);
         // Nota: Para agrupar por día, seguimos usando DATE() pero sobre un rango filtrado eficientemente
         const sql = `
-            SELECT 
-                DATE(DATE_SUB(fecha, INTERVAL 6 HOUR)) AS dia, 
-                SUM(total_venta) AS total_diario
+SELECT
+DATE(DATE_SUB(fecha, INTERVAL 6 HOUR)) AS dia,
+    SUM(total_venta) AS total_diario
             FROM ventas
-            WHERE 
-                estado = 'COMPLETADA' 
+WHERE
+estado = 'COMPLETADA' 
                 AND fecha >= ? AND fecha <= ?
-            GROUP BY dia 
+    GROUP BY dia 
             ORDER BY dia ASC;
-        `;
+`;
         const [results] = await db.query(sql, [from, to]);
         res.json(results);
     } catch (error) {
@@ -166,18 +203,18 @@ const getDetailedSales = async (req, res) => {
         const params = [from, to];
 
         if (clientId) {
-            clientFilter = ` AND v.id_cliente = ?`;
+            clientFilter = ` AND v.id_cliente = ? `;
             params.push(clientId);
         }
 
         if (keyword && keyword.trim() !== '') {
-            keywordFilter = ` AND EXISTS (
-                SELECT 1 FROM detalle_ventas dv2
+            keywordFilter = ` AND EXISTS(
+    SELECT 1 FROM detalle_ventas dv2
                 JOIN productos p2 ON dv2.id_producto = p2.id_producto
                 WHERE dv2.id_venta = v.id_venta
-                AND (p2.nombre LIKE ? OR p2.codigo LIKE ?)
-            )`;
-            params.push(`%${keyword}%`, `%${keyword}%`);
+                AND(p2.nombre LIKE ? OR p2.codigo LIKE ?)
+)`;
+            params.push(`% ${keyword}% `, ` % ${keyword}% `);
         }
 
         // Filter by Wholesale status
@@ -186,34 +223,37 @@ const getDetailedSales = async (req, res) => {
         if (req.query.isWholesale === 'true') {
             keywordFilter += ` AND v.pago_detalles LIKE '%"isWholesale":true%'`;
         } else if (req.query.isWholesale === 'false') {
-            keywordFilter += ` AND (v.pago_detalles NOT LIKE '%"isWholesale":true%' OR v.pago_detalles IS NULL)`;
+            keywordFilter += ` AND(v.pago_detalles NOT LIKE '%"isWholesale":true%' OR v.pago_detalles IS NULL)`;
         }
 
         // OPTIMIZACIÓN: Rango directo en 'fecha' usa índice.
         const [sales] = await db.query(`
-            SELECT 
-                v.id_venta AS id,
-                v.fecha,
-                v.total_venta AS totalVenta,
-                v.subtotal,
-                v.descuento,
-                v.estado,
-                v.pago_detalles AS pagoDetalles,
-                v.tipo_venta,
-                v.id_usuario AS userId,
+SELECT
+v.id_venta AS id,
+    v.fecha,
+    v.total_venta AS totalVenta,
+        v.subtotal,
+        v.descuento,
+        v.estado,
+        v.pago_detalles AS pagoDetalles,
+            v.tipo_venta,
+            v.id_usuario AS userId,
                 v.id_cliente AS clientId,
-                c.nombre AS clienteNombre,
-                u.nombre_usuario AS vendedorNombre
+                    c.nombre AS clienteNombre,
+                        u.nombre_usuario AS vendedorNombre,
+                        v.id_empleado,
+                e.nombre AS empleado_nombre
             FROM ventas v
             LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
             LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
+            LEFT JOIN empleados e ON v.id_empleado = e.id_empleado
             WHERE v.fecha >= ? AND v.fecha <= ?
-            ${tipoFilter}
+    ${tipoFilter}
             ${clientFilter}
             ${keywordFilter}
             ORDER BY v.fecha DESC
             LIMIT 500
-        `, params);
+    `, params);
 
         if (!sales.length) return res.json([]);
 
@@ -221,17 +261,17 @@ const getDetailedSales = async (req, res) => {
 
         // Optimización: Traer detalles solo de las ventas filtradas
         const [details] = await db.query(`
-            SELECT 
-                dv.id_venta,
-                p.id_producto AS id,
-                p.nombre,
-                p.codigo,
-                dv.cantidad AS quantity,
-                dv.precio_unitario AS precio
+SELECT
+dv.id_venta,
+    p.id_producto AS id,
+        p.nombre,
+        p.codigo,
+        dv.cantidad AS quantity,
+            dv.precio_unitario AS precio
             FROM detalle_ventas dv
             JOIN productos p ON dv.id_producto = p.id_producto
-            WHERE dv.id_venta IN (?)
-        `, [saleIds]);
+            WHERE dv.id_venta IN(?)
+    `, [saleIds]);
 
         // Mapeo en memoria (O(N) en lugar de O(N^2) filter)
         // Agrupar detalles por venta
@@ -268,8 +308,8 @@ const getProductHistory = async (req, res) => {
             `SELECT id_producto, nombre, codigo, venta AS precio, costo, existencia 
              FROM productos 
              WHERE codigo = ? OR codigo LIKE ? OR nombre LIKE ?
-             LIMIT 20`,
-            [code, `%${code}%`, `%${code}%`]
+    LIMIT 20`,
+            [code, `% ${code}% `, ` % ${code}% `]
         );
         products = rows;
 
@@ -298,25 +338,25 @@ const getProductHistory = async (req, res) => {
             const placeHolders = productIds.map(() => '?').join(',');
 
             const sql = `
-                SELECT 
-                    v.id_venta AS idVenta,
-                    v.fecha,
-                    v.estado,
-                    v.tipo_venta,
-                    dv.cantidad,
-                    p.codigo AS codigoProducto,
-                    dv.precio_unitario AS precioUnitario,
-                    c.nombre AS clienteNombre,
-                    c.id_cliente AS clienteId,
+SELECT
+v.id_venta AS idVenta,
+    v.fecha,
+    v.estado,
+    v.tipo_venta,
+    dv.cantidad,
+    p.codigo AS codigoProducto,
+        dv.precio_unitario AS precioUnitario,
+            c.nombre AS clienteNombre,
+                c.id_cliente AS clienteId,
                     u.nombre_usuario AS vendedorNombre
                 FROM detalle_ventas dv
                 JOIN ventas v ON dv.id_venta = v.id_venta
                 JOIN productos p ON dv.id_producto = p.id_producto
                 LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
                 LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
-                WHERE dv.id_producto IN (${placeHolders})
+                WHERE dv.id_producto IN(${placeHolders})
                 ORDER BY v.fecha DESC
-            `;
+    `;
 
             // Pass flattened productIds array
             const [histResults] = await db.query(sql, productIds);
@@ -339,6 +379,7 @@ module.exports = {
     getSalesSummaryReport,
     getInventoryValueReport,
     getSalesByUserReport,
+    getSalesByEmployeeReport,
     getTopProductsReport,
     getSalesChartReport,
     getDetailedSales,

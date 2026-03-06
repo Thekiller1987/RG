@@ -45,6 +45,7 @@ const POS = () => {
   const [searchType, setSearchType] = useState('description');
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [modal, setModal] = useState({ name: null, data: null });
+  const [empleados, setEmpleados] = useState([]); // NUEVO: Estado de empleados
   const [ticketData, setTicketData] = useState(null); // State for the ticket to print
   const [shouldAutoTriggerPrint, setShouldAutoTriggerPrint] = useState(false); // Auto-print 80mm on open
   const [alert, setAlert] = useState({ isOpen: false, title: '', message: '' });
@@ -166,6 +167,22 @@ const POS = () => {
     if (initialProducts) setProductsState(initialProducts);
   }, [initialProducts]);
 
+  // NUEVO: Fetch Empleados
+  const fetchEmpleados = useCallback(async () => {
+    try {
+      if (!token) return;
+      const res = await api.getEmpleados(token);
+      if (res && res.data) setEmpleados(res.data);
+    } catch (e) {
+      console.warn("No se pudieron cargar los empleados.");
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchEmpleados();
+  }, [fetchEmpleados]);
+
+
   useEffect(() => {
     if (userId) {
       // 1. Initial Load: Get everything
@@ -200,6 +217,7 @@ const POS = () => {
     try {
       await refreshProducts();
       if (userId) await loadOrdersFromDB(userId);
+      fetchEmpleados(); // Recargar empleados
     } catch (e) { console.error("Error refreshing data", e); }
   };
 
@@ -919,6 +937,9 @@ const POS = () => {
             onFinishSale={handleFinishSale} // Corrected prop name
             tasaDolar={tasaDolar}
             clientes={clients || []} // Pass clients from auth context
+            users={allUsers}
+            empleados={empleados} // NUEVO: Pasar empleados al modal
+            initialClientId={activeOrder?.clientId}
             showAlert={showAlert} // Pass alert handler
           />
         )}
