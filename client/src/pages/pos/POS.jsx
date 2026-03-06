@@ -172,7 +172,8 @@ const POS = () => {
     try {
       if (!token) return;
       const res = await api.getEmpleados(token);
-      if (res && res.data) setEmpleados(res.data);
+      if (Array.isArray(res)) setEmpleados(res);
+      else if (res && res.data) setEmpleados(res.data);
     } catch (e) {
       console.warn("No se pudieron cargar los empleados.");
     }

@@ -79,7 +79,8 @@ const WholesalePOS = () => {
             if (!token) return;
             try {
                 const res = await api.getEmpleados(token);
-                if (res && res.data) setEmpleados(res.data);
+                if (Array.isArray(res)) setEmpleados(res);
+                else if (res && res.data) setEmpleados(res.data);
             } catch (error) {
                 console.warn("No se pudieron cargar los empleados.");
             }
