@@ -67,11 +67,25 @@ const WholesalePOS = () => {
     const searchRef = useRef(null);
 
     const [products, setProductsState] = useState([]); // Filtered list
+    const [empleados, setEmpleados] = useState([]); // NUEVO: State para empleados
 
     // Sounds
     const audioSuccess = useMemo(() => new Audio('/sounds/success.mp3'), []);
     const audioError = useMemo(() => new Audio('/sounds/error.mp3'), []);
     const audioBeep = useMemo(() => new Audio('/sounds/beep.wav'), []);
+
+    useEffect(() => {
+        const fetchEmpleados = async () => {
+            if (!token) return;
+            try {
+                const res = await api.getEmpleados(token);
+                if (res && res.data) setEmpleados(res.data);
+            } catch (error) {
+                console.warn("No se pudieron cargar los empleados.");
+            }
+        };
+        fetchEmpleados();
+    }, [token]);
 
     useEffect(() => {
         if (initialProducts) {
@@ -751,7 +765,7 @@ const WholesalePOS = () => {
 
                 {modal.name === 'caja' && <CajaModal isOpen={true} onClose={closeModal} isCajaOpen={isCajaOpen} session={cajaSession} isAdmin={isAdmin} showConfirmation={setConfirmation} showAlert={showAlert} refreshSession={refreshSession} />}
 
-                {modal.name === 'payment' && <PaymentModal isOpen={true} onClose={closeModal} total={total} onFinishSale={handleFinishSale} tasaDolar={tasaDolar} clients={clients} showAlert={showAlert} />}
+                {modal.name === 'payment' && <PaymentModal isOpen={true} onClose={closeModal} total={total} onFinishSale={handleFinishSale} tasaDolar={tasaDolar} clients={clients} empleados={empleados} showAlert={showAlert} />}
 
                 {ticketData && (
                     <TicketModal

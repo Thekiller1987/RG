@@ -1138,6 +1138,7 @@ const POS = () => {
             onAbonoSuccess={() => {
               console.log('Abono success');
             }}
+            empleados={empleados}
           />
         )}
 
