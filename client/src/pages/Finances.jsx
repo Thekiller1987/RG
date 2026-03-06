@@ -19,6 +19,7 @@ import {
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import AlertModal from './pos/components/AlertModal.jsx';
+import { API_URL } from '../service/api';
 
 // --- REGISTRO DE CHART.JS ---
 ChartJS.register(
@@ -344,22 +345,32 @@ const Finances = () => {
     }
 
     try {
-      const { default: api } = await import('../service/api'); // Lazy load api to avoid circular dependencies locally
-      const query = { params: { startDate, endDate } };
+      const headers = { 'Authorization': `Bearer ${token}` };
+      const qs = `?startDate=${startDate}&endDate=${endDate}`;
+
+      const safeFetch = async (endpoint) => {
+        try {
+          const res = await fetch(`${API_URL}${endpoint}`, { headers });
+          if (!res.ok) return null;
+          return await res.json();
+        } catch {
+          return null;
+        }
+      };
 
       const [resSum, resInv, resUser, resProd, resChart] = await Promise.all([
-        api.get('/reports/sales-summary', query).catch(() => ({ data: { ventas_brutas: 0, ganancia_total: 0 } })),
-        api.get('/reports/inventory-value').catch(() => ({ data: { valor_total_inventario: 0 } })),
-        api.get('/reports/sales-by-user', query).catch(() => ({ data: [] })),
-        api.get('/reports/top-products', query).catch(() => ({ data: [] })),
-        api.get('/reports/sales-chart', query).catch(() => ({ data: [] })),
+        safeFetch(`/reports/sales-summary${qs}`),
+        safeFetch(`/reports/inventory-value`),
+        safeFetch(`/reports/sales-by-user${qs}`),
+        safeFetch(`/reports/top-products${qs}`),
+        safeFetch(`/reports/sales-chart${qs}`),
       ]);
 
-      const dataSum = resSum.data || { ventas_brutas: 0, ganancia_total: 0 };
-      const dataInv = resInv.data || { valor_total_inventario: 0 };
-      const dataUser = Array.isArray(resUser.data) ? resUser.data : [];
-      const dataProd = Array.isArray(resProd.data) ? resProd.data : [];
-      const dataChart = Array.isArray(resChart.data) ? resChart.data : [];
+      const dataSum = resSum || { ventas_brutas: 0, ganancia_total: 0 };
+      const dataInv = resInv || { valor_total_inventario: 0 };
+      const dataUser = Array.isArray(resUser) ? resUser : [];
+      const dataProd = Array.isArray(resProd) ? resProd : [];
+      const dataChart = Array.isArray(resChart) ? resChart : [];
 
       setSalesSummary(dataSum);
       setInventoryValue(dataInv.valor_total_inventario || 0);
