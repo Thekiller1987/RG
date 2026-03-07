@@ -450,7 +450,7 @@ const FacturasProveedores = () => {
 
                 // 3. Cargar Historial Global de Abonos si está en esa vista
                 if (showGlobalHistory) {
-                    const hpData = await api.fetchProviderPaymentsReport(token, params);
+                    const hpData = await api.fetchProviderPaymentsReport(token, Object.keys(params).length ? params : undefined);
                     setGlobalHistoryData(Array.isArray(hpData) ? hpData : (hpData?.data || []));
                 }
 
