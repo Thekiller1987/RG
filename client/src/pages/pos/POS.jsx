@@ -356,6 +356,7 @@ const POS = () => {
       pagoDetalles,
       userId,
       clientId: Number(pagoDetalles.clienteId || 0),
+      empleadoId: pagoDetalles.empleadoId || null, // FIXED: Send empleadoId to root for salesController
       tasaDolarAlMomento: tasaDolar,
       originalOrderId: currentOrder?.serverSaleId || null
     };

@@ -322,6 +322,7 @@ const WholesalePOS = () => {
             subtotal: subtotal,
             descuento: discountAmount,
             totalVenta: total,
+            empleadoId: pagoDetalles.empleadoId || null, // FIXED: Send empleadoId to root for salesController
             isWholesale: true,
             isProReceipt: true // MARK AS PRO RECEIPT FOR WHOLESALE
         };
