@@ -12,7 +12,8 @@ const {
     getTopProductsReport,
     getSalesChartReport,
     getDetailedSales,
-    getProductHistory
+    getProductHistory,
+    getProviderPaymentsReport
 } = require('../controllers/reportController');
 
 // --- RUTAS PARA REPORTES ---
@@ -41,5 +42,8 @@ router.get('/detailed-sales', verifyToken, getDetailedSales);
 
 // GET /api/reports/product-history?code=...
 router.get('/product-history', verifyToken, getProductHistory);
+
+// GET /api/reports/provider-payments?startDate=...&endDate=...&proveedor=...
+router.get('/provider-payments', verifyToken, getProviderPaymentsReport);
 
 module.exports = router;

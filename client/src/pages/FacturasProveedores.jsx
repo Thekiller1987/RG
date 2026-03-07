@@ -398,8 +398,10 @@ const FacturasProveedores = () => {
     const [showPayModal, setShowPayModal] = useState(false);
     const [showConfirmDelete, setShowConfirmDelete] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [showGlobalHistory, setShowGlobalHistory] = useState(false); // NUEVO
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [historyData, setHistoryData] = useState([]);
+    const [globalHistoryData, setGlobalHistoryData] = useState([]); // NUEVO
     const [selectedInvoice, setSelectedInvoice] = useState(null);
 
     // Formularios
@@ -446,6 +448,12 @@ const FacturasProveedores = () => {
                 const provList = Array.isArray(provResponse.data) ? provResponse.data : (provResponse.data.data || []);
                 setProviders(provList);
 
+                // 3. Cargar Historial Global de Abonos si está en esa vista
+                if (showGlobalHistory) {
+                    const hpData = await api.fetchProviderPaymentsReport(token, params);
+                    setGlobalHistoryData(Array.isArray(hpData) ? hpData : (hpData?.data || []));
+                }
+
             } catch (err) {
                 console.error("Error cargando datos:", err);
                 // No mostrar alerta intrusiva inicial si falla silenciosamente, solo log
@@ -454,7 +462,7 @@ const FacturasProveedores = () => {
             }
         };
         if (token) loadData();
-    }, [token, refreshTrigger, filterDateFrom, filterDateTo]);
+    }, [token, refreshTrigger, filterDateFrom, filterDateTo, filterProvider, showGlobalHistory]);
 
     // --- LÓGICA DE PAGO (ADMINISTRATIVO) ---
     // Esta función NO valida si la caja está abierta, ya que es un proceso administrativo
@@ -715,260 +723,398 @@ const FacturasProveedores = () => {
                 </ActionButtons>
             </HeaderContainer>
 
-            {/* KPI CARDS */}
-            <StatsGrid>
-                <StatCard color="#ef4444" bg="#fef2f2">
-                    <div className="icon-wrapper"><FaExclamationCircle /></div>
-                    <div className="label">Vencidas</div>
-                    <div className="value">{stats.venc}</div>
-                    <div className="sub">Requieren atención urgente</div>
-                </StatCard>
-                <StatCard color="#ea580c" bg="#fff7ed">
-                    <div className="icon-wrapper"><FaClock /></div>
-                    <div className="label">Próximas a Vencer</div>
-                    <div className="value">{stats.prox}</div>
-                    <div className="sub">En los próx. 5 días</div>
-                </StatCard>
-                <StatCard color="#6366f1" bg="#eef2ff">
-                    <div className="icon-wrapper"><FaFileInvoiceDollar /></div>
-                    <div className="label">Total Facturas</div>
-                    <div className="value">{stats.totalCount}</div>
-                    <div className="sub">Registradas en sistema</div>
-                </StatCard>
-                <StatCard color="#3b82f6" bg="#eff6ff">
-                    <div className="icon-wrapper"><FaClock /></div>
-                    <div className="label">Pendientes</div>
-                    <div className="value">{stats.pend}</div>
-                    <div className="sub">Sin riesgo inmediato</div>
-                </StatCard>
-                <StatCard color="#f59e0b" bg="#fffbeb">
-                    <div className="icon-wrapper"><FaMoneyBillWave /></div>
-                    <div className="label">Deuda Total</div>
-                    <div className="value" style={{ color: '#b45309' }}>C${stats.totalDebt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                    <div className="sub" style={{ color: '#b45309' }}>Saldo Pendiente Global</div>
-                </StatCard>
-            </StatsGrid>
+            {/* TOGGLE VISTA PRINCIPAL VS REPORTE DE ABONOS */}
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '1rem' }}>
+                <button
+                    onClick={() => setShowGlobalHistory(false)}
+                    style={{
+                        padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', border: 'none',
+                        background: !showGlobalHistory ? '#3b82f6' : 'transparent',
+                        color: !showGlobalHistory ? 'white' : '#64748b',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    <FaFileInvoiceDollar style={{ marginRight: '8px' }} /> Control de Facturas (Deudas)
+                </button>
+                <button
+                    onClick={() => setShowGlobalHistory(true)}
+                    style={{
+                        padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', border: 'none',
+                        background: showGlobalHistory ? '#3b82f6' : 'transparent',
+                        color: showGlobalHistory ? 'white' : '#64748b',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    <FaList style={{ marginRight: '8px' }} /> Reporte de Egresos (Abonos & Pagos Históricos)
+                </button>
+            </div>
 
-            {/* TOOLBAR */}
-            <Toolbar>
-                <FilterTabs>
-                    {[
-                        { id: 'PENDIENTE', label: 'Por Pagar (Prox)', icon: FaClock, color: '#3b82f6', bg: '#eff6ff', count: stats.pend + stats.prox },
-                        { id: 'VENCIDA', label: 'Vencidas', icon: FaExclamationCircle, color: '#dc2626', bg: '#fef2f2', count: stats.venc },
-                        { id: 'PAGADA', label: 'Pagadas', icon: FaCheckCircle, color: '#16a34a', bg: '#f0fdf4', count: stats.pag },
-                        { id: 'BI', label: 'Resumen BI', icon: FaFilter, color: '#6366f1', bg: '#eef2ff', count: null },
-                        { id: 'TODAS', label: 'Todas', icon: FaList, color: '#64748b', bg: '#f1f5f9', count: null },
-                    ].map(tab => (
-                        <TabButton
-                            key={tab.id}
-                            active={filter === tab.id}
-                            activeColor={tab.color}
-                            activeBg={tab.bg}
-                            onClick={() => setFilter(tab.id)}
-                        >
-                            <tab.icon /> {tab.label}
-                            {tab.count !== null && <span className="badge">{tab.count}</span>}
-                        </TabButton>
-                    ))}
-                </FilterTabs>
+            {/* VISTA 1: CONTROL DE FACTURAS ORIGINAL */}
+            {!showGlobalHistory && (
+                <>
+                    {/* KPI CARDS */}
+                    <StatsGrid>
+                        <StatCard color="#ef4444" bg="#fef2f2">
+                            <div className="icon-wrapper"><FaExclamationCircle /></div>
+                            <div className="label">Vencidas</div>
+                            <div className="value">{stats.venc}</div>
+                            <div className="sub">Requieren atención urgente</div>
+                        </StatCard>
+                        <StatCard color="#ea580c" bg="#fff7ed">
+                            <div className="icon-wrapper"><FaClock /></div>
+                            <div className="label">Próximas a Vencer</div>
+                            <div className="value">{stats.prox}</div>
+                            <div className="sub">En los próx. 5 días</div>
+                        </StatCard>
+                        <StatCard color="#6366f1" bg="#eef2ff">
+                            <div className="icon-wrapper"><FaFileInvoiceDollar /></div>
+                            <div className="label">Total Facturas</div>
+                            <div className="value">{stats.totalCount}</div>
+                            <div className="sub">Registradas en sistema</div>
+                        </StatCard>
+                        <StatCard color="#3b82f6" bg="#eff6ff">
+                            <div className="icon-wrapper"><FaClock /></div>
+                            <div className="label">Pendientes</div>
+                            <div className="value">{stats.pend}</div>
+                            <div className="sub">Sin riesgo inmediato</div>
+                        </StatCard>
+                        <StatCard color="#f59e0b" bg="#fffbeb">
+                            <div className="icon-wrapper"><FaMoneyBillWave /></div>
+                            <div className="label">Deuda Total</div>
+                            <div className="value" style={{ color: '#b45309' }}>C${stats.totalDebt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                            <div className="sub" style={{ color: '#b45309' }}>Saldo Pendiente Global</div>
+                        </StatCard>
+                    </StatsGrid>
 
-                <SearchAndFilters>
-                    <SearchContainer>
-                        <FaSearch />
-                        <input
-                            type="text"
-                            placeholder="Buscar proveedor o No. factura..."
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                        />
-                    </SearchContainer>
-
-                    <FilterGroup style={{ minWidth: '180px' }}>
-                        <label>Ordenar Por</label>
-                        <select
-                            value={sortBy}
-                            onChange={e => setSortBy(e.target.value)}
-                        >
-                            <option value="vencimiento_asc">Vencen Primero (Próximas)</option>
-                            <option value="emision_desc">Emitidas Reciente (Nuevas)</option>
-                            <option value="emision_asc">Emitidas Antiguas (Viejas)</option>
-                        </select>
-                    </FilterGroup>
-
-                    <FilterGroup>
-                        <label>Proveedor</label>
-                        <select
-                            value={filterProvider}
-                            onChange={e => setFilterProvider(e.target.value)}
-                        >
-                            <option value="">Todos</option>
-                            {providers.map(p => (
-                                <option key={p.id_proveedor || p.id} value={p.nombre}>
-                                    {p.nombre}
-                                </option>
+                    {/* TOOLBAR */}
+                    <Toolbar>
+                        <FilterTabs>
+                            {[
+                                { id: 'PENDIENTE', label: 'Por Pagar (Prox)', icon: FaClock, color: '#3b82f6', bg: '#eff6ff', count: stats.pend + stats.prox },
+                                { id: 'VENCIDA', label: 'Vencidas', icon: FaExclamationCircle, color: '#dc2626', bg: '#fef2f2', count: stats.venc },
+                                { id: 'PAGADA', label: 'Pagadas', icon: FaCheckCircle, color: '#16a34a', bg: '#f0fdf4', count: stats.pag },
+                                { id: 'BI', label: 'Resumen BI', icon: FaFilter, color: '#6366f1', bg: '#eef2ff', count: null },
+                                { id: 'TODAS', label: 'Todas', icon: FaList, color: '#64748b', bg: '#f1f5f9', count: null },
+                            ].map(tab => (
+                                <TabButton
+                                    key={tab.id}
+                                    active={filter === tab.id}
+                                    activeColor={tab.color}
+                                    activeBg={tab.bg}
+                                    onClick={() => setFilter(tab.id)}
+                                >
+                                    <tab.icon /> {tab.label}
+                                    {tab.count !== null && <span className="badge">{tab.count}</span>}
+                                </TabButton>
                             ))}
-                        </select>
-                    </FilterGroup>
+                        </FilterTabs>
 
-                    <FilterGroup style={{ minWidth: '140px' }}>
-                        <label>Desde</label>
-                        <input
-                            type="date"
-                            value={filterDateFrom}
-                            onChange={e => setFilterDateFrom(e.target.value)}
-                        // Usamos el placeholder nativo, pero el valor debe ser YYYY-MM-DD
-                        />
-                    </FilterGroup>
+                        <SearchAndFilters>
+                            <SearchContainer>
+                                <FaSearch />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar proveedor o No. factura..."
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                />
+                            </SearchContainer>
 
-                    <FilterGroup style={{ minWidth: '140px' }}>
-                        <label>Hasta</label>
-                        <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} />
-                    </FilterGroup>
-                </SearchAndFilters>
-            </Toolbar>
+                            <FilterGroup style={{ minWidth: '180px' }}>
+                                <label>Ordenar Por</label>
+                                <select
+                                    value={sortBy}
+                                    onChange={e => setSortBy(e.target.value)}
+                                >
+                                    <option value="vencimiento_asc">Vencen Primero (Próximas)</option>
+                                    <option value="emision_desc">Emitidas Reciente (Nuevas)</option>
+                                    <option value="emision_asc">Emitidas Antiguas (Viejas)</option>
+                                </select>
+                            </FilterGroup>
 
-            {/* GRID FACTURAS */}
-            {loading ? (
-                <div style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>
-                    <FaClock className="spin" style={{ fontSize: '2rem', marginBottom: '1rem' }} />
-                    <p>Cargando información...</p>
-                </div>
-            ) : filteredInvoices.length > 0 ? (
-                <InvoicesGrid>
-                    {filteredInvoices.map(inv => {
-                        const status = inv.effectiveStatus; // Usamos la calculada
-                        const styles = getStatusStyles(status);
-                        const total = parseFloat(inv.monto_total) || 0;
-                        const abonado = parseFloat(inv.monto_abonado) || 0;
-                        const saldo = total - abonado;
-                        const progress = total > 0 ? (abonado / total) * 100 : 0;
-                        const reference = status === 'PAGADA' ? inv.referencia_pago : null;
+                            <FilterGroup>
+                                <label>Proveedor</label>
+                                <select
+                                    value={filterProvider}
+                                    onChange={e => setFilterProvider(e.target.value)}
+                                >
+                                    <option value="">Todos</option>
+                                    {providers.map(p => (
+                                        <option key={p.id_proveedor || p.id} value={p.nombre}>
+                                            {p.nombre}
+                                        </option>
+                                    ))}
+                                </select>
+                            </FilterGroup>
 
-                        return (
-                            <InvoiceCard key={inv.id} color={styles.color} balanceColor={saldo > 0 ? '#ef4444' : '#16a34a'}>
-                                <div className="card-header">
-                                    <div className="provider-info">
-                                        <h3 title={inv.proveedor}>
-                                            <FaStore style={{ marginRight: 6, color: '#94a3b8' }} /> {inv.proveedor}
-                                        </h3>
-                                        <span className="invoice-number">#{inv.numero_factura}</span>
-                                    </div>
-                                    <StatusBadge bg={styles.bg} text={styles.color}>{styles.label}</StatusBadge>
-                                </div>
+                            <FilterGroup style={{ minWidth: '140px' }}>
+                                <label>Desde</label>
+                                <input
+                                    type="date"
+                                    value={filterDateFrom}
+                                    onChange={e => setFilterDateFrom(e.target.value)}
+                                // Usamos el placeholder nativo, pero el valor debe ser YYYY-MM-DD
+                                />
+                            </FilterGroup>
 
-                                <div className="card-body">
-                                    <div className="meta-row">
-                                        <span className="label"><FaCalendarAlt /> Emisión</span>
-                                        {/* Usamos el helper formatManagua */}
-                                        <span className="value">{formatDateManagua(inv.fecha_emision)}</span>
-                                    </div>
-                                    <div className="meta-row">
-                                        <span className="label"><FaExclamationCircle /> Vence</span>
-                                        <span className="value" style={{ color: inv.estado === 'VENCIDA' ? '#ef4444' : 'inherit' }}>
-                                            {formatDateManagua(inv.fecha_vencimiento)}
-                                        </span>
-                                    </div>
-                                    {reference && (
-                                        <div className="meta-row">
-                                            <span className="label"><FaReceipt /> Referencia</span>
-                                            <span className="value">{reference}</span>
+                            <FilterGroup style={{ minWidth: '140px' }}>
+                                <label>Hasta</label>
+                                <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} />
+                            </FilterGroup>
+                        </SearchAndFilters>
+                    </Toolbar>
+
+                    {/* GRID FACTURAS */}
+                    {loading ? (
+                        <div style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>
+                            <FaClock className="spin" style={{ fontSize: '2rem', marginBottom: '1rem' }} />
+                            <p>Cargando información...</p>
+                        </div>
+                    ) : filteredInvoices.length > 0 ? (
+                        <InvoicesGrid>
+                            {filteredInvoices.map(inv => {
+                                const status = inv.effectiveStatus; // Usamos la calculada
+                                const styles = getStatusStyles(status);
+                                const total = parseFloat(inv.monto_total) || 0;
+                                const abonado = parseFloat(inv.monto_abonado) || 0;
+                                const saldo = total - abonado;
+                                const progress = total > 0 ? (abonado / total) * 100 : 0;
+                                const reference = status === 'PAGADA' ? inv.referencia_pago : null;
+
+                                return (
+                                    <InvoiceCard key={inv.id} color={styles.color} balanceColor={saldo > 0 ? '#ef4444' : '#16a34a'}>
+                                        <div className="card-header">
+                                            <div className="provider-info">
+                                                <h3 title={inv.proveedor}>
+                                                    <FaStore style={{ marginRight: 6, color: '#94a3b8' }} /> {inv.proveedor}
+                                                </h3>
+                                                <span className="invoice-number">#{inv.numero_factura}</span>
+                                            </div>
+                                            <StatusBadge bg={styles.bg} text={styles.color}>{styles.label}</StatusBadge>
                                         </div>
+
+                                        <div className="card-body">
+                                            <div className="meta-row">
+                                                <span className="label"><FaCalendarAlt /> Emisión</span>
+                                                {/* Usamos el helper formatManagua */}
+                                                <span className="value">{formatDateManagua(inv.fecha_emision)}</span>
+                                            </div>
+                                            <div className="meta-row">
+                                                <span className="label"><FaExclamationCircle /> Vence</span>
+                                                <span className="value" style={{ color: inv.estado === 'VENCIDA' ? '#ef4444' : 'inherit' }}>
+                                                    {formatDateManagua(inv.fecha_vencimiento)}
+                                                </span>
+                                            </div>
+                                            {reference && (
+                                                <div className="meta-row">
+                                                    <span className="label"><FaReceipt /> Referencia</span>
+                                                    <span className="value">{reference}</span>
+                                                </div>
+                                            )}
+
+                                            <div className="financial-block">
+                                                <div className="total-row">
+                                                    <span className="label">Total a Pagar</span>
+                                                    <span className="amount">C${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                </div>
+                                                <div className="progress-bar">
+                                                    <div style={{ width: `${progress}%`, background: styles.color }}></div>
+                                                </div>
+                                                <div className="balance-text">
+                                                    Abonado: C${abonado.toLocaleString(undefined, { minimumFractionDigits: 2 })} &bull; <strong>Resta: C${saldo.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="card-footer" style={{ flexWrap: 'wrap' }}>
+                                            {saldo > 0 && (
+                                                <Button $primary style={{ flex: 1, justifyContent: 'center' }} onClick={() => openPayModal(inv)}>
+                                                    <FaMoneyBillWave /> Abonar
+                                                </Button>
+                                            )}
+                                            <Button $secondary style={{ flex: 1, justifyContent: 'center' }} onClick={() => openHistoryModal(inv)}>
+                                                <FaList /> Historial
+                                            </Button>
+                                            <Button $danger style={{ padding: '0.75rem' }} onClick={() => { setSelectedInvoice(inv); setShowConfirmDelete(true); }}>
+                                                <FaTrashAlt />
+                                            </Button>
+                                        </div>
+                                    </InvoiceCard>
+                                );
+                            })}
+                        </InvoicesGrid>
+                    ) : filter === 'BI' ? (
+                        <BISummaryContainer>
+                            <BISummaryHeader>
+                                <h3><FaFilter /> Resumen de Razonamiento de Negocio</h3>
+                                {filterDateFrom && filterDateTo && (
+                                    <span className="date-range">
+                                        {formatDateManagua(filterDateFrom)} - {formatDateManagua(filterDateTo)}
+                                    </span>
+                                )}
+                            </BISummaryHeader>
+                            <BITable>
+                                <thead>
+                                    <tr>
+                                        <th>Proveedor</th>
+                                        <th style={{ textAlign: 'center' }}>Facturas</th>
+                                        <th style={{ textAlign: 'right' }}>Total Comprado</th>
+                                        <th style={{ textAlign: 'right' }}>Pagado</th>
+                                        <th style={{ textAlign: 'right' }}>Saldo Pendiente</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {biSummary.map(item => (
+                                        <tr key={item.provider}>
+                                            <td className="provider-name">{item.provider}</td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                <span className="count-badge">{item.count}</span>
+                                            </td>
+                                            <td className="amount">C${item.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                            <td className="amount" style={{ color: '#16a34a' }}>C${item.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                            <td className="amount" style={{ color: (item.totalAmount - item.totalPaid) > 0.1 ? '#ef4444' : '#16a34a' }}>
+                                                C${(item.totalAmount - item.totalPaid).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {biSummary.length === 0 && (
+                                        <tr>
+                                            <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                                                No hay datos para el período seleccionado.
+                                            </td>
+                                        </tr>
                                     )}
+                                </tbody>
+                                {biSummary.length > 0 && (
+                                    <tfoot>
+                                        <tr style={{ background: '#f8fafc', fontWeight: '900' }}>
+                                            <td colSpan="2" style={{ textAlign: 'right', textTransform: 'uppercase', fontSize: '0.8rem', color: '#64748b' }}>Totales Globales:</td>
+                                            <td className="amount">C${biSummary.reduce((acc, curr) => acc + curr.totalAmount, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                            <td className="amount">C${biSummary.reduce((acc, curr) => acc + curr.totalPaid, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                            <td className="amount" style={{ color: '#ef4444' }}>C${(biSummary.reduce((acc, curr) => acc + curr.totalAmount, 0) - biSummary.reduce((acc, curr) => acc + curr.totalPaid, 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                        </tr>
+                                    </tfoot>
+                                )}
+                            </BITable>
+                        </BISummaryContainer>
+                    ) : (
+                        <div style={{
+                            textAlign: 'center', padding: '4rem', color: '#94a3b8',
+                            border: '2px dashed #e2e8f0', borderRadius: '24px', background: 'white'
+                        }}>
+                            <FaFileInvoiceDollar style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.3 }} />
+                            <h3 style={{ color: '#475569' }}>No se encontraron facturas</h3>
+                            <p>Intenta ajustar los filtros o registra una nueva.</p>
+                        </div>
+                    )}
+                </>
+            )}
 
-                                    <div className="financial-block">
-                                        <div className="total-row">
-                                            <span className="label">Total a Pagar</span>
-                                            <span className="amount">C${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                        </div>
-                                        <div className="progress-bar">
-                                            <div style={{ width: `${progress}%`, background: styles.color }}></div>
-                                        </div>
-                                        <div className="balance-text">
-                                            Abonado: C${abonado.toLocaleString(undefined, { minimumFractionDigits: 2 })} &bull; <strong>Resta: C${saldo.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
-                                        </div>
-                                    </div>
-                                </div>
+            {/* VISTA 2: REPORTE GLOBAL DE ABONOS */}
+            {showGlobalHistory && (
+                <>
+                    <Toolbar>
+                        <SearchAndFilters style={{ width: '100%' }}>
+                            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#3b82f6', fontWeight: '800' }}>
+                                <FaFilter /> Filtros del Reporte:
+                            </div>
+                            <FilterGroup>
+                                <label>Proveedor</label>
+                                <select value={filterProvider} onChange={e => setFilterProvider(e.target.value)}>
+                                    <option value="">TODOS</option>
+                                    {providers.map(p => (
+                                        <option key={p.id_proveedor || p.id} value={p.nombre}>{p.nombre}</option>
+                                    ))}
+                                </select>
+                            </FilterGroup>
+                            <FilterGroup style={{ minWidth: '140px' }}>
+                                <label>Desde</label>
+                                <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} />
+                            </FilterGroup>
+                            <FilterGroup style={{ minWidth: '140px' }}>
+                                <label>Hasta</label>
+                                <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} />
+                            </FilterGroup>
+                            <Button $secondary onClick={() => setRefreshTrigger(prev => prev + 1)} style={{ alignSelf: 'flex-end', height: '42px' }}>
+                                Aplicar Filtros
+                            </Button>
+                        </SearchAndFilters>
+                    </Toolbar>
 
-                                <div className="card-footer" style={{ flexWrap: 'wrap' }}>
-                                    {saldo > 0 && (
-                                        <Button $primary style={{ flex: 1, justifyContent: 'center' }} onClick={() => openPayModal(inv)}>
-                                            <FaMoneyBillWave /> Abonar
-                                        </Button>
-                                    )}
-                                    <Button $secondary style={{ flex: 1, justifyContent: 'center' }} onClick={() => openHistoryModal(inv)}>
-                                        <FaList /> Historial
-                                    </Button>
-                                    <Button $danger style={{ padding: '0.75rem' }} onClick={() => { setSelectedInvoice(inv); setShowConfirmDelete(true); }}>
-                                        <FaTrashAlt />
-                                    </Button>
-                                </div>
-                            </InvoiceCard>
-                        );
-                    })}
-                </InvoicesGrid>
-            ) : filter === 'BI' ? (
-                <BISummaryContainer>
-                    <BISummaryHeader>
-                        <h3><FaFilter /> Resumen de Razonamiento de Negocio</h3>
-                        {filterDateFrom && filterDateTo && (
-                            <span className="date-range">
-                                {formatDateManagua(filterDateFrom)} - {formatDateManagua(filterDateTo)}
-                            </span>
-                        )}
-                    </BISummaryHeader>
-                    <BITable>
-                        <thead>
-                            <tr>
-                                <th>Proveedor</th>
-                                <th style={{ textAlign: 'center' }}>Facturas</th>
-                                <th style={{ textAlign: 'right' }}>Total Comprado</th>
-                                <th style={{ textAlign: 'right' }}>Pagado</th>
-                                <th style={{ textAlign: 'right' }}>Saldo Pendiente</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {biSummary.map(item => (
-                                <tr key={item.provider}>
-                                    <td className="provider-name">{item.provider}</td>
-                                    <td style={{ textAlign: 'center' }}>
-                                        <span className="count-badge">{item.count}</span>
-                                    </td>
-                                    <td className="amount">C${item.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                    <td className="amount" style={{ color: '#16a34a' }}>C${item.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                    <td className="amount" style={{ color: (item.totalAmount - item.totalPaid) > 0.1 ? '#ef4444' : '#16a34a' }}>
-                                        C${(item.totalAmount - item.totalPaid).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                    </td>
-                                </tr>
-                            ))}
-                            {biSummary.length === 0 && (
-                                <tr>
-                                    <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
-                                        No hay datos para el período seleccionado.
-                                    </td>
-                                </tr>
+                    <BISummaryContainer>
+                        <BISummaryHeader>
+                            <h3><FaMoneyBillWave /> Listado de Pagos y Abonos Efectuados</h3>
+                            {(filterDateFrom || filterDateTo) && (
+                                <span className="date-range">
+                                    {filterDateFrom ? formatDateManagua(filterDateFrom) : 'Inicio'} - {filterDateTo ? formatDateManagua(filterDateTo) : 'Hoy'}
+                                </span>
                             )}
-                        </tbody>
-                        {biSummary.length > 0 && (
-                            <tfoot>
-                                <tr style={{ background: '#f8fafc', fontWeight: '900' }}>
-                                    <td colSpan="2" style={{ textAlign: 'right', textTransform: 'uppercase', fontSize: '0.8rem', color: '#64748b' }}>Totales Globales:</td>
-                                    <td className="amount">C${biSummary.reduce((acc, curr) => acc + curr.totalAmount, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                    <td className="amount">C${biSummary.reduce((acc, curr) => acc + curr.totalPaid, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                    <td className="amount" style={{ color: '#ef4444' }}>C${(biSummary.reduce((acc, curr) => acc + curr.totalAmount, 0) - biSummary.reduce((acc, curr) => acc + curr.totalPaid, 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                </tr>
-                            </tfoot>
+                        </BISummaryHeader>
+                        {loading ? (
+                            <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                                <FaClock className="spin" style={{ fontSize: '2rem', marginBottom: '1rem' }} />
+                                <p>Cargando información...</p>
+                            </div>
+                        ) : (
+                            <div style={{ overflowX: 'auto' }}>
+                                <BITable>
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha Abono</th>
+                                            <th>Factura</th>
+                                            <th>Proveedor</th>
+                                            <th>Método</th>
+                                            <th>Referencia / Detalle</th>
+                                            <th style={{ textAlign: 'center' }}>Modo de Compra</th>
+                                            <th style={{ textAlign: 'right' }}>Monto Pagado (C$)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {globalHistoryData.map((abono) => (
+                                            <tr key={abono.abono_id}>
+                                                <td>{formatDateManagua(abono.fecha_abono)}</td>
+                                                <td><b>#{abono.numero_factura}</b></td>
+                                                <td>{abono.proveedor}</td>
+                                                <td><StatusBadge bg="#f1f5f9" text="#475569">{abono.metodo_pago}</StatusBadge></td>
+                                                <td>{abono.referencia || '-'}</td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <StatusBadge
+                                                        bg={abono.tipo_compra === 'CONTADO' ? '#dcfce7' : '#eef2ff'}
+                                                        text={abono.tipo_compra === 'CONTADO' ? '#16a34a' : '#4f46e5'}>
+                                                        {abono.tipo_compra}
+                                                    </StatusBadge>
+                                                </td>
+                                                <td className="amount" style={{ color: '#16a34a' }}>
+                                                    C${parseFloat(abono.monto).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {globalHistoryData.length === 0 && (
+                                            <tr>
+                                                <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                                                    No hay registro de abonos o pagos en este período.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                    {globalHistoryData.length > 0 && (
+                                        <tfoot>
+                                            <tr style={{ background: '#f8fafc', fontWeight: '900' }}>
+                                                <td colSpan="6" style={{ textAlign: 'right', textTransform: 'uppercase', fontSize: '0.8rem', color: '#64748b' }}>
+                                                    Total Egresos (Abonos + Pagos de Contado):
+                                                </td>
+                                                <td className="amount" style={{ color: '#16a34a', fontSize: '1.2rem' }}>
+                                                    C${globalHistoryData.reduce((acc, curr) => acc + parseFloat(curr.monto), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    )}
+                                </BITable>
+                            </div>
                         )}
-                    </BITable>
-                </BISummaryContainer>
-            ) : (
-                <div style={{
-                    textAlign: 'center', padding: '4rem', color: '#94a3b8',
-                    border: '2px dashed #e2e8f0', borderRadius: '24px', background: 'white'
-                }}>
-                    <FaFileInvoiceDollar style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.3 }} />
-                    <h3 style={{ color: '#475569' }}>No se encontraron facturas</h3>
-                    <p>Intenta ajustar los filtros o registra una nueva.</p>
-                </div>
+                    </BISummaryContainer>
+
+                </>
             )}
 
             {/* --- MODAL CREAR FACTURA --- */}

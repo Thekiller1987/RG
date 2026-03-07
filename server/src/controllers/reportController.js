@@ -379,6 +379,45 @@ v.id_venta AS idVenta,
     }
 };
 
+// --- REPORTE ABONOS A PROVEEDORES ---
+const getProviderPaymentsReport = async (req, res) => {
+    const { startDate, endDate, proveedor } = req.query;
+    if (!startDate || !endDate) return res.status(400).json({ msg: 'Fechas requeridas.' });
+
+    try {
+        const { from, to } = getDateRange(startDate, endDate);
+
+        let sql = `
+            SELECT 
+                a.id AS abono_id,
+                a.monto,
+                a.metodo_pago,
+                a.referencia,
+                a.fecha AS fecha_abono,
+                f.numero_factura,
+                f.proveedor,
+                f.tipo_compra
+            FROM abonos_proveedores a
+            JOIN facturas_proveedores f ON a.id_factura = f.id
+            WHERE a.fecha >= ? AND a.fecha <= ?
+        `;
+        const queryParams = [from, to];
+
+        if (proveedor && proveedor !== 'TODOS' && proveedor !== '') {
+            sql += ' AND f.proveedor = ?';
+            queryParams.push(proveedor);
+        }
+
+        sql += ' ORDER BY a.fecha DESC';
+
+        const [results] = await db.query(sql, queryParams);
+        res.json(results);
+    } catch (error) {
+        console.error('Error en reporte de abonos a proveedores:', error);
+        res.status(500).json({ msg: 'Error en el servidor al cargar abonos de proveedores.' });
+    }
+}
+
 module.exports = {
     getSalesSummaryReport,
     getInventoryValueReport,
@@ -387,5 +426,6 @@ module.exports = {
     getTopProductsReport,
     getSalesChartReport,
     getDetailedSales,
-    getProductHistory
+    getProductHistory,
+    getProviderPaymentsReport
 };

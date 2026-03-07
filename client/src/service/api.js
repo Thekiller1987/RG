@@ -355,6 +355,10 @@ export const fetchTopProductsReport = (token, params) => {
     return request('get', '/reports/top-products', token, null, { params });
 };
 
+export const fetchProviderPaymentsReport = (token, params) => {
+    return request('get', '/reports/provider-payments', token, null, { params });
+};
+
 export const fetchSalesChartReport = (token, params) => {
     return request('get', '/reports/sales-chart', token, null, { params });
 };
