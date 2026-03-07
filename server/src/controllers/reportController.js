@@ -96,7 +96,7 @@ LEFT JOIN empleados AS e ON v.id_empleado = e.id_empleado
 WHERE
     v.estado = 'COMPLETADA' 
     AND v.fecha >= ? AND v.fecha <= ?
-GROUP BY nombre_usuario 
+GROUP BY 1
 ORDER BY total_vendido DESC;
 `;
         const [results] = await db.query(sql, [from, to]);
