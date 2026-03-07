@@ -397,6 +397,9 @@ const FacturasProveedores = () => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showPayModal, setShowPayModal] = useState(false);
     const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+    const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+    const [historyData, setHistoryData] = useState([]);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
 
     // Formularios
@@ -407,10 +410,13 @@ const FacturasProveedores = () => {
         fecha_emision: getTodayManaguaISO(),
         fecha_vencimiento: '',
         monto_total: '',
-        notas: ''
+        notas: '',
+        tipo_compra: 'CREDITO',
+        metodo_pago: 'EFECTIVO',
+        referencia: ''
     });
 
-    const [payData, setPayData] = useState({ amount: '', reference: '' });
+    const [payData, setPayData] = useState({ amount: '', reference: '', method: 'EFECTIVO' });
 
     // --- HELPER ALERTAS ---
     const showAlert = (title, message, type = 'info') => {
@@ -426,6 +432,7 @@ const FacturasProveedores = () => {
                 const params = {};
                 if (filterDateFrom) params.startDate = filterDateFrom;
                 if (filterDateTo) params.endDate = filterDateTo;
+                if (filterProvider && filterProvider !== '') params.proveedor = filterProvider;
 
                 const invResponse = await api.fetchProviderInvoices(token, Object.keys(params).length ? params : undefined);
                 // Aseguramos que sea array
@@ -454,7 +461,7 @@ const FacturasProveedores = () => {
     // y no afecta el arqueo diario (a menos que el backend lo vincule explícitamente).
     const openPayModal = (invoice) => {
         setSelectedInvoice(invoice);
-        setPayData({ amount: '', reference: '' });
+        setPayData({ amount: '', reference: '', method: 'EFECTIVO' });
         setShowPayModal(true);
     };
 
@@ -473,7 +480,12 @@ const FacturasProveedores = () => {
         const newStatus = isFullPayment ? 'PAGADA' : selectedInvoice.estado;
 
         try {
-            await api.payProviderInvoice(selectedInvoice.id, payAmount, payData.reference, newStatus, token);
+            await api.payProviderInvoice(selectedInvoice.id, {
+                amount: payAmount,
+                reference: payData.reference,
+                method: payData.method,
+                status: newStatus
+            }, token);
             setRefreshTrigger(prev => prev + 1);
             setShowPayModal(false);
             showAlert("Pago Registrado", `Se registró el abono correctamente. Estado: ${newStatus}`, "success");
@@ -496,7 +508,8 @@ const FacturasProveedores = () => {
             setFormData({
                 proveedor: '', numero_factura: '',
                 fecha_emision: getTodayManaguaISO(),
-                fecha_vencimiento: '', monto_total: '', notas: ''
+                fecha_vencimiento: '', monto_total: '', notas: '',
+                tipo_compra: 'CREDITO', metodo_pago: 'EFECTIVO', referencia: ''
             });
             showAlert("Guardado", "La factura ha sido registrada exitosamente.", "success");
         } catch (error) {
@@ -514,6 +527,22 @@ const FacturasProveedores = () => {
             showAlert("Eliminada", "La factura fue eliminada del sistema.", "success");
         } catch (error) {
             showAlert("Error", "No se pudo eliminar la factura.", "error");
+        }
+    };
+
+    // --- VER HISTORIAL DE ABONOS ---
+    const openHistoryModal = async (invoice) => {
+        setSelectedInvoice(invoice);
+        setShowHistoryModal(true);
+        setLoadingHistory(true);
+        setHistoryData([]);
+        try {
+            const data = await api.fetchProviderInvoicePayments(invoice.id, token);
+            setHistoryData(Array.isArray(data) ? data : (data?.data || []));
+        } catch (error) {
+            showAlert("Error", "No se pudo cargar el historial de abonos.", "error");
+        } finally {
+            setLoadingHistory(false);
         }
     };
 
@@ -860,12 +889,15 @@ const FacturasProveedores = () => {
                                     </div>
                                 </div>
 
-                                <div className="card-footer">
+                                <div className="card-footer" style={{ flexWrap: 'wrap' }}>
                                     {saldo > 0 && (
                                         <Button $primary style={{ flex: 1, justifyContent: 'center' }} onClick={() => openPayModal(inv)}>
                                             <FaMoneyBillWave /> Abonar
                                         </Button>
                                     )}
+                                    <Button $secondary style={{ flex: 1, justifyContent: 'center' }} onClick={() => openHistoryModal(inv)}>
+                                        <FaList /> Historial
+                                    </Button>
                                     <Button $danger style={{ padding: '0.75rem' }} onClick={() => { setSelectedInvoice(inv); setShowConfirmDelete(true); }}>
                                         <FaTrashAlt />
                                     </Button>
@@ -981,6 +1013,34 @@ const FacturasProveedores = () => {
                                     <input required type="date" value={formData.fecha_vencimiento} onChange={e => setFormData({ ...formData, fecha_vencimiento: e.target.value })} />
                                 </FormGroup>
                             </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: '#f8fafc', padding: '1rem', borderRadius: '12px', marginBottom: '1.25rem', border: '1px solid #e2e8f0' }}>
+                                <FormGroup style={{ marginBottom: 0 }}>
+                                    <label>Tipo de Compra</label>
+                                    <select required value={formData.tipo_compra} onChange={e => setFormData({ ...formData, tipo_compra: e.target.value })}>
+                                        <option value="CREDITO">A Crédito</option>
+                                        <option value="CONTADO">De Contado</option>
+                                    </select>
+                                </FormGroup>
+                                {formData.tipo_compra === 'CONTADO' && (
+                                    <FormGroup style={{ marginBottom: 0 }}>
+                                        <label>Método de Pago</label>
+                                        <select required value={formData.metodo_pago} onChange={e => setFormData({ ...formData, metodo_pago: e.target.value })}>
+                                            <option value="EFECTIVO">Efectivo</option>
+                                            <option value="TARJETA">Tarjeta</option>
+                                            <option value="TRANSFERENCIA">Transferencia</option>
+                                            <option value="CHEQUE">Cheque</option>
+                                        </select>
+                                    </FormGroup>
+                                )}
+                            </div>
+
+                            {formData.tipo_compra === 'CONTADO' && (
+                                <FormGroup>
+                                    <label>Referencia de Pago (Transferencia, Cheque, etc.)</label>
+                                    <input type="text" value={formData.referencia} onChange={e => setFormData({ ...formData, referencia: e.target.value })} placeholder="Opcional..." />
+                                </FormGroup>
+                            )}
+
                             <FormGroup>
                                 <label>Notas (Opcional)</label>
                                 <textarea rows="3" value={formData.notas} onChange={e => setFormData({ ...formData, notas: e.target.value })} placeholder="Detalles extra..."></textarea>
@@ -1020,6 +1080,15 @@ const FacturasProveedores = () => {
                                 />
                             </FormGroup>
                             <FormGroup>
+                                <label>Método de Pago</label>
+                                <select required value={payData.method} onChange={e => setPayData({ ...payData, method: e.target.value })}>
+                                    <option value="EFECTIVO">Efectivo</option>
+                                    <option value="TARJETA">Tarjeta</option>
+                                    <option value="TRANSFERENCIA">Transferencia</option>
+                                    <option value="CHEQUE">Cheque</option>
+                                </select>
+                            </FormGroup>
+                            <FormGroup>
                                 <label>Referencia / Detalle (Opcional)</label>
                                 <input
                                     type="text"
@@ -1051,6 +1120,65 @@ const FacturasProveedores = () => {
                             <Button $secondary onClick={() => setShowConfirmDelete(false)} style={{ flex: 1 }}>Cancelar</Button>
                             <Button $danger onClick={handleDelete} style={{ flex: 1 }}>Sí, Eliminar</Button>
                         </div>
+                    </ModalContent>
+                </ModalOverlay>
+            )}
+
+            {/* --- MODAL HISTORIAL DE ABONOS --- */}
+            {showHistoryModal && (
+                <ModalOverlay onClick={() => setShowHistoryModal(false)}>
+                    <ModalContent onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+                        <CloseButton onClick={() => setShowHistoryModal(false)}><FaTimes /></CloseButton>
+                        <h2>Historial de Abonos</h2>
+                        <div style={{ background: '#f1f5f9', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <div style={{ fontSize: '0.9rem', color: '#64748b' }}>Factura #{selectedInvoice?.numero_factura}</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#1e293b' }}>{selectedInvoice?.proveedor}</div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '0.9rem', color: '#64748b' }}>Abonado Total</div>
+                                <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#16a34a' }}>C${(parseFloat(selectedInvoice?.monto_abonado) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                            </div>
+                        </div>
+
+                        {loadingHistory ? (
+                            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                                <FaClock className="spin" style={{ fontSize: '1.5rem', marginBottom: '1rem' }} />
+                                <p>Cargando historial...</p>
+                            </div>
+                        ) : historyData.length > 0 ? (
+                            <div style={{ overflowX: 'auto' }}>
+                                <BITable>
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Método</th>
+                                            <th>Referencia</th>
+                                            <th style={{ textAlign: 'right' }}>Monto</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {historyData.map((abono, idx) => (
+                                            <tr key={idx}>
+                                                <td>{formatDateManagua(abono.fecha)}</td>
+                                                <td>
+                                                    <StatusBadge bg="#f1f5f9" text="#475569">{abono.metodo_pago}</StatusBadge>
+                                                </td>
+                                                <td>{abono.referencia || '-'}</td>
+                                                <td className="amount" style={{ color: '#16a34a' }}>
+                                                    C${parseFloat(abono.monto).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </BITable>
+                            </div>
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8', border: '1px dashed #cbd5e1', borderRadius: '16px' }}>
+                                <FaMoneyBillWave style={{ fontSize: '2rem', marginBottom: '1rem', opacity: 0.5 }} />
+                                <p>No existen abonos registrados para esta factura.</p>
+                            </div>
+                        )}
                     </ModalContent>
                 </ModalOverlay>
             )}

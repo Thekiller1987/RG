@@ -3,13 +3,18 @@ const db = require('../config/db');
 // Obtener todas las facturas
 exports.getInvoices = async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
-    let query = 'SELECT * FROM facturas_proveedores';
+    const { startDate, endDate, proveedor } = req.query;
+    let query = 'SELECT * FROM facturas_proveedores WHERE 1=1';
     const queryParams = [];
 
     if (startDate && endDate) {
-      query += ' WHERE fecha_emision BETWEEN ? AND ?';
+      query += ' AND fecha_emision BETWEEN ? AND ?';
       queryParams.push(startDate, endDate);
+    }
+
+    if (proveedor && proveedor !== '') {
+      query += ' AND proveedor = ?';
+      queryParams.push(proveedor);
     }
 
     query += ' ORDER BY created_at DESC';
@@ -24,15 +29,33 @@ exports.getInvoices = async (req, res) => {
 
 // Crear nueva factura
 exports.createInvoice = async (req, res) => {
-  const { proveedor, numero_factura, fecha_emision, fecha_vencimiento, monto_total, notas } = req.body;
+  const {
+    proveedor, numero_factura, fecha_emision, fecha_vencimiento,
+    monto_total, notas, tipo_compra, metodo_pago, referencia
+  } = req.body;
+
   try {
+    const isContado = tipo_compra === 'CONTADO';
+    const estado = isContado ? 'PAGADA' : 'PENDIENTE';
+    const monto_abonado = isContado ? monto_total : 0;
+
     const [result] = await db.query(
       `INSERT INTO facturas_proveedores 
-      (proveedor, numero_factura, fecha_emision, fecha_vencimiento, monto_total, notas, estado) 
-      VALUES (?, ?, ?, ?, ?, ?, 'PENDIENTE')`,
-      [proveedor, numero_factura, fecha_emision, fecha_vencimiento, monto_total, notas]
+      (proveedor, numero_factura, fecha_emision, fecha_vencimiento, monto_total, notas, estado, tipo_compra, metodo_pago, monto_abonado) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [proveedor, numero_factura, fecha_emision, fecha_vencimiento, monto_total, notas, estado, tipo_compra || 'CREDITO', isContado ? metodo_pago : null, monto_abonado]
     );
-    res.status(201).json({ id: result.insertId, message: 'Factura creada exitosamente' });
+
+    const newInvoiceId = result.insertId;
+
+    if (isContado) {
+      await db.query(
+        `INSERT INTO abonos_proveedores (id_factura, monto, metodo_pago, referencia) VALUES (?, ?, ?, ?)`,
+        [newInvoiceId, monto_total, metodo_pago || 'EFECTIVO', referencia || 'Pago de Contado']
+      );
+    }
+
+    res.status(201).json({ id: newInvoiceId, message: 'Factura creada exitosamente' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error al crear factura' });
@@ -42,7 +65,11 @@ exports.createInvoice = async (req, res) => {
 // Registrar abono
 exports.registerPayment = async (req, res) => {
   const { id } = req.params;
-  const { amount } = req.body;
+  const { amount, method, reference } = req.body;
+
+  if (!amount || Number(amount) <= 0) {
+    return res.status(400).json({ message: 'Monto inválido' });
+  }
 
   try {
     // 1. Buscar la factura
@@ -58,10 +85,16 @@ exports.registerPayment = async (req, res) => {
       nuevoEstado = 'PAGADA';
     }
 
-    // 3. Actualizar BD
+    // 3. Actualizar BD Factura
     await db.query(
-      'UPDATE facturas_proveedores SET monto_abonado = ?, estado = ?, referencia_pago = ? WHERE id = ?',
-      [nuevoAbonado, nuevoEstado, req.body.reference || null, id]
+      'UPDATE facturas_proveedores SET monto_abonado = ?, estado = ? WHERE id = ?',
+      [nuevoAbonado, nuevoEstado, id]
+    );
+
+    // 4. Registrar Abono en Historial
+    await db.query(
+      `INSERT INTO abonos_proveedores (id_factura, monto, metodo_pago, referencia) VALUES (?, ?, ?, ?)`,
+      [id, amount, method || 'EFECTIVO', reference || 'Abono']
     );
 
     res.json({ message: 'Abono registrado', nuevoAbonado, nuevoEstado });
@@ -71,11 +104,23 @@ exports.registerPayment = async (req, res) => {
   }
 };
 
+// Obtener historial de abonos de una factura
+exports.getInvoicePayments = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [rows] = await db.query('SELECT * FROM abonos_proveedores WHERE id_factura = ? ORDER BY fecha DESC', [id]);
+    res.json(rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error al obtener historial de abonos' });
+  }
+};
+
 // Eliminar factura
 exports.deleteInvoice = async (req, res) => {
   const { id } = req.params;
   try {
-    // Opcional: Verificar si tiene abonos antes de borrar, o borrar directo
+    // Borrado en cascada configurado en BD
     await db.query('DELETE FROM facturas_proveedores WHERE id = ?', [id]);
     res.json({ message: 'Factura eliminada correctamente' });
   } catch (error) {
