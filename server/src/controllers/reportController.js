@@ -382,11 +382,8 @@ v.id_venta AS idVenta,
 // --- REPORTE ABONOS A PROVEEDORES ---
 const getProviderPaymentsReport = async (req, res) => {
     const { startDate, endDate, proveedor } = req.query;
-    if (!startDate || !endDate) return res.status(400).json({ msg: 'Fechas requeridas.' });
 
     try {
-        const { from, to } = getDateRange(startDate, endDate);
-
         let sql = `
             SELECT 
                 a.id AS abono_id,
@@ -399,9 +396,15 @@ const getProviderPaymentsReport = async (req, res) => {
                 f.tipo_compra
             FROM abonos_proveedores a
             JOIN facturas_proveedores f ON a.id_factura = f.id
-            WHERE a.fecha >= ? AND a.fecha <= ?
+            WHERE 1=1
         `;
-        const queryParams = [from, to];
+        const queryParams = [];
+
+        if (startDate && endDate) {
+            const { from, to } = getDateRange(startDate, endDate);
+            sql += ' AND a.fecha >= ? AND a.fecha <= ?';
+            queryParams.push(from, to);
+        }
 
         if (proveedor && proveedor !== 'TODOS' && proveedor !== '') {
             sql += ' AND f.proveedor = ?';
