@@ -17,7 +17,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     );
 
     if (!hasAccess) {
-      return <Navigate to="/unauthorized" replace />;
+      return <Navigate to="/unauthorized" state={{ role: userRole, allowed: allowedRoles }} replace />;
     }
   }
 

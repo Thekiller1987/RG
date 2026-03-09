@@ -1,13 +1,13 @@
 import React from 'react';
 import styled, { keyframes } from 'styled-components';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 // --- Icono SVG ---
 const LockIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-    </svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+  </svg>
 );
 
 // --- Estilos ---
@@ -64,12 +64,23 @@ const BackButton = styled(Link)`
 `;
 
 const Unauthorized = () => {
+  const { state } = useLocation();
+  const role = state?.role || 'Desconocido';
+  const allowed = state?.allowed?.join(', ') || 'Desconocido';
+
   return (
     <Wrapper>
       <MessageBox>
         <LockIcon />
         <Title>Acceso Denegado</Title>
         <Message>No tienes los permisos suficientes para acceder a esta página.</Message>
+        {state && (
+          <div style={{ background: '#f8d7da', padding: '10px', borderRadius: '8px', marginBottom: '1rem', border: '1px solid #f5c6cb' }}>
+            <p style={{ margin: 0, fontSize: '0.9rem', color: '#721c24' }}>
+              <strong>Depuración:</strong> Tu rol es <code>{role}</code> y la página requiere uno de <code>[{allowed}]</code>. Si esto es incorrecto, por favor presiona <strong>Ctrl + F5</strong> para recargar el sistema.
+            </p>
+          </div>
+        )}
         <BackButton to="/dashboard">Volver al Dashboard</BackButton>
       </MessageBox>
     </Wrapper>
