@@ -372,9 +372,11 @@ const adjustStock = async (req, res) => {
 
 
 /* ===================== HISTORIAL ===================== */
-const getInventoryHistory = async (_req, res) => {
+const getInventoryHistory = async (req, res) => {
   try {
-    const [rows] = await db.query(`
+    const { startDate, endDate, search } = req.query;
+
+    let query = `
       SELECT mi.id_movimiento,
              mi.fecha,
              mi.tipo_movimiento,
@@ -385,9 +387,30 @@ const getInventoryHistory = async (_req, res) => {
         FROM movimientos_inventario mi
         LEFT JOIN productos p ON mi.id_producto = p.id_producto
         LEFT JOIN usuarios  u ON mi.id_usuario  = u.id_usuario
-       ORDER BY mi.fecha DESC
-       LIMIT 100
-    `);
+        WHERE 1=1
+    `;
+
+    const params = [];
+
+    if (startDate) {
+      query += ` AND DATE(mi.fecha) >= ?`;
+      params.push(startDate);
+    }
+
+    if (endDate) {
+      query += ` AND DATE(mi.fecha) <= ?`;
+      params.push(endDate);
+    }
+
+    if (search && search.trim() !== '') {
+      query += ` AND (p.codigo LIKE ? OR p.nombre LIKE ?)`;
+      const searchPattern = `%${search.trim()}%`;
+      params.push(searchPattern, searchPattern);
+    }
+
+    query += ` ORDER BY mi.fecha DESC LIMIT 1000`; // Increased limit to 1000 for filtered results
+
+    const [rows] = await db.query(query, params);
     res.json(rows);
   } catch (error) {
     console.error('Error en getInventoryHistory:', error);

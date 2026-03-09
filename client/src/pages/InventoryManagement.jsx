@@ -507,23 +507,43 @@ const InventoryHistoryModal = ({ onClose }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // New Filter States
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const fetchHistory = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('token');
+
+      const params = new URLSearchParams();
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      if (searchQuery) params.append('search', searchQuery);
+
+      const res = await axios.get(`/api/products/inventory/history?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setHistory(res.data);
+    } catch (err) {
+      console.error(err);
+      setError('No se pudo cargar el historial.');
+    } finally {
+      setLoading(false);
+    }
+  }, [startDate, endDate, searchQuery]);
+
   useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get('/api/products/inventory/history', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setHistory(res.data);
-      } catch (err) {
-        console.error(err);
-        setError('No se pudo cargar el historial.');
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchHistory();
-  }, []);
+  }, [fetchHistory]);
+
+  const handleResetFilters = () => {
+    setStartDate('');
+    setEndDate('');
+    setSearchQuery('');
+  };
 
   return (
     <ModalOverlay onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -533,14 +553,59 @@ const InventoryHistoryModal = ({ onClose }) => {
           <button onClick={onClose} style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer' }}><FaTimes /></button>
         </div>
 
+        {/* --- Filtros --- */}
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem',
+          background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0'
+        }}>
+          <FormGroup style={{ flex: '1 1 200px' }}>
+            <Label>Buscar por Código/Nombre</Label>
+            <div style={{ position: 'relative' }}>
+              <FaSearch style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <Input
+                type="text"
+                placeholder="Buscar..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ paddingLeft: '32px' }}
+              />
+            </div>
+          </FormGroup>
+          <FormGroup style={{ flex: '1 1 150px' }}>
+            <Label>Fecha Inicio</Label>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+          </FormGroup>
+          <FormGroup style={{ flex: '1 1 150px' }}>
+            <Label>Fecha Fin</Label>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+          </FormGroup>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem' }}>
+            <SaveButton type="button" onClick={fetchHistory} style={{ height: '42px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FaSearch /> Filtrar
+            </SaveButton>
+            <CancelButton type="button" onClick={handleResetFilters} style={{ height: '42px' }}>
+              Limpiar
+            </CancelButton>
+          </div>
+        </div>
+        {/* --- Fin Filtros --- */}
+
         {loading ? (
           <div style={{ textAlign: 'center', padding: '2rem' }}><Spinner /></div>
         ) : error ? (
           <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflowX: 'auto', maxHeight: '400px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-              <thead>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <tr style={{ background: '#f7fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left' }}>
                   <th style={{ padding: '10px' }}>Fecha</th>
                   <th style={{ padding: '10px' }}>Producto</th>
@@ -568,7 +633,7 @@ const InventoryHistoryModal = ({ onClose }) => {
                   </tr>
                 ))}
                 {history.length === 0 && (
-                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>No hay movimientos registrados.</td></tr>
+                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>No hay movimientos registrados para estos filtros.</td></tr>
                 )}
               </tbody>
             </table>
