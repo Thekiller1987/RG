@@ -142,15 +142,16 @@ const Dashboard = () => {
     }
 
     // ----------------------------------------------------
-    // LÓGICA DE ROLES AJUSTADA
+    // LÓGICA DE ROLES AJUSTADA (Case Insensitive)
     // ----------------------------------------------------
     const userRole = user.rol || 'N/A';
+    const normalizedRole = userRole.trim().toLowerCase();
 
     // Roles base
-    const isAdmin = userRole === 'Administrador' || userRole === 'Admin';
-    const isVendedor = userRole === 'Vendedor';
-    const isContador = userRole === 'Encargado de Finanzas' || userRole === 'Contador';
-    const isInventoryManager = userRole === 'Encargado de Inventario';
+    const isAdmin = normalizedRole === 'administrador' || normalizedRole === 'admin';
+    const isVendedor = normalizedRole === 'vendedor';
+    const isContador = normalizedRole === 'encargado de finanzas' || normalizedRole === 'contador';
+    const isInventoryManager = normalizedRole === 'encargado de inventario';
 
     // --- DEFINICIÓN DE ACCESOS ---
 

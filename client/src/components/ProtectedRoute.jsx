@@ -10,8 +10,15 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   if (!user) return <Navigate to="/login" replace />;
 
-  if (allowedRoles && Array.isArray(allowedRoles) && !allowedRoles.includes(user.rol)) {
-    return <Navigate to="/unauthorized" replace />;
+  if (allowedRoles && Array.isArray(allowedRoles)) {
+    const userRole = (user?.rol || '').trim().toLowerCase();
+    const hasAccess = allowedRoles.some(role =>
+      role.toLowerCase() === userRole
+    );
+
+    if (!hasAccess) {
+      return <Navigate to="/unauthorized" replace />;
+    }
   }
 
   return children;

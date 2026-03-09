@@ -1,0 +1,719 @@
+commit 8cf0eecd9e185f26c3f61e657ec9b629fc766acf
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Sat Mar 7 06:23:57 2026 -0600
+
+    cambios solicitados
+
+A	client/dist/assets/CashReport-Fey4VBIN.js
+A	client/dist/assets/ClientesYCreditos-BG0uEmFl.js
+A	client/dist/assets/Dashboard-DzavsgRI.js
+A	client/dist/assets/DetailedSalesReport-D_yJh9rI.js
+A	client/dist/assets/Empleados-DApKU07O.js
+A	client/dist/assets/FacturasProveedores-BslPXn_n.js
+A	client/dist/assets/Finances-5bIcW9NO.js
+A	client/dist/assets/InventoryOutflowPage-DpL7ouDn.js
+A	client/dist/assets/InventoryUpload-wJ6BBt2j.js
+A	client/dist/assets/POS-D43D8yL2.js
+A	client/dist/assets/PedidosYApartados-BoJ6jo7m.js
+A	client/dist/assets/Reports-DHx3VtNj.js
+A	client/dist/assets/SalesHistoryModal-CyuysyXR.js
+A	client/dist/assets/SecretAdjustModal-DUrr6YEQ.js
+A	client/dist/assets/SettingsPage-B9NGeUNV.js
+A	client/dist/assets/Solicitudes-cRSfgCOz.js
+A	client/dist/assets/WholesaleCatalog-3D_o1CzO.js
+A	client/dist/assets/WholesalePOS-DTm2v1gj.js
+A	client/dist/assets/WholesalePromotions-BUrGwInc.js
+A	client/dist/assets/index-CjMKJdYy.js
+A	client/dist/assets/login-DXj_HOVE.js
+A	server/src/migrate_abonos.js
+
+commit cd60286a25e6cd64c9de7654acfd803d6841c5fe
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Sat Mar 7 01:41:56 2026 -0600
+
+    Fix fetchProviderPaymentsReport empty params bug
+
+D	client/dist/assets/CashReport-BLAqef5g.js
+D	client/dist/assets/ClientesYCreditos-njrqEYSC.js
+D	client/dist/assets/Dashboard-CuV-KRnO.js
+D	client/dist/assets/DetailedSalesReport-3SNrzpYE.js
+D	client/dist/assets/Empleados-Dd8P9zJ9.js
+D	client/dist/assets/FacturasProveedores-f_z20x2Y.js
+D	client/dist/assets/Finances-DBC_Z1NU.js
+D	client/dist/assets/InventoryOutflowPage-BIP4i2RZ.js
+D	client/dist/assets/InventoryUpload-XYBr3cCJ.js
+D	client/dist/assets/POS-CktNPswW.js
+D	client/dist/assets/PedidosYApartados-BaOZHpnc.js
+D	client/dist/assets/Reports-Cks6x_Au.js
+D	client/dist/assets/SalesHistoryModal-DjgRQLyr.js
+D	client/dist/assets/SecretAdjustModal-Df7CM6lL.js
+D	client/dist/assets/SettingsPage-CaF0xc1W.js
+D	client/dist/assets/Solicitudes-CQozbGbn.js
+D	client/dist/assets/WholesaleCatalog-ByLTqSdq.js
+D	client/dist/assets/WholesalePOS-BHq48NEy.js
+D	client/dist/assets/WholesalePromotions-DKsvFwHl.js
+D	client/dist/assets/index-B613Eyqa.js
+D	client/dist/assets/login-yO2ScsvU.js
+M	client/dist/index.html
+M	client/dist/sw.js
+M	client/src/pages/FacturasProveedores.jsx
+
+commit fa44570e1c995adace0c200f995c979df9054052
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Sat Mar 7 01:09:11 2026 -0600
+
+    Make Provider Payments report date filters optional
+
+M	server/src/controllers/reportController.js
+
+commit 89a88e6fb892f27d32fbd8eb6e803422316129e4
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Sat Mar 7 01:01:34 2026 -0600
+
+    cambios solicitados
+
+A	client/dist/assets/AlertModal-C1eU8apX.js
+A	client/dist/assets/CashReport-BLAqef5g.js
+A	client/dist/assets/ClientesYCreditos-njrqEYSC.js
+A	client/dist/assets/ConfirmationModal-CKIKEjV-.js
+A	client/dist/assets/Dashboard-CuV-KRnO.js
+A	client/dist/assets/DetailedSalesReport-3SNrzpYE.js
+A	client/dist/assets/Empleados-Dd8P9zJ9.js
+A	client/dist/assets/FacturasProveedores-f_z20x2Y.js
+A	client/dist/assets/Finances-DBC_Z1NU.js
+A	client/dist/assets/InventoryManagement-CNWcdpaB.js
+A	client/dist/assets/InventoryOutflowPage-BIP4i2RZ.js
+A	client/dist/assets/InventoryUpload-XYBr3cCJ.js
+A	client/dist/assets/POS-CktNPswW.js
+A	client/dist/assets/POS.styles-C4qzct5K.js
+A	client/dist/assets/PedidosYApartados-BaOZHpnc.js
+A	client/dist/assets/Reports-Cks6x_Au.js
+A	client/dist/assets/SalesHistoryModal-DjgRQLyr.js
+A	client/dist/assets/SecretAdjustModal-Df7CM6lL.js
+A	client/dist/assets/SettingsPage-CaF0xc1W.js
+A	client/dist/assets/Solicitudes-CQozbGbn.js
+A	client/dist/assets/Unauthorized-Dthki3OX.js
+A	client/dist/assets/UserManagement-tddGBeM6.js
+A	client/dist/assets/WholesaleCatalog-ByLTqSdq.js
+A	client/dist/assets/WholesaleMenu-DGxLdoHv.js
+A	client/dist/assets/WholesalePOS-BHq48NEy.js
+A	client/dist/assets/WholesalePromotions-DKsvFwHl.js
+A	client/dist/assets/index-B613Eyqa.js
+A	client/dist/assets/login-yO2ScsvU.js
+A	client/dist/assets/pdf-vendor-DV8V3V31.js
+A	client/dist/assets/vendor-Bl8eSE-Q.js
+
+commit 0283c7ee23464562bb9f3cfcf934e17d23f4fb0d
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Sat Mar 7 01:00:59 2026 -0600
+
+    Added Global Provider Payments Report View
+
+D	client/dist/assets/AlertModal-eg7K_wmT.js
+D	client/dist/assets/CashReport-DmNIbkSo.js
+D	client/dist/assets/ClientesYCreditos-a1PGNfpH.js
+D	client/dist/assets/ConfirmationModal-B8viWg0N.js
+D	client/dist/assets/Dashboard-DrpIkOaA.js
+D	client/dist/assets/DetailedSalesReport-D-gj6gt8.js
+D	client/dist/assets/Empleados-TqHRdezf.js
+D	client/dist/assets/FacturasProveedores-Bm7sXjqC.js
+D	client/dist/assets/Finances-C7eE12Pn.js
+D	client/dist/assets/InventoryManagement-9UEmTg7J.js
+D	client/dist/assets/InventoryOutflowPage-CPdVLEIT.js
+D	client/dist/assets/InventoryUpload-D5jtHurQ.js
+D	client/dist/assets/POS-vKrGGqtf.js
+D	client/dist/assets/POS.styles-DQ9pTtF7.js
+D	client/dist/assets/PedidosYApartados-BHMwWrt1.js
+D	client/dist/assets/Reports-D2yiwCbC.js
+D	client/dist/assets/SalesHistoryModal-sZg6-a08.js
+D	client/dist/assets/SecretAdjustModal-BNGCsoNw.js
+D	client/dist/assets/SettingsPage-DIAdBet1.js
+D	client/dist/assets/Solicitudes-GMQnZJQT.js
+D	client/dist/assets/Unauthorized-BOJCUjJh.js
+D	client/dist/assets/UserManagement-HICVT8ft.js
+D	client/dist/assets/WholesaleCatalog-CC4dBjly.js
+D	client/dist/assets/WholesaleMenu-cmXch-rf.js
+D	client/dist/assets/WholesalePOS-Dj9Ct7ow.js
+D	client/dist/assets/WholesalePromotions-CoEWBP2t.js
+D	client/dist/assets/index-BSfZwKsy.js
+D	client/dist/assets/login-BWq-kqCa.js
+D	client/dist/assets/pdf-vendor-ClxtRhIU.js
+D	client/dist/assets/vendor-CmfT02pU.js
+M	client/dist/index.html
+M	client/dist/sw.js
+M	client/src/pages/FacturasProveedores.jsx
+M	client/src/service/api.js
+M	server/src/controllers/reportController.js
+M	server/src/routes/reportRoutes.js
+
+commit 119be2958a25418d8cc262985e33db9d5a2cd4eb
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Sat Mar 7 00:51:46 2026 -0600
+
+    cambios solicitados
+
+A	client/dist/assets/CashReport-DmNIbkSo.js
+A	client/dist/assets/ClientesYCreditos-a1PGNfpH.js
+A	client/dist/assets/Dashboard-DrpIkOaA.js
+A	client/dist/assets/DetailedSalesReport-D-gj6gt8.js
+A	client/dist/assets/Empleados-TqHRdezf.js
+A	client/dist/assets/FacturasProveedores-Bm7sXjqC.js
+A	client/dist/assets/Finances-C7eE12Pn.js
+A	client/dist/assets/InventoryOutflowPage-CPdVLEIT.js
+A	client/dist/assets/InventoryUpload-D5jtHurQ.js
+A	client/dist/assets/POS-vKrGGqtf.js
+A	client/dist/assets/PedidosYApartados-BHMwWrt1.js
+A	client/dist/assets/Reports-D2yiwCbC.js
+A	client/dist/assets/SalesHistoryModal-sZg6-a08.js
+A	client/dist/assets/SecretAdjustModal-BNGCsoNw.js
+A	client/dist/assets/SettingsPage-DIAdBet1.js
+A	client/dist/assets/Solicitudes-GMQnZJQT.js
+A	client/dist/assets/WholesaleCatalog-CC4dBjly.js
+A	client/dist/assets/WholesalePOS-Dj9Ct7ow.js
+A	client/dist/assets/WholesalePromotions-CoEWBP2t.js
+A	client/dist/assets/index-BSfZwKsy.js
+A	client/dist/assets/login-BWq-kqCa.js
+A	server/update_proveedores_db.js
+
+commit 9dd1cdd5908bc8052e761ec4fa47ffa1d1947025
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Sat Mar 7 00:34:45 2026 -0600
+
+    Implement Provider Invoices improvements
+
+D	client/dist/assets/CashReport-DTq4qaxT.js
+D	client/dist/assets/ClientesYCreditos-Drsm2rr-.js
+D	client/dist/assets/Dashboard-CdnTn5U4.js
+D	client/dist/assets/DetailedSalesReport-DTZCZbWg.js
+D	client/dist/assets/Empleados-Cg8QnHol.js
+D	client/dist/assets/FacturasProveedores-CYN5edNI.js
+D	client/dist/assets/Finances-HILAZ0AQ.js
+D	client/dist/assets/InventoryOutflowPage-DEJJAbdI.js
+D	client/dist/assets/InventoryUpload-DQbqWvQ4.js
+D	client/dist/assets/POS-Dl_XZZnc.js
+D	client/dist/assets/PedidosYApartados-BLy83VWj.js
+D	client/dist/assets/Reports-ChgMF14s.js
+D	client/dist/assets/SalesHistoryModal-Jj-KqqEh.js
+D	client/dist/assets/SecretAdjustModal-Igqaq1cS.js
+D	client/dist/assets/SettingsPage-DrSVL_ws.js
+D	client/dist/assets/Solicitudes-D8uy0iOm.js
+D	client/dist/assets/WholesaleCatalog-B_LycUnO.js
+D	client/dist/assets/WholesalePOS-BDwKMtpv.js
+D	client/dist/assets/WholesalePromotions-DyMm5Gbx.js
+D	client/dist/assets/index-DnX-2Exk.js
+D	client/dist/assets/login-CsKmmt4X.js
+M	client/dist/index.html
+M	client/dist/sw.js
+M	client/src/pages/FacturasProveedores.jsx
+M	client/src/service/api.js
+M	server/src/controllers/providerInvoiceController.js
+M	server/src/routes/providerInvoiceRoutes.js
+
+commit e9642ef58e382daf2972a74974921f5fdbd64928
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Fri Mar 6 18:11:09 2026 -0600
+
+    nueva funciuon
+
+A	client/dist/assets/CashReport-DTq4qaxT.js
+A	client/dist/assets/ClientesYCreditos-Drsm2rr-.js
+A	client/dist/assets/Dashboard-CdnTn5U4.js
+A	client/dist/assets/DetailedSalesReport-DTZCZbWg.js
+A	client/dist/assets/Empleados-Cg8QnHol.js
+A	client/dist/assets/FacturasProveedores-CYN5edNI.js
+A	client/dist/assets/Finances-HILAZ0AQ.js
+A	client/dist/assets/InventoryOutflowPage-DEJJAbdI.js
+A	client/dist/assets/InventoryUpload-DQbqWvQ4.js
+A	client/dist/assets/POS-Dl_XZZnc.js
+A	client/dist/assets/PedidosYApartados-BLy83VWj.js
+A	client/dist/assets/Reports-ChgMF14s.js
+A	client/dist/assets/SalesHistoryModal-Jj-KqqEh.js
+A	client/dist/assets/SecretAdjustModal-Igqaq1cS.js
+A	client/dist/assets/SettingsPage-DrSVL_ws.js
+A	client/dist/assets/Solicitudes-D8uy0iOm.js
+A	client/dist/assets/WholesaleCatalog-B_LycUnO.js
+A	client/dist/assets/WholesalePOS-BDwKMtpv.js
+A	client/dist/assets/WholesalePromotions-DyMm5Gbx.js
+A	client/dist/assets/index-DnX-2Exk.js
+A	client/dist/assets/login-CsKmmt4X.js
+
+commit 3fb5f727b81ff74312caec24bbd612b605473bda
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Fri Mar 6 18:09:15 2026 -0600
+
+    Send empleadoId properly mapped in saleData for sales tracking
+
+M	client/dist/index.html
+M	client/dist/sw.js
+M	client/src/pages/WholesalePOS.jsx
+M	client/src/pages/pos/POS.jsx
+
+commit e8f7133d96c4ad9034eb7cdc12fcb27e8db0b9fb
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Fri Mar 6 18:00:33 2026 -0600
+
+    Fix 500 error on sales-by-user report by using index in GROUP BY
+
+M	server/src/controllers/reportController.js
+
+commit 11c5c904e2702143906866065704e7af39c6ee12
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Fri Mar 6 17:56:24 2026 -0600
+
+    Fix Empleados state destructuring to map into Payment POS Modals
+
+D	client/dist/assets/CashReport-CC0bLofu.js
+D	client/dist/assets/ClientesYCreditos-C0NgbZXv.js
+D	client/dist/assets/Dashboard-QbIwhPMF.js
+D	client/dist/assets/DetailedSalesReport-DOj7s397.js
+D	client/dist/assets/Empleados-C05_mYlO.js
+D	client/dist/assets/FacturasProveedores-DbwPjImY.js
+D	client/dist/assets/Finances-CYmPCAmZ.js
+D	client/dist/assets/InventoryOutflowPage-C305ihUt.js
+D	client/dist/assets/InventoryUpload-DEWgL7md.js
+D	client/dist/assets/POS-CMezcRRw.js
+D	client/dist/assets/PedidosYApartados-CT1lrre0.js
+D	client/dist/assets/Reports-zMVyduHz.js
+D	client/dist/assets/SalesHistoryModal-DePHOinC.js
+D	client/dist/assets/SecretAdjustModal-D5Y0T1d4.js
+D	client/dist/assets/SettingsPage-DfPfnusR.js
+D	client/dist/assets/Solicitudes-Cami8YCD.js
+D	client/dist/assets/WholesaleCatalog-B11LQeOs.js
+D	client/dist/assets/WholesalePOS-CH9qqbOG.js
+D	client/dist/assets/WholesalePromotions-BLZIlcfh.js
+D	client/dist/assets/index-g3Nd03bt.js
+D	client/dist/assets/login-NNnIyy5p.js
+M	client/dist/index.html
+M	client/dist/sw.js
+M	client/src/pages/WholesalePOS.jsx
+M	client/src/pages/pos/POS.jsx
+
+commit ad6f260ce6c629cfa0b13aac9d58dd08405bcb50
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Fri Mar 6 17:52:49 2026 -0600
+
+    nueva funciuon
+
+A	client/dist/assets/CashReport-CC0bLofu.js
+A	client/dist/assets/ClientesYCreditos-C0NgbZXv.js
+A	client/dist/assets/Dashboard-QbIwhPMF.js
+A	client/dist/assets/DetailedSalesReport-DOj7s397.js
+A	client/dist/assets/Empleados-C05_mYlO.js
+A	client/dist/assets/FacturasProveedores-DbwPjImY.js
+A	client/dist/assets/Finances-CYmPCAmZ.js
+A	client/dist/assets/InventoryOutflowPage-C305ihUt.js
+A	client/dist/assets/InventoryUpload-DEWgL7md.js
+A	client/dist/assets/POS-CMezcRRw.js
+A	client/dist/assets/PedidosYApartados-CT1lrre0.js
+A	client/dist/assets/Reports-zMVyduHz.js
+A	client/dist/assets/SalesHistoryModal-DePHOinC.js
+A	client/dist/assets/SecretAdjustModal-D5Y0T1d4.js
+A	client/dist/assets/SettingsPage-DfPfnusR.js
+A	client/dist/assets/Solicitudes-Cami8YCD.js
+A	client/dist/assets/WholesaleCatalog-B11LQeOs.js
+A	client/dist/assets/WholesalePOS-CH9qqbOG.js
+A	client/dist/assets/WholesalePromotions-BLZIlcfh.js
+A	client/dist/assets/index-g3Nd03bt.js
+A	client/dist/assets/login-NNnIyy5p.js
+
+commit 60d629057eea80ad3afdb9965bfe50cbf86aa815
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Fri Mar 6 17:51:58 2026 -0600
+
+    Pass empleados list down to PaymentModal in both POS environments
+
+D	client/dist/assets/CashReport-CYHO57ih.js
+D	client/dist/assets/ClientesYCreditos-C2nOoMP2.js
+D	client/dist/assets/Dashboard-DvK-c1Mp.js
+D	client/dist/assets/DetailedSalesReport-ZiXLpaRG.js
+D	client/dist/assets/Empleados-DumQ6Lcl.js
+D	client/dist/assets/FacturasProveedores-CBBHmlDT.js
+D	client/dist/assets/Finances-ChkAjh7F.js
+D	client/dist/assets/InventoryOutflowPage-C55u14kC.js
+D	client/dist/assets/InventoryUpload-NzoNdYCc.js
+D	client/dist/assets/POS-O9IQO3fI.js
+D	client/dist/assets/PedidosYApartados-DMutPS1O.js
+D	client/dist/assets/Reports-Cr5WKw9t.js
+D	client/dist/assets/SalesHistoryModal-B_laLBp6.js
+D	client/dist/assets/SecretAdjustModal-DHC9q1OQ.js
+D	client/dist/assets/SettingsPage-Dc53_kvD.js
+D	client/dist/assets/Solicitudes-ypnaeZHg.js
+D	client/dist/assets/WholesaleCatalog-CdBvGy5O.js
+D	client/dist/assets/WholesalePOS-D1j9R4x_.js
+D	client/dist/assets/WholesalePromotions-C-WOFGpP.js
+D	client/dist/assets/index-wFii9qvY.js
+D	client/dist/assets/login-CqTb9LQE.js
+M	client/dist/index.html
+M	client/dist/sw.js
+M	client/src/pages/WholesalePOS.jsx
+M	client/src/pages/pos/POS.jsx
+
+commit 13cec6e045a4c2a9457c297685f9376214738872
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Fri Mar 6 17:44:53 2026 -0600
+
+    nueva funciuon
+
+A	client/dist/assets/AlertModal-eg7K_wmT.js
+A	client/dist/assets/CashReport-CYHO57ih.js
+A	client/dist/assets/ClientesYCreditos-C2nOoMP2.js
+A	client/dist/assets/ConfirmationModal-B8viWg0N.js
+A	client/dist/assets/Dashboard-DvK-c1Mp.js
+A	client/dist/assets/DetailedSalesReport-ZiXLpaRG.js
+A	client/dist/assets/Empleados-DumQ6Lcl.js
+A	client/dist/assets/FacturasProveedores-CBBHmlDT.js
+A	client/dist/assets/Finances-ChkAjh7F.js
+A	client/dist/assets/InventoryManagement-9UEmTg7J.js
+A	client/dist/assets/InventoryOutflowPage-C55u14kC.js
+A	client/dist/assets/InventoryUpload-NzoNdYCc.js
+A	client/dist/assets/POS-O9IQO3fI.js
+A	client/dist/assets/POS.styles-DQ9pTtF7.js
+A	client/dist/assets/PedidosYApartados-DMutPS1O.js
+A	client/dist/assets/Reports-Cr5WKw9t.js
+A	client/dist/assets/SalesHistoryModal-B_laLBp6.js
+A	client/dist/assets/SecretAdjustModal-DHC9q1OQ.js
+A	client/dist/assets/SettingsPage-Dc53_kvD.js
+A	client/dist/assets/Solicitudes-ypnaeZHg.js
+A	client/dist/assets/Unauthorized-BOJCUjJh.js
+A	client/dist/assets/UserManagement-HICVT8ft.js
+A	client/dist/assets/WholesaleCatalog-CdBvGy5O.js
+A	client/dist/assets/WholesaleMenu-cmXch-rf.js
+A	client/dist/assets/WholesalePOS-D1j9R4x_.js
+A	client/dist/assets/WholesalePromotions-C-WOFGpP.js
+A	client/dist/assets/index-wFii9qvY.js
+A	client/dist/assets/login-CqTb9LQE.js
+A	client/dist/assets/pdf-vendor-ClxtRhIU.js
+A	client/dist/assets/vendor-CmfT02pU.js
+
+commit 01eea9cdfecbc76bee9f95197395bac84477e081
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Fri Mar 6 17:37:24 2026 -0600
+
+    Fix FaUserTie reference error in POS and adjust Top Vendedores SQL query
+
+M	client/dist/index.html
+M	client/dist/sw.js
+M	client/src/pages/pos/components/PaymentModal.jsx
+M	server/src/controllers/reportController.js
+
+commit fd25dfe4f9d75c5c61b429f4fa4fa042e23c9b5d
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Fri Mar 6 17:30:56 2026 -0600
+
+    Fix Invalid Time Date in Finances Chart
+
+M	client/dist/index.html
+M	client/dist/sw.js
+M	client/src/pages/Finances.jsx
+
+commit 9c873927c206c8c40249c93cc7a23d4620b26371
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Fri Mar 6 17:26:47 2026 -0600
+
+    Feat(Finances): Server-side invoice date filtering
+
+M	client/dist/index.html
+M	client/dist/sw.js
+M	client/src/pages/FacturasProveedores.jsx
+M	client/src/service/api.js
+M	server/src/controllers/providerInvoiceController.js
+
+commit d370346fe44a887e66ae6aa83087b50a44457b29
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Fri Mar 6 17:21:38 2026 -0600
+
+    Fix Finances API TypeError in prod
+
+M	client/build_error.log
+M	client/dist/index.html
+M	client/dist/sw.js
+M	client/src/pages/Finances.jsx
+
+commit efeed91f445890946ede0eb88852a2c02fabe4bd
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Fri Mar 6 16:51:47 2026 -0600
+
+    Fix SQL date syntax and Finances map error
+
+M	client/dist/index.html
+M	client/dist/sw.js
+M	client/src/pages/Finances.jsx
+M	server/src/controllers/reportController.js
+
+commit cc846922d248c41d58c92f7ef7b21550f8274c0a
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Fri Mar 6 16:36:06 2026 -0600
+
+    Fix missing Fa icons in Dashboard.jsx
+
+D	client/dist/assets/AlertModal-J0d4OT4p.js
+D	client/dist/assets/CashReport-M2hYZ6mC.js
+D	client/dist/assets/ClientesYCreditos-DtdE4dv5.js
+D	client/dist/assets/ConfirmationModal-ChP6Juzz.js
+D	client/dist/assets/Dashboard-D7zfii4Q.js
+D	client/dist/assets/DetailedSalesReport-CERputgV.js
+D	client/dist/assets/Empleados-D7MRrk71.js
+D	client/dist/assets/FacturasProveedores-QGq5m4Nt.js
+D	client/dist/assets/Finances-Ce1XUDOb.js
+D	client/dist/assets/InventoryManagement-7e2uXFef.js
+D	client/dist/assets/InventoryOutflowPage-C-W-Cmhp.js
+D	client/dist/assets/InventoryUpload-BLVz16LK.js
+D	client/dist/assets/POS-BzXoSSH8.js
+D	client/dist/assets/POS.styles-Bl7oeOK9.js
+D	client/dist/assets/PedidosYApartados-CyQTJNMJ.js
+D	client/dist/assets/Reports-D-GMo3Us.js
+D	client/dist/assets/SalesHistoryModal-DdRktxPb.js
+D	client/dist/assets/SecretAdjustModal-9Vw4LJMX.js
+D	client/dist/assets/SettingsPage-CEkhFQYu.js
+D	client/dist/assets/Solicitudes-BEi24tsA.js
+D	client/dist/assets/Unauthorized-D4vjUqjP.js
+D	client/dist/assets/UserManagement-D_NxA1z3.js
+D	client/dist/assets/WholesaleCatalog-C1IpZzfq.js
+D	client/dist/assets/WholesaleMenu-D0D3bnqC.js
+D	client/dist/assets/WholesalePOS-B3epSfHz.js
+D	client/dist/assets/WholesalePromotions-Cl8WFB-7.js
+D	client/dist/assets/index-D5OxzALZ.js
+D	client/dist/assets/login-BCfPyVUB.js
+D	client/dist/assets/pdf-vendor-DPVwc1km.js
+D	client/dist/assets/vendor-bjMGIQJ7.js
+M	client/dist/index.html
+M	client/dist/sw.js
+M	client/src/pages/Dashboard.jsx
+
+commit 9d83e26e47ac2e3cbca0fd7e865a2084e8eb45cb
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Fri Mar 6 16:31:29 2026 -0600
+
+    nueva funciuon
+
+A	client/dist/assets/AlertModal-J0d4OT4p.js
+A	client/dist/assets/CashReport-M2hYZ6mC.js
+A	client/dist/assets/ClientesYCreditos-DtdE4dv5.js
+A	client/dist/assets/ConfirmationModal-ChP6Juzz.js
+A	client/dist/assets/Dashboard-D7zfii4Q.js
+A	client/dist/assets/DetailedSalesReport-CERputgV.js
+A	client/dist/assets/Empleados-D7MRrk71.js
+A	client/dist/assets/FacturasProveedores-QGq5m4Nt.js
+A	client/dist/assets/Finances-Ce1XUDOb.js
+A	client/dist/assets/InventoryManagement-7e2uXFef.js
+A	client/dist/assets/InventoryOutflowPage-C-W-Cmhp.js
+A	client/dist/assets/InventoryUpload-BLVz16LK.js
+A	client/dist/assets/POS-BzXoSSH8.js
+A	client/dist/assets/POS.styles-Bl7oeOK9.js
+A	client/dist/assets/PedidosYApartados-CyQTJNMJ.js
+A	client/dist/assets/Reports-D-GMo3Us.js
+A	client/dist/assets/SalesHistoryModal-DdRktxPb.js
+A	client/dist/assets/SecretAdjustModal-9Vw4LJMX.js
+A	client/dist/assets/SettingsPage-CEkhFQYu.js
+A	client/dist/assets/Solicitudes-BEi24tsA.js
+A	client/dist/assets/Unauthorized-D4vjUqjP.js
+A	client/dist/assets/UserManagement-D_NxA1z3.js
+A	client/dist/assets/WholesaleCatalog-C1IpZzfq.js
+A	client/dist/assets/WholesaleMenu-D0D3bnqC.js
+A	client/dist/assets/WholesalePOS-B3epSfHz.js
+A	client/dist/assets/WholesalePromotions-Cl8WFB-7.js
+A	client/dist/assets/index-D5OxzALZ.js
+A	client/dist/assets/login-BCfPyVUB.js
+A	client/dist/assets/pdf-vendor-DPVwc1km.js
+A	client/dist/assets/vendor-bjMGIQJ7.js
+
+commit 8405763dc0f1031b8e17981c8fde653b6e2cca87
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Fri Mar 6 16:30:07 2026 -0600
+
+    Fix missing import FaTags
+
+D	client/dist/assets/AlertModal-D8LdRFUA.js
+D	client/dist/assets/CashReport-Bbudv4nm.js
+D	client/dist/assets/ClientesYCreditos-m7VrUvVm.js
+D	client/dist/assets/ConfirmationModal-BEfQVOak.js
+D	client/dist/assets/Dashboard-BN_DibJa.js
+D	client/dist/assets/DetailedSalesReport-Db68yD7v.js
+D	client/dist/assets/Empleados-Cz3I04oy.js
+D	client/dist/assets/FacturasProveedores-CphQft-I.js
+D	client/dist/assets/Finances-4kZ2WzEe.js
+D	client/dist/assets/InventoryManagement-TUeMxEIi.js
+D	client/dist/assets/InventoryOutflowPage-9-y7U6q0.js
+D	client/dist/assets/InventoryUpload-kK_hcfbx.js
+D	client/dist/assets/POS-CpXfwfi5.js
+D	client/dist/assets/POS.styles-edu8PlKE.js
+D	client/dist/assets/PedidosYApartados-BpnDgqUx.js
+D	client/dist/assets/Reports-Hr7rlWjY.js
+D	client/dist/assets/SalesHistoryModal-t8pl8oGd.js
+D	client/dist/assets/SecretAdjustModal-Bh5Vi6eP.js
+D	client/dist/assets/SettingsPage-D-H--URA.js
+D	client/dist/assets/Solicitudes-xUYR9r7V.js
+D	client/dist/assets/Unauthorized-DWZ6ZoR4.js
+D	client/dist/assets/UserManagement-B9dlbWk7.js
+D	client/dist/assets/WholesaleCatalog-CmcsUZNF.js
+D	client/dist/assets/WholesaleMenu-jY2Bxgma.js
+D	client/dist/assets/WholesalePOS-BJFKn6fI.js
+D	client/dist/assets/WholesalePromotions-DiqNbLpP.js
+D	client/dist/assets/index-8T-9wPBW.js
+D	client/dist/assets/login-DWp-R5pb.js
+D	client/dist/assets/pdf-vendor-CJwN73Oo.js
+D	client/dist/assets/vendor-j_myMsPa.js
+M	client/dist/index.html
+M	client/dist/sw.js
+M	client/src/pages/Dashboard.jsx
+
+commit 4a817870bd5939547ec1663027c55c269a257c14
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Fri Mar 6 12:15:01 2026 -0600
+
+    nueva funciuon
+
+A	client/build-error.log
+A	client/build-error2.log
+A	client/build_err.txt
+A	client/build_output.log
+A	client/build_output.txt
+R089	client/dist/assets/AlertModal-DN-lJRTs.js	client/dist/assets/AlertModal-D8LdRFUA.js
+R068	client/dist/assets/CashReport-LlmLexbk.js	client/dist/assets/CashReport-Bbudv4nm.js
+A	client/dist/assets/ClientesYCreditos-m7VrUvVm.js
+D	client/dist/assets/ClientesYCreditos-v9s4Ior6.js
+R081	client/dist/assets/ConfirmationModal-Bd2BPeD6.js	client/dist/assets/ConfirmationModal-BEfQVOak.js
+R051	client/dist/assets/Dashboard-FMFSJnkH.js	client/dist/assets/Dashboard-BN_DibJa.js
+A	client/dist/assets/DetailedSalesReport-Db68yD7v.js
+D	client/dist/assets/DetailedSalesReport-DubRC-z0.js
+A	client/dist/assets/Empleados-Cz3I04oy.js
+D	client/dist/assets/FacturasProveedores-BfPieOXR.js
+A	client/dist/assets/FacturasProveedores-CphQft-I.js
+R095	client/dist/assets/Finances-BAefU0sZ.js	client/dist/assets/Finances-4kZ2WzEe.js
+D	client/dist/assets/InventoryManagement-CEQqQPp4.js
+A	client/dist/assets/InventoryManagement-TUeMxEIi.js
+R096	client/dist/assets/InventoryOutflowPage-DV8WS8Yc.js	client/dist/assets/InventoryOutflowPage-9-y7U6q0.js
+R094	client/dist/assets/InventoryUpload-BLBThTY5.js	client/dist/assets/InventoryUpload-kK_hcfbx.js
+A	client/dist/assets/POS-CpXfwfi5.js
+D	client/dist/assets/POS-D72COMfA.js
+R098	client/dist/assets/POS.styles-Bz1HfwTU.js	client/dist/assets/POS.styles-edu8PlKE.js
+R089	client/dist/assets/PedidosYApartados-CGacck8R.js	client/dist/assets/PedidosYApartados-BpnDgqUx.js
+R084	client/dist/assets/Reports-CIvsfNXJ.js	client/dist/assets/Reports-Hr7rlWjY.js
+D	client/dist/assets/SalesHistoryModal-BqcGqdHD.js
+A	client/dist/assets/SalesHistoryModal-t8pl8oGd.js
+D	client/dist/assets/SecretAdjustModal-BP9ADvV1.js
+A	client/dist/assets/SecretAdjustModal-Bh5Vi6eP.js
+R088	client/dist/assets/SettingsPage-cGgcUrGc.js	client/dist/assets/SettingsPage-D-H--URA.js
+R082	client/dist/assets/Solicitudes-BXz4tkio.js	client/dist/assets/Solicitudes-xUYR9r7V.js
+R095	client/dist/assets/Unauthorized-DlJC5YPt.js	client/dist/assets/Unauthorized-DWZ6ZoR4.js
+R092	client/dist/assets/UserManagement-FjKEtajw.js	client/dist/assets/UserManagement-B9dlbWk7.js
+R093	client/dist/assets/WholesaleCatalog-BIRUDswt.js	client/dist/assets/WholesaleCatalog-CmcsUZNF.js
+R095	client/dist/assets/WholesaleMenu-CfiU2R_0.js	client/dist/assets/WholesaleMenu-jY2Bxgma.js
+A	client/dist/assets/WholesalePOS-BJFKn6fI.js
+D	client/dist/assets/WholesalePOS-BLonQ7XJ.js
+R094	client/dist/assets/WholesalePromotions-DQ9G9mtl.js	client/dist/assets/WholesalePromotions-DiqNbLpP.js
+A	client/dist/assets/index-8T-9wPBW.js
+D	client/dist/assets/index-C9q57MBf.js
+R097	client/dist/assets/login-CDJPFppu.js	client/dist/assets/login-DWp-R5pb.js
+R099	client/dist/assets/pdf-vendor-DGlygaeZ.js	client/dist/assets/pdf-vendor-CJwN73Oo.js
+R071	client/dist/assets/vendor-B-pOHZxB.js	client/dist/assets/vendor-j_myMsPa.js
+M	client/dist/index.html
+M	client/dist/sw.js
+A	client/out.txt
+A	client/out2.txt
+M	client/src/App.jsx
+M	client/src/pages/Dashboard.jsx
+M	client/src/pages/DetailedSalesReport.jsx
+A	client/src/pages/Empleados.jsx
+M	client/src/pages/pos/POS.jsx
+M	client/src/pages/pos/components/PaymentModal.jsx
+M	client/src/service/api.js
+A	server/scripts/create_empleados_table.js
+M	server/server.js
+A	server/src/controllers/employeeController.js
+M	server/src/controllers/reportController.js
+M	server/src/controllers/salesController.js
+A	server/src/routes/employeeRoutes.js
+M	server/src/routes/reportRoutes.js
+
+commit a42b74fb94c7854264b4d178e23805fb0e338135
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Thu Mar 5 15:20:08 2026 -0600
+
+    g mode
+
+M	client/src/pages/pos/components/CajaModal.jsx
+
+commit 664a20b4d9e4e643f1cd75de40d39cc4685eb33a
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Thu Mar 5 15:15:07 2026 -0600
+
+    g mode
+
+M	client/src/pages/pos/components/CajaModal.jsx
+
+commit 6da87c052f0913c651bac3676db97820c46f60d4
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Thu Mar 5 15:01:18 2026 -0600
+
+    g mode
+
+M	client/src/pages/pos/components/CajaModal.jsx
+
+commit d469d3f13bdc1974b58cbb28bf33ae3f108508fd
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Thu Mar 5 14:45:18 2026 -0600
+
+    g mode
+
+M	server/src/routes/cajaRoutes.js
+
+commit b1140ef8a286e8016ae46399ea63828c196a833c
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Thu Mar 5 14:22:55 2026 -0600
+
+    g mode
+
+M	client/src/pages/pos/components/SecretAdjustModal.jsx
+
+commit 5180b625b3c8538d459c5b0d2327c5c505a6576d
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Thu Mar 5 14:19:15 2026 -0600
+
+    g mode
+
+M	client/src/pages/pos/POS.jsx
+M	client/src/pages/pos/components/SecretAdjustModal.jsx
+M	client/src/service/cajaUtils.js
+M	server/src/controllers/clientController.js
+
+commit d2e73a6e1a95581cc2b7b17e46372a7490cde699
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Thu Mar 5 11:42:39 2026 -0600
+
+    espero que quede listo esta  shit
+
+M	client/src/pages/pos/components/SalesHistoryModal.jsx
+
+commit 33c6ac10953918cbaf872b331214bb2b027136da
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Thu Mar 5 11:39:05 2026 -0600
+
+    espero que quede listo esta  shit
+
+M	client/src/pages/pos/components/HistorialCreditoModal.jsx
+
+commit 817ce81aac32340c90fa2c5d1a9243c0d2117030
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Thu Mar 5 11:33:44 2026 -0600
+
+    espero que quede listo esta  shit
+
+M	client/src/pages/ClientesYCreditos.jsx
+M	client/src/pages/pos/components/AbonoCreditoModal.jsx
+M	client/src/pages/pos/components/HistorialCreditoModal.jsx
+M	client/src/pages/pos/components/StatementModal.jsx
+M	client/src/service/api.js
+M	server/src/controllers/clientController.js
+M	server/src/routes/clientRoutes.js
+
+commit 602475eac68996bd98d8a2da321ca6ca4396830c
+Author: waskar <waskareliasrios11@gmail.com>
+Date:   Thu Mar 5 10:44:37 2026 -0600
+
+    espero que quede listo esta  shit
+
+M	client/src/pages/FacturasProveedores.jsx
+M	client/src/pages/InventoryManagement.jsx
+M	client/src/service/api.js
+M	server/src/controllers/providerInvoiceController.js
