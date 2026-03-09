@@ -163,6 +163,8 @@ const Dashboard = () => {
     const canAccessReports = isAdmin || userRole === 'Gerente' || isContador;
     const canAccessCashReports = isAdmin || userRole === 'Gerente' || isContador;
     const canAccessAdminUsers = isAdmin;
+    const canAccessEmpleados = isAdmin || userRole === 'Gerente';
+    const canAccessFinances = isAdmin || userRole === 'Gerente';
 
     // NUEVO ACCESO: Facturas de Proveedores (Solo Admin y Contador)
     const canAccessInvoices = isAdmin || isContador;
@@ -255,22 +257,22 @@ const Dashboard = () => {
                         </Card>
                     )}
                     {/* TARJETA: Finanzas (Admin/Gerente) */}
-                    <ProtectedRoute allowedRoles={['Administrador', 'Gerente']}>
+                    {canAccessFinances && (
                         <Card to="/finances" color="#10b981" onMouseEnter={() => prefetch('/finances')}>
                             <CardIcon color="#10b981"><FaChartPie /></CardIcon>
                             <h2>Finanzas</h2>
                             <p>Control de ingresos, gastos y reportes financieros.</p>
                         </Card>
-                    </ProtectedRoute>
+                    )}
 
                     {/* TARJETA: Empleados (Admin/Gerente) */}
-                    <ProtectedRoute allowedRoles={['Administrador', 'Gerente']}>
+                    {canAccessEmpleados && (
                         <Card to="/empleados" color="#6366f1" onMouseEnter={() => prefetch('/empleados')}>
                             <CardIcon color="#6366f1"><FaAddressCard /></CardIcon>
                             <h2>Empleados</h2>
                             <p>Gestión de vendedores y comisiones.</p>
                         </Card>
-                    </ProtectedRoute>
+                    )}
 
                     {/* 4. Inventario */}
                     {canAccessInventory && (
