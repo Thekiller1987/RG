@@ -4,7 +4,7 @@ import axios from 'axios';
 import {
     FaArrowLeft, FaSyncAlt, FaCalendarAlt, FaSearch,
     FaShoppingCart, FaUndoAlt, FaBarcode, FaFileInvoice,
-    FaUser, FaClock, FaChevronDown, FaChevronUp, FaPrint, FaBoxOpen, FaUserTie
+    FaUser, FaClock, FaChevronDown, FaChevronUp, FaPrint, FaBoxOpen, FaUserTie, FaTimes
 } from 'react-icons/fa';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
