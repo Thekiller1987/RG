@@ -151,13 +151,16 @@ function calculateReportStats(session) {
   let netCordobas = 0; // Efectivo C$
   let netDolares = 0;  // Efectivo $
 
-  // Acumuladores de Flujo (No efectivo)
-  let tTarjeta = 0;
-  let tTransf = 0;
-  let tCredito = 0;
+  // Acumuladores de Flujo Detallado (Ventas)
+  let vEfectivoC = 0; let vEfectivoD = 0;
+  let vTarjeta = 0; let vTransf = 0; let vCredito = 0;
+
+  // Acumuladores de Flujo Detallado (Abonos)
+  let aEfectivoC = 0; let aEfectivoD = 0;
+  let aTarjeta = 0; let aTransf = 0;
 
   let sumDevsCancels = 0;
-  let tVentasDia = 0; // Total Bruto Ingresos (Ventas + Abonos)
+  let tVentasDia = 0; // Total Bruto Ingresos (Usado solo por referencia vieja)
   let totalHidden = 0;
 
   for (const tx of transactions) {
@@ -187,47 +190,47 @@ function calculateReportStats(session) {
     }
 
     // CREAR VERSIÓN NORMALIZADA REPORTES
-    const normalizedTx = { ...tx, pagoDetalles: pd, displayAmount: totalAmount }; // Use totalAmount for display in lists
+    const normalizedTx = { ...tx, pagoDetalles: pd, displayAmount: totalAmount };
 
-    // Desglose NO EFECTIVO
+    // Desglose genérico de pagos
     const txTarjeta = Number(pd.tarjeta || 0);
     const txTransf = Number(pd.transferencia || 0);
     const txCredito = Number(pd.credito || 0);
+    const txEfecC = Number(pd.efectivo || 0) - Number(pd.cambio || 0);
+    const txEfecD = Number(pd.dolares || 0);
 
-    // Acumuladores Informativos de No Efectivo
-    if (t.startsWith('venta') || t.includes('abono') || t.includes('pedido') || t.includes('apartado')) {
-      tTarjeta += txTarjeta;
-      tTransf += txTransf;
-      tCredito += txCredito;
-    } else if (t === 'ajuste') {
-      if (pd.target === 'tarjeta') tTarjeta += Number(tx.amount || 0);
-      if (pd.target === 'credito') tCredito += Number(tx.amount || 0);
-      if (pd.target === 'transferencia') tTransf += Number(tx.amount || 0);
-    }
+    const isVenta = t.startsWith('venta');
+    const isAbono = t.includes('abono') || t.includes('pedido') || t.includes('apartado');
 
-    // 2. CALCULO DE EFECTIVO FÍSICO (Separado por moneda)
-    if (t === 'venta_contado' || t === 'venta_mixta' || t === 'venta_credito' || t.startsWith('venta')) {
+    // 2. CALCULO DE EFECTIVO FÍSICO Y DESGLOSE DETALLADO
+    if (isVenta) {
       if (pd.efectivo !== undefined || pd.dolares !== undefined) {
-        const cashInCordobas = Number(pd.efectivo || 0);
-        const cashInDolares = Number(pd.dolares || 0);
-        const cashOutCordobas = Number(pd.cambio || 0);
-
-        netCordobas += (cashInCordobas - cashOutCordobas);
-        netDolares += cashInDolares;
+        netCordobas += txEfecC;
+        netDolares += txEfecD;
+        vEfectivoC += txEfecC;
+        vEfectivoD += txEfecD;
       } else {
-        // Si no hay desglose explícito de efectivo/dólares, asumimos que el rawAmount es en córdobas
         const neto = rawAmount - txTarjeta - txTransf - txCredito;
         netCordobas += neto;
+        vEfectivoC += neto;
       }
+      vTarjeta += txTarjeta;
+      vTransf += txTransf;
+      vCredito += txCredito;
     }
-    else if (t.includes('abono')) {
-      if (pd.dolares !== undefined) {
-        netDolares += Number(pd.dolares || 0);
-        netCordobas += Number(pd.efectivo || 0);
+    else if (isAbono) {
+      if (pd.efectivo !== undefined || pd.dolares !== undefined) {
+        netCordobas += txEfecC;
+        netDolares += txEfecD;
+        aEfectivoC += txEfecC;
+        aEfectivoD += txEfecD;
       } else {
-        // Abono Cash uses rawAmount (ingresoCaja)
-        netCordobas += rawAmount;
+        const neto = rawAmount - txTarjeta - txTransf - txCredito;
+        netCordobas += neto;
+        aEfectivoC += neto;
       }
+      aTarjeta += txTarjeta;
+      aTransf += txTransf;
     }
     else if (t === 'entrada') {
       netCordobas += Math.abs(rawAmount);
@@ -246,10 +249,11 @@ function calculateReportStats(session) {
       if (pd.target === 'dolares') {
         netDolares += rawAmount;
       }
+      if (pd.target === 'tarjeta') vTarjeta += rawAmount;
+      if (pd.target === 'credito') vCredito += rawAmount;
+      if (pd.target === 'transferencia') vTransf += rawAmount;
     }
     else {
-      // Default: Si no es un tipo específico, asumimos que el rawAmount es el impacto en efectivo
-      // Esto cubre tipos como 'abono' que no tienen desglose de efectivo/dolares explícito
       netCordobas += rawAmount;
     }
 
@@ -303,10 +307,12 @@ function calculateReportStats(session) {
     entradas: cls.entradas,
     salidas: cls.salidas,
     abonos: cls.abonos,
-    totalTarjeta: tTarjeta,
-    totalTransferencia: tTransf,
-    totalCredito: tCredito,
-    totalNoEfectivo: tTarjeta + tTransf + tCredito,
+    totalTarjeta: vTarjeta + aTarjeta,
+    totalTransferencia: vTransf + aTransf,
+    totalCredito: vCredito,
+    totalNoEfectivo: vTarjeta + aTarjeta + vTransf + aTransf + vCredito,
+    vEfectivoC, vEfectivoD, vTarjeta, vTransf, vCredito,
+    aEfectivoC, aEfectivoD, aTarjeta, aTransf,
     sumDevolucionesCancelaciones: sumDevsCancels,
     totalVentasDia: tVentasDia,
     tasaRef,
@@ -778,31 +784,53 @@ const CashReport = () => {
         </div>
 
         <div class="box">
-          <div class="box-header">Conciliación de Efectivo</div>
+          <div class="box-header">Conciliación de Efectivo y Flujos</div>
           <div class="box-content">
                 <div class="section">
-                  <div class="row bold" style="background:#f8fafc; padding:8px;"><span>1. TOTAL INGRESOS BRUTOS:</span><span>${fmtMoney(stats.totalVentasDia)}</span></div>
-                  <div class="row sub-row" style="margin-bottom:10px;">(Incluye Ventas Contado, Crédito, Abonos, Entradas y Ajustes)</div>
-                </div>
-
-                <div class="section">
-                  <div class="row bold" style="border:none;"><span>2. MENOS NO EFECTIVO:</span></div>
-                  ${stats.totalTarjeta > 0 ? `<div class="row"><span>(-) Tarjetas:</span><span>${fmtMoney(stats.totalTarjeta)}</span></div>` : ''}
-                  ${stats.totalTransferencia > 0 ? `<div class="row"><span>(-) Transferencias:</span><span>${fmtMoney(stats.totalTransferencia)}</span></div>` : ''}
-                  ${stats.totalCredito > 0 ? `<div class="row"><span>(-) Créditos Otorgados:</span><span>${fmtMoney(stats.totalCredito)}</span></div>` : ''}
-                  <div class="row bold" style="border-top: 1px dashed #000; margin-top:5px;"><span>TOTAL DEDUCIBLE:</span><span>${fmtMoney(stats.totalNoEfectivo)}</span></div>
+                  <div class="row bold" style="background:#f8fafc; padding:8px;"><span>1. INGRESOS POR VENTAS:</span></div>
+                  ${stats.vEfectivoC > 0 ? `<div class="row"><span>(+) Efectivo (C$):</span><span>${fmtMoney(stats.vEfectivoC)}</span></div>` : ''}
+                  ${stats.vEfectivoD > 0 ? `<div class="row"><span>(+) Dólares ($):</span><span>$${Number(stats.vEfectivoD).toFixed(2)}</span></div>` : ''}
+                  ${stats.vTarjeta > 0 ? `<div class="row"><span>(+) Tarjetas:</span><span>${fmtMoney(stats.vTarjeta)}</span></div>` : ''}
+                  ${stats.vTransf > 0 ? `<div class="row"><span>(+) Transferencias:</span><span>${fmtMoney(stats.vTransf)}</span></div>` : ''}
+                  ${stats.vCredito > 0 ? `<div class="row"><span>(+) Créditos Otorgados:</span><span>${fmtMoney(stats.vCredito)}</span></div>` : ''}
+                  <div class="row bold sub-row" style="border-top: 1px dashed #000; margin-top:5px; padding-top:5px;">
+                    <span>Total Ventas Brutas:</span><span>${fmtMoney(stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef) + stats.vTarjeta + stats.vTransf + stats.vCredito)}</span>
+                  </div>
                 </div>
 
                 <div class="section" style="margin-top:15px;">
-                  <div class="row bold" style="border:none;"><span>3. FLUJO DE CAJA NETO:</span></div>
-                  <div class="row"><span>(+) Fondo Inicial:</span><span>${fmtMoney(session.monto_inicial || session.initialAmount)}</span></div>
-                  <div class="row"><span>(+) Ingresos Totales:</span><span>${fmtMoney(stats.totalVentasDia)}</span></div>
-                  <div class="row"><span>(-) Total No Efectivo:</span><span>-${fmtMoney(stats.totalNoEfectivo)}</span></div>
+                  <div class="row bold" style="background:#f8fafc; padding:8px;"><span>2. INGRESOS POR ABONOS:</span></div>
+                  ${stats.aEfectivoC > 0 ? `<div class="row"><span>(+) Efectivo (C$):</span><span>${fmtMoney(stats.aEfectivoC)}</span></div>` : ''}
+                  ${stats.aEfectivoD > 0 ? `<div class="row"><span>(+) Dólares ($):</span><span>$${Number(stats.aEfectivoD).toFixed(2)}</span></div>` : ''}
+                  ${stats.aTarjeta > 0 ? `<div class="row"><span>(+) Tarjetas:</span><span>${fmtMoney(stats.aTarjeta)}</span></div>` : ''}
+                  ${stats.aTransf > 0 ? `<div class="row"><span>(+) Transferencias:</span><span>${fmtMoney(stats.aTransf)}</span></div>` : ''}
+                  <div class="row bold sub-row" style="border-top: 1px dashed #000; margin-top:5px; padding-top:5px;">
+                    <span>Total Abonos Netos:</span><span>${fmtMoney(stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef) + stats.aTarjeta + stats.aTransf)}</span>
+                  </div>
+                </div>
+
+                <div class="section" style="margin-top:15px;">
+                  <div class="row bold" style="border:none;"><span>3. EGRESOS DE CAJA Y CANCELACIONES:</span></div>
+                  ${stats.sumDevolucionesCancelaciones > 0 ? `<div class="row"><span>(-) Devoluciones/Cancelaciones:</span><span>-${fmtMoney(stats.sumDevolucionesCancelaciones)}</span></div>` : ''}
                   ${Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)) > 0 ? `
-                      <div class="row"><span>(-) Salidas de Caja:</span><span>-${fmtMoney(Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)))}</span></div>
+                      <div class="row"><span>(-) Gastos/Salidas de Caja:</span><span>-${fmtMoney(Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)))}</span></div>
+                  ` : ''}
+                </div>
+
+                <div class="section" style="margin-top:15px;">
+                  <div class="row bold" style="border:none;"><span>4. RESUMEN PARA ENTREGA DE CAJA (SOLO EFECTIVO):</span></div>
+                  <div class="row"><span>(+) Fondo Inicial C$:</span><span>${fmtMoney(session.monto_inicial || session.initialAmount)}</span></div>
+                  <div class="row"><span>(+) Efectivo Total Ventas C$:</span><span>${fmtMoney(stats.vEfectivoC)}</span></div>
+                  <div class="row"><span>(+) Efectivo Total Abonos C$:</span><span>${fmtMoney(stats.aEfectivoC)}</span></div>
+                  ${stats.sumDevolucionesCancelaciones > 0 ? `<div class="row"><span>(-) Efectivo Devuelto C$:</span><span>-${fmtMoney(stats.sumDevolucionesCancelaciones)}</span></div>` : ''}
+                  ${Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)) > 0 ? `
+                      <div class="row"><span>(-) Gastos en Efectivo C$:</span><span>-${fmtMoney(Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)))}</span></div>
                   ` : ''}
                   <div class="row bold" style="background:#f0fdf4; padding:8px; border:1px solid #bbf7d0; margin-top:10px;">
-                    <span>= EFECTIVO ESPERADO EN CAJA:</span><span>${fmtMoney(stats.efectivoEsperado)}</span>
+                    <span>= EFECTIVO ESPERADO EN CAJA (Combinado en C$):</span><span>${fmtMoney(stats.efectivoEsperado)}</span>
+                  </div>
+                  <div class="row sub-row" style="text-align:right;">
+                    (Físico Esperado: C$ ${fmtMoney(stats.efectivoEsperadoCordobas).replace('C$', '')} y $ ${Number(stats.efectivoEsperadoDolares).toFixed(2)})
                   </div>
                 </div>
             </div>
@@ -1003,47 +1031,70 @@ const CashReport = () => {
               </CardHeader>
 
               <CardBody>
-                {/* TOTAL VENTAS GLOBAL */}
+                {/* TOTAL INGRESOS DEL DÍA (Bruto Ventas + Abonos) */}
                 <div style={{
                   background: '#f1f5f9', padding: '1rem', borderRadius: '8px', border: `1px solid ${theme.border}`, marginBottom: '1rem',
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                 }}>
-                  <span style={{ fontWeight: '600', color: theme.secondary, textTransform: 'uppercase', fontSize: '0.85rem' }}>💰 Ventas Totales</span>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontWeight: '600', color: theme.secondary, textTransform: 'uppercase', fontSize: '0.85rem' }}>💰 Ingresos Totales Generados</span>
+                    <span style={{ fontSize: '0.7rem', color: theme.textLight }}>(Efectivo + Electrónico)</span>
+                  </div>
                   <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: theme.primary, fontFamily: 'Roboto Mono' }}>
-                    {fmtMoney(totalVendido)}
+                    {fmtMoney((stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef) + stats.vTarjeta + stats.vTransf + stats.vCredito) + (stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef) + stats.aTarjeta + stats.aTransf))}
                   </span>
                 </div>
 
-                {/* RESUMEN FINANCIERO DETALLADO */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '1rem' }}>
                   <div style={{ background: '#fff', padding: '10px', borderRadius: 8, border: '1px solid #eee' }}>
-                    <h5 style={{ margin: '0 0 0.5rem 0', color: theme.secondary, fontSize: '0.85rem', borderBottom: '1px solid #eee', paddingBottom: 5 }}>📊 Desglose de Efectivo</h5>
+                    <h5 style={{ margin: '0 0 0.5rem 0', color: theme.secondary, fontSize: '0.85rem', borderBottom: '1px solid #eee', paddingBottom: 5 }}>📊 Desglose Dinero en Caja</h5>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                      <span>(+) Ventas Totales:</span>
-                      <strong>{fmtMoney(totalVendido)}</strong>
+                    {/* VENTAS */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: theme.secondary, marginTop: 4 }}>
+                      <span>Ventas Efectivo (C$ y $):</span>
+                      <span>{fmtMoney(stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef))}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#dc3545' }}>
-                      <span>(-) Tarjetas/Transf:</span>
-                      <strong>- {fmtMoney(stats.totalNoEfectivo)}</strong>
+                    {/* ABONOS */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: theme.secondary, marginTop: 4 }}>
+                      <span>Abonos Efectivo (C$ y $):</span>
+                      <span>{fmtMoney(stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef))}</span>
                     </div>
+
+                    {/* EGRESOS */}
+                    {(stats.sumDevolucionesCancelaciones > 0 || Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)) > 0) && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#dc3545', marginTop: 4 }}>
+                        <span>(-) Devoluciones / Salidas:</span>
+                        <span>-{fmtMoney(stats.sumDevolucionesCancelaciones + Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)))}</span>
+                      </div>
+                    )}
+
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 'bold', borderTop: '1px dashed #ccc', marginTop: 4, paddingTop: 4 }}>
-                      <span>(=) Efectivo de Ventas:</span>
-                      <span>{fmtMoney(totalVendido - stats.totalNoEfectivo)}</span>
+                      <span>(=) Flujo Efectivo Neto Hoy:</span>
+                      <span>{fmtMoney((stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef)) + (stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef)) - stats.sumDevolucionesCancelaciones - Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)))}</span>
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginTop: 8 }}>
-                      <span>(+) Fondo Inicial:</span>
+                      <span>(+) Fondo Inicial C$:</span>
                       <strong>{fmtMoney(session.monto_inicial || session.initialAmount)}</strong>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginTop: 4, background: '#f8fafc', padding: 4, borderRadius: 4 }}>
-                      <span style={{ fontWeight: 'bold', color: theme.primary }}>Total Esperado:</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginTop: 4, background: '#f8fafc', padding: 6, borderRadius: 4, border: '1px solid #e2e8f0' }}>
+                      <span style={{ fontWeight: 'bold', color: theme.primary }}>EFECTIVO ESPERADO:</span>
                       <strong style={{ color: theme.primary }}>{fmtMoney(stats.efectivoEsperado)}</strong>
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'right' }}>
-                      (C${stats.efectivoEsperadoCordobas.toFixed(2)} + ${stats.efectivoEsperadoDolares.toFixed(2)})
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'right', marginTop: 2 }}>
+                      (Físico esperado: {fmtMoney(stats.efectivoEsperadoCordobas)} y $ {Number(stats.efectivoEsperadoDolares).toFixed(2)})
                     </div>
+
+                    {/* PAGOS ELECTRONICOS NO SUMAN A LA CAJA */}
+                    <div style={{ marginTop: 15, paddingTop: 8, borderTop: '1px solid #eee' }}>
+                      <div style={{ fontSize: '0.75rem', color: theme.textLight, fontWeight: 'bold', marginBottom: 4 }}>PAGOS ELECTRÓNICOS (NO SUMAN A CAJA):</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: theme.secondary }}>
+                        <span>Tarjetas: {fmtMoney(stats.totalTarjeta)}</span>
+                        <span>Transferencias: {fmtMoney(stats.totalTransferencia)}</span>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
 
