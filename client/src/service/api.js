@@ -11,8 +11,8 @@ const API_URL = RAW_BASE; // Simplificado
 
 export { API_URL };
 
-const REQUEST_TIMEOUT = 15000; // 15 segundos máximo por request
-const MAX_RETRIES = 2; // Reintentos solo para GET
+const REQUEST_TIMEOUT = 45000; // Aumentado a 45s para redes rurales muy lentas
+const MAX_RETRIES = 3; // Hasta 3 reintentos automáticos para GETs
 
 const request = async (method, path, token = null, data = null, config = {}) => {
     const headers = { 'Content-Type': 'application/json', ...(config.headers || {}) };
@@ -59,10 +59,11 @@ const request = async (method, path, token = null, data = null, config = {}) => 
             if (isLastAttempt) {
                 const networkError = new Error(
                     err.code === 'ECONNABORTED'
-                        ? 'Tiempo de espera agotado. Verifica tu conexión a internet.'
+                        ? 'Tiempo de espera agotado. El internet está muy lento, por favor espera.'
                         : (err.message || 'Error de conexión con el servidor.')
                 );
                 networkError.isNetworkError = true;
+                networkError.status = 503; // Force 503 instead of letting frontend interpret Network Error as a critical failure
                 throw networkError;
             }
 

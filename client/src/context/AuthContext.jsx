@@ -28,10 +28,18 @@ export const AuthProvider = ({ children, socket }) => {
         navigate('/login');
     }, [navigate]);
 
-    const CACHE_KEY = 'masterDataCache';
-
-    const loadMasterData = useCallback(async (token, useBackground = false) => {
+    const loadMasterData = useCallback(async (token) => {
         try {
+            // Validar Token REAL: La única manera de ser deslogueado es si /auth/me da 401
+            try {
+                await api.fetchMe(token);
+            } catch (authErr) {
+                if (authErr.status === 401) {
+                    logout();
+                    return;
+                }
+            }
+
             const results = await Promise.allSettled([
                 api.fetchUsers(token),
                 api.fetchProducts(token),
@@ -40,7 +48,7 @@ export const AuthProvider = ({ children, socket }) => {
                 api.fetchProviders(token),
             ]);
 
-            // Cada uno se procesa individualmente — si uno falla, los demás aún cargan
+            // Cada uno se procesa individualmente — si uno falla, los demás aún cargan o se reintentarán luego
             const newUsers = results[0].status === 'fulfilled' ? (results[0].value || []) : null;
             const newProducts = results[1].status === 'fulfilled' ? (results[1].value || []) : null;
             const newClients = results[2].status === 'fulfilled' ? (results[2].value || []) : null;
@@ -53,44 +61,13 @@ export const AuthProvider = ({ children, socket }) => {
             if (newCategories) setCategories(newCategories);
             if (newProviders) setProviders(newProviders);
 
-            // Guardar en caché local para carga instantánea futura
-            try {
-                const cacheData = {
-                    users: newUsers || [],
-                    products: newProducts || [],
-                    clients: newClients || [],
-                    categories: newCategories || [],
-                    providers: newProviders || [],
-                    timestamp: Date.now()
-                };
-                localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
-            } catch (e) { /* localStorage lleno — ignorar */ }
+            // No más caché local forzosamente destruido. El sistema es 100% dependiente de la Nube para siempre ver datos reales.
 
-            // Si TODOS fallaron con 401, hacer logout
-            const allUnauth = results.every(r => r.status === 'rejected' && r.reason?.status === 401);
-            if (allUnauth) logout();
         } catch (err) {
-            console.error("Fallo crítico cargando datos maestros:", err);
-            if (err.status === 401) logout();
+            console.error("Error de Red cargando datos maestros (Esperando reintento):", err);
+            // Ya no cerramos sesión (logout) a lo loco por desconexiones o lags.
         }
     }, [logout]);
-
-    // Cargar datos desde caché local (instantáneo)
-    const loadFromCache = useCallback(() => {
-        try {
-            const cached = localStorage.getItem(CACHE_KEY);
-            if (cached) {
-                const data = JSON.parse(cached);
-                if (data.users?.length) setAllUsers(data.users);
-                if (data.products?.length) setProducts(data.products);
-                if (data.clients?.length) setClients(data.clients);
-                if (data.categories?.length) setCategories(data.categories);
-                if (data.providers?.length) setProviders(data.providers);
-                return true; // Caché encontrada
-            }
-        } catch (e) { /* caché corrupta */ }
-        return false; // Sin caché
-    }, []);
 
     const refreshProducts = useCallback(async () => {
         if (!token) return;
@@ -172,30 +149,19 @@ export const AuthProvider = ({ children, socket }) => {
                         setUser(parsedUser);
                         setToken(tokenInStorage);
 
-                        // 1. CARGAR DESDE CACHÉ = INSTANTÁNEO (< 10ms)
-                        const hadCache = loadFromCache();
-
-                        if (hadCache) {
-                            // Tenemos datos en caché — mostrar el app INMEDIATAMENTE
-                            setIsLoading(false);
-                            // 2. Refrescar en segundo plano sin bloquear UI
-                            loadMasterData(tokenInStorage, true).catch(console.warn);
-                        } else {
-                            // Sin caché — primera vez, hay que esperar
-                            await loadMasterData(tokenInStorage);
-                            setIsLoading(false);
-                        }
+                        // MODO 100% NUBE ESTRICTA: Cero caché tolerado. Todo se carga del servidor.
+                        await loadMasterData(tokenInStorage);
                     } catch (error) {
-                        logout();
+                        // Logout handled gracefully inside loadMasterData now only if 401
                     }
                 }
             } finally {
                 // Failsafe: si algo salió mal, asegurar que loading se apague
-                setIsLoading(prev => prev ? false : prev);
+                setIsLoading(false);
             }
         };
         initializeAuth();
-    }, [logout, loadMasterData, loadFromCache]);
+    }, [logout, loadMasterData]);
 
     const login = async (userData, token) => {
         localStorage.setItem('token', token);

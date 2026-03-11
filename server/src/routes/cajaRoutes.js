@@ -237,7 +237,14 @@ function calcularTotalesSesion(transactions, details) {
     // AJUSTES SECRETOS
     else if (tipo === 'ajuste') {
       const monto = txAmount;
-      if (d.target === 'efectivo') movimientoNetoEfectivo += monto;
+      if (d.target === 'efectivo') {
+        movimientoNetoEfectivo += monto;
+        // USER REQUEST: Si el ajuste al efectivo es negativo (un faltante o reintegro), 
+        // debe restar de las Ventas Totales para que la contabilidad del dia baje junto con el cash.
+        if (monto < 0) {
+          ventasAjuste += monto;
+        }
+      }
       else if (d.target === 'credito') totalCredito += monto;
       else if (d.target === 'tarjeta') totalTarjeta += monto;
       else if (d.target === 'transferencia') totalTransferencia += monto;

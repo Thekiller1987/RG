@@ -185,8 +185,10 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
             tVentasDia -= Math.abs(totalRevenue);
         } else if (t === 'ajuste' && pd.target === 'ventas_totales') {
             tVentasDia += txAmount; // God Mode: ajustar ventas totales
+        } else if (t === 'ajuste' && pd.target === 'efectivo' && txAmount < 0) {
+            // USER REQUEST: Si el ajuste al efectivo es negativo, debe sumar (ya que txAmount es negativo, le sumamos a tVentasDia para restar)
+            tVentasDia += txAmount;
         }
-        // ajustes regulares NO afectan ventas totales (God Mode invisible)
 
         // ══════════════════════════════════════════════════════
         // 4. CLASSIFICATION for Lists
