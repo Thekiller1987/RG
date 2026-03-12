@@ -835,17 +835,16 @@ const POS = () => {
                   cart.map(item => (
                     <S.CartItemWrapper
                       as={motion.div}
-                      layout
-                      initial={{ opacity: 0, x: -20, scale: 0.95 }}
-                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.9 }}
-                      transition={{ duration: 0.2 }}
+                      transition={{ duration: 0.15 }}
                       key={item.id_producto || item.id}
                     >
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#e6ecff' }}>{item.nombre}</div>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#99a3c4', fontStyle: 'normal' }}>{item.codigo}</div>
-                        <div style={{ fontSize: '0.8rem', color: '#99a3c4', marginTop: '4px' }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#0f172a' }}>{item.nombre}</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b', fontStyle: 'normal' }}>{item.codigo}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
                           Unit: C$ {fmt(item.precio_venta)}
                         </div>
                         <div style={{ fontSize: '0.9rem', fontWeight: '800', color: '#4ade80', marginTop: '2px' }}>

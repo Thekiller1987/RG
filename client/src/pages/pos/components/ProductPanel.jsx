@@ -201,11 +201,10 @@ export default function ProductPanel({
               <S.ProductCard
                 as={motion.div}
                 key={pid}
-                layoutId={`card-${pid}`}
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ duration: 0.25, ease: "easeOut" }}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.15 }} // Una animación cortita y limpia
                 whileHover={!agotado ? { scale: 1.02, y: -4 } : {}}
                 whileTap={!agotado ? { scale: 0.96 } : {}}
                 onClick={() => !agotado && onProductClick(p)}
