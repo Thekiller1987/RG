@@ -154,39 +154,38 @@ export const ProductGrid = styled.div`
 `;
 
 export const ProductCard = styled.div`
-  background: ${C_BG_CARD};
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: #ffffff;
   border-radius: 16px;
   overflow: hidden;
   position: relative;
-  border: ${CARD_BORDER};
+  border: 1px solid #e2e8f0;
   display: flex; flex-direction: column;
   height: 280px;
   cursor: pointer;
-  box-shadow: ${GLASS_SHADOW};
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
   &:hover {
-    border-color: rgba(14, 165, 233, 0.4);
-    box-shadow: 0 12px 32px 0 rgba(31, 38, 135, 0.1);
+    border-color: #38bdf8;
+    box-shadow: 0 12px 20px -5px rgba(14, 165, 233, 0.15), 0 8px 10px -6px rgba(14, 165, 233, 0.1);
+    transform: translateY(-2px);
     .eye-icon { opacity: 1; transform: scale(1); }
   }
 
   ${p => p.outOfStock && css`
     opacity: 0.6; filter: grayscale(0.8);
-    background: rgba(248, 250, 252, 0.6);
+    background: #f8fafc;
     pointer-events: none;
   `}
 
   .image-placeholder {
     width: 100%; height: 150px;
-    background: rgba(255,255,255,0.4);
+    background: #f1f5f9; /* Un tono gris/celeste muy claro para separar la imagen del texto blanco */
     display: flex; align-items: center; justify-content: center;
     position: relative;
-    border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+    border-bottom: 1px solid #e2e8f0;
     
-    img { width: 100%; height: 100%; object-fit: contain; padding: 12px; }
+    img { width: 100%; height: 100%; object-fit: contain; padding: 12px; mix-blend-mode: darken; }
     .no-image-icon { font-size: 2.5rem; color: #cbd5e1; }
   }
 
@@ -195,7 +194,7 @@ export const ProductCard = styled.div`
     background: white; border-radius: 50%;
     width: 32px; height: 32px;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     color: #475569;
     opacity: 0; transform: scale(0.8);
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
