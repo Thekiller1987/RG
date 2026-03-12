@@ -6,7 +6,7 @@ import {
   FaFileInvoice, FaMoneyBillWave, FaArrowDown, FaArrowUp,
   FaPercentage, FaTag, FaEdit, FaPencilAlt
 } from 'react-icons/fa';
-import { AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import * as S from './POS.styles.jsx';
 import * as api from '../../service/api';
@@ -66,6 +66,7 @@ const POS = () => {
       netDolares: stats.efectivoEsperadoDolares
     };
   }, [cajaSession, tasaDolar]);
+  // --- SONIDOS PREMIUM WEB AUDIO API ---
   const playBeep = useCallback(() => {
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -75,17 +76,17 @@ const POS = () => {
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(1200, ctx.currentTime);
-      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      osc.type = 'triangle'; // Sonido más suave que sine/square
+      osc.frequency.setValueAtTime(800, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.05); // Snap up
+      gain.gain.setValueAtTime(0.001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
       osc.start();
       osc.stop(ctx.currentTime + 0.1);
-    } catch (e) {
-      // Ignore audio errors (interaction requirement)
-    }
+    } catch (e) { }
   }, []);
 
-  // Sonido de éxito al completar una venta (chime agradable)
   const playSuccessSound = useCallback(() => {
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -93,43 +94,31 @@ const POS = () => {
       const ctx = new Ctx();
       const now = ctx.currentTime;
 
-      // Nota 1: Do (C5)
-      const osc1 = ctx.createOscillator();
-      const gain1 = ctx.createGain();
-      osc1.connect(gain1); gain1.connect(ctx.destination);
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(523, now);
-      gain1.gain.setValueAtTime(0.15, now);
-      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-      osc1.start(now); osc1.stop(now + 0.4);
+      // Acorde Mágico moderno (Major 7th arpeggio rápido)
+      const notes = [
+        { f: 523.25, time: 0 },   // C5
+        { f: 659.25, time: 0.08 },// E5
+        { f: 783.99, time: 0.16 },// G5
+        { f: 1046.50, time: 0.24 }// C6
+      ];
 
-      // Nota 2: Mi (E5)
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.connect(gain2); gain2.connect(ctx.destination);
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(659, now + 0.12);
-      gain2.gain.setValueAtTime(0.001, now);
-      gain2.gain.setValueAtTime(0.15, now + 0.12);
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-      osc2.start(now + 0.12); osc2.stop(now + 0.5);
+      notes.forEach(({ f, time }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, now + time);
 
-      // Nota 3: Sol (G5)
-      const osc3 = ctx.createOscillator();
-      const gain3 = ctx.createGain();
-      osc3.connect(gain3); gain3.connect(ctx.destination);
-      osc3.type = 'sine';
-      osc3.frequency.setValueAtTime(784, now + 0.24);
-      gain3.gain.setValueAtTime(0.001, now);
-      gain3.gain.setValueAtTime(0.18, now + 0.24);
-      gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
-      osc3.start(now + 0.24); osc3.stop(now + 0.7);
-    } catch (e) {
-      // Ignore audio errors
-    }
+        gain.gain.setValueAtTime(0.001, now + time);
+        gain.gain.exponentialRampToValueAtTime(0.1, now + time + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + time + 0.4);
+
+        osc.start(now + time);
+        osc.stop(now + time + 0.5);
+      });
+    } catch (e) { }
   }, []);
 
-  // Sonido de eliminación de producto del carrito
   const playDeleteSound = useCallback(() => {
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -140,16 +129,29 @@ const POS = () => {
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(150, now);
-      osc.frequency.exponentialRampToValueAtTime(50, now + 0.15);
-      gain.gain.setValueAtTime(0.15, now);
+
+      osc.type = 'square';
+      // Pitch drop effect
+      osc.frequency.setValueAtTime(400, now);
+      osc.frequency.exponentialRampToValueAtTime(100, now + 0.15);
+
+      // Filter para opacar el sonido (muffled effect)
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1000, now);
+      filter.frequency.exponentialRampToValueAtTime(100, now + 0.15);
+
+      osc.disconnect();
+      osc.connect(filter);
+      filter.connect(gain);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
       osc.start(now);
       osc.stop(now + 0.15);
-    } catch (e) {
-      // Ignore audio errors
-    }
+    } catch (e) { }
   }, []);
 
   // Cálculos del Carrito Activo
@@ -826,43 +828,55 @@ const POS = () => {
 
             {/* Lista de Items en Carrito */}
             <div style={{ flex: 1, overflowY: 'auto', margin: '1rem 0', paddingRight: '5px' }}>
-              {cart.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: '2rem' }}>Selecciona productos para vender</div>
-              ) : (
-                cart.map(item => (
-                  <S.CartItemWrapper key={item.id_producto || item.id}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1e293b' }}>{item.nombre}</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', fontStyle: 'normal' }}>{item.codigo}</div>
-                      <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                        Unit: C$ {fmt(item.precio_venta)}
+              <AnimatePresence>
+                {cart.length === 0 ? (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center', color: '#94a3b8', marginTop: '2rem' }}>
+                    Selecciona productos para vender
+                  </motion.div>
+                ) : (
+                  cart.map(item => (
+                    <S.CartItemWrapper
+                      as={motion.div}
+                      layout
+                      initial={{ opacity: 0, x: -20, scale: 0.95 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      transition={{ duration: 0.2 }}
+                      key={item.id_producto || item.id}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#e6ecff' }}>{item.nombre}</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#99a3c4', fontStyle: 'normal' }}>{item.codigo}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#99a3c4', marginTop: '4px' }}>
+                          Unit: C$ {fmt(item.precio_venta)}
+                        </div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: '800', color: '#4ade80', marginTop: '2px' }}>
+                          Total: C$ {fmt(Number(item.quantity || 1) * Number(item.precio_venta || 0))}
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                          <S.RoundBtn title="Editar Precio" onClick={() => openModal('editPrice', { item })}>
+                            <FaPencilAlt size={11} />
+                          </S.RoundBtn>
+                          <S.RoundBtn title="Precio Mayorista" onClick={() => handleItemWholesale(item)}>
+                            <FaTag size={11} />
+                          </S.RoundBtn>
+                          <S.RoundBtn title="Descuento Item" onClick={() => openModal('itemDiscount', { item })}>
+                            <FaPercentage size={11} />
+                          </S.RoundBtn>
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#2563eb', marginTop: '2px' }}>
-                        Total: C$ {fmt(Number(item.quantity || 1) * Number(item.precio_venta || 0))}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <S.QtyControl>
+                          <S.RoundBtn onClick={() => handleUpdateCartQuantity(item.id_producto || item.id, item.quantity - 1)}><FaMinus size={10} /></S.RoundBtn>
+                          <span style={{ fontWeight: 800, minWidth: 26, textAlign: 'center', fontSize: '1rem', color: 'white' }}>{item.quantity}</span>
+                          <S.RoundBtn onClick={() => handleUpdateCartQuantity(item.id_producto || item.id, item.quantity + 1)}><FaPlus size={10} /></S.RoundBtn>
+                        </S.QtyControl>
+                        <S.RoundBtn onClick={() => { playDeleteSound(); updateActiveCart(cart.filter(x => (x.id_producto || x.id) !== (item.id_producto || item.id))); }} style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5' }}><FaTrashAlt size={14} /></S.RoundBtn>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                        <S.RoundBtn title="Editar Precio" onClick={() => openModal('editPrice', { item })} style={{ width: 26, height: 26, background: '#f1f5f9', color: '#334155' }}>
-                          <FaPencilAlt size={10} />
-                        </S.RoundBtn>
-                        <S.RoundBtn title="Precio Mayorista" onClick={() => handleItemWholesale(item)} style={{ width: 26, height: 26, background: '#f1f5f9', color: '#334155' }}>
-                          <FaTag size={10} />
-                        </S.RoundBtn>
-                        <S.RoundBtn title="Descuento Item" onClick={() => openModal('itemDiscount', { item })} style={{ width: 26, height: 26, background: '#f1f5f9', color: '#334155' }}>
-                          <FaPercentage size={10} />
-                        </S.RoundBtn>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <S.QtyControl>
-                        <S.RoundBtn onClick={() => handleUpdateCartQuantity(item.id_producto || item.id, item.quantity - 1)}><FaMinus size={8} /></S.RoundBtn>
-                        <span style={{ fontWeight: 700, minWidth: 24, textAlign: 'center', fontSize: '0.9rem' }}>{item.quantity}</span>
-                        <S.RoundBtn onClick={() => handleUpdateCartQuantity(item.id_producto || item.id, item.quantity + 1)}><FaPlus size={8} /></S.RoundBtn>
-                      </S.QtyControl>
-                      <S.RoundBtn onClick={() => { playDeleteSound(); updateActiveCart(cart.filter(x => (x.id_producto || x.id) !== (item.id_producto || item.id))); }} style={{ color: '#ef4444' }}><FaTrashAlt size={12} /></S.RoundBtn>
-                    </div>
-                  </S.CartItemWrapper>
-                ))
-              )}
+                    </S.CartItemWrapper>
+                  ))
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Totales y Botón Cobrar */}

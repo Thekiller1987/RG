@@ -789,9 +789,10 @@ const CashReport = () => {
             <div class="row"><span>(+) Efectivo Físico (Ventas y Abonos):</span><span>${fmtMoney(stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef) + stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef))}</span></div>
             <div class="row"><span>(+) Pagos Electrónicos (Tarjetas/Transf):</span><span>${fmtMoney(stats.totalTarjeta + stats.totalTransferencia)}</span></div>
             <div class="row"><span>(+) Ventas al Crédito (Por Cobrar):</span><span>${fmtMoney(stats.totalCredito)}</span></div>
+            ${stats.sumDevolucionesCancelaciones > 0 ? `<div class="row" style="color: #dc2626; font-weight: bold;"><span>(-) Devoluciones / Cancelaciones:</span><span>-${fmtMoney(stats.sumDevolucionesCancelaciones)}</span></div>` : ''}
             <div class="row bold" style="border-top: 1px dashed #cbd5e1; margin-top: 5px; padding-top: 8px;">
-              <span>(=) INGRESOS TOTALES GENERADOS:</span>
-              <span>${fmtMoney((stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef) + stats.vTarjeta + stats.vTransf + stats.vCredito) + (stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef) + stats.aTarjeta + stats.aTransf))}</span>
+              <span>(=) INGRESOS TOTALES NETOS GENERADOS:</span>
+              <span>${fmtMoney((stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef) + stats.vTarjeta + stats.vTransf + stats.vCredito) + (stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef) + stats.aTarjeta + stats.aTransf) - stats.sumDevolucionesCancelaciones)}</span>
             </div>
           </div>
         </div>
@@ -800,9 +801,9 @@ const CashReport = () => {
           <div class="box-header">Conciliación de Efectivo Físico (Dinero en Mano)</div>
           <div class="box-content">
                   <div class="row"><span>(+) Ventas y Abonos Efectivo:</span><span>${fmtMoney(stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef) + stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef))}</span></div>
-                  ${stats.sumDevolucionesCancelaciones > 0 ? `<div class="row"><span>(-) Efectivo Devuelto:</span><span>-${fmtMoney(stats.sumDevolucionesCancelaciones)}</span></div>` : ''}
+                  ${stats.sumDevolucionesCancelaciones > 0 ? `<div class="row"><span>(-) Efectivo Devuelto (Cancel/Devoluciones):</span><span>-${fmtMoney(stats.sumDevolucionesCancelaciones)}</span></div>` : ''}
                   ${Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)) > 0 ? `
-                      <div class="row"><span>(-) Gastos de Caja:</span><span>-${fmtMoney(Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)))}</span></div>
+                      <div class="row"><span>(-) Gastos de Caja (Salidas):</span><span>-${fmtMoney(Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)))}</span></div>
                   ` : ''}
                   <div class="row bold" style="margin-top: 5px;">
                     <span>(=) Flujo Efectivo Neto Hoy:</span>
@@ -1018,17 +1019,16 @@ const CashReport = () => {
               </CardHeader>
 
               <CardBody>
-                {/* TOTAL INGRESOS DEL DÍA (Bruto Ventas + Abonos) */}
                 <div style={{
                   background: '#f1f5f9', padding: '1rem', borderRadius: '8px', border: `1px solid ${theme.border}`, marginBottom: '1rem',
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                 }}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontWeight: '600', color: theme.secondary, textTransform: 'uppercase', fontSize: '0.85rem' }}>💰 Ingresos Totales Generados</span>
-                    <span style={{ fontSize: '0.7rem', color: theme.textLight }}>(Efectivo + Electrónico)</span>
+                    <span style={{ fontWeight: '600', color: theme.secondary, textTransform: 'uppercase', fontSize: '0.85rem' }}>💰 Ingresos Totales Netos Generados</span>
+                    <span style={{ fontSize: '0.7rem', color: theme.textLight }}>(Ventas + Abonos - Devoluciones/Cancelaciones)</span>
                   </div>
                   <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: theme.primary, fontFamily: 'Roboto Mono' }}>
-                    {fmtMoney((stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef) + stats.vTarjeta + stats.vTransf + stats.vCredito) + (stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef) + stats.aTarjeta + stats.aTransf))}
+                    {fmtMoney((stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef) + stats.vTarjeta + stats.vTransf + stats.vCredito) + (stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef) + stats.aTarjeta + stats.aTransf) - stats.sumDevolucionesCancelaciones)}
                   </span>
                 </div>
 
@@ -1054,9 +1054,17 @@ const CashReport = () => {
                       <span>{fmtMoney(stats.totalCredito)}</span>
                     </div>
 
+                    {/* DEVOLUCIONES Y CANCELACIONES VISIBLES EN INGRESOS */}
+                    {stats.sumDevolucionesCancelaciones > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#dc3545', marginTop: 4 }}>
+                        <span>(-) Devoluciones / Cancelaciones:</span>
+                        <span>-{fmtMoney(stats.sumDevolucionesCancelaciones)}</span>
+                      </div>
+                    )}
+
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 'bold', borderTop: '1px dashed #ccc', marginTop: 4, paddingTop: 4 }}>
-                      <span>(=) Ingresos Totales Generados:</span>
-                      <span>{fmtMoney((stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef) + stats.vTarjeta + stats.vTransf + stats.vCredito) + (stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef) + stats.aTarjeta + stats.aTransf))}</span>
+                      <span>(=) Ingresos Totales Netos:</span>
+                      <span>{fmtMoney((stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef) + stats.vTarjeta + stats.vTransf + stats.vCredito) + (stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef) + stats.aTarjeta + stats.aTransf) - stats.sumDevolucionesCancelaciones)}</span>
                     </div>
                   </div>
 
@@ -1070,10 +1078,17 @@ const CashReport = () => {
                     </div>
 
                     {/* EGRESOS */}
-                    {(stats.sumDevolucionesCancelaciones > 0 || Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)) > 0) && (
+                    {stats.sumDevolucionesCancelaciones > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#dc3545', marginTop: 4 }}>
-                        <span>(-) Devoluciones / Salidas:</span>
-                        <span>-{fmtMoney(stats.sumDevolucionesCancelaciones + Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)))}</span>
+                        <span>(-) Efectivo Devuelto (Devol./Cancel.):</span>
+                        <span>-{fmtMoney(stats.sumDevolucionesCancelaciones)}</span>
+                      </div>
+                    )}
+
+                    {Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)) > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#dc3545', marginTop: 4 }}>
+                        <span>(-) Gastos de Caja (Salidas):</span>
+                        <span>-{fmtMoney(Math.abs(stats.salidas?.reduce((s, t) => s + Math.abs(t.amount || 0), 0)))}</span>
                       </div>
                     )}
 

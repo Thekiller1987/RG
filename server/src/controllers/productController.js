@@ -82,7 +82,6 @@ const getAllProducts = async (_req, res) => {
 
     // 1. Obtener carritos activos (últimos 60 min) EXCLUYENDO al usuario actual
     const requestingUserId = _req.user?.id_usuario || _req.user?.id;
-    // FIXED: Column name is carts_json, not cart_data
     const [carts] = await db.query(
       "SELECT user_id, carts_json FROM active_carts WHERE updated_at > NOW() - INTERVAL 60 MINUTE AND user_id != ?",
       [requestingUserId || -1]
@@ -92,9 +91,6 @@ const getAllProducts = async (_req, res) => {
     const reservedMap = new Map();
     carts.forEach(c => {
       try {
-        // FIXED: Use carts_json. Native JSON type in MySQL might not need parsing if driver handles it, 
-        // but often it returns string or object. If Object (mysql2), no need to parse.
-        // Let's handle both.
         let items = c.carts_json;
         if (typeof items === 'string') {
           items = JSON.parse(items);

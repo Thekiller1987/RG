@@ -189,88 +189,98 @@ export default function ProductPanel({
       </div>
 
       <S.ProductGrid>
-        {filteredProducts.map(p => {
-          const pid = p.id_producto || p.id;
-          const enCarrito = qtyInCart.get(pid) || 0;
-          const enOtrosTickets = reservedStock?.get(pid) || 0;
-          const restante = Math.max(0, Number(p.existencia || 0) - enCarrito - enOtrosTickets);
-          const agotado = restante <= 0;
+        <AnimatePresence>
+          {filteredProducts.map((p, index) => {
+            const pid = p.id_producto || p.id;
+            const enCarrito = qtyInCart.get(pid) || 0;
+            const enOtrosTickets = reservedStock?.get(pid) || 0;
+            const restante = Math.max(0, Number(p.existencia || 0) - enCarrito - enOtrosTickets);
+            const agotado = restante <= 0;
 
-          return (
-            <S.ProductCard
-              key={pid}
-              onClick={() => !agotado && onProductClick(p)}
-              outOfStock={agotado}
-              title={p.nombre}
-            >
-              <S.StockBadge lowstock={restante < 5 && !agotado} outOfStock={agotado}>
-                {agotado ? 'Agotado' : `Stock: ${restante}`}
-              </S.StockBadge>
+            return (
+              <S.ProductCard
+                as={motion.div}
+                key={pid}
+                layoutId={`card-${pid}`}
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                whileHover={!agotado ? { scale: 1.02, y: -4 } : {}}
+                whileTap={!agotado ? { scale: 0.96 } : {}}
+                onClick={() => !agotado && onProductClick(p)}
+                outOfStock={agotado}
+                title={p.nombre}
+              >
+                <S.StockBadge lowstock={restante < 5 && !agotado} outOfStock={agotado}>
+                  {agotado ? 'Agotado' : `Stock: ${restante}`}
+                </S.StockBadge>
 
-              <div className="image-placeholder" style={{ position: 'relative', height: 160, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f1f5f9', overflow: 'hidden' }}>
-                {p.imagen && (
-                  <div
-                    className="eye-icon"
-                    onClick={(e) => { e.stopPropagation(); setViewImage({ isOpen: true, imageUrl: p.imagen }); }}
-                    style={{
-                      position: 'absolute', top: 10, left: 10, zIndex: 20,
-                      background: 'white', borderRadius: '50%', width: 32, height: 32,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)', cursor: 'pointer',
-                      transition: 'transform 0.2s',
-                    }}
-                    title="Ver imagen"
-                  >
-                    <FaEye size={14} color="#64748b" />
+                <div className="image-placeholder" style={{ position: 'relative', height: 160, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f1f5f9', overflow: 'hidden' }}>
+                  {p.imagen && (
+                    <div
+                      className="eye-icon"
+                      onClick={(e) => { e.stopPropagation(); setViewImage({ isOpen: true, imageUrl: p.imagen }); }}
+                      style={{
+                        position: 'absolute', top: 10, left: 10, zIndex: 20,
+                        background: 'white', borderRadius: '50%', width: 32, height: 32,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)', cursor: 'pointer',
+                        transition: 'transform 0.2s',
+                      }}
+                      title="Ver imagen"
+                    >
+                      <FaEye size={14} color="#64748b" />
+                    </div>
+                  )}
+                  {p.imagen ? (
+                    <img src={p.imagen} alt={p.nombre} loading="lazy" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                  ) : (
+                    <FaImage className="no-image-icon" size={40} color="#e2e8f0" />
+                  )}
+                </div>
+
+                <div className="info" style={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div className="product-name" style={{
+                    fontWeight: 600, fontSize: '0.88rem', color: '#1e293b',
+                    lineHeight: '1.25', height: '3.8rem', overflow: 'hidden',
+                    display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical'
+                  }}>
+                    {p.nombre}
                   </div>
-                )}
-                {p.imagen ? (
-                  <img src={p.imagen} alt={p.nombre} loading="lazy" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-                ) : (
-                  <FaImage className="no-image-icon" size={40} color="#e2e8f0" />
-                )}
-              </div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
+                    {p.codigo || 'S/C'}
+                  </div>
 
-              <div className="info" style={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div className="product-name" style={{
-                  fontWeight: 600, fontSize: '0.88rem', color: '#1e293b',
-                  lineHeight: '1.25', height: '3.8rem', overflow: 'hidden',
-                  display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical'
-                }}>
-                  {p.nombre}
-                </div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
-                  {p.codigo || 'S/C'}
-                </div>
-
-                {/* LOGICA DE PRECIOS ADAPTATIVA */}
-                {isWholesale ? (
-                  // MODO MAYORISTA
-                  <>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px', textDecoration: 'line-through' }}>
-                      Tienda: C$ {fmt(p.precio_venta || p.precio)}
-                    </div>
-                    <div className="price" style={{ fontWeight: 800, color: '#8b5cf6', fontSize: '1.1rem' }}>
-                      C$ {fmt(p.mayorista || p.mayoreo || p.distribuidor || p.taller || p.precio_venta)}
-                    </div>
-                  </>
-                ) : (
-                  // MODO NORMAL (Minoreo)
-                  <>
-                    {(Number(p.mayorista) > 0 || Number(p.mayoreo) > 0 || Number(p.distribuidor) > 0 || Number(p.taller) > 0) && (
-                      <div style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px' }}>
-                        <FaTags size={10} /> May: C$ {fmt(p.mayorista || p.mayoreo || p.distribuidor || p.taller)}
+                  {/* LOGICA DE PRECIOS ADAPTATIVA */}
+                  {isWholesale ? (
+                    // MODO MAYORISTA
+                    <>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px', textDecoration: 'line-through' }}>
+                        Tienda: C$ {fmt(p.precio_venta || p.precio)}
                       </div>
-                    )}
-                    <div className="price" style={{ fontWeight: 800, color: '#2563eb', fontSize: '1.05rem', marginTop: !((Number(p.mayorista) > 0 || Number(p.mayoreo) > 0 || Number(p.distribuidor) > 0 || Number(p.taller) > 0)) ? 'auto' : 0 }}>
-                      C$ {fmt(p.precio_venta || p.precio)}
-                    </div>
-                  </>
-                )}
-              </div>
-            </S.ProductCard>
-          );
-        })}
+                      <div className="price" style={{ fontWeight: 800, color: '#8b5cf6', fontSize: '1.1rem' }}>
+                        C$ {fmt(p.mayorista || p.mayoreo || p.distribuidor || p.taller || p.precio_venta)}
+                      </div>
+                    </>
+                  ) : (
+                    // MODO NORMAL (Minoreo)
+                    <>
+                      {(Number(p.mayorista) > 0 || Number(p.mayoreo) > 0 || Number(p.distribuidor) > 0 || Number(p.taller) > 0) && (
+                        <div style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px' }}>
+                          <FaTags size={10} /> May: C$ {fmt(p.mayorista || p.mayoreo || p.distribuidor || p.taller)}
+                        </div>
+                      )}
+                      <div className="price" style={{ fontWeight: 800, color: '#2563eb', fontSize: '1.05rem', marginTop: !((Number(p.mayorista) > 0 || Number(p.mayoreo) > 0 || Number(p.distribuidor) > 0 || Number(p.taller) > 0)) ? 'auto' : 0 }}>
+                        C$ {fmt(p.precio_venta || p.precio)}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </S.ProductCard>
+            );
+          })}
+        </AnimatePresence>
       </S.ProductGrid>
 
       <AnimatePresence>

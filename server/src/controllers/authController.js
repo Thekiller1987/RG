@@ -85,4 +85,21 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { login, register };
+// Función para obtener los datos del usuario actual a partir del token
+const me = async (req, res) => {
+  try {
+    // req.user viene del middleware verifyToken
+    const [users] = await db.query('SELECT id_usuario, nombre_usuario, rol FROM usuarios WHERE id_usuario = ?', [req.user.id]);
+
+    if (users.length === 0) {
+      return res.status(404).json({ msg: 'Usuario no encontrado' });
+    }
+
+    res.json(users[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error en el servidor');
+  }
+};
+
+module.exports = { login, register, me };

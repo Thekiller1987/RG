@@ -34,12 +34,19 @@ const PrintWrapper = styled.div`
   font-family: 'League Spartan', 'Inter', system-ui, -apple-system, sans-serif;
   color: #000;
   background: #fff;
-  width: 310px;
+  width: 100%;
+  max-width: 340px;
   margin: 0 auto;
-  padding: 14px 12px;
-  box-shadow: 0 0 10px rgba(0,0,0,.08);
-  border: 1px solid #eee;
-  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+
+  @media (max-width: 480px) {
+    border-radius: 6px;
+    padding: 12px 8px;
+  }
 
   /* ===== 80mm TICKET STYLES ===== */
   .brand {
@@ -216,22 +223,23 @@ const PrintWrapper = styled.div`
 
 const Wrapper = styled.div`
   display: flex; flex-direction: column; gap: 12px;
+  align-items: center; /* Center the ticket inside modal */
 `;
 
 const TicketLogo = styled.img`
-  width: 100px;
-  height: 100px;
+  width: 90px;
+  height: 90px;
   object-fit: contain;
   display: block;
-  border-radius: 6px;
+  border-radius: 8px;
   .print-a4 & { width: 130px; height: auto; }
 `;
 
 const Tag = styled.span`
   display: inline-flex; align-items: center; gap: 6px;
-  font-weight: 700; letter-spacing: .4px; padding: 4px 8px;
-  border-radius: 4px; font-size: 0.85rem;
-  background: #e8f4ff; color: #0b72b9; border: 1px solid #b9defc;
+  font-weight: 700; letter-spacing: .4px; padding: 6px 10px;
+  border-radius: 8px; font-size: 0.85rem;
+  background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd;
   text-transform: uppercase;
 `;
 
@@ -373,11 +381,11 @@ const ProformaModal = ({
       <GlobalPrintStyle />
       <ModalContent className="no-print" style={{ maxWidth: 520, width: '96%', padding: '1.2rem', background: '#fff' }}>
         <HeaderBar>
-          <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}><FaReceipt /> Vista Cotización / Proforma</h2>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button onClick={() => doPrint('80')}>Ticket 80mm</Button>
-            <Button onClick={() => doPrint('A4')}><FaFileInvoice /> A4</Button>
-            <Button $cancel onClick={onClose}><FaWindowClose /></Button>
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0, fontSize: '1.25rem' }}><FaReceipt /> Proforma</h2>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <Button onClick={() => doPrint('80')} style={{ padding: '8px 12px', fontSize: '0.85rem' }}>80mm</Button>
+            <Button onClick={() => doPrint('A4')} style={{ padding: '8px 12px', fontSize: '0.85rem' }}><FaFileInvoice /> A4</Button>
+            <Button $cancel onClick={onClose} style={{ padding: '8px 12px', background: '#e2e8f0', color: '#0f172a' }}><FaWindowClose /></Button>
           </div>
         </HeaderBar>
 
