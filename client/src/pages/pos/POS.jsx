@@ -842,12 +842,12 @@ const POS = () => {
                       key={item.id_producto || item.id}
                     >
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#0f172a' }}>{item.nombre}</div>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b', fontStyle: 'normal' }}>{item.codigo}</div>
-                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
+                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a' }}>{item.nombre}</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155', fontStyle: 'normal' }}>{item.codigo}</div>
+                        <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: '4px' }}>
                           Unit: C$ {fmt(item.precio_venta)}
                         </div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: '800', color: '#4ade80', marginTop: '2px' }}>
+                        <div style={{ fontSize: '0.95rem', fontWeight: '900', color: '#15803d', marginTop: '2px' }}>
                           Total: C$ {fmt(Number(item.quantity || 1) * Number(item.precio_venta || 0))}
                         </div>
                         <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
@@ -865,10 +865,10 @@ const POS = () => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <S.QtyControl>
                           <S.RoundBtn onClick={() => handleUpdateCartQuantity(item.id_producto || item.id, item.quantity - 1)}><FaMinus size={10} /></S.RoundBtn>
-                          <span style={{ fontWeight: 800, minWidth: 26, textAlign: 'center', fontSize: '1rem', color: 'white' }}>{item.quantity}</span>
+                          <span style={{ fontWeight: 800, minWidth: 26, textAlign: 'center', fontSize: '1rem', color: '#0f172a' }}>{item.quantity}</span>
                           <S.RoundBtn onClick={() => handleUpdateCartQuantity(item.id_producto || item.id, item.quantity + 1)}><FaPlus size={10} /></S.RoundBtn>
                         </S.QtyControl>
-                        <S.RoundBtn onClick={() => { playDeleteSound(); updateActiveCart(cart.filter(x => (x.id_producto || x.id) !== (item.id_producto || item.id))); }} style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5' }}><FaTrashAlt size={14} /></S.RoundBtn>
+                        <S.RoundBtn onClick={() => { playDeleteSound(); updateActiveCart(cart.filter(x => (x.id_producto || x.id) !== (item.id_producto || item.id))); }} style={{ background: '#fef2f2', color: '#ef4444' }}><FaTrashAlt size={14} /></S.RoundBtn>
                       </div>
                     </S.CartItemWrapper>
                   ))
