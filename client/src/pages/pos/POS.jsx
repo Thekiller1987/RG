@@ -66,7 +66,6 @@ const POS = () => {
       netDolares: stats.efectivoEsperadoDolares
     };
   }, [cajaSession, tasaDolar]);
-  // --- SONIDOS PREMIUM WEB AUDIO API ---
   const playBeep = useCallback(() => {
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -76,17 +75,17 @@ const POS = () => {
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.type = 'triangle'; // Sonido más suave que sine/square
-      osc.frequency.setValueAtTime(800, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.05); // Snap up
-      gain.gain.setValueAtTime(0.001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1200, ctx.currentTime);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
       osc.start();
       osc.stop(ctx.currentTime + 0.1);
-    } catch (e) { }
+    } catch (e) {
+      // Ignore audio errors (interaction requirement)
+    }
   }, []);
 
+  // Sonido de éxito al completar una venta (chime agradable)
   const playSuccessSound = useCallback(() => {
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -94,31 +93,43 @@ const POS = () => {
       const ctx = new Ctx();
       const now = ctx.currentTime;
 
-      // Acorde Mágico moderno (Major 7th arpeggio rápido)
-      const notes = [
-        { f: 523.25, time: 0 },   // C5
-        { f: 659.25, time: 0.08 },// E5
-        { f: 783.99, time: 0.16 },// G5
-        { f: 1046.50, time: 0.24 }// C6
-      ];
+      // Nota 1: Do (C5)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.connect(gain1); gain1.connect(ctx.destination);
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(523, now);
+      gain1.gain.setValueAtTime(0.15, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      osc1.start(now); osc1.stop(now + 0.4);
 
-      notes.forEach(({ f, time }) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(f, now + time);
+      // Nota 2: Mi (E5)
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.connect(gain2); gain2.connect(ctx.destination);
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(659, now + 0.12);
+      gain2.gain.setValueAtTime(0.001, now);
+      gain2.gain.setValueAtTime(0.15, now + 0.12);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      osc2.start(now + 0.12); osc2.stop(now + 0.5);
 
-        gain.gain.setValueAtTime(0.001, now + time);
-        gain.gain.exponentialRampToValueAtTime(0.1, now + time + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + time + 0.4);
-
-        osc.start(now + time);
-        osc.stop(now + time + 0.5);
-      });
-    } catch (e) { }
+      // Nota 3: Sol (G5)
+      const osc3 = ctx.createOscillator();
+      const gain3 = ctx.createGain();
+      osc3.connect(gain3); gain3.connect(ctx.destination);
+      osc3.type = 'sine';
+      osc3.frequency.setValueAtTime(784, now + 0.24);
+      gain3.gain.setValueAtTime(0.001, now);
+      gain3.gain.setValueAtTime(0.18, now + 0.24);
+      gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+      osc3.start(now + 0.24); osc3.stop(now + 0.7);
+    } catch (e) {
+      // Ignore audio errors
+    }
   }, []);
 
+  // Sonido de eliminación de producto del carrito
   const playDeleteSound = useCallback(() => {
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -129,29 +140,16 @@ const POS = () => {
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-
-      osc.type = 'square';
-      // Pitch drop effect
-      osc.frequency.setValueAtTime(400, now);
-      osc.frequency.exponentialRampToValueAtTime(100, now + 0.15);
-
-      // Filter para opacar el sonido (muffled effect)
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(1000, now);
-      filter.frequency.exponentialRampToValueAtTime(100, now + 0.15);
-
-      osc.disconnect();
-      osc.connect(filter);
-      filter.connect(gain);
-
-      gain.gain.setValueAtTime(0.001, now);
-      gain.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, now);
+      osc.frequency.exponentialRampToValueAtTime(50, now + 0.15);
+      gain.gain.setValueAtTime(0.15, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-
       osc.start(now);
       osc.stop(now + 0.15);
-    } catch (e) { }
+    } catch (e) {
+      // Ignore audio errors
+    }
   }, []);
 
   // Cálculos del Carrito Activo

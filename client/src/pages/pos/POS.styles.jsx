@@ -6,8 +6,8 @@ import { Link } from 'react-router-dom';
 /* ===========================
    VARIABLES & THEME
    =========================== */
-const C_BG_1 = '#0b1220';
-const C_BG_2 = '#1d2b64';
+const C_BG_1 = '#dbeafe'; // Celeste cielo claro
+const C_BG_2 = '#bfdbfe'; // Celeste cielo medio
 const C_ACCENT = '#4A90E2';
 const C_ACCENT_HOVER = '#3B7ADF';
 const C_TEXT_LIGHT = '#e6ecff';
@@ -43,9 +43,7 @@ export const SpinningSpinner = styled(FaSpinner)`
 export const PageWrapper = styled.div`
   display: flex; flex-direction: column; height: 100vh;
   height: 100dvh;
-  background: radial-gradient(1200px 800px at 15% 10%, #2b3d6d 0%, transparent 60%),
-              radial-gradient(900px 600px at 85% 90%, #18325b 0%, transparent 60%),
-              linear-gradient(135deg, ${C_BG_1} 0%, ${C_BG_2} 100%);
+  background: linear-gradient(135deg, ${C_BG_1} 0%, ${C_BG_2} 100%);
   font-family: 'Inter', system-ui, sans-serif;
   color: ${C_TEXT_LIGHT};
   overflow: hidden;
