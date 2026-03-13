@@ -1,4 +1,4 @@
-import{u as F,r as u,j as e,Y as N,I as E,w as T,a0 as _,O as B,A as C,a3 as q,bi as G,a7 as A,ba as L,s as a,m as z,am as h,n as O,D}from"./vendor-Bl8eSE-Q.js";import{u as R,a1 as k}from"./index-D4EmPGrI.js";import"./scanner-vendor-DfxRpMWJ.js";import"./pdf-vendor-DV8V3V31.js";const V=a.div`
+import{u as F,r as u,j as e,Y as N,I as E,w as T,a0 as _,O as B,A as C,a3 as q,bi as G,a7 as A,ba as L,s as a,m as z,am as h,n as O,D}from"./vendor-Bl8eSE-Q.js";import{u as R,a1 as k}from"./index-CWW3cZWH.js";import"./scanner-vendor-DfxRpMWJ.js";import"./pdf-vendor-DV8V3V31.js";const V=a.div`
   max-width: 1400px;
   margin: 0 auto;
   padding: 2rem;

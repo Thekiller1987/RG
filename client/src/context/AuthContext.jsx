@@ -28,15 +28,17 @@ export const AuthProvider = ({ children, socket }) => {
         navigate('/login');
     }, [navigate]);
 
-    const loadMasterData = useCallback(async (token) => {
+    const loadMasterData = useCallback(async (token, isBackground = false) => {
         try {
-            // Validar Token REAL: La única manera de ser deslogueado es si /auth/me da 401
-            try {
-                await api.fetchMe(token);
-            } catch (authErr) {
-                if (authErr.status === 401) {
-                    logout();
-                    return;
+            // Si no es en background, valida el token (solo al hacer login)
+            if (!isBackground) {
+                try {
+                    await api.fetchMe(token);
+                } catch (authErr) {
+                    if (authErr.status === 401) {
+                        logout();
+                        return;
+                    }
                 }
             }
 
@@ -48,7 +50,6 @@ export const AuthProvider = ({ children, socket }) => {
                 api.fetchProviders(token),
             ]);
 
-            // Cada uno se procesa individualmente — si uno falla, los demás aún cargan o se reintentarán luego
             const newUsers = results[0].status === 'fulfilled' ? (results[0].value || []) : null;
             const newProducts = results[1].status === 'fulfilled' ? (results[1].value || []) : null;
             const newClients = results[2].status === 'fulfilled' ? (results[2].value || []) : null;
@@ -56,16 +57,20 @@ export const AuthProvider = ({ children, socket }) => {
             const newProviders = results[4].status === 'fulfilled' ? (results[4].value || []) : null;
 
             if (newUsers) setAllUsers(newUsers);
-            if (newProducts) setProducts(newProducts);
-            if (newClients) setClients(newClients);
+            if (newProducts) {
+                setProducts(newProducts);
+                // Cache productos: para que la próxima carga sea instantánea
+                try { localStorage.setItem('cache_products', JSON.stringify(newProducts)); } catch (e) { }
+            }
+            if (newClients) {
+                setClients(newClients);
+                try { localStorage.setItem('cache_clients', JSON.stringify(newClients)); } catch (e) { }
+            }
             if (newCategories) setCategories(newCategories);
             if (newProviders) setProviders(newProviders);
 
-            // No más caché local forzosamente destruido. El sistema es 100% dependiente de la Nube para siempre ver datos reales.
-
         } catch (err) {
             console.error("Error de Red cargando datos maestros (Esperando reintento):", err);
-            // Ya no cerramos sesión (logout) a lo loco por desconexiones o lags.
         }
     }, [logout]);
 
@@ -149,14 +154,29 @@ export const AuthProvider = ({ children, socket }) => {
                         setUser(parsedUser);
                         setToken(tokenInStorage);
 
-                        // MODO 100% NUBE ESTRICTA: Cero caché tolerado. Todo se carga del servidor.
-                        await loadMasterData(tokenInStorage);
+                        // ★ CARGA INSTANTÁNEA: Mostrar datos cacheados al instante
+                        // para que el usuario NO vea pantalla en blanco/spinner largo.
+                        const cachedProducts = localStorage.getItem('cache_products');
+                        const cachedClients = localStorage.getItem('cache_clients');
+                        if (cachedProducts) setProducts(JSON.parse(cachedProducts));
+                        if (cachedClients) setClients(JSON.parse(cachedClients));
+
+                        // Desbloquear UI inmediatamente con los datos cacheados
+                        setIsLoading(false);
+
+                        // ★ BACKGROUND REFRESH: Los datos reales se cargan
+                        // en segundo plano sin bloquear la pantalla.
+                        // La UI ya se ve, y se actualizará sola cuando lleguen
+                        // los datos reales del servidor.
+                        loadMasterData(tokenInStorage, true); // true = background (skip auth check)
+
                     } catch (error) {
-                        // Logout handled gracefully inside loadMasterData now only if 401
+                        setIsLoading(false);
                     }
+                } else {
+                    setIsLoading(false);
                 }
             } finally {
-                // Failsafe: si algo salió mal, asegurar que loading se apague
                 setIsLoading(false);
             }
         };

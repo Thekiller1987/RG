@@ -113,51 +113,34 @@ const CajaModal = ({
 
   // --------- Clasificación y totales (100% AUTORIDAD DEL SERVIDOR) ----------
   const stats = useMemo(() => {
+    // Usar SIEMPRE el cálculo local basado en las transacciones para tener las nuevas variables
+    // de desglose (vEfectivoC, vEfectivoD) porque session.stats histórico no las tiene.
     const fallbackStats = calculateCajaStats(transactions, (session?.initialAmount || 0), (session?.tasaDolar || initialTasaDolar));
 
-    // 1. Prioridad: Stats pre-calculadas por el servidor
-    if (session?.stats && typeof session.stats === 'object') {
+    // Si el server mandó un stats con las nuevas variables, lo usamos, si no, nos fiamos del cálculo local.
+    if (session?.stats && session.stats.vEfectivoC !== undefined) {
       return {
         ...session.stats,
         lists: session.stats.lists || fallbackStats.lists
       };
     }
 
-    // 2. Fallback: sqlTotals (si el server mandó totales directos pero no el breakdown)
-    if (session?.sqlTotals) {
-      const sql = session.sqlTotals;
-      const initial = session?.initialAmount || 0;
-      return {
-        cajaInicial: initial,
-        netCordobas: sql.efectivo,
-        netDolares: sql.dolares,
-        movimientoNetoEfectivo: sql.esperado - initial,
-        efectivoEsperado: sql.esperado,
-        efectivoEsperadoCordobas: sql.efectivo + initial,
-        efectivoEsperadoDolares: sql.dolares,
-        totalTarjeta: sql.tarjeta,
-        totalTransferencia: sql.transferencia,
-        totalCredito: sql.credito,
-        totalNoEfectivo: sql.tarjeta + sql.transferencia + sql.credito,
-        tasaRef: session?.tasaDolar || initialTasaDolar,
-        lists: fallbackStats.lists
-      };
-    }
-
-    // 3. Último recurso (Offline/Legacy)
     return fallbackStats;
   }, [transactions, session, initialTasaDolar]);
 
   const {
     cajaInicial, netCordobas, netDolares, efectivoEsperado, efectivoEsperadoCordobas, efectivoEsperadoDolares,
-    totalVentasDia, totalTarjeta, totalTransferencia, totalCredito, totalNoEfectivo,
+    totalTarjeta, totalTransferencia, totalCredito, totalNoEfectivo,
     sumDevolucionesCancelaciones, totalHidden, tasaRef,
+    vEfectivoC, vEfectivoD, vTarjeta, vTransf, vCredito,
+    aEfectivoC, aEfectivoD, aTarjeta, aTransf,
     lists: { ventasContado, devoluciones, cancelaciones, entradas, salidas, abonos }
   } = stats;
 
-
-
-  const diferencia = (Number(montoContado || 0) - efectivoEsperado);
+  const ingresosTotalesNetos = (
+    (vEfectivoC || 0) + ((vEfectivoD || 0) * tasaRef) + (vTarjeta || 0) + (vTransf || 0) + (vCredito || 0) +
+    (aEfectivoC || 0) + ((aEfectivoD || 0) * tasaRef) + (aTarjeta || 0) + (aTransf || 0)
+  ) - (sumDevolucionesCancelaciones || 0); const diferencia = (Number(montoContado || 0) - efectivoEsperado);
   const openedAt = session?.openedAt ? new Date(session.openedAt) : null;
 
   // --------- HANDLERS ----------
@@ -289,8 +272,8 @@ const CajaModal = ({
               {/* Resumen Cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 15, marginBottom: 20 }}>
                 <div style={{ background: '#fff', padding: 15, borderRadius: 8, boxShadow: '0 2px 5px rgba(0,0,0,0.05)', borderLeft: '4px solid #007bff' }}>
-                  <div style={{ fontSize: '0.8rem', color: '#666', textTransform: 'uppercase' }}>Ventas Totales</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#333' }}>{money(totalVentasDia)}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#666', textTransform: 'uppercase' }}>Ingresos Totales Netos</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#333' }}>{money(ingresosTotalesNetos)}</div>
                 </div>
                 <div style={{ background: '#fff', padding: 15, borderRadius: 8, boxShadow: '0 2px 5px rgba(0,0,0,0.05)', borderLeft: '4px solid #28a745' }}>
                   <div style={{ fontSize: '0.8rem', color: '#666', textTransform: 'uppercase' }}>Efectivo Real</div>
@@ -311,7 +294,7 @@ const CajaModal = ({
 
                     {/* Sección Detallada de Ventas */}
                     <tr style={{ background: '#f8f9fa' }}><td colSpan="2" style={{ padding: '8px 10px', fontSize: '0.85rem', fontWeight: 'bold', color: '#007bff' }}>RESUMEN DE INGRESOS</td></tr>
-                    <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem' }}>(+) Ventas Netas (Ventas + Abonos - Devoluciones)</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem' }}>{money(totalVentasDia)}</td></tr>
+                    <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem' }}>(+) Ventas Netas (Ventas + Abonos - Devoluciones)</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem' }}>{money(ingresosTotalesNetos)}</td></tr>
                     {sumDevolucionesCancelaciones > 0 && <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.85rem', color: '#856404' }}>    (Devoluciones/Cancel. ya descontadas: {money(sumDevolucionesCancelaciones)})</td><td></td></tr>}
                     <tr><td style={{ padding: '4px 10px 4px 20px', fontSize: '0.9rem', color: '#dc3545' }}>(-) Tarjetas / Transf / Crédito</td><td className="text-right" style={{ padding: '4px 10px', fontSize: '0.9rem', color: '#dc3545' }}>- {money(totalNoEfectivo)}</td></tr>
                     {totalTarjeta > 0 && <tr><td style={{ padding: '2px 10px 2px 35px', fontSize: '0.82rem', color: '#6c757d' }}>💳 Tarjeta</td><td className="text-right" style={{ padding: '2px 10px', fontSize: '0.82rem', color: '#6c757d' }}>{money(totalTarjeta)}</td></tr>}
@@ -384,8 +367,8 @@ const CajaModal = ({
                 </div>
 
                 <div className="section">
-                  <div className="section-title">1. VENTAS NETAS</div>
-                  <div className="row big"><span>TOTAL NETO:</span><span>{money(totalVentasDia)}</span></div>
+                  <div className="section-title">1. INGRESOS TOTALES NETOS</div>
+                  <div className="row big"><span>TOTAL NETO:</span><span>{money(ingresosTotalesNetos)}</span></div>
                   <div className="row sub">(Ventas + Abonos - Devoluciones/Cancelaciones)</div>
                   {sumDevolucionesCancelaciones > 0 && <div className="row sub" style={{ color: '#856404' }}>(Devol./Cancel.: -{money(sumDevolucionesCancelaciones)})</div>}
                 </div>
@@ -401,7 +384,7 @@ const CajaModal = ({
                 <div className="section">
                   <div className="section-title">3. FLUJO EFECTIVO (RESUMEN)</div>
                   <div className="row"><span>Fondo Inicial:</span><span>{money(cajaInicial)}</span></div>
-                  <div className="row"><span>(+) Ventas Netas:</span><span>{money(totalVentasDia)}</span></div>
+                  <div className="row"><span>(+) Ingresos Netos:</span><span>{money(ingresosTotalesNetos)}</span></div>
                   <div className="row"><span>(-) No Efectivo:</span><span>-{money(totalNoEfectivo)}</span></div>
                   {Math.abs(salidas.reduce((s, t) => s + Math.abs(t.displayAmount || 0), 0)) > 0 && (
                     <div className="row"><span>(-) Salidas:</span><span>-{money(salidas.reduce((s, t) => s + Math.abs(t.displayAmount || 0), 0))}</span></div>

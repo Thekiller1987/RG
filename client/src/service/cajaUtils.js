@@ -56,6 +56,14 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
     // CRITICAL: Deduplicate BEFORE processing to prevent inflated totals
     const validTransactions = deduplicateTransactions(Array.isArray(transactions) ? transactions : []);
 
+    // Desglose de Ventas
+    let vEfectivoC = 0; let vEfectivoD = 0;
+    let vTarjeta = 0; let vTransf = 0; let vCredito = 0;
+
+    // Desglose de Abonos
+    let aEfectivoC = 0; let aEfectivoD = 0;
+    let aTarjeta = 0; let aTransf = 0;
+
     for (const tx of validTransactions) {
         let t = (tx?.type || '').toLowerCase().trim();
         t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -110,10 +118,13 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
             if (txEfectivo > 0.001 || txDolares > 0.001 || txCambio > 0.001) {
                 netCordobas += (txEfectivo - txCambio);
                 netDolares += txDolares;
+                vEfectivoC += (txEfectivo - txCambio);
+                vEfectivoD += txDolares;
             }
             // ── TIER 2: ingresoCaja (ya calculado por PaymentModal, incluye dólares convertidos) ──
             else if (txIngresoCaja > 0.001) {
                 netCordobas += txIngresoCaja;
+                vEfectivoC += txIngresoCaja;
                 // NO sumar dólares aquí para evitar doble conteo
             }
             // ── TIER 3: Calcular residual (totalVenta - lo no-efectivo) ──
@@ -122,22 +133,34 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
                 const residual = txTotalVenta - noEfectivoSum;
                 if (residual > 0.001) {
                     netCordobas += residual;
+                    vEfectivoC += residual;
                 }
                 // Si residual <= 0, fue todo tarjeta/transferencia/crédito → no cash
             }
+            vTarjeta += txTarjeta;
+            vTransf += txTransf;
+            vCredito += txCredito;
 
         } else if (t.includes('abono') || t.includes('liquidación') || t.includes('liquidacion') || t.includes('pedido')) {
             if (txDolares > 0.001) {
                 netDolares += txDolares;
                 netCordobas += txEfectivo;
+                aEfectivoD += txDolares;
+                aEfectivoC += txEfectivo;
             } else if (txEfectivo > 0.001) {
                 netCordobas += txEfectivo;
+                aEfectivoC += txEfectivo;
             } else if (txIngresoCaja > 0.001) {
                 netCordobas += txIngresoCaja;
+                aEfectivoC += txIngresoCaja;
             } else {
                 const noEfectivo = txTarjeta + txTransf;
-                netCordobas += Math.max(0, txAmount - noEfectivo);
+                const cashPart = Math.max(0, txAmount - noEfectivo);
+                netCordobas += cashPart;
+                aEfectivoC += cashPart;
             }
+            aTarjeta += txTarjeta;
+            aTransf += txTransf;
 
         } else if (t === 'entrada') {
             netCordobas += Math.abs(txAmount);
@@ -179,7 +202,7 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
         // ══════════════════════════════════════════════════════
         // 3. GLOBAL SALES TOTAL
         // ══════════════════════════════════════════════════════
-        if (t.startsWith('venta') || t.includes('abono') || t.includes('liquid') || t.includes('pedido') || t === 'entrada') {
+        if (t.startsWith('venta') || t.includes('abono') || t.includes('liquid') || t.includes('pedido')) {
             tVentasDia += Math.abs(totalRevenue);
         } else if (t.includes('devolucion') || t.includes('cancelacion') || t.includes('anulacion')) {
             tVentasDia -= Math.abs(totalRevenue);
@@ -230,6 +253,15 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
         sumDevolucionesCancelaciones: sumDevsCancels,
         totalHidden,
         tasaRef,
-        lists: cls
+        lists: cls,
+        vEfectivoC: safe(vEfectivoC),
+        vEfectivoD: safe(vEfectivoD),
+        vTarjeta: safe(vTarjeta),
+        vTransf: safe(vTransf),
+        vCredito: safe(vCredito),
+        aEfectivoC: safe(aEfectivoC),
+        aEfectivoD: safe(aEfectivoD),
+        aTarjeta: safe(aTarjeta),
+        aTransf: safe(aTransf)
     };
 };

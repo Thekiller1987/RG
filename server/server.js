@@ -1,6 +1,7 @@
 // 1. Importar las librerías
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 require('dotenv').config();
 
 // Importamos la conexión a la BD
@@ -61,6 +62,8 @@ const corsOptions = {
 };
 
 // 3. Configurar Middlewares
+// ★ Compresión gzip/brotli: Reduce JSON de productos de ~2MB a ~250KB
+app.use(compression({ level: 6, threshold: 1024 })); // Solo comprimir si >1KB
 app.use(cors(corsOptions));
 
 // Evita 413: payload grande

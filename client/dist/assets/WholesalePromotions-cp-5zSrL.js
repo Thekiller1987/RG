@@ -1,4 +1,4 @@
-import{r as s,j as e,W as v,Y as _,Z as C,bg as w,bh as T,a7 as P,a8 as k,E as x,s as r}from"./vendor-Bl8eSE-Q.js";import{u as E,$ as S,a0 as D}from"./index-D4EmPGrI.js";import"./POS.styles-C4qzct5K.js";import"./scanner-vendor-DfxRpMWJ.js";import"./pdf-vendor-DV8V3V31.js";const F=r.div`
+import{r as s,j as e,W as v,Y as _,Z as C,bg as w,bh as T,a7 as P,a8 as k,E as x,s as r}from"./vendor-Bl8eSE-Q.js";import{u as E,$ as S,a0 as D}from"./index-CWW3cZWH.js";import"./POS.styles-D3cpvBqp.js";import"./scanner-vendor-DfxRpMWJ.js";import"./pdf-vendor-DV8V3V31.js";const F=r.div`
   padding: 2rem;
   background-color: #f0f2f5;
   min-height: 100vh;
