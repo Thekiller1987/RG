@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue } from 'react';
 import styled, { keyframes } from 'styled-components';
 import axios from 'axios';
-import { API_URL } from '../service/api';
+import { API_URL, fetchProductImage } from '../service/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
@@ -353,10 +353,9 @@ const ImageViewModal = ({ isOpen, productId, imageSrc, onClose }) => {
     if (imageSrc) { setModalImg(imageSrc); return; }
     if (!productId) return;
     // La imagen aún no se ha cargado — pedirla ahora
-    setLoadingImg(true);
     const token = localStorage.getItem('token');
-    axios.get(`${API_URL}/products/${productId}/image`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => setModalImg(r.data.imagen))
+    fetchProductImage(productId, token)
+      .then(data => setModalImg(data?.imagen))
       .catch(() => setModalImg(null))
       .finally(() => setLoadingImg(false));
   }, [isOpen, productId, imageSrc]);
@@ -414,10 +413,8 @@ const useLazyImage = (productId) => {
           if (imageCache.get(productId) === 'loading') return;
           imageCache.set(productId, 'loading');
           const token = localStorage.getItem('token');
-          axios.get(`${API_URL}/products/${productId}/image`, {
-            headers: { Authorization: `Bearer ${token}` }
-          }).then(r => {
-            const src = r.data.imagen || null;
+          fetchProductImage(productId, token).then(data => {
+            const src = data?.imagen || null;
             imageCache.set(productId, src || 'none');
             if (src) setImgSrc(src);
           }).catch(() => {
@@ -1154,10 +1151,8 @@ const InventoryManagement = () => {
       if (cached !== 'none') {
         try {
           const token = localStorage.getItem('token');
-          const r = await axios.get(`${API_URL}/products/${product.id_producto}/image`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          imagen = r.data.imagen || null;
+          const data = await fetchProductImage(product.id_producto, token);
+          imagen = data?.imagen || null;
           imageCache.set(product.id_producto, imagen || 'none');
         } catch { /* sin imagen */ }
       }

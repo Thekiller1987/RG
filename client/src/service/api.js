@@ -114,6 +114,10 @@ export const fetchProducts = async (token) => {
     }));
 };
 
+export const fetchProductImage = async (productId, token) => {
+    return await request('get', `/products/${productId}/image`, token);
+};
+
 export const createProduct = async (productData, token) => {
     return await request('post', '/products', token, productData);
 };

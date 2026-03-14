@@ -12,8 +12,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 // ... imports
 import { useAuth } from '../context/AuthContext';
 import { useCaja } from '../context/CajaContext';
+import { API_URL, fetchProductImage } from '../service/api';
 import * as api from '../service/api';
-import { API_URL } from '../service/api';
 import axios from 'axios';
 
 import ProformaEmpleadoModal from './pos/components/ProformaEmpleadoModal.jsx';
@@ -33,8 +33,8 @@ async function preloadImages(productIds, concurrency = 4) {
         if (imageCache.has(id)) return next();
         imageCache.set(id, 'loading');
         try {
-            const r = await axios.get(`${API_URL}/products/${id}/image`, { headers: { Authorization: `Bearer ${token}` } });
-            imageCache.set(id, r.data?.imagen || 'none');
+            const data = await fetchProductImage(id, token);
+            imageCache.set(id, data?.imagen || 'none');
         } catch { imageCache.set(id, 'none'); }
         return next();
     }
@@ -62,8 +62,8 @@ function useLazyEmpleadoImage(productId) {
                 if (!c || (c !== 'loading' && c !== 'none')) {
                     const token = localStorage.getItem('token');
                     imageCache.set(productId, 'loading');
-                    axios.get(`${API_URL}/products/${productId}/image`, { headers: { Authorization: `Bearer ${token}` } })
-                        .then(r => { const img = r.data?.imagen || null; imageCache.set(productId, img || 'none'); if (img) setImgSrc(img); })
+                    fetchProductImage(productId, token)
+                        .then(data => { const img = data?.imagen || null; imageCache.set(productId, img || 'none'); if (img) setImgSrc(img); })
                         .catch(() => imageCache.set(productId, 'none'));
                 }
             }

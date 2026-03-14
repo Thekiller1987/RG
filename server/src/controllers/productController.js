@@ -142,21 +142,31 @@ const getAllProducts = async (_req, res) => {
 /* ===================== GET IMAGE BY ID ===================== */
 const getProductImage = async (req, res) => {
   const { id } = req.params;
+  console.log(`[IMAGE_REQUEST] Requerida imagen para ID: ${id}`);
   try {
     const [rows] = await db.query(
       'SELECT imagen FROM productos WHERE id_producto = ?',
       [id]
     );
-    if (!rows.length) return res.status(404).json({ msg: 'Producto no encontrado.' });
+    if (!rows.length) {
+      console.warn(`[IMAGE_REQUEST] Producto no encontrado ID: ${id}`);
+      return res.status(404).json({ msg: 'Producto no encontrado.' });
+    }
 
     const raw = rows[0].imagen;
     const imagen = raw
       ? (Buffer.isBuffer(raw) ? raw.toString('utf-8') : raw)
       : null;
 
+    if (!imagen) {
+      console.log(`[IMAGE_REQUEST] El producto ID ${id} existe pero no tiene imagen (NULL).`);
+    } else {
+      console.log(`[IMAGE_REQUEST] Imagen enviada para ID ${id}. Tamaño: ${imagen.length} bytes.`);
+    }
+
     res.json({ imagen });
   } catch (error) {
-    console.error('Error en getProductImage:', error);
+    console.error(`[IMAGE_REQUEST] Error al obtener imagen para ID ${id}:`, error);
     res.status(500).json({ msg: 'Error al obtener imagen.' });
   }
 };
