@@ -6,6 +6,7 @@ import styled, { keyframes } from 'styled-components';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { fetchActiveCajaSessions, getCart, saveCart } from '../../../service/api'; // Import API functions
+import { useAuth } from '../../../context/AuthContext.jsx'; // Para sesión de caja fallback
 
 // --- ESTILOS DE BASE (Requeridos para el funcionamiento del Modal) ---
 const fadeIn = keyframes`from { opacity: 0; } to { opacity: 1; }`;
@@ -165,6 +166,9 @@ const ProformaEmpleadoModal = ({
     const [loadingPDF, setLoadingPDF] = React.useState(false);
     const proformaRef = useRef(null);
 
+    // --- AUTH CONTEXT (para cajaSession fallback) ---
+    const { cajaSession, user: authUser } = useAuth() || {};
+
     // --- SEND TO CASHIER STATE ---
     const [isSending, setIsSending] = React.useState(false);
     const [showSessionSelector, setShowSessionSelector] = React.useState(false);
@@ -255,22 +259,30 @@ const ProformaEmpleadoModal = ({
     const handleStartSend = async () => {
         if (cart.length === 0) return;
         setIsSending(true);
-        const token = localStorage.getItem('token'); // Get token
+        const token = localStorage.getItem('token');
         try {
-            const response = await fetchActiveCajaSessions(token); // Pass token
-            const sessions = response?.abiertas || [];
+            const response = await fetchActiveCajaSessions(token);
+            let sessions = response?.abiertas || [];
+
+            // FALLBACK: Si la API no devuelve sesiones pero el usuario tiene
+            // una caja abierta en el contexto, usarla directamente
+            if (sessions.length === 0 && cajaSession && !cajaSession.closedAt) {
+                const userId = cajaSession.openedBy?.id || (authUser?.id_usuario ?? authUser?.id);
+                const userName = cajaSession.openedBy?.name || authUser?.nombre_usuario || 'Cajero';
+                sessions = [{
+                    id: cajaSession.id,
+                    openedAt: cajaSession.openedAt,
+                    openedBy: { id: userId, name: userName }
+                }];
+            }
 
             if (sessions.length === 0) {
-                showAlert("Atención", "⚠️ No hay cajas abiertas en este momento. No se puede enviar el pedido.", "warning");
+                showAlert("Atención", "⚠️ No hay cajas abiertas en este momento. Abre una caja primero desde el POS antes de enviar el pedido.", "warning");
                 setIsSending(false);
                 return;
             }
 
-            // Filter out purely system sessions if needed, or just show all
             setActiveSessions(sessions);
-
-            // If only one session, pre-select it but still show dialog for name confirmation? 
-            // User requested "que les pida solo el nombre del ticket", so let's show dialog always for name input.
             if (sessions.length > 0) {
                 setSelectedSessionId(sessions[0].openedBy.id);
             }

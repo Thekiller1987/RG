@@ -773,16 +773,34 @@ router.get('/reporte', async (req, res) => {
 // GET /api/caja/abiertas/activas (Para CashReport: mostrar quién está trabajando)
 router.get('/abiertas/activas', async (req, res) => {
   try {
-    // Consulta SQL directa
+    // Consulta SQL: sessiones sin cerrar.
+    // NOTA: En MySQL, '0000-00-00 00:00:00' NO es NULL, se verifica por separado.
     const [rows] = await pool.query(`
       SELECT * FROM cierres_caja 
       WHERE fecha_cierre IS NULL
+         OR fecha_cierre = '0000-00-00 00:00:00'
+      ORDER BY fecha_apertura DESC
     `);
 
     console.log(`[DEBUG] /abiertas/activas found ${rows.length} sessions.`);
 
+    // Si no encontró nada con IS NULL, buscar sesiones abiertas en las últimas 24 horas
+    // como fallback (cubre casos de desincronización)
+    let finalRows = rows;
+    if (rows.length === 0) {
+      const [recentRows] = await pool.query(`
+        SELECT * FROM cierres_caja 
+        WHERE fecha_apertura > NOW() - INTERVAL 24 HOUR
+          AND (fecha_cierre IS NULL OR fecha_cierre = '0000-00-00 00:00:00')
+        ORDER BY fecha_apertura DESC
+      `);
+      finalRows = recentRows;
+      if (recentRows.length > 0) {
+        console.log(`[DEBUG] /abiertas/activas fallback 24h found ${recentRows.length} sessions.`);
+      }
+    }
 
-    const abiertas = rows.map(row => {
+    const abiertas = finalRows.map(row => {
       let details = {};
       try {
         details = (typeof row.detalles_json === 'string')
@@ -808,6 +826,7 @@ router.get('/abiertas/activas', async (req, res) => {
     res.status(500).json({ message: 'Error obteniendo sesiones activas', abiertas: [] });
   }
 });
+
 
 // ───────── Active Carts (Persistence) ─────────
 // GET /api/caja/cart?userId=123
