@@ -161,6 +161,7 @@ const Dashboard = () => {
     const canAccessInventory = isAdmin || isInventoryManager;
     const canAccessMassUpload = isAdmin || isInventoryManager;
     const canAccessFinances = isAdmin || userRole === 'Gerente' || isContador;
+    const canAccessReports = isAdmin || userRole === 'Gerente' || isContador;
     const canAccessCashReports = isAdmin || userRole === 'Gerente' || isContador;
     const canAccessAdminUsers = isAdmin;
     const canAccessEmpleados = isAdmin || userRole === 'Gerente';
@@ -190,6 +191,7 @@ const Dashboard = () => {
             case '/invoices': import('./FacturasProveedores.jsx'); break;
             case '/orders': import('./PedidosYApartados.jsx'); break;
             case '/finances': import('./Finances.jsx'); break; // Corrected path
+            case '/detailed-sales-report': import('./DetailedSalesReport.jsx'); break;
             case '/empleados': import('./Empleados.jsx'); break; // Corrected path
             default: break;
         }
@@ -306,6 +308,15 @@ const Dashboard = () => {
                             <CardIcon color="#dc3545"><FaBriefcase /></CardIcon>
                             <h2>Gestión de Cajas</h2>
                             <p>Cierres y arqueos de caja.</p>
+                        </Card>
+                    )}
+
+                    {/* Reportes de Ventas Detallado (RESTABLECIDO) */}
+                    {canAccessReports && (
+                        <Card to="/detailed-sales-report" color="#6366f1" onMouseEnter={() => prefetch('/detailed-sales-report')}>
+                            <CardIcon color="#6366f1"><FaFileInvoiceDollar /></CardIcon>
+                            <h2>Reporte de Ventas Detallado</h2>
+                            <p>Ventas, devoluciones y rastreo por producto.</p>
                         </Card>
                     )}
 

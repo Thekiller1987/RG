@@ -24,6 +24,7 @@ const Solicitudes = React.lazy(() => import('./pages/Solicitudes.jsx'));
 const Empleados = React.lazy(() => import('./pages/Empleados.jsx'));
 
 const InventoryOutflowPage = React.lazy(() => import('./pages/InventoryOutflowPage.jsx'));
+const DetailedSalesReport = React.lazy(() => import('./pages/DetailedSalesReport.jsx'));
 const SettingsPage = React.lazy(() => import('./pages/SettingsPage.jsx'));
 const WholesalePOS = React.lazy(() => import('./pages/WholesalePOS.jsx'));
 const WholesalePromotions = React.lazy(() => import('./pages/WholesalePromotions.jsx'));
@@ -206,6 +207,15 @@ function App() {
           />
 
 
+
+          <Route
+            path="/detailed-sales-report"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
+                <motion.div {...pageTransition}><DetailedSalesReport /></motion.div>
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/invoices"
