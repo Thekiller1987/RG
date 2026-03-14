@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue } from 'react';
 import styled, { keyframes } from 'styled-components';
 import axios from 'axios';
-import { API_URL, fetchProductImage } from '../service/api';
+import { API_URL, fetchProductImage, getCachedImage, setCachedImage } from '../service/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
@@ -385,11 +385,9 @@ const ImageViewModal = ({ isOpen, productId, imageSrc, onClose }) => {
 
 const norm = (str) => String(str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
-import { API_URL, fetchProductImage, getCachedImage, setCachedImage } from '../service/api';
-import { motion, AnimatePresence } from 'framer-motion';
-// ... (rest of imports unchanged)
-// ... (scroll down to useLazyImage)
-
+/* ======================================================
+   CACHE GLOBAL + HOOK: Lazy load de imágenes por tarjeta
+   ====================================================== */
 const useLazyImage = (productId) => {
   const [imgSrc, setImgSrc] = React.useState(() => {
     const cached = getCachedImage(productId);
