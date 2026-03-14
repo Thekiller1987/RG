@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import { FaStore, FaExclamationTriangle, FaTags, FaBarcode, FaFont, FaImage, FaEye, FaTimes } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
+import { API_URL } from '../../../service/api';
 import * as S from '../POS.styles.jsx';
 
 const PRODUCTS_PER_PAGE = 100;
@@ -29,7 +30,7 @@ async function preloadImages(productIds, concurrency = 4) {
     if (imageCache.has(id)) return next(); // Ya en caché, saltar
     imageCache.set(id, 'loading');
     try {
-      const r = await axios.get(`/api/products/${id}/image`, {
+      const r = await axios.get(`${API_URL}/products/${id}/image`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const img = r.data?.imagen || null;
@@ -60,7 +61,7 @@ function useLazyPOSImage(productId) {
     imageCache.set(productId, 'loading');
     try {
       const token = localStorage.getItem('token');
-      const r = await axios.get(`/api/products/${productId}/image`, {
+      const r = await axios.get(`${API_URL}/products/${productId}/image`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const img = r.data?.imagen || null;

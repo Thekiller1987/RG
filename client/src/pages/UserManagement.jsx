@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled, { css } from 'styled-components'; // Importamos 'css' para las media queries
 import axios from 'axios';
+import { API_URL } from '../service/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
@@ -394,7 +395,7 @@ const UserManagement = () => {
       setError(null);
       const token = localStorage.getItem('token');
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      const { data } = await axios.get('/api/users', config);
+      const { data } = await axios.get(`${API_URL}/users`, config);
       setUsers(data);
     } catch (err) {
       setError('Error al cargar los usuarios.');
@@ -447,7 +448,7 @@ const UserManagement = () => {
     try {
       const token = localStorage.getItem('token');
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      await axios.delete(`/api/users/${userToDelete.id_usuario}`, config);
+      await axios.delete(`${API_URL}/users/${userToDelete.id_usuario}`, config);
       setUsers(users.filter(u => u.id_usuario !== userToDelete.id_usuario));
       setIsDeleteModalOpen(false);
       setUserToDelete(null);
@@ -477,9 +478,9 @@ const UserManagement = () => {
         if (formData.password) {
           updateData.password = formData.password;
         }
-        await axios.put(`/api/users/${editingUser.id_usuario}`, updateData, config);
+        await axios.put(`${API_URL}/users/${editingUser.id_usuario}`, updateData, config);
       } else {
-        await axios.post('/api/auth/register', {
+        await axios.post(`${API_URL}/auth/register`, {
           nombre_usuario: formData.nombre_usuario,
           password: formData.password,
           rol: formData.rol

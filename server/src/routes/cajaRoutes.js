@@ -115,15 +115,16 @@ async function ensureSchema() {
 
     // 5. LIMPIEZA CRÍTICA: Convertir fechas "zero" (0000-00-00) a NULL para evitar error 500 en Node.js
     try {
-      await pool.query(`
+      console.log('--- Iniciando limpieza de fechas en cierres_caja ---');
+      const [cleanResult] = await pool.query(`
         UPDATE cierres_caja 
         SET fecha_cierre = NULL 
         WHERE CAST(fecha_cierre AS CHAR) = '0000-00-00 00:00:00' 
            OR fecha_cierre < '1970-01-01';
       `);
-      console.log('✅ Base de datos saneada: Fechas invalidas corregidas.');
+      console.log(`✅ Base de datos saneada: ${cleanResult.affectedRows} fechas corregidas.`);
     } catch (e) {
-      // Ignoramos si no se puede ejecutar la limpieza
+      console.warn('⚠️ No se pudo ejecutar la limpieza automática:', e.message);
     }
 
     console.log('✅ Esquema de caja verificado/creado correctamente.');
@@ -787,27 +788,33 @@ router.get('/reporte', async (req, res) => {
 router.get('/abiertas/activas', async (req, res) => {
   try {
     // Consulta SQL: sessiones sin cerrar.
-    // NOTA: En MySQL, '0000-00-00 00:00:00' NO es NULL, se verifica por separado.
+    // Usamos columnas explícitas para evitar errores con columnas no usadas o corruptas
+    const cols = [
+      'id', 'usuario_id', 'usuario_nombre', 'monto_inicial', 
+      'CAST(fecha_apertura AS CHAR) as fa_char', 
+      'CAST(fecha_cierre AS CHAR) as fc_char',
+      'fecha_apertura', 'fecha_cierre', 'detalles_json'
+    ].join(', ');
+
     const [rows] = await pool.query(`
-      SELECT * FROM cierres_caja 
+      SELECT ${cols} FROM cierres_caja 
       WHERE (fecha_cierre IS NULL OR fecha_cierre < '1970-01-01')
       ORDER BY fecha_apertura DESC
     `);
 
     console.log(`[DEBUG] /abiertas/activas found ${rows.length} sessions.`);
 
-    // Si no encontró nada, buscar sesiones abiertas en las últimas 48 horas como fallback
     let finalRows = rows;
     if (rows.length === 0) {
       const [recentRows] = await pool.query(`
-        SELECT * FROM cierres_caja 
+        SELECT ${cols} FROM cierres_caja 
         WHERE fecha_apertura > NOW() - INTERVAL 48 HOUR
           AND (fecha_cierre IS NULL OR fecha_cierre < '1900-01-01' OR CAST(fecha_cierre AS CHAR) = '0000-00-00 00:00:00')
         ORDER BY fecha_apertura DESC
       `);
       finalRows = recentRows;
       if (recentRows.length > 0) {
-        console.log(`[DEBUG] /abiertas/activas fallback 24h found ${recentRows.length} sessions.`);
+        console.log(`[DEBUG] /abiertas/activas fallback found ${recentRows.length} sessions.`);
       }
     }
 
@@ -821,7 +828,8 @@ router.get('/abiertas/activas', async (req, res) => {
 
       return {
         id: row.id,
-        openedAt: row.fecha_apertura,
+        // Usar fa_char si fecha_apertura falla, pero mysql2 suele parsear bien si no es 0000
+        openedAt: row.fecha_apertura || row.fa_char, 
         openedBy: { id: row.usuario_id, name: row.usuario_nombre },
         monto_inicial: Number(row.monto_inicial || 0),
         tasaDolar: Number(details.tasaDolar || 0),
@@ -833,8 +841,14 @@ router.get('/abiertas/activas', async (req, res) => {
     res.json({ abiertas });
 
   } catch (error) {
-    console.error('Error getting active sessions:', error);
-    res.status(500).json({ message: 'Error obteniendo sesiones activas', abiertas: [] });
+    console.error('CRITICAL ERROR /abiertas/activas:', error);
+    // Devolvemos el error detallado para debug en producción
+    res.status(500).json({ 
+      message: 'Error obteniendo sesiones activas', 
+      error: error.message,
+      stack: error.stack,
+      abiertas: [] 
+    });
   }
 });
 
