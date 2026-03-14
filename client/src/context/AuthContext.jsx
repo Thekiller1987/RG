@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect, useCallback, use
 import { useNavigate } from 'react-router-dom';
 import * as api from '../service/api.js';
 import { loadCajaSession, saveCajaSession } from '../utils/caja.js';
+import { toast } from 'react-hot-toast';
 
 const AuthContext = createContext(null);
 
@@ -20,11 +21,16 @@ export const AuthProvider = ({ children, socket }) => {
     // Ref for Debouncing
     const refreshTimeoutRef = useRef(null);
 
-    const logout = useCallback(() => {
+    const logout = useCallback((message = null) => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         setUser(null);
         setToken(null);
+        
+        if (message && typeof message === 'string') {
+            toast.error(message);
+        }
+
         navigate('/login');
     }, [navigate]);
 
@@ -144,6 +150,11 @@ export const AuthProvider = ({ children, socket }) => {
 
     useEffect(() => {
         const initializeAuth = async () => {
+            // Registrar el manejador de logout global para errores 401/403 de la API
+            api.setUnauthorizedHandler(() => {
+                logout('Su sesión ha expirado o es inválida. Por favor, ingrese de nuevo.');
+            });
+
             setIsLoading(true);
             try {
                 const tokenInStorage = localStorage.getItem('token');

@@ -14,6 +14,17 @@ export { API_URL };
 const REQUEST_TIMEOUT = 45000; // Aumentado a 45s para redes rurales muy lentas
 const MAX_RETRIES = 3; // Hasta 3 reintentos automáticos para GETs
 
+// Handler global para errores de autorización (token vencido/inválido)
+let unauthorizedHandler = null;
+
+/**
+ * Registra un callback que se ejecutará cuando el servidor devuelva 401 o 403.
+ * Esto permite que el AuthContext maneje el logout de forma centralizada.
+ */
+export const setUnauthorizedHandler = (handler) => {
+    unauthorizedHandler = handler;
+};
+
 const request = async (method, path, token = null, data = null, config = {}) => {
     const headers = { 'Content-Type': 'application/json', ...(config.headers || {}) };
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -48,9 +59,17 @@ const request = async (method, path, token = null, data = null, config = {}) => 
         } catch (err) {
             // Error de servidor (respuesta con código de error) — no reintentar
             if (err.response) {
+                const status = err.response.status;
+                
+                // Si el token falló o expiró (401) o no tiene permisos (403)
+                if ((status === 401 || status === 403) && unauthorizedHandler) {
+                    console.error("🚫 Sesión inválida o expirada. Redirigiendo al login...");
+                    unauthorizedHandler();
+                }
+
                 const msg = err.response.data?.message || err.response.data?.msg || JSON.stringify(err.response.data);
-                const error = new Error(msg || `HTTP ${err.response.status}`);
-                error.status = err.response.status;
+                const error = new Error(msg || `HTTP ${status}`);
+                error.status = status;
                 throw error;
             }
 
