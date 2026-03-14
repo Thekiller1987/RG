@@ -509,19 +509,7 @@ const ProformaGenerator = () => {
                     </HeaderActions>
                 </Header>
 
-                {/* ESTADO DE CAJA */}
-                <div style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
-                    background: cajaSession && !cajaSession.closedAt ? '#f0fdf4' : '#fef2f2',
-                    border: `1px solid ${cajaSession && !cajaSession.closedAt ? '#86efac' : '#fca5a5'}`,
-                    borderRadius: 12, fontSize: '0.88rem', fontWeight: 600,
-                    color: cajaSession && !cajaSession.closedAt ? '#166534' : '#991b1b'
-                }}>
-                    <span style={{ fontSize: 16 }}>{cajaSession && !cajaSession.closedAt ? '🟢' : '🔴'}</span>
-                    {cajaSession && !cajaSession.closedAt
-                        ? `Caja abierta — ${cajaSession.openedBy?.name || user?.nombre_usuario || 'Cajero'}`
-                        : 'Sin caja abierta — Abre una caja desde el POS para enviar pedidos'}
-                </div>
+
 
                 <SearchContainer>
                     <SearchTypeToggle>
