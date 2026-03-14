@@ -385,20 +385,20 @@ const ImageViewModal = ({ isOpen, productId, imageSrc, onClose }) => {
 
 const norm = (str) => String(str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
-/* ======================================================
-   CACHE GLOBAL + HOOK: Lazy load de imágenes por tarjeta
-   ====================================================== */
-const imageCache = new Map(); // id_producto -> base64 string | 'loading' | 'none'
+import { API_URL, fetchProductImage, getCachedImage, setCachedImage } from '../service/api';
+import { motion, AnimatePresence } from 'framer-motion';
+// ... (rest of imports unchanged)
+// ... (scroll down to useLazyImage)
 
 const useLazyImage = (productId) => {
   const [imgSrc, setImgSrc] = React.useState(() => {
-    const cached = imageCache.get(productId);
+    const cached = getCachedImage(productId);
     return (cached && cached !== 'loading' && cached !== 'none') ? cached : null;
   });
   const cardRef = React.useRef(null);
 
   React.useEffect(() => {
-    const cached = imageCache.get(productId);
+    const cached = getCachedImage(productId);
     if (cached && cached !== 'loading') {
       setImgSrc(cached !== 'none' ? cached : null);
       return;
@@ -410,15 +410,17 @@ const useLazyImage = (productId) => {
       (entries) => {
         if (entries[0].isIntersecting) {
           observer.disconnect();
-          if (imageCache.get(productId) === 'loading') return;
-          imageCache.set(productId, 'loading');
+          if (getCachedImage(productId) === 'loading') return;
+          setCachedImage(productId, 'loading');
           const token = localStorage.getItem('token');
           fetchProductImage(productId, token).then(data => {
             const src = data?.imagen || null;
-            imageCache.set(productId, src || 'none');
+            setCachedImage(productId, src || 'none');
             if (src) setImgSrc(src);
+            else setImgSrc(null);
           }).catch(() => {
-            imageCache.set(productId, 'none');
+            setCachedImage(productId, 'none');
+            setImgSrc(null);
           });
         }
       },

@@ -36,6 +36,10 @@ export const AuthProvider = ({ children, socket }) => {
 
     const loadMasterData = useCallback(async (token, isBackground = false) => {
         try {
+            // Obtener el rol del usuario (desde el estado o desde localStorage si es necesario)
+            const currentUser = user || JSON.parse(localStorage.getItem('user'));
+            const userRole = currentUser?.rol;
+
             // Si no es en background, valida el token (solo al hacer login)
             if (!isBackground) {
                 try {
@@ -49,7 +53,7 @@ export const AuthProvider = ({ children, socket }) => {
             }
 
             const results = await Promise.allSettled([
-                api.fetchUsers(token),
+                userRole === 'Administrador' ? api.fetchUsers(token) : Promise.resolve(null),
                 api.fetchProducts(token),
                 api.fetchClients(token),
                 api.fetchCategories(token),
@@ -121,7 +125,11 @@ export const AuthProvider = ({ children, socket }) => {
     useEffect(() => {
         if (!socket) return;
 
-        const onInventoryUpdate = () => {
+        const onInventoryUpdate = (data) => {
+            // Invalida la imagen en caché para que useLazyImage vuelva a pedirla
+            if (data?.id) {
+                api.clearCachedImage(data.id);
+            }
             // Use Debounced version!
             refreshProductsDebounced();
         };
@@ -131,7 +139,8 @@ export const AuthProvider = ({ children, socket }) => {
         socket.on('clients:update', refreshClients); // Clients usually don't spam, direct call is fine
         socket.on('users:update', async () => {
             const token = localStorage.getItem('token');
-            if (token) {
+            const currentUser = JSON.parse(localStorage.getItem('user'));
+            if (token && currentUser?.rol === 'Administrador') {
                 try {
                     const users = await api.fetchUsers(token);
                     setAllUsers(users || []);

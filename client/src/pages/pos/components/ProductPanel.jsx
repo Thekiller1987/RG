@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import { FaStore, FaExclamationTriangle, FaTags, FaBarcode, FaFont, FaImage, FaEye, FaTimes } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
-import { API_URL, fetchProductImage } from '../../../service/api';
+import { API_URL, fetchProductImage, getCachedImage, setCachedImage } from '../../../service/api';
 import * as S from '../POS.styles.jsx';
 
 const PRODUCTS_PER_PAGE = 100;
@@ -12,14 +12,11 @@ const PRODUCTS_PER_PAGE = 100;
 const fmt = (n) =>
   Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Caché global compartido con InventoryManagement
-const imageCache = new Map();
-
 // Pre-carga imágenes en paralelo con límite de concurrencia
 async function preloadImages(productIds, concurrency = 4) {
   const token = localStorage.getItem('token');
   const queue = productIds.filter(id => {
-    const c = imageCache.get(id);
+    const c = getCachedImage(id);
     return !c || (c !== 'loading' && c !== 'none'); // Solo los que no estén cargados o en proceso
   });
 
@@ -27,14 +24,14 @@ async function preloadImages(productIds, concurrency = 4) {
   async function next() {
     if (i >= queue.length) return;
     const id = queue[i++];
-    if (imageCache.has(id)) return next(); // Ya en caché, saltar
-    imageCache.set(id, 'loading');
+    if (getCachedImage(id)) return next(); // Ya en caché, saltar
+    setCachedImage(id, 'loading');
     try {
       const data = await fetchProductImage(id, token);
       const img = data?.imagen || null;
-      imageCache.set(id, img || 'none');
+      setCachedImage(id, img || 'none');
     } catch {
-      imageCache.set(id, 'none');
+      setCachedImage(id, 'none');
     }
     return next();
   }
@@ -45,41 +42,48 @@ async function preloadImages(productIds, concurrency = 4) {
 // Hook: carga la imagen cuando la tarjeta entra en el viewport
 function useLazyPOSImage(productId) {
   const [imgSrc, setImgSrc] = useState(() => {
-    const cached = imageCache.get(productId);
+    const cached = getCachedImage(productId);
     return (cached && cached !== 'loading' && cached !== 'none') ? cached : null;
   });
   const cardRef = useRef(null);
 
   const fetchImage = useCallback(async () => {
     if (!productId) return;
-    const cached = imageCache.get(productId);
+    const cached = getCachedImage(productId);
     if (cached === 'loading' || cached === 'none') return;
     if (cached && cached !== 'loading') { setImgSrc(cached); return; }
 
-    imageCache.set(productId, 'loading');
+    setCachedImage(productId, 'loading');
     try {
       const token = localStorage.getItem('token');
       const data = await fetchProductImage(productId, token);
       const img = data?.imagen || null;
-      imageCache.set(productId, img || 'none');
+      setCachedImage(productId, img || 'none');
       if (img) setImgSrc(img);
+      else setImgSrc(null); // Asegurar que se limpie si ahora no tiene imagen
     } catch {
-      imageCache.set(productId, 'none');
+      setCachedImage(productId, 'none');
+      setImgSrc(null);
     }
   }, [productId]);
 
   useEffect(() => {
     // Si ya está en caché, mostrar de inmediato
-    const cached = imageCache.get(productId);
-    if (cached && cached !== 'loading' && cached !== 'none') { setImgSrc(cached); return; }
-    if (cached === 'none') return;
+    const cached = getCachedImage(productId);
+    if (cached && cached !== 'loading') {
+        setImgSrc(cached !== 'none' ? cached : null);
+        // Si ya está en caché, no necesitamos el observer ni el interval
+        return;
+    }
 
     // Escuchar cuando el caché se llena (para los pre-cargados)
     const checkInterval = setInterval(() => {
-      const c = imageCache.get(productId);
-      if (c && c !== 'loading' && c !== 'none') { setImgSrc(c); clearInterval(checkInterval); }
-      else if (c === 'none') clearInterval(checkInterval);
-    }, 100);
+      const c = getCachedImage(productId);
+      if (c && c !== 'loading') {
+          setImgSrc(c !== 'none' ? c : null);
+          clearInterval(checkInterval);
+      }
+    }, 200);
 
     // También usar IntersectionObserver como fallback
     const observer = new IntersectionObserver(

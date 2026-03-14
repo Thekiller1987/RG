@@ -8,8 +8,24 @@ const RAW_BASE = import.meta.env.VITE_API_URL || 'https://multirepuestosrg.com/a
 // ===================================================================
 
 const API_URL = RAW_BASE; // Simplificado
-
 export { API_URL };
+
+// ===================================================================
+// === GESTIÓN CENTRALIZADA DE CACHÉ DE IMÁGENES ===
+// Permite invalidar imágenes específicas cuando el servidor emite un update.
+// ===================================================================
+const imageCache = new Map(); // id_producto -> base64 | 'loading' | 'none'
+
+export const getCachedImage = (id) => imageCache.get(id);
+export const setCachedImage = (id, val) => imageCache.set(id, val);
+export const clearCachedImage = (id) => {
+    if (id) {
+        imageCache.delete(id);
+        // console.log(`[Cache] Imagen invalidada para ID: ${id}`);
+    } else {
+        imageCache.clear();
+    }
+};
 
 const REQUEST_TIMEOUT = 45000; // Aumentado a 45s para redes rurales muy lentas
 const MAX_RETRIES = 3; // Hasta 3 reintentos automáticos para GETs
@@ -61,8 +77,8 @@ const request = async (method, path, token = null, data = null, config = {}) => 
             if (err.response) {
                 const status = err.response.status;
                 
-                // Si el token falló o expiró (401) o no tiene permisos (403)
-                if ((status === 401 || status === 403) && unauthorizedHandler) {
+                // Si el token falló o expiró (401)
+                if (status === 401 && unauthorizedHandler) {
                     console.error("🚫 Sesión inválida o expirada. Redirigiendo al login...");
                     unauthorizedHandler();
                 }
