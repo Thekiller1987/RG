@@ -15,8 +15,9 @@ import {
 } from 'chart.js';
 import {
   FaCalendarAlt, FaChartBar, FaStar, FaUserFriends,
-  FaWarehouse, FaMoneyBillWave, FaArrowUp, FaFilter, FaSync, FaArrowLeft
+  FaWarehouse, FaMoneyBillWave, FaArrowUp, FaFilter, FaSync, FaArrowLeft, FaPrint
 } from 'react-icons/fa';
+import { createGlobalStyle } from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import AlertModal from './pos/components/AlertModal.jsx';
 import { API_URL } from '../service/api';
@@ -45,6 +46,26 @@ const PageWrapper = styled.div`
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: #1e293b;
   animation: ${fadeIn} 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+
+  @media print {
+    padding: 0;
+    background-color: white;
+  }
+`;
+
+const PrintStyles = createGlobalStyle`
+  @media print {
+    body { background: white !important; }
+    .no-print { display: none !important; }
+    .print-only { display: block !important; }
+    ${PageWrapper} { padding: 0 !important; }
+    button { display: none !important; }
+    header, .controls { display: none !important; }
+    .chart-container { page-break-inside: avoid; margin-bottom: 2rem; }
+    .grid-container { display: block !important; }
+    .card { break-inside: avoid; border: 1px solid #eee !important; margin-bottom: 15px !important; box-shadow: none !important; }
+  }
+  .print-only { display: none; }
 `;
 
 const Header = styled.header`
@@ -167,6 +188,12 @@ const RefreshButton = styled.button`
 
   &:hover { background: #2563eb; transform: translateY(-1px); box-shadow: 0 6px 15px rgba(59, 130, 246, 0.4); }
   &:active { transform: translateY(0); }
+`;
+
+const PrintButtonHeader = styled(RefreshButton)`
+  background: #10b981;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+  &:hover { background: #059669; box-shadow: 0 6px 15px rgba(16, 185, 129, 0.4); }
 `;
 
 // --- DASHBOARD GRID ---
@@ -419,8 +446,17 @@ const Finances = () => {
     else setEndDate(val);
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <PageWrapper>
+      <PrintStyles />
+      <div className="print-only" style={{ textAlign: 'center', marginBottom: '20px' }}>
+        <h1 style={{ margin: 0 }}>Reporte Financiero - Multirepuestos RG</h1>
+        <p>Periodo: {startDate} al {endDate}</p>
+      </div>
       {isLoading && (
         <LoadingOverlay>
           <FaSync className="spin" size={40} />
@@ -453,12 +489,15 @@ const Finances = () => {
             <PillButton active={activeFilter === 'month'} onClick={() => handleQuickFilter('month')}>Mes</PillButton>
           </FilterPills>
 
-          <DateGroup>
+          <DateGroup className="controls">
             <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Rango:</span>
             <DateInput type="date" value={startDate} onChange={e => handleCustomDate('start', e.target.value)} />
             <span style={{ color: '#cbd5e0' }}>—</span>
             <DateInput type="date" value={endDate} onChange={e => handleCustomDate('end', e.target.value)} />
             <RefreshButton onClick={fetchReports} title="Recargar"><FaSync /></RefreshButton>
+            <PrintButtonHeader onClick={handlePrint} title="Imprimir Reporte">
+              <FaPrint />
+            </PrintButtonHeader>
           </DateGroup>
         </ControlsContainer>
       </Header>

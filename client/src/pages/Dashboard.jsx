@@ -160,11 +160,10 @@ const Dashboard = () => {
     const canAccessCredits = isAdmin || isContador;
     const canAccessInventory = isAdmin || isInventoryManager;
     const canAccessMassUpload = isAdmin || isInventoryManager;
-    const canAccessReports = isAdmin || userRole === 'Gerente' || isContador;
+    const canAccessFinances = isAdmin || userRole === 'Gerente' || isContador;
     const canAccessCashReports = isAdmin || userRole === 'Gerente' || isContador;
     const canAccessAdminUsers = isAdmin;
     const canAccessEmpleados = isAdmin || userRole === 'Gerente';
-    const canAccessFinances = isAdmin || userRole === 'Gerente';
 
     // NUEVO ACCESO: Facturas de Proveedores (Solo Admin y Contador)
     const canAccessInvoices = isAdmin || isContador;
@@ -256,12 +255,12 @@ const Dashboard = () => {
                             <p>Gestiona clientes, saldos pendientes y abonos.</p>
                         </Card>
                     )}
-                    {/* TARJETA: Finanzas (Admin/Gerente) */}
+                    {/* TARJETA: Finanzas (Admin/Gerente/Contador) */}
                     {canAccessFinances && (
                         <Card to="/finances" color="#10b981" onMouseEnter={() => prefetch('/finances')}>
                             <CardIcon color="#10b981"><FaChartPie /></CardIcon>
-                            <h2>Finanzas</h2>
-                            <p>Control de ingresos, gastos y reportes financieros.</p>
+                            <h2>Finanzas y Reportes</h2>
+                            <p>Control de ingresos, gastos y rendimiento general.</p>
                         </Card>
                     )}
 
@@ -301,30 +300,12 @@ const Dashboard = () => {
                         </Card>
                     )}
 
-                    {/* 6. Reportes */}
-                    {canAccessReports && (
-                        <Card to="/reports" color="#6c757d">
-                            <CardIcon color="#6c757d"><FaChartBar /></CardIcon>
-                            <h2>Reportes</h2>
-                            <p>Visualiza el rendimiento general.</p>
-                        </Card>
-                    )}
-
                     {/* 7. Gestión de Cajas */}
                     {canAccessCashReports && (
                         <Card to="/cash-report" color="#dc3545">
                             <CardIcon color="#dc3545"><FaBriefcase /></CardIcon>
                             <h2>Gestión de Cajas</h2>
                             <p>Cierres y arqueos de caja.</p>
-                        </Card>
-                    )}
-
-                    {/* Reportes de Ventas Detallado (NUEVO) */}
-                    {canAccessReports && (
-                        <Card to="/detailed-sales-report" color="#6366f1">
-                            <CardIcon color="#6366f1"><FaFileInvoiceDollar /></CardIcon>
-                            <h2>Reportes de Ventas Detallado</h2>
-                            <p>Ventas, devoluciones y rastreo por producto.</p>
                         </Card>
                     )}
 

@@ -16,7 +16,6 @@ const PedidosYApartados = React.lazy(() => import('./pages/PedidosYApartados.jsx
 const ClientesYCreditos = React.lazy(() => import('./pages/ClientesYCreditos.jsx'));
 const Finances = React.lazy(() => import('./pages/Finances.jsx'));
 const POS = React.lazy(() => import('./pages/pos/POS.jsx'));
-const Reports = React.lazy(() => import('./pages/Reports.jsx'));
 const Unauthorized = React.lazy(() => import('./components/Unauthorized.jsx'));
 const InventoryUpload = React.lazy(() => import('./pages/InventoryUpload.jsx'));
 const CashReport = React.lazy(() => import('./pages/CashReport.jsx'));
@@ -25,7 +24,6 @@ const Solicitudes = React.lazy(() => import('./pages/Solicitudes.jsx'));
 const Empleados = React.lazy(() => import('./pages/Empleados.jsx'));
 
 const InventoryOutflowPage = React.lazy(() => import('./pages/InventoryOutflowPage.jsx'));
-const DetailedSalesReport = React.lazy(() => import('./pages/DetailedSalesReport.jsx'));
 const SettingsPage = React.lazy(() => import('./pages/SettingsPage.jsx'));
 const WholesalePOS = React.lazy(() => import('./pages/WholesalePOS.jsx'));
 const WholesalePromotions = React.lazy(() => import('./pages/WholesalePromotions.jsx'));
@@ -154,20 +152,13 @@ function App() {
           <Route
             path="/finances"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS]}>
+              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS, ROLES.GERENTE]}>
                 <motion.div {...pageTransition}><Finances /></motion.div>
               </ProtectedRoute>
             }
           />
 
-          <Route
-            path="/reports"
-            element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
-                <motion.div {...pageTransition}><Reports /></motion.div>
-              </ProtectedRoute>
-            }
-          />
+
 
           <Route
             path="/admin/users"
@@ -214,14 +205,7 @@ function App() {
             }
           />
 
-          <Route
-            path="/detailed-sales-report"
-            element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
-                <motion.div {...pageTransition}><DetailedSalesReport /></motion.div>
-              </ProtectedRoute>
-            }
-          />
+
 
           <Route
             path="/invoices"
