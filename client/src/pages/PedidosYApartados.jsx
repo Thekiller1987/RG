@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // ... imports
 import { useAuth } from '../context/AuthContext';
+import { useCaja } from '../context/CajaContext';
 import * as api from '../service/api';
 import axios from 'axios';
 
@@ -355,7 +356,8 @@ const BarcodeScannerModal = ({ onClose, onScan }) => {
 };
 
 const ProformaGenerator = () => {
-    const { user, products: authProducts, cajaSession } = useAuth();
+    const { user, products: authProducts } = useAuth();
+    const { cajaSession } = useCaja();
     const token = localStorage.getItem('token');
 
     const [products, setProducts] = useState(authProducts || []);

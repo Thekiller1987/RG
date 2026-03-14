@@ -113,6 +113,19 @@ async function ensureSchema() {
       await pool.query(`ALTER TABLE cierres_caja ADD COLUMN cerrado_por_nombre VARCHAR(255) DEFAULT '' AFTER cerrado_por_id;`);
     } catch (e) { /* ya existe */ }
 
+    // 5. LIMPIEZA CRÍTICA: Convertir fechas "zero" (0000-00-00) a NULL para evitar error 500 en Node.js
+    try {
+      await pool.query(`
+        UPDATE cierres_caja 
+        SET fecha_cierre = NULL 
+        WHERE CAST(fecha_cierre AS CHAR) = '0000-00-00 00:00:00' 
+           OR fecha_cierre < '1970-01-01';
+      `);
+      console.log('✅ Base de datos saneada: Fechas invalidas corregidas.');
+    } catch (e) {
+      // Ignoramos si no se puede ejecutar la limpieza
+    }
+
     console.log('✅ Esquema de caja verificado/creado correctamente.');
   } catch (error) {
     console.error('❌ Error fatal verificando esquema DB:', error);
@@ -340,7 +353,7 @@ router.get('/session', async (req, res) => {
     // 1. Buscar sesión ABIERTA en SQL
     const [openRows] = await pool.query(`
       SELECT * FROM cierres_caja 
-      WHERE usuario_id = ? AND fecha_cierre IS NULL 
+      WHERE usuario_id = ? AND (fecha_cierre IS NULL OR fecha_cierre < '2000-01-01')
       ORDER BY fecha_apertura DESC LIMIT 1
     `, [userId]);
 
@@ -777,21 +790,19 @@ router.get('/abiertas/activas', async (req, res) => {
     // NOTA: En MySQL, '0000-00-00 00:00:00' NO es NULL, se verifica por separado.
     const [rows] = await pool.query(`
       SELECT * FROM cierres_caja 
-      WHERE fecha_cierre IS NULL
-         OR fecha_cierre = '0000-00-00 00:00:00'
+      WHERE (fecha_cierre IS NULL OR fecha_cierre < '1970-01-01')
       ORDER BY fecha_apertura DESC
     `);
 
     console.log(`[DEBUG] /abiertas/activas found ${rows.length} sessions.`);
 
-    // Si no encontró nada con IS NULL, buscar sesiones abiertas en las últimas 24 horas
-    // como fallback (cubre casos de desincronización)
+    // Si no encontró nada, buscar sesiones abiertas en las últimas 48 horas como fallback
     let finalRows = rows;
     if (rows.length === 0) {
       const [recentRows] = await pool.query(`
         SELECT * FROM cierres_caja 
-        WHERE fecha_apertura > NOW() - INTERVAL 24 HOUR
-          AND (fecha_cierre IS NULL OR fecha_cierre = '0000-00-00 00:00:00')
+        WHERE fecha_apertura > NOW() - INTERVAL 48 HOUR
+          AND (fecha_cierre IS NULL OR fecha_cierre < '1900-01-01' OR CAST(fecha_cierre AS CHAR) = '0000-00-00 00:00:00')
         ORDER BY fecha_apertura DESC
       `);
       finalRows = recentRows;
