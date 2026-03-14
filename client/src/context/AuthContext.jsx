@@ -37,8 +37,9 @@ export const AuthProvider = ({ children, socket }) => {
     const loadMasterData = useCallback(async (token, isBackground = false) => {
         try {
             // Obtener el rol del usuario (desde el estado o desde localStorage si es necesario)
-            const currentUser = user || JSON.parse(localStorage.getItem('user'));
-            const userRole = currentUser?.rol;
+            const storedUser = localStorage.getItem('user');
+            const currentUser = user || (storedUser ? JSON.parse(storedUser) : null);
+            const userRole = (currentUser?.rol || '').trim();
 
             // Si no es en background, valida el token (solo al hacer login)
             if (!isBackground) {
@@ -46,6 +47,7 @@ export const AuthProvider = ({ children, socket }) => {
                     await api.fetchMe(token);
                 } catch (authErr) {
                     if (authErr.status === 401) {
+                        console.error("🚫 Fallo en fetchMe (Validación inicial). Redirigiendo al login...");
                         logout();
                         return;
                     }

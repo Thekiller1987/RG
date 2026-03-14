@@ -79,7 +79,7 @@ const request = async (method, path, token = null, data = null, config = {}) => 
                 
                 // Si el token falló o expiró (401)
                 if (status === 401 && unauthorizedHandler) {
-                    console.error("🚫 Sesión inválida o expirada. Redirigiendo al login...");
+                    console.error(`🚫 Sesión inválida o expirada para: ${method.toUpperCase()} ${path}. Redirigiendo al login...`);
                     unauthorizedHandler();
                 }
 

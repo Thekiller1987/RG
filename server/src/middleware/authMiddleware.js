@@ -10,7 +10,11 @@ const verifyToken = (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
 
       // Verificamos la validez del token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_key_reemplazo_seguro');
+      const secret = process.env.JWT_SECRET || 'secret_key_reemplazo_seguro';
+      if (!process.env.JWT_SECRET) {
+          console.warn("[AUTH] Advertencia: JWT_SECRET no está definido en el entorno, usando fallback.");
+      }
+      const decoded = jwt.verify(token, secret);
 
       // Adjuntamos los datos del usuario (id y rol) a la petición
       req.user = decoded;
