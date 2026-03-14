@@ -261,8 +261,8 @@ const Dashboard = () => {
                     {canAccessFinances && (
                         <Card to="/finances" color="#10b981" onMouseEnter={() => prefetch('/finances')}>
                             <CardIcon color="#10b981"><FaChartPie /></CardIcon>
-                            <h2>Finanzas y Reportes</h2>
-                            <p>Control de ingresos, gastos y rendimiento general.</p>
+                            <h2>Finanzas y Estadísticas</h2>
+                            <p>Gestión de ingresos, gastos y analítica general.</p>
                         </Card>
                     )}
 
