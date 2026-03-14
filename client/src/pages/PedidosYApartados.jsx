@@ -12,8 +12,82 @@ import { motion, AnimatePresence } from 'framer-motion';
 // ... imports
 import { useAuth } from '../context/AuthContext';
 import * as api from '../service/api';
+import axios from 'axios';
 
 import ProformaEmpleadoModal from './pos/components/ProformaEmpleadoModal.jsx';
+
+// =================================================================
+// LAZY IMAGE LOADING (mismo sistema que el POS)
+// =================================================================
+const imageCache = new Map();
+
+async function preloadImages(productIds, concurrency = 4) {
+    const token = localStorage.getItem('token');
+    const queue = productIds.filter(id => { const c = imageCache.get(id); return !c || (c !== 'loading' && c !== 'none'); });
+    let i = 0;
+    async function next() {
+        if (i >= queue.length) return;
+        const id = queue[i++];
+        if (imageCache.has(id)) return next();
+        imageCache.set(id, 'loading');
+        try {
+            const r = await axios.get(`/api/products/${id}/image`, { headers: { Authorization: `Bearer ${token}` } });
+            imageCache.set(id, r.data?.imagen || 'none');
+        } catch { imageCache.set(id, 'none'); }
+        return next();
+    }
+    await Promise.all(Array.from({ length: concurrency }, next));
+}
+
+function useLazyEmpleadoImage(productId) {
+    const [imgSrc, setImgSrc] = React.useState(() => {
+        const c = imageCache.get(productId);
+        return (c && c !== 'loading' && c !== 'none') ? c : null;
+    });
+    const ref = React.useRef(null);
+    React.useEffect(() => {
+        const cached = imageCache.get(productId);
+        if (cached && cached !== 'loading' && cached !== 'none') { setImgSrc(cached); return; }
+        if (cached === 'none') return;
+        const interval = setInterval(() => {
+            const c = imageCache.get(productId);
+            if (c && c !== 'loading' && c !== 'none') { setImgSrc(c); clearInterval(interval); }
+            else if (c === 'none') clearInterval(interval);
+        }, 100);
+        const obs = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) {
+                const c = imageCache.get(productId);
+                if (!c || (c !== 'loading' && c !== 'none')) {
+                    const token = localStorage.getItem('token');
+                    imageCache.set(productId, 'loading');
+                    axios.get(`/api/products/${productId}/image`, { headers: { Authorization: `Bearer ${token}` } })
+                        .then(r => { const img = r.data?.imagen || null; imageCache.set(productId, img || 'none'); if (img) setImgSrc(img); })
+                        .catch(() => imageCache.set(productId, 'none'));
+                }
+            }
+        }, { rootMargin: '200px' });
+        if (ref.current) obs.observe(ref.current);
+        return () => { obs.disconnect(); clearInterval(interval); };
+    }, [productId]);
+    return { imgSrc, ref };
+}
+
+function LazyEmpleadoImage({ productId, productName, onView }) {
+    const { imgSrc, ref } = useLazyEmpleadoImage(productId);
+    return (
+        <div ref={ref} style={{ height: 160, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+            {imgSrc && (
+                <div className="eye-icon" onClick={(e) => { e.stopPropagation(); onView(imgSrc); }}
+                    style={{ position: 'absolute', top: 10, left: 10, zIndex: 20, background: 'white', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', cursor: 'pointer' }} title="Ver imagen">
+                    <FaEye size={14} color="#64748b" />
+                </div>
+            )}
+            {imgSrc
+                ? <img src={imgSrc} alt={productName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                : <FaImage size={40} color="#e2e8f0" />}
+        </div>
+    );
+}
 
 // =================================================================
 // ESTILOS PREMIUM
@@ -281,7 +355,7 @@ const BarcodeScannerModal = ({ onClose, onScan }) => {
 };
 
 const ProformaGenerator = () => {
-    const { user, products: authProducts } = useAuth();
+    const { user, products: authProducts, cajaSession } = useAuth();
     const token = localStorage.getItem('token');
 
     const [products, setProducts] = useState(authProducts || []);
@@ -360,6 +434,16 @@ const ProformaGenerator = () => {
         }).slice(0, 100);
     }, [products, searchTerm, searchType]);
 
+    // PRE-CARGA: primeros 100 visibles inmediato + catálogo completo en background
+    useEffect(() => {
+        preloadImages(filteredProducts.map(p => p.id_producto || p.id), 6);
+    }, [filteredProducts]);
+    useEffect(() => {
+        if (!products.length) return;
+        const t = setTimeout(() => preloadImages(products.map(p => p.id_producto || p.id), 2), 1500);
+        return () => clearTimeout(t);
+    }, [products]);
+
     const total = useMemo(() => cart.reduce((acc, item) => acc + (parseFloat(item.precio_venta) * item.quantity), 0), [cart]);
 
     // --- BARCODE SCANNER LISTENER ---
@@ -422,6 +506,20 @@ const ProformaGenerator = () => {
                     </HeaderActions>
                 </Header>
 
+                {/* ESTADO DE CAJA */}
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
+                    background: cajaSession && !cajaSession.closedAt ? '#f0fdf4' : '#fef2f2',
+                    border: `1px solid ${cajaSession && !cajaSession.closedAt ? '#86efac' : '#fca5a5'}`,
+                    borderRadius: 12, fontSize: '0.88rem', fontWeight: 600,
+                    color: cajaSession && !cajaSession.closedAt ? '#166534' : '#991b1b'
+                }}>
+                    <span style={{ fontSize: 16 }}>{cajaSession && !cajaSession.closedAt ? '🟢' : '🔴'}</span>
+                    {cajaSession && !cajaSession.closedAt
+                        ? `Caja abierta — ${cajaSession.openedBy?.name || user?.nombre_usuario || 'Cajero'}`
+                        : 'Sin caja abierta — Abre una caja desde el POS para enviar pedidos'}
+                </div>
+
                 <SearchContainer>
                     <SearchTypeToggle>
                         <ToggleButton active={searchType === 'nombre'} onClick={() => { setSearchType('nombre'); setSearchTerm(''); searchInputRef.current?.focus(); }}><FaFont /> Nombre</ToggleButton>
@@ -464,30 +562,11 @@ const ProformaGenerator = () => {
                                     {agotado ? 'Agotado' : `Stock: ${restante}`}
                                 </StockBadge>
 
-                                {p.imagen && (
-                                    <div
-                                        className="eye-icon"
-                                        onClick={(e) => { e.stopPropagation(); setViewImage({ isOpen: true, imageUrl: p.imagen }); }}
-                                        style={{
-                                            position: 'absolute', top: 10, left: 10, zIndex: 20,
-                                            background: 'white', borderRadius: '50%', width: 32, height: 32,
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)', cursor: 'pointer',
-                                            transition: 'transform 0.2s',
-                                        }}
-                                        title="Ver imagen"
-                                    >
-                                        <FaEye size={14} color="#64748b" />
-                                    </div>
-                                )}
-
-                                <div style={{ height: 160, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-                                    {p.imagen ? (
-                                        <img src={p.imagen} alt={p.nombre} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                                    ) : (
-                                        <FaImage size={40} color="#e2e8f0" />
-                                    )}
-                                </div>
+                                <LazyEmpleadoImage
+                                    productId={pid}
+                                    productName={p.nombre}
+                                    onView={(imgSrc) => setViewImage({ isOpen: true, imageUrl: imgSrc })}
+                                />
 
                                 <div style={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                     <div style={{
@@ -496,6 +575,9 @@ const ProformaGenerator = () => {
                                         display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'
                                     }}>
                                         {p.nombre}
+                                    </div>
+                                    <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600 }}>
+                                        {p.codigo || 'S/C'}
                                     </div>
                                     <div style={{ fontWeight: 800, color: '#2563eb', fontSize: '1.05rem', marginTop: 'auto' }}>
                                         C$ {parseFloat(p.precio_venta || p.precio || 0).toFixed(2)}

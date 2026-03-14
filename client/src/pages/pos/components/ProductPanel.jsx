@@ -1,14 +1,134 @@
 // client/src/pages/pos/components/ProductPanel.jsx
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import styled from 'styled-components';
 import { FaStore, FaExclamationTriangle, FaTags, FaBarcode, FaFont, FaImage, FaEye, FaTimes } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
+import axios from 'axios';
 import * as S from '../POS.styles.jsx';
 
 const PRODUCTS_PER_PAGE = 100;
 
 const fmt = (n) =>
   Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Caché global compartido con InventoryManagement
+const imageCache = new Map();
+
+// Pre-carga imágenes en paralelo con límite de concurrencia
+async function preloadImages(productIds, concurrency = 4) {
+  const token = localStorage.getItem('token');
+  const queue = productIds.filter(id => {
+    const c = imageCache.get(id);
+    return !c || (c !== 'loading' && c !== 'none'); // Solo los que no estén cargados o en proceso
+  });
+
+  let i = 0;
+  async function next() {
+    if (i >= queue.length) return;
+    const id = queue[i++];
+    if (imageCache.has(id)) return next(); // Ya en caché, saltar
+    imageCache.set(id, 'loading');
+    try {
+      const r = await axios.get(`/api/products/${id}/image`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const img = r.data?.imagen || null;
+      imageCache.set(id, img || 'none');
+    } catch {
+      imageCache.set(id, 'none');
+    }
+    return next();
+  }
+  // Lanzar N workers concurrentes
+  await Promise.all(Array.from({ length: concurrency }, next));
+}
+
+// Hook: carga la imagen cuando la tarjeta entra en el viewport
+function useLazyPOSImage(productId) {
+  const [imgSrc, setImgSrc] = useState(() => {
+    const cached = imageCache.get(productId);
+    return (cached && cached !== 'loading' && cached !== 'none') ? cached : null;
+  });
+  const cardRef = useRef(null);
+
+  const fetchImage = useCallback(async () => {
+    if (!productId) return;
+    const cached = imageCache.get(productId);
+    if (cached === 'loading' || cached === 'none') return;
+    if (cached && cached !== 'loading') { setImgSrc(cached); return; }
+
+    imageCache.set(productId, 'loading');
+    try {
+      const token = localStorage.getItem('token');
+      const r = await axios.get(`/api/products/${productId}/image`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const img = r.data?.imagen || null;
+      imageCache.set(productId, img || 'none');
+      if (img) setImgSrc(img);
+    } catch {
+      imageCache.set(productId, 'none');
+    }
+  }, [productId]);
+
+  useEffect(() => {
+    // Si ya está en caché, mostrar de inmediato
+    const cached = imageCache.get(productId);
+    if (cached && cached !== 'loading' && cached !== 'none') { setImgSrc(cached); return; }
+    if (cached === 'none') return;
+
+    // Escuchar cuando el caché se llena (para los pre-cargados)
+    const checkInterval = setInterval(() => {
+      const c = imageCache.get(productId);
+      if (c && c !== 'loading' && c !== 'none') { setImgSrc(c); clearInterval(checkInterval); }
+      else if (c === 'none') clearInterval(checkInterval);
+    }, 100);
+
+    // También usar IntersectionObserver como fallback
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) { fetchImage(); } },
+      { rootMargin: '200px' } // Cargar 200px antes de entrar a pantalla
+    );
+    if (cardRef.current) observer.observe(cardRef.current);
+    return () => { observer.disconnect(); clearInterval(checkInterval); };
+  }, [productId, fetchImage]);
+
+  return { imgSrc, cardRef };
+}
+
+// Componente de imagen lazy para el POS
+function LazyPOSImage({ productId, productName, onView }) {
+  const { imgSrc, cardRef } = useLazyPOSImage(productId);
+  return (
+    <div
+      ref={cardRef}
+      className="image-placeholder"
+      style={{ position: 'relative', height: 160, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f1f5f9', overflow: 'hidden' }}
+    >
+      {imgSrc && (
+        <div
+          className="eye-icon"
+          onClick={(e) => { e.stopPropagation(); onView(imgSrc); }}
+          style={{
+            position: 'absolute', top: 10, left: 10, zIndex: 20,
+            background: 'white', borderRadius: '50%', width: 32, height: 32,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)', cursor: 'pointer',
+            transition: 'transform 0.2s',
+          }}
+          title="Ver imagen"
+        >
+          <FaEye size={14} color="#64748b" />
+        </div>
+      )}
+      {imgSrc ? (
+        <img src={imgSrc} alt={productName} loading="lazy" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+      ) : (
+        <FaImage className="no-image-icon" size={40} color="#e2e8f0" />
+      )}
+    </div>
+  );
+}
 
 const FilterButton = styled.button`
   display: flex; align-items: center; justify-content: center;
@@ -120,6 +240,25 @@ export default function ProductPanel({
     return results.slice(0, 100); // Límite visual para no saturar el DOM (virtualización sería mejor si crece mucho)
   }, [products, searchTerm, searchType]);
 
+  // ★ PRE-CARGA INMEDIATA: carga TODOS los productos visibles (hasta 100) en paralelo
+  useEffect(() => {
+    const ids = filteredProducts.map(p => p.id_producto || p.id);
+    preloadImages(ids, 6); // 6 peticiones simultáneas para los visibles
+  }, [filteredProducts]);
+
+  // ★ PRECARGA GLOBAL EN SEGUNDO PLANO: carga TODO el catálogo silenciosamente
+  // para que cuando el usuario busque, las imágenes ya estén en caché.
+  useEffect(() => {
+    if (!products.length) return;
+    // Pequeño delay para no competir con los productos visibles
+    const timer = setTimeout(() => {
+      const allIds = products.map(p => p.id_producto || p.id);
+      preloadImages(allIds, 2); // Solo 2 en paralelo para no saturar el servidor
+    }, 1500); // Esperar 1.5s para que los visibles carguen primero
+    return () => clearTimeout(timer);
+  }, [products]); // Solo se dispara cuando cambia el catálogo
+
+
   const totalResults = useMemo(() => {
     const term = (searchTerm || '').toLowerCase().trim();
     if (!term) return products.length;
@@ -215,29 +354,11 @@ export default function ProductPanel({
                   {agotado ? 'Agotado' : `Stock: ${restante}`}
                 </S.StockBadge>
 
-                <div className="image-placeholder" style={{ position: 'relative', height: 160, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f1f5f9', overflow: 'hidden' }}>
-                  {p.imagen && (
-                    <div
-                      className="eye-icon"
-                      onClick={(e) => { e.stopPropagation(); setViewImage({ isOpen: true, imageUrl: p.imagen }); }}
-                      style={{
-                        position: 'absolute', top: 10, left: 10, zIndex: 20,
-                        background: 'white', borderRadius: '50%', width: 32, height: 32,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)', cursor: 'pointer',
-                        transition: 'transform 0.2s',
-                      }}
-                      title="Ver imagen"
-                    >
-                      <FaEye size={14} color="#64748b" />
-                    </div>
-                  )}
-                  {p.imagen ? (
-                    <img src={p.imagen} alt={p.nombre} loading="lazy" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-                  ) : (
-                    <FaImage className="no-image-icon" size={40} color="#e2e8f0" />
-                  )}
-                </div>
+                <LazyPOSImage
+                  productId={pid}
+                  productName={p.nombre}
+                  onView={(imgSrc) => setViewImage({ isOpen: true, imageUrl: imgSrc })}
+                />
 
                 <div className="info" style={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div className="product-name" style={{
