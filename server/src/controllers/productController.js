@@ -71,11 +71,17 @@ const createProduct = async (req, res) => {
 /* ===================== READ ===================== */
 const getAllProducts = async (_req, res) => {
   try {
+    // PERF: Excluimos `imagen` del listado masivo para que 4000 productos carguen instantáneamente.
+    // Las imágenes se sirven individualmente por /api/products/:id/image
     const query = `
-      SELECT p.*, c.nombre AS nombre_categoria, pr.nombre AS nombre_proveedor
+      SELECT p.id_producto, p.codigo, p.nombre, p.costo, p.venta, p.mayoreo,
+             p.existencia, p.minimo, p.maximo, p.tipo_venta,
+             p.id_categoria, p.id_proveedor, p.descripcion,
+             p.distribuidor, p.taller, p.mayorista, p.catalogo_mayorista,
+             c.nombre AS nombre_categoria, pr.nombre AS nombre_proveedor
       FROM productos p
       LEFT JOIN categorias c   ON p.id_categoria  = c.id_categoria
-      LEFT   JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
+      LEFT JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
       ORDER BY p.nombre ASC
     `;
     const [rows] = await db.query(query);
@@ -113,19 +119,16 @@ const getAllProducts = async (_req, res) => {
       } catch (e) { /* ignore parse error */ }
     });
 
-    // 3. Formatear y restar stock reservado
+    // 3. Restar stock reservado (imagen ya no viene en este endpoint)
     const products = rows.map(p => {
       const pid = p.id_producto;
       const reserved = reservedMap.get(pid) || 0;
-      // Restar lo reservado (pero no bajar de 0 visualmente para no confundir, o sí?)
-      // User says "no le salga", so reducing existence is correct.
       const existenciaReal = Math.max(0, p.existencia - reserved);
-
       return {
         ...p,
-        existencia: existenciaReal, // Override existence with Available Stock
-        reserved: reserved,         // Optional: expose reserved count
-        imagen: p.imagen ? (Buffer.isBuffer(p.imagen) ? p.imagen.toString('utf-8') : p.imagen) : null
+        existencia: existenciaReal,
+        reserved: reserved
+        // imagen: no se incluye aquí — se pide por /api/products/:id/image
       };
     });
 
@@ -133,6 +136,28 @@ const getAllProducts = async (_req, res) => {
   } catch (error) {
     console.error('Error en getAllProducts:', error);
     res.status(500).json({ msg: 'Error al obtener productos.' });
+  }
+};
+
+/* ===================== GET IMAGE BY ID ===================== */
+const getProductImage = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [rows] = await db.query(
+      'SELECT imagen FROM productos WHERE id_producto = ?',
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ msg: 'Producto no encontrado.' });
+
+    const raw = rows[0].imagen;
+    const imagen = raw
+      ? (Buffer.isBuffer(raw) ? raw.toString('utf-8') : raw)
+      : null;
+
+    res.json({ imagen });
+  } catch (error) {
+    console.error('Error en getProductImage:', error);
+    res.status(500).json({ msg: 'Error al obtener imagen.' });
   }
 };
 
@@ -419,8 +444,9 @@ module.exports = {
   createProduct,
   getAllProducts,
   getProductById,
+  getProductImage,
   updateProduct,
-  deleteProduct,   // ← ahora permite eliminar aunque haya ventas/pedidos (Fks SET NULL)
+  deleteProduct,
   adjustStock,
   getInventoryHistory,
   archiveProduct

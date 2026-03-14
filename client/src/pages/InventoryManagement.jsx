@@ -343,13 +343,41 @@ const ImageUpload = ({ currentImage, onImageChange }) => {
   );
 };
 
-const ImageViewModal = ({ isOpen, imageSrc, onClose }) => {
-  if (!isOpen || !imageSrc) return null;
+const ImageViewModal = ({ isOpen, productId, imageSrc, onClose }) => {
+  const [modalImg, setModalImg] = React.useState(null);
+  const [loadingImg, setLoadingImg] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isOpen) { setModalImg(null); return; }
+    if (imageSrc) { setModalImg(imageSrc); return; }
+    if (!productId) return;
+    // La imagen aún no se ha cargado — pedirla ahora
+    setLoadingImg(true);
+    const token = localStorage.getItem('token');
+    axios.get(`/api/products/${productId}/image`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => setModalImg(r.data.imagen))
+      .catch(() => setModalImg(null))
+      .finally(() => setLoadingImg(false));
+  }, [isOpen, productId, imageSrc]);
+
+  if (!isOpen) return null;
   return (
     <ModalOverlay onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} style={{ position: 'relative', maxWidth: '90%', maxHeight: '90vh' }}>
-        <button onClick={onClose} style={{ position: 'absolute', top: -15, right: -15, background: 'white', width: 30, height: 30, borderRadius: '50%', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>X</button>
-        <img src={imageSrc} alt="Full view" style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: '8px', boxShadow: '0 5px 20px rgba(0,0,0,0.5)' }} />
+      <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} style={{ position: 'relative', maxWidth: '90%', maxHeight: '90vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <button onClick={onClose} style={{ position: 'absolute', top: -15, right: -15, background: 'white', width: 30, height: 30, borderRadius: '50%', border: 'none', cursor: 'pointer', fontWeight: 'bold', zIndex: 1 }}>X</button>
+        {loadingImg ? (
+          <div style={{ background: 'white', borderRadius: '12px', padding: '3rem 4rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', color: '#64748b' }}>
+            <Spinner />
+            <span style={{ fontSize: '0.95rem', fontWeight: 600 }}>Cargando imagen, espere por favor...</span>
+          </div>
+        ) : modalImg ? (
+          <img src={modalImg} alt="Vista completa" style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: '8px', boxShadow: '0 5px 20px rgba(0,0,0,0.5)' }} />
+        ) : (
+          <div style={{ background: 'white', borderRadius: '12px', padding: '3rem 4rem', color: '#94a3b8', textAlign: 'center' }}>
+            <FaImage size={48} style={{ marginBottom: '1rem' }} />
+            <p style={{ margin: 0 }}>Este producto no tiene imagen.</p>
+          </div>
+        )}
       </motion.div>
     </ModalOverlay>
   );
@@ -357,11 +385,84 @@ const ImageViewModal = ({ isOpen, imageSrc, onClose }) => {
 
 const norm = (str) => String(str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
+/* ======================================================
+   CACHE GLOBAL + HOOK: Lazy load de imágenes por tarjeta
+   ====================================================== */
+const imageCache = new Map(); // id_producto -> base64 string | 'loading' | 'none'
+
+const useLazyImage = (productId) => {
+  const [imgSrc, setImgSrc] = React.useState(() => {
+    const cached = imageCache.get(productId);
+    return (cached && cached !== 'loading' && cached !== 'none') ? cached : null;
+  });
+  const cardRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const cached = imageCache.get(productId);
+    if (cached && cached !== 'loading') {
+      setImgSrc(cached !== 'none' ? cached : null);
+      return;
+    }
+    const el = cardRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          observer.disconnect();
+          if (imageCache.get(productId) === 'loading') return;
+          imageCache.set(productId, 'loading');
+          const token = localStorage.getItem('token');
+          axios.get(`/api/products/${productId}/image`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).then(r => {
+            const src = r.data.imagen || null;
+            imageCache.set(productId, src || 'none');
+            if (src) setImgSrc(src);
+          }).catch(() => {
+            imageCache.set(productId, 'none');
+          });
+        }
+      },
+      { rootMargin: '200px' } // Pre-cargar 200px antes de que sea visible
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [productId]);
+
+  return { imgSrc, cardRef };
+};
+
 const MAX_RESULTS_SEARCH = 10000; // Aumentado para permitir filtrar todo el inventario
 const ITEMS_PER_PAGE = 50;
 const LARGE_LIST_CUTOFF = 500;
 
 // ... (Rest of existing imports and constants)
+
+/* ======================================================
+   COMPONENTE: Tarjeta con imagen lazy
+   ====================================================== */
+const LazyProductImage = ({ productId, productName, onViewFull }) => {
+  const { imgSrc, cardRef } = useLazyImage(productId);
+  return (
+    <div
+      ref={cardRef}
+      className="image-placeholder"
+      onClick={() => onViewFull(imgSrc)} // imgSrc puede ser null si aún no cargó — el modal lo maneja
+      style={{ cursor: 'zoom-in' }}
+    >
+      {imgSrc ? (
+        <>
+          <img src={imgSrc} alt={productName} />
+          <div className="overlay"><FaEye /></div>
+        </>
+      ) : (
+        <div className="no-image-text"><FaImage /></div>
+      )}
+    </div>
+  );
+};
+
 
 /* ==================================
    COMPONENTES DE MODAL FALTANTES
@@ -1041,10 +1142,29 @@ const InventoryManagement = () => {
 
   // Handlers para abrir modales
   const openCreateModal = () => setIsCreateModalOpen(true);
-  const openEditModal = (product) => {
-    setProductToEdit(product);
+  const openEditModal = async (product) => {
+    // Intentar cargar la imagen desde el cach\u00e9 o fetch si a\u00fan no ha cargado
+    let imagen = null;
+    const cached = imageCache.get(product.id_producto);
+    if (cached && cached !== 'loading' && cached !== 'none') {
+      imagen = cached;
+    } else if (!cached || cached === 'none') {
+      // No intentar fetch si ya sabemos que no tiene imagen
+      if (cached !== 'none') {
+        try {
+          const token = localStorage.getItem('token');
+          const r = await axios.get(`/api/products/${product.id_producto}/image`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          imagen = r.data.imagen || null;
+          imageCache.set(product.id_producto, imagen || 'none');
+        } catch { /* sin imagen */ }
+      }
+    }
+    setProductToEdit({ ...product, imagen });
     setIsEditModalOpen(true);
   };
+
   const openDeleteModal = (product) => {
     setProductToDelete(product);
     setIsDeleteModalOpen(true);
@@ -1261,16 +1381,7 @@ const InventoryManagement = () => {
           const out = p.existencia <= 0;
           return (
             <ProductCard key={p.id_producto} {...cardProps}>
-              <div className="image-placeholder" onClick={() => p.imagen && setViewImage({ isOpen: true, imageUrl: p.imagen })}>
-                {p.imagen ? (
-                  <>
-                    <img src={p.imagen} alt={p.nombre} />
-                    <div className="overlay"><FaEye /></div>
-                  </>
-                ) : (
-                  <div className="no-image-text"><FaImage /></div>
-                )}
-              </div>
+    <LazyProductImage productId={p.id_producto} productName={p.nombre} onViewFull={(imgSrc) => setViewImage({ isOpen: true, productId: p.id_producto, imageUrl: imgSrc })} />
               <CardHeader>
                 <CardTitle title={p.nombre}>{p.nombre}</CardTitle>
                 <CardCode>Código: {p.codigo}</CardCode>
@@ -1377,7 +1488,7 @@ const InventoryManagement = () => {
         {alert.isOpen && <AlertModal isOpen={alert.isOpen} onClose={closeAlert} title={alert.title} message={alert.message} />}
       </AnimatePresence>
       <AnimatePresence>
-        {viewImage.isOpen && <ImageViewModal isOpen={viewImage.isOpen} imageSrc={viewImage.imageUrl} onClose={() => setViewImage({ isOpen: false, imageUrl: null })} />}
+        {viewImage.isOpen && <ImageViewModal isOpen={viewImage.isOpen} productId={viewImage.productId} imageSrc={viewImage.imageUrl} onClose={() => setViewImage({ isOpen: false, productId: null, imageUrl: null })} />}
       </AnimatePresence>
     </PageWrapper>
   );

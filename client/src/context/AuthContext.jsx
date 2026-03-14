@@ -96,7 +96,7 @@ export const AuthProvider = ({ children, socket }) => {
         }
         refreshTimeoutRef.current = setTimeout(() => {
             refreshProducts();
-        }, 300); // Wait 300ms for other events to settle
+        }, 50); // 50ms: imperceptible pero suficiente para deduplicar eventos simultáneos
     }, [refreshProducts]);
 
     const refreshClients = useCallback(async () => {
