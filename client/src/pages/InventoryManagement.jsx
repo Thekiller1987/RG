@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue } from 'react';
 import styled, { keyframes } from 'styled-components';
 import axios from 'axios';
-import { API_URL, fetchProductImage, getCachedImage, setCachedImage } from '../service/api';
+import { API_URL, fetchProductImage, getCachedImage, setCachedImage, clearCachedImage } from '../service/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
@@ -1141,21 +1141,19 @@ const InventoryManagement = () => {
   // Handlers para abrir modales
   const openCreateModal = () => setIsCreateModalOpen(true);
   const openEditModal = async (product) => {
-    // Intentar cargar la imagen desde el cach\u00e9 o fetch si a\u00fan no ha cargado
+    // Intentar cargar la imagen desde el caché o fetch si aún no ha cargado
     let imagen = null;
-    const cached = imageCache.get(product.id_producto);
+    const cached = getCachedImage(product.id_producto);
     if (cached && cached !== 'loading' && cached !== 'none') {
       imagen = cached;
-    } else if (!cached || cached === 'none') {
+    } else if (cached !== 'none') {
       // No intentar fetch si ya sabemos que no tiene imagen
-      if (cached !== 'none') {
-        try {
-          const token = localStorage.getItem('token');
-          const data = await fetchProductImage(product.id_producto, token);
-          imagen = data?.imagen || null;
-          imageCache.set(product.id_producto, imagen || 'none');
-        } catch { /* sin imagen */ }
-      }
+      try {
+        const token = localStorage.getItem('token');
+        const data = await fetchProductImage(product.id_producto, token);
+        imagen = data?.imagen || null;
+        setCachedImage(product.id_producto, imagen || 'none');
+      } catch { /* sin imagen */ }
     }
     setProductToEdit({ ...product, imagen });
     setIsEditModalOpen(true);
@@ -1191,6 +1189,8 @@ const InventoryManagement = () => {
       const token = localStorage.getItem('token');
       await axios.put(`${API_URL}/products/${productId}`, payload, { headers: { Authorization: `Bearer ${token}` } });
       setIsEditModalOpen(false);
+      // Limpiar caché de imagen para forzar recarga con la nueva imagen
+      clearCachedImage(productId);
       audioSuccess.currentTime = 0;
       audioSuccess.play().catch(e => console.warn(e));
       showAlert({ title: '✅ Éxito', message: 'Producto actualizado correctamente.' });
