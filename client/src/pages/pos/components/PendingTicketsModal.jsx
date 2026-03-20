@@ -8,6 +8,7 @@ import {
     FaClipboardList 
 } from 'react-icons/fa';
 import * as api from '../../service/api'; 
+import { rankItems } from '../../utils/searchEngine';
 
 // Función de formato de moneda local (solo para este componente)
 const fmt = (n) =>
@@ -179,9 +180,7 @@ const PendingTicketsModal = ({ onClose, onLoadToPOS, token, showAlert }) => {
         onLoadToPOS(rawTicket);
     };
 
-    const displayTickets = tickets.filter(t => 
-        t.client.toLowerCase().includes(searchTerm.toLowerCase()) || String(t.id).includes(searchTerm)
-    );
+    const displayTickets = rankItems(tickets, searchTerm, ['client', 'id']);
 
     return (
         <Overlay>

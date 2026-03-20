@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { FaArrowLeft, FaSearch, FaBoxOpen, FaTags, FaInfoCircle, FaEdit, FaCog, FaEye, FaEyeSlash, FaTimes, FaSave } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as api from '../service/api';
+import { rankItems } from '../utils/searchEngine';
 import toast from 'react-hot-toast';
 
 const Container = styled.div`
@@ -287,14 +288,8 @@ const WholesaleCatalog = () => {
 
     let items = isManageMode ? products : products.filter(p => !!p.catalogo_mayorista);
 
-    const q = deferredSearch.toLowerCase().trim();
-    if (!q) return items;
-
-    return items.filter(p =>
-      (p.nombre || '').toLowerCase().includes(q) ||
-      (p.codigo || '').toLowerCase().includes(q) ||
-      (p.descripcion || '').toLowerCase().includes(q)
-    );
+    // Usamos rankItems para la búsqueda avanzada
+    return rankItems(items, deferredSearch, ['nombre', 'codigo', 'descripcion']);
   }, [products, deferredSearch, isManageMode]);
 
   const handleToggleVisibility = async (p) => {

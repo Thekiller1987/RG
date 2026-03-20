@@ -9,6 +9,7 @@ import {
     FaFilter, FaReceipt // Nuevo ícono para la referencia
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
+import { rankItems } from '../utils/searchEngine';
 import * as api from '../service/api';
 import { API_URL } from '../service/api';
 
@@ -678,14 +679,8 @@ const FacturasProveedores = () => {
 
 
 
-        // 4. Búsqueda Texto
-        if (searchTerm) {
-            const term = searchTerm.toLowerCase();
-            data = data.filter(i =>
-                (i.proveedor && i.proveedor.toLowerCase().includes(term)) ||
-                (i.numero_factura && i.numero_factura.toLowerCase().includes(term))
-            );
-        }
+        // 4. Búsqueda Avanzada con rankItems
+        data = rankItems(data, searchTerm, ['proveedor', 'numero_factura']);
 
         // 5. ORDENAMIENTO
         data.sort((a, b) => {

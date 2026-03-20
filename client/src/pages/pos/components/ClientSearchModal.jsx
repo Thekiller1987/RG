@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import styled from 'styled-components';
 import { FaSearch, FaTimes, FaUser } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
+import { rankItems } from '../../../utils/searchEngine';
 
 const ModalOverlay = styled(motion.div)`
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -63,12 +64,7 @@ const ClientSearchModal = ({ isOpen, onClose, onSelect, clients = [] }) => {
     const [searchTerm, setSearchTerm] = useState('');
 
     const filteredClients = useMemo(() => {
-        if (!searchTerm) return clients;
-        const lower = searchTerm.toLowerCase();
-        return clients.filter(c =>
-            c.nombre.toLowerCase().includes(lower) ||
-            (c.telefono && c.telefono.includes(lower))
-        );
+        return rankItems(clients, searchTerm, ['nombre', 'telefono']);
     }, [clients, searchTerm]);
 
     if (!isOpen) return null;

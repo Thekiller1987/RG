@@ -8,6 +8,7 @@ import {
 } from 'react-icons/fa';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { rankItems } from '../utils/searchEngine';
 
 /* ================== CONFIG ================== */
 const API_URL = 'https://multirepuestosrg.com/api';
@@ -466,12 +467,7 @@ export default function DetailedSalesReport() {
 
     // Derived state for Product List (filtered)
     const filteredProducts = useMemo(() => {
-        if (!searchTerm) return allProducts; // Show all (or limit logic in render)
-        const lower = searchTerm.toLowerCase();
-        return allProducts.filter(p =>
-            p.nombre.toLowerCase().includes(lower) ||
-            String(p.codigo).toLowerCase().includes(lower)
-        );
+        return rankItems(allProducts, searchTerm, ['nombre', 'codigo']);
     }, [allProducts, searchTerm]);
 
     const fetchProductHistory = async (product) => {
@@ -701,7 +697,7 @@ export default function DetailedSalesReport() {
                                         >
                                             -- Todos los clientes --
                                         </div>
-                                        {clients.filter(c => c.nombre.toLowerCase().includes(clientSearch.toLowerCase())).slice(0, 20).map(c => (
+                                        {rankItems(clients, clientSearch, ['nombre']).slice(0, 20).map(c => (
                                             <div
                                                 key={c.id_cliente}
                                                 onClick={() => { setReportClient(c); setClientSearch(c.nombre); setShowClientList(false); }}

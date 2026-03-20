@@ -21,6 +21,7 @@ import AlertModal from './AlertModal';
 import AbonoCreditoModal from './AbonoCreditoModal';
 import SaleDetailView from './SaleDetailView';
 import * as api from '../../../service/api';
+import { rankItems } from '../../../utils/searchEngine';
 import toast from 'react-hot-toast';
 
 /* ───────────────────────── Helpers ───────────────────────── */
@@ -323,17 +324,20 @@ function SalesHistoryModal({
 
   // Filtros
   const filteredSales = useMemo(() => {
-    const q = (searchTerm || '').toLowerCase();
-    const out = (salesData || []).filter(s => {
+    let data = (salesData || []).map(s => {
       const clientId = s.clientId || s.idCliente;
-      const clientName = safeClients.find(c => c.id_cliente === clientId)?.nombre || '';
-      return (
-        (!filterUser || String(s.userId) === String(filterUser)) &&
-        (!filterStatus || s.estado === filterStatus) &&
-        (!q || String(s.id).includes(q) || clientName.toLowerCase().includes(q))
-      );
+      const clientName = safeClients.find(c => c.id_cliente === clientId)?.nombre || 'Consumidor Final';
+      return { ...s, _clientName: clientName, _idStr: String(s.id) };
     });
-    return out.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    if (filterUser) {
+      data = data.filter(s => String(s.userId) === String(filterUser));
+    }
+    if (filterStatus) {
+      data = data.filter(s => s.estado === filterStatus);
+    }
+
+    return rankItems(data, searchTerm, ['_idStr', '_clientName']).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
   }, [salesData, filterUser, filterStatus, searchTerm, safeClients]);
 
   // Paginación

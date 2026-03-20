@@ -10,6 +10,7 @@ import * as api from '../service/api';
 import { useAuth } from '../context/AuthContext';
 import OutflowTicketModal from './pos/components/OutflowTicketModal';
 import { motion, AnimatePresence } from 'framer-motion';
+import { rankItems } from '../utils/searchEngine';
 
 const ModalOverlay = styled(motion.div)`
   position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
@@ -170,8 +171,7 @@ const InventoryOutflowPage = () => {
 
     const { clients = [] } = useAuth();
     const filteredClients = useMemo(() => {
-        if (!clientSearch.trim()) return clients.slice(0, 10);
-        return clients.filter(c => c.nombre.toLowerCase().includes(clientSearch.toLowerCase())).slice(0, 10);
+        return rankItems(clients, clientSearch, ['nombre']).slice(0, 10);
     }, [clientSearch, clients]);
 
     // Refs
@@ -179,12 +179,7 @@ const InventoryOutflowPage = () => {
 
     // Search Logic (Memoized for performance)
     const results = React.useMemo(() => {
-        if (!searchTerm.trim()) return globalProducts.slice(0, 24);
-        const term = searchTerm.toLowerCase();
-        return globalProducts.filter(p =>
-            (p.nombre?.toLowerCase().includes(term)) ||
-            (p.codigo?.toString().toLowerCase().includes(term))
-        ).slice(0, 50);
+        return rankItems(globalProducts, searchTerm, ['nombre', 'codigo']).slice(0, 50);
     }, [searchTerm, globalProducts]);
 
     // 3. Add to Cart

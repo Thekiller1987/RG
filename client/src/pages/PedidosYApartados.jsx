@@ -8,6 +8,7 @@ import {
     FaArrowLeft, FaPhone, FaImage, FaEye, FaTimes, FaShoppingCart
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
+import { rankItems } from '../utils/searchEngine';
 
 // ... imports
 import { useAuth } from '../context/AuthContext';
@@ -429,11 +430,9 @@ const ProformaGenerator = () => {
     };
 
     const filteredProducts = useMemo(() => {
-        const term = searchTerm.toLowerCase().trim();
-        if (!term) return products.slice(0, 100);
-        return products.filter(p => {
-            if (searchType === 'codigo') return String(p.codigo || '').toLowerCase().includes(term);
-            return String(p.nombre || '').toLowerCase().includes(term);
+        const isCodeSearch = searchType === 'codigo';
+        return rankItems(products, searchTerm, isCodeSearch ? ['codigo'] : ['nombre', 'codigo'], {
+            strict: isCodeSearch
         }).slice(0, 100);
     }, [products, searchTerm, searchType]);
 

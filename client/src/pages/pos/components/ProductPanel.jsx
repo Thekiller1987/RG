@@ -5,6 +5,7 @@ import { FaStore, FaExclamationTriangle, FaTags, FaBarcode, FaFont, FaImage, FaE
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { API_URL, fetchProductImage, getCachedImage, setCachedImage } from '../../../service/api';
+import { rankItems } from '../../../utils/searchEngine';
 import * as S from '../POS.styles.jsx';
 
 const PRODUCTS_PER_PAGE = 100;
@@ -214,31 +215,14 @@ export default function ProductPanel({
   }, [cartItems]);
 
   const filteredProducts = useMemo(() => {
-    const term = (searchTerm || '').toLowerCase().trim();
-
-    const results = products.filter(p => {
-      // Optimización: Búsqueda rápida ignorando acentos y mayúsculas
-      const normalize = (str) => str ? String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : '';
-      const termNormalized = normalize(term);
-
-      if (!termNormalized) return true;
-
-      if (searchType === 'code') {
-        const codigo = normalize(p.codigo);
-        const barras = normalize(p.codigo_barras);
-        return codigo.startsWith(termNormalized) || barras.startsWith(termNormalized);
-      } else {
-        // En description, buscamos en nombre Y código para mayor flexibilidad
-        // Si el término es muy corto (1 car) y hay muchos productos, podría ser lento, pero asumimos <2000 items
-        const nombre = normalize(p.nombre);
-        const descripcion = normalize(p.descripcion);
-        const codigo = normalize(p.codigo);
-
-        return nombre.includes(termNormalized) || descripcion.includes(termNormalized) || codigo.includes(termNormalized);
-      }
+    const isCodeSearch = searchType === 'code';
+    
+    // Usamos el nuevo motor de búsqueda rankItems
+    const ranked = rankItems(products, searchTerm, ['nombre', 'codigo', 'descripcion'], {
+      strict: isCodeSearch // En modo código, usamos búsqueda estricta/exacta
     });
 
-    return results.slice(0, 100); // Límite visual para no saturar el DOM (virtualización sería mejor si crece mucho)
+    return ranked.slice(0, 100); // Límite visual
   }, [products, searchTerm, searchType]);
 
   // ★ PRE-CARGA INMEDIATA: carga TODOS los productos visibles (hasta 100) en paralelo

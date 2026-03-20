@@ -9,6 +9,7 @@ import {
   FaSearch, FaTimes, FaPlusCircle, FaMinusCircle, FaExclamationTriangle,
   FaBarcode, FaFont, FaImage, FaEye
 } from 'react-icons/fa';
+import { rankItems } from '../utils/searchEngine';
 
 /* ================================
    STYLED COMPONENTS LOCALES
@@ -1068,66 +1069,43 @@ const InventoryManagement = () => {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const { filtered, totalFilteredCount } = useMemo(() => {
-    const q = (deferredSearch || '').toLowerCase().trim();
+    const isCodeSearch = searchType === 'code';
     const cat = String(filterCategory || '');
     const prov = String(filterProvider || '');
 
-    let matched = allProducts;
+    let items = allProducts;
+    if (cat) items = items.filter(p => String(p.id_categoria) === cat);
+    if (prov) items = items.filter(p => String(p.id_proveedor) === prov);
 
-    if (cat) matched = matched.filter(p => String(p.id_categoria) === cat);
-    if (prov) matched = matched.filter(p => String(p.id_proveedor) === prov);
-
-    // Filter Logic
-    const results = matched.filter(p => {
-      if (searchType === 'code') {
-        const codigo = String(p.codigo || '').toLowerCase();
-        const barras = String(p.codigo_barras || '').toLowerCase();
-        return codigo.includes(q) || barras.includes(q);
-      } else {
-        const nombre = (p.nombre || '').toLowerCase();
-        const desc = (p.descripcion || '').toLowerCase();
-        const codigo = String(p.codigo || '').toLowerCase();
-        return nombre.includes(q) || desc.includes(q) || codigo.includes(q);
-      }
+    // Usamos el motor de búsqueda avanzado
+    let results = rankItems(items, deferredSearch, isCodeSearch ? ['codigo', 'codigo_barras'] : ['nombre', 'codigo', 'descripcion'], {
+      strict: isCodeSearch
     });
 
-    // SORTING: StartsWith Priority + Selected Sort
-    results.sort((a, b) => {
-      // 1. Si hay búsqueda, priorizar coincidencias al inicio del nombre/código
-      if (q) {
-        // Starts with Name
-        const aNameStart = (a.nombre || '').toLowerCase().startsWith(q);
-        const bNameStart = (b.nombre || '').toLowerCase().startsWith(q);
-        if (aNameStart && !bNameStart) return -1;
-        if (!aNameStart && bNameStart) return 1;
+    // Si NO hay término de búsqueda, aplicamos el ordenamiento manual solicitado
+    // Si HAY término, rankItems ya devolvió el orden por relevancia
+    if (!deferredSearch) {
+      results.sort((a, b) => {
+        switch (sortBy) {
+          case 'name-asc':
+            return (a.nombre || '').localeCompare(b.nombre || '');
+          case 'name-desc':
+            return (b.nombre || '').localeCompare(a.nombre || '');
+          case 'stock-asc':
+            return (a.existencia || 0) - (b.existencia || 0);
+          case 'stock-desc':
+            return (b.existencia || 0) - (a.existencia || 0);
+          case 'price-asc':
+            return (a.venta || 0) - (b.venta || 0);
+          case 'price-desc':
+            return (b.venta || 0) - (a.venta || 0);
+          default:
+            return 0;
+        }
+      });
+    }
 
-        // Starts with Code
-        const aCodeStart = (a.codigo || '').toLowerCase().startsWith(q);
-        const bCodeStart = (b.codigo || '').toLowerCase().startsWith(q);
-        if (aCodeStart && !bCodeStart) return -1;
-        if (!aCodeStart && bCodeStart) return 1;
-      }
-
-      // 2. Aplicar ordenamiento seleccionado
-      switch (sortBy) {
-        case 'name-asc':
-          return (a.nombre || '').localeCompare(b.nombre || '');
-        case 'name-desc':
-          return (b.nombre || '').localeCompare(a.nombre || '');
-        case 'stock-asc':
-          return (a.existencia || 0) - (b.existencia || 0);
-        case 'stock-desc':
-          return (b.existencia || 0) - (a.existencia || 0);
-        case 'price-asc':
-          return (a.venta || 0) - (b.venta || 0);
-        case 'price-desc':
-          return (b.venta || 0) - (a.venta || 0);
-        default:
-          return 0;
-      }
-    });
-
-    // Pagination
+    // Paginación
     const totalCount = results.length;
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const paginatedResults = results.slice(startIndex, startIndex + ITEMS_PER_PAGE);
