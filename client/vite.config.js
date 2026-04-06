@@ -17,7 +17,7 @@ const pwaConfig = {
         navigateFallbackDenylist: [/^\/api/, /^\/socket\.io/, /^\/uploads/],
         runtimeCaching: [
             {
-                urlPattern: /^https:\/\/multirepuestosrg\.com\/api\/.*/i,
+                urlPattern: /^https:\/\/sistema\.multirepuestosrg\.com\/api\/.*/i,
                 handler: 'NetworkFirst',
                 options: {
                     cacheName: 'api-cache',

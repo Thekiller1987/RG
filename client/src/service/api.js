@@ -4,7 +4,7 @@ import axios from 'axios';
 // === MODIFICACIÓN OBLIGATORIA: CONEXIÓN DIRECTA A DIGITALOCEAN ===
 // RAW_BASE DEBE TERMINAR SIN SLASH PARA UNIÓN LIMPIA
 // RAW_BASE DEBE TERMINAR SIN SLASH PARA UNIÓN LIMPIA
-const RAW_BASE = import.meta.env.VITE_API_URL || 'https://multirepuestosrg.com/api';
+const RAW_BASE = import.meta.env.VITE_API_URL || 'https://sistema.multirepuestosrg.com/api';
 // ===================================================================
 
 const API_URL = RAW_BASE; // Simplificado
