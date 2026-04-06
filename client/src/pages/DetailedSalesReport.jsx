@@ -11,7 +11,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { rankItems } from '../utils/searchEngine';
 
 /* ================== CONFIG ================== */
-const API_URL = 'https://multirepuestosrg.com/api';
+const API_URL = 'https://sistema.multirepuestosrg.com/api';
 
 /* ================== HELPERS ================== */
 function todayManagua() {

@@ -432,7 +432,7 @@ const TicketModal = ({
     if (!settings?.empresa_logo_url) return null;
     if (settings.empresa_logo_url.startsWith('http')) return settings.empresa_logo_url;
     // Get base URL (remove /api if present)
-    const base = (import.meta.env.VITE_API_URL || 'https://multirepuestosrg.com/api').replace(/\/api$/, '');
+    const base = (import.meta.env.VITE_API_URL || 'https://sistema.multirepuestosrg.com/api').replace(/\/api$/, '');
     return `${base}${settings.empresa_logo_url.startsWith('/') ? '' : '/'}${settings.empresa_logo_url}`;
   }, [settings?.empresa_logo_url]);
 
