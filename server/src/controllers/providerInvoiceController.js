@@ -128,3 +128,36 @@ exports.deleteInvoice = async (req, res) => {
     res.status(500).json({ message: 'Error al eliminar factura' });
   }
 };
+
+// Eliminar un abono específico (corregir duplicados)
+exports.deletePayment = async (req, res) => {
+  const { abonoId } = req.params;
+  try {
+    // 1. Obtener el abono para saber cuánto revertir
+    const [rows] = await db.query('SELECT * FROM abonos_proveedores WHERE id = ?', [abonoId]);
+    if (rows.length === 0) return res.status(404).json({ message: 'Abono no encontrado' });
+
+    const abono = rows[0];
+    const { id_factura, monto } = abono;
+
+    // 2. Eliminar el abono
+    await db.query('DELETE FROM abonos_proveedores WHERE id = ?', [abonoId]);
+
+    // 3. Revertir el monto en la factura
+    const [invRows] = await db.query('SELECT * FROM facturas_proveedores WHERE id = ?', [id_factura]);
+    if (invRows.length > 0) {
+      const inv = invRows[0];
+      const nuevoAbonado = Math.max(0, Number(inv.monto_abonado) - Number(monto));
+      const nuevoEstado = nuevoAbonado >= Number(inv.monto_total) ? 'PAGADA' : (inv.estado === 'PAGADA' ? 'PENDIENTE' : inv.estado);
+      await db.query(
+        'UPDATE facturas_proveedores SET monto_abonado = ?, estado = ? WHERE id = ?',
+        [nuevoAbonado, nuevoEstado, id_factura]
+      );
+    }
+
+    res.json({ message: 'Abono eliminado y factura actualizada correctamente' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error al eliminar el abono' });
+  }
+};

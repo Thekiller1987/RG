@@ -555,6 +555,23 @@ const FacturasProveedores = () => {
         }
     };
 
+    // --- ELIMINAR ABONO INDIVIDUAL (Corregir duplicados) ---
+    const handleDeletePayment = async (abonoId, invoiceId = null) => {
+        if (!window.confirm('¿Eliminar este abono? El monto se descontará del total abonado en la factura.')) return;
+        try {
+            await api.deleteProviderPayment(abonoId, token);
+            // Actualizar historial local si hay modal abierto
+            setHistoryData(prev => prev.filter(a => a.id !== abonoId));
+            // Actualizar reporte global
+            setGlobalHistoryData(prev => prev.filter(a => a.abono_id !== abonoId));
+            // Refrescar facturas para actualizar monto_abonado
+            setRefreshTrigger(prev => prev + 1);
+            showAlert('Abono Eliminado', 'El abono fue eliminado y la factura fue actualizada.', 'success');
+        } catch (err) {
+            showAlert('Error', 'No se pudo eliminar el abono. Intenta nuevamente.', 'error');
+        }
+    };
+
     // --- CÁLCULO DE ESTADO DINÁMICO ---
     const getEffectiveStatus = useCallback((invoice) => {
         const total = parseFloat(invoice.monto_total) || 0;
@@ -1062,6 +1079,7 @@ const FacturasProveedores = () => {
                                             <th>Referencia / Detalle</th>
                                             <th style={{ textAlign: 'center' }}>Modo de Compra</th>
                                             <th style={{ textAlign: 'right' }}>Monto Pagado (C$)</th>
+                                            <th style={{ textAlign: 'center' }}>Acción</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1082,6 +1100,16 @@ const FacturasProveedores = () => {
                                                 <td className="amount" style={{ color: '#16a34a' }}>
                                                     C${parseFloat(abono.monto).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                                 </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <Button
+                                                        $danger
+                                                        title="Eliminar este abono"
+                                                        style={{ padding: '0.4rem 0.7rem', fontSize: '0.8rem', borderRadius: '8px', margin: '0 auto' }}
+                                                        onClick={() => handleDeletePayment(abono.abono_id)}
+                                                    >
+                                                        <FaTrashAlt />
+                                                    </Button>
+                                                </td>
                                             </tr>
                                         ))}
                                         {globalHistoryData.length === 0 && (
@@ -1095,7 +1123,7 @@ const FacturasProveedores = () => {
                                     {globalHistoryData.length > 0 && (
                                         <tfoot>
                                             <tr style={{ background: '#f8fafc', fontWeight: '900' }}>
-                                                <td colSpan="6" style={{ textAlign: 'right', textTransform: 'uppercase', fontSize: '0.8rem', color: '#64748b' }}>
+                                                <td colSpan="7" style={{ textAlign: 'right', textTransform: 'uppercase', fontSize: '0.8rem', color: '#64748b' }}>
                                                     Total Egresos (Abonos + Pagos de Contado):
                                                 </td>
                                                 <td className="amount" style={{ color: '#16a34a', fontSize: '1.2rem' }}>
@@ -1296,11 +1324,12 @@ const FacturasProveedores = () => {
                                             <th>Método</th>
                                             <th>Referencia</th>
                                             <th style={{ textAlign: 'right' }}>Monto</th>
+                                            <th style={{ textAlign: 'center' }}>Eliminar</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {historyData.map((abono, idx) => (
-                                            <tr key={idx}>
+                                            <tr key={abono.id || idx}>
                                                 <td>{formatDateManagua(abono.fecha)}</td>
                                                 <td>
                                                     <StatusBadge bg="#f1f5f9" text="#475569">{abono.metodo_pago}</StatusBadge>
@@ -1308,6 +1337,16 @@ const FacturasProveedores = () => {
                                                 <td>{abono.referencia || '-'}</td>
                                                 <td className="amount" style={{ color: '#16a34a' }}>
                                                     C${parseFloat(abono.monto).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <Button
+                                                        $danger
+                                                        title="Eliminar este abono duplicado"
+                                                        style={{ padding: '0.4rem 0.7rem', fontSize: '0.8rem', borderRadius: '8px' }}
+                                                        onClick={() => handleDeletePayment(abono.id, selectedInvoice?.id)}
+                                                    >
+                                                        <FaTrashAlt />
+                                                    </Button>
                                                 </td>
                                             </tr>
                                         ))}

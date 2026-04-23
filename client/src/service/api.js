@@ -488,6 +488,10 @@ export const deleteProviderInvoice = async (invoiceId, token) => {
     return await request('delete', `/facturas-proveedores/${invoiceId}`, token);
 };
 
+export const deleteProviderPayment = async (abonoId, token) => {
+    return await request('delete', `/facturas-proveedores/abonos/${abonoId}`, token);
+};
+
 // ===================================================================
 // === FUNCIONES PARA EL FLUJO COMPLETO PEDIDOS → POS ===
 // ===================================================================
