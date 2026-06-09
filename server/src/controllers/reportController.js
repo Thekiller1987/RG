@@ -522,7 +522,7 @@ const getBiMetrics = async (req, res) => {
             SELECT * FROM (
                 SELECT 
                     DATE(fecha) AS dia,
-                    DATE_FORMAT(fecha, '%d/%m') AS etiqueta,
+                    DATE_FORMAT(MIN(fecha), '%d/%m') AS etiqueta,
                     SUM(total_venta) AS total
                 FROM ventas
                 WHERE estado = 'COMPLETADA' AND fecha < CURDATE()
