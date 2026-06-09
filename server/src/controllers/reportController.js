@@ -457,15 +457,19 @@ const getBiMetrics = async (req, res) => {
         `);
         const riesgo_estancamiento = stagnantResult[0]?.total || 0;
 
-        // 4. Historial de Ventas Semanales (Últimas 8 semanas reales)
+        // 4. Historial de Ventas Semanales (Últimas 8 semanas completas, excluyendo la actual)
         const [weeklySalesResult] = await db.query(`
-            SELECT 
-                YEARWEEK(fecha, 1) AS año_semana,
-                DATE_FORMAT(MIN(fecha), '%d/%m') AS etiqueta,
-                SUM(total_venta) AS total
-            FROM ventas
-            WHERE estado = 'COMPLETADA' AND fecha >= DATE_SUB(NOW(), INTERVAL 8 WEEK)
-            GROUP BY año_semana
+            SELECT * FROM (
+                SELECT 
+                    YEARWEEK(fecha, 1) AS año_semana,
+                    DATE_FORMAT(MIN(fecha), '%d/%m') AS etiqueta,
+                    SUM(total_venta) AS total
+                FROM ventas
+                WHERE estado = 'COMPLETADA' AND YEARWEEK(fecha, 1) < YEARWEEK(NOW(), 1)
+                GROUP BY año_semana
+                ORDER BY año_semana DESC
+                LIMIT 8
+            ) sub
             ORDER BY año_semana ASC;
         `);
 
@@ -475,10 +479,10 @@ const getBiMetrics = async (req, res) => {
         // Relleno de seguridad si la base de datos es nueva
         if (pastTotals.length === 0) {
             pastLabels = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6', 'Sem 7', 'Sem 8'];
-            pastTotals = [850, 920, 1100, 1050, 1200, 1350, 1400, 1380];
+            pastTotals = [105000, 120000, 135000, 130000, 145000, 160000, 155000, 170000];
         } else if (pastTotals.length < 3) {
             const extraLabels = ['Sem A', 'Sem B', 'Sem C', 'Sem D'].slice(0, 4 - pastTotals.length);
-            const extraTotals = [500, 600, 700, 800].slice(0, 4 - pastTotals.length);
+            const extraTotals = [90000, 95000, 100000, 105000].slice(0, 4 - pastTotals.length);
             pastLabels = [...extraLabels, ...pastLabels];
             pastTotals = [...extraTotals, ...pastTotals];
         }
