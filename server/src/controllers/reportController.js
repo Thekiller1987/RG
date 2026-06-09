@@ -546,10 +546,10 @@ const getBiMetrics = async (req, res) => {
             values: categoryValues
         };
 
-        // 6. Anomalías en tiempo real
+        // 6. Anomalías en tiempo real con detalle de productos
         const anomalies = [];
 
-        // Anomalía A: Ventas inusualmente altas
+        // Anomalía A: Ventas inusualmente altas (Uniendo con productos para detallar de qué fue)
         const [avgSaleResult] = await db.query(`
             SELECT AVG(total_venta) AS promedio FROM ventas WHERE estado = 'COMPLETADA'
         `);
@@ -557,10 +557,18 @@ const getBiMetrics = async (req, res) => {
         const thresholdHighSale = Math.max(800, averageSale * 3);
 
         const [highSalesResult] = await db.query(`
-            SELECT v.id_venta, v.total_venta, DATE_FORMAT(v.fecha, '%H:%i') AS hora, u.nombre_usuario
+            SELECT 
+                v.id_venta, 
+                v.total_venta, 
+                DATE_FORMAT(v.fecha, '%H:%i') AS hora, 
+                u.nombre_usuario,
+                GROUP_CONCAT(CONCAT(p.nombre, ' (x', dv.cantidad, ')') SEPARATOR ', ') AS productos
             FROM ventas v
             JOIN usuarios u ON v.id_usuario = u.id_usuario
+            JOIN detalle_ventas dv ON v.id_venta = dv.id_venta
+            JOIN productos p ON dv.id_producto = p.id_producto
             WHERE v.estado = 'COMPLETADA' AND v.total_venta > ?
+            GROUP BY v.id_venta, u.nombre_usuario, v.fecha
             ORDER BY v.fecha DESC
             LIMIT 2;
         `, [thresholdHighSale]);
@@ -568,7 +576,7 @@ const getBiMetrics = async (req, res) => {
         highSalesResult.forEach(s => {
             anomalies.push({
                 title: 'Venta Inusualmente Alta (Alerta BI)',
-                desc: `El cajero '${s.nombre_usuario}' facturó una transacción por valor de C$ ${Number(s.total_venta).toLocaleString('es-NI')} a las ${s.hora}.`,
+                desc: `El cajero '${s.nombre_usuario}' facturó C$ ${Number(s.total_venta).toLocaleString('es-NI')} en repuestos: ${s.productos} a las ${s.hora}.`,
                 badge: 'Auditoría',
                 risk: 'Revisar'
             });
@@ -620,13 +628,36 @@ const getBiMetrics = async (req, res) => {
             });
         }
 
+        // 7. Distribución de Métodos de Pago (Últimos 30 días)
+        const [paymentDistributionResult] = await db.query(`
+            SELECT 
+                COALESCE(metodo_pago, 'Efectivo') AS metodo, 
+                SUM(total_venta) AS total
+            FROM ventas
+            WHERE estado = 'COMPLETADA' AND fecha >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            GROUP BY metodo;
+        `);
+        
+        const payment_distribution = paymentDistributionResult.map(r => ({
+            metodo: r.metodo,
+            total: Number(r.total || 0)
+        }));
+
+        // 8. Ticket Promedio
+        const [ticketPromedioResult] = await db.query(`
+            SELECT COALESCE(AVG(total_venta), 0) AS ticket_promedio FROM ventas WHERE estado = 'COMPLETADA'
+        `);
+        const ticket_promedio = Number(ticketPromedioResult[0]?.ticket_promedio || 0);
+
         res.json({
             total_productos,
             promedio_margen,
             riesgo_estancamiento,
             sales_history,
             category_margins,
-            anomalies
+            anomalies,
+            payment_distribution,
+            ticket_promedio
         });
 
     } catch (error) {

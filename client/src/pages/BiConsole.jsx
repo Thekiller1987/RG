@@ -393,56 +393,57 @@ const LoadingOverlay = styled.div`
 const BiConsole = () => {
   const navigate = useNavigate();
 
-  // Estados del Simulador de Arqueo
-  const [montoInicial, setMontoInicial] = useState(100.00);
-  const [ventasEfectivo, setVentasEfectivo] = useState(1250.00);
-  const [cajaReal, setCajaReal] = useState(1350.00);
-  const [arqueoResult, setArqueoResult] = useState({
-    diferencia: 0,
-    mensaje: 'Conciliación Exitosa: El efectivo físico cuadra al 100% con caja.',
-    color: '#10b981',
-    bg: 'rgba(16, 185, 129, 0.15)',
-    border: 'rgba(16, 185, 129, 0.4)'
-  });
-
   // Estados de datos de la base de datos
   const [metrics, setMetrics] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Recalcular arqueo
-  const calcularArqueo = useCallback(() => {
-    const finalEsperado = Number(montoInicial) + Number(ventasEfectivo);
-    const dif = Number(cajaReal) - finalEsperado;
-    
-    let msg = '';
-    let color = '';
-    let bg = '';
-    let border = '';
-
-    if (dif === 0) {
-      color = '#10b981';
-      bg = 'rgba(16, 185, 129, 0.15)';
-      border = 'rgba(16, 185, 129, 0.4)';
-      msg = 'Conciliación Exitosa: El efectivo físico cuadra al 100% con caja.';
-    } else if (dif < 0) {
-      color = '#f43f5e';
-      bg = 'rgba(244, 63, 94, 0.15)';
-      border = 'rgba(244, 63, 94, 0.4)';
-      msg = `Alerta de Auditoría: Pérdida o desvío no facturado de C$ ${Math.abs(dif).toFixed(2)}`;
-    } else {
-      color = '#ED7D31';
-      bg = 'rgba(237, 125, 49, 0.15)';
-      border = 'rgba(237, 125, 49, 0.4)';
-      msg = `Ingreso de Efectivo Excedente: Dinero físico no registrado de C$ ${dif.toFixed(2)}`;
+  // Calcular distribución de pagos
+  const getPaymentMethodDistribution = useCallback(() => {
+    if (!metrics || !metrics.payment_distribution || metrics.payment_distribution.length === 0) {
+      // Valores por defecto / snapshot
+      return {
+        efectivo: { pct: 68, total: 45210 },
+        transferencia: { pct: 22, total: 14620 },
+        tarjeta: { pct: 10, total: 6650 }
+      };
     }
 
-    setArqueoResult({ diferencia: dif, mensaje: msg, color, bg, border });
-  }, [montoInicial, ventasEfectivo, cajaReal]);
+    const total = metrics.payment_distribution.reduce((sum, item) => sum + item.total, 0);
+    let efectivo = 0;
+    let transferencia = 0;
+    let tarjeta = 0;
 
-  // Actualizar arqueo cuando cambian los inputs
-  useEffect(() => {
-    calcularArqueo();
-  }, [calcularArqueo]);
+    metrics.payment_distribution.forEach(item => {
+      const met = item.metodo.toLowerCase();
+      if (met.includes('efectivo')) {
+        efectivo += item.total;
+      } else if (met.includes('transferencia') || met.includes('banco') || met.includes('deposito')) {
+        transferencia += item.total;
+      } else if (met.includes('tarjeta') || met.includes('pos') || met.includes('credito') || met.includes('crédito')) {
+        tarjeta += item.total;
+      } else {
+        efectivo += item.total;
+      }
+    });
+
+    return {
+      efectivo: {
+        pct: total > 0 ? Math.round((efectivo / total) * 100) : 0,
+        total: efectivo
+      },
+      transferencia: {
+        pct: total > 0 ? Math.round((transferencia / total) * 100) : 0,
+        total: transferencia
+      },
+      tarjeta: {
+        pct: total > 0 ? Math.round((tarjeta / total) * 100) : 0,
+        total: tarjeta
+      }
+    };
+  }, [metrics]);
+
+  const paymentDist = getPaymentMethodDistribution();
+  const ticketPromedio = metrics?.ticket_promedio !== undefined ? metrics.ticket_promedio : 845.50;
 
   // Fetch metrics de la BD
   const loadMetrics = useCallback(async () => {
@@ -659,42 +660,68 @@ const BiConsole = () => {
               <Card>
                 <CardTitle>
                   <FaCheckCircle color="#ED7D31" />
-                  Calculadora de Cuadre de Caja
+                  Distribución Financiera y Ticket Promedio
                 </CardTitle>
                 <CardDesc>
-                  Herramienta de conciliación aritmética instantánea entre la caja real versus las ventas facturadas electrónicamente.
+                  Análisis de los métodos de pago preferidos por los clientes y el monto promedio facturado por cada transacción de venta.
                 </CardDesc>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <FormGroup>
-                    <label style={{ fontSize: '0.85rem', color: '#9ca3af', fontWeight: 600 }}>Monto Inicial de Caja (C$)</label>
-                    <Input type="number" value={montoInicial} onChange={e => setMontoInicial(e.target.value)} />
-                  </FormGroup>
-                  <FormGroup>
-                    <label style={{ fontSize: '0.85rem', color: '#9ca3af', fontWeight: 600 }}>Ventas en Efectivo (C$)</label>
-                    <Input type="number" value={ventasEfectivo} onChange={e => setVentasEfectivo(e.target.value)} />
-                  </FormGroup>
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <div>
+                    <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#9ca3af', fontWeight: 600 }}>Valor Ticket Promedio</span>
+                    <div style={{ fontSize: '1.9rem', fontWeight: 800, color: '#10b981', marginTop: '0.2rem' }}>
+                      C$ {ticketPromedio.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  <div style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '12px', padding: '0.75rem 1rem', fontWeight: 800, fontSize: '1.2rem', fontFamily: "'JetBrains Mono', monospace" }}>
+                    C$
+                  </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <FormGroup>
-                    <label style={{ fontSize: '0.85rem', color: '#9ca3af', fontWeight: 600 }}>Efectivo Físico Contado (C$)</label>
-                    <Input type="number" value={cajaReal} onChange={e => setCajaReal(e.target.value)} />
-                  </FormGroup>
-                  <FormGroup>
-                    <label style={{ fontSize: '0.85rem', color: '#9ca3af', fontWeight: 600 }}>Diferencia de Conciliación</label>
-                    <Input 
-                      type="text" 
-                      value={(arqueoResult.diferencia >= 0 ? '+' : '') + 'C$ ' + arqueoResult.diferencia.toFixed(2)} 
-                      readOnly 
-                      style={{ fontWeight: 'bold', background: 'rgba(0,0,0,0.25)', color: arqueoResult.color }} 
-                    />
-                  </FormGroup>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid rgba(255, 255, 25, 0.04)', paddingBottom: '0.4rem' }}>
+                    Distribución de Pagos (Últimos 30 días)
+                  </div>
+                  
+                  {/* Efectivo */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.3rem' }}>
+                      <span style={{ color: '#fff', fontWeight: 600 }}>Efectivo</span>
+                      <span style={{ color: '#9ca3af', fontFamily: "'JetBrains Mono', monospace" }}>
+                        {paymentDist.efectivo.pct}% (C$ {paymentDist.efectivo.total.toLocaleString('es-NI', { maximumFractionDigits: 0 })})
+                      </span>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.04)', height: '8px', borderRadius: '4px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ background: '#ED7D31', height: '100%', width: `${paymentDist.efectivo.pct}%`, borderRadius: '4px', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}></div>
+                    </div>
+                  </div>
+                  
+                  {/* Transferencia */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.3rem' }}>
+                      <span style={{ color: '#fff', fontWeight: 600 }}>Transferencia Bancaria</span>
+                      <span style={{ color: '#9ca3af', fontFamily: "'JetBrains Mono', monospace" }}>
+                        {paymentDist.transferencia.pct}% (C$ {paymentDist.transferencia.total.toLocaleString('es-NI', { maximumFractionDigits: 0 })})
+                      </span>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.04)', height: '8px', borderRadius: '4px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ background: '#38bdf8', height: '100%', width: `${paymentDist.transferencia.pct}%`, borderRadius: '4px', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}></div>
+                    </div>
+                  </div>
+                  
+                  {/* Tarjeta */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.3rem' }}>
+                      <span style={{ color: '#fff', fontWeight: 600 }}>Tarjeta de Crédito / Débito</span>
+                      <span style={{ color: '#9ca3af', fontFamily: "'JetBrains Mono', monospace" }}>
+                        {paymentDist.tarjeta.pct}% (C$ {paymentDist.tarjeta.total.toLocaleString('es-NI', { maximumFractionDigits: 0 })})
+                      </span>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.04)', height: '8px', borderRadius: '4px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ background: '#a855f7', height: '100%', width: `${paymentDist.tarjeta.pct}%`, borderRadius: '4px', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}></div>
+                    </div>
+                  </div>
                 </div>
-
-                <ArqueoMensaje bg={arqueoResult.bg} color={arqueoResult.color} border={arqueoResult.border}>
-                  {arqueoResult.mensaje}
-                </ArqueoMensaje>
               </Card>
 
               <Card>
