@@ -30,6 +30,7 @@ const WholesalePOS = React.lazy(() => import('./pages/WholesalePOS.jsx'));
 const WholesalePromotions = React.lazy(() => import('./pages/WholesalePromotions.jsx'));
 const WholesaleMenu = React.lazy(() => import('./pages/WholesaleMenu.jsx'));
 const WholesaleCatalog = React.lazy(() => import('./pages/WholesaleCatalog.jsx'));
+const BiConsole = React.lazy(() => import('./pages/BiConsole.jsx'));
 
 // Simple fallback component
 const Loading = () => (
@@ -247,6 +248,15 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE]}>
                 <motion.div {...pageTransition}><SettingsPage /></motion.div>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/bi-console"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
+                <motion.div {...pageTransition}><BiConsole /></motion.div>
               </ProtectedRoute>
             }
           />

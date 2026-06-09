@@ -46,4 +46,8 @@ router.get('/product-history', verifyToken, getProductHistory);
 // GET /api/reports/provider-payments?startDate=...&endDate=...&proveedor=...
 router.get('/provider-payments', verifyToken, getProviderPaymentsReport);
 
+// GET /api/reports/bi-metrics
+const { getBiMetrics } = require('../controllers/reportController');
+router.get('/bi-metrics', verifyToken, getBiMetrics);
+
 module.exports = router;

@@ -403,6 +403,10 @@ export const fetchSalesChartReport = (token, params) => {
     return request('get', '/reports/sales-chart', token, null, { params });
 };
 
+export const fetchBiMetricsReport = (token) => {
+    return request('get', '/reports/bi-metrics', token);
+};
+
 // ===================================================================
 // --- SECCIÓN DE CARGA MASIVA ---
 // ===================================================================

@@ -193,6 +193,7 @@ const Dashboard = () => {
             case '/finances': import('./Finances.jsx'); break; // Corrected path
             case '/detailed-sales-report': import('./DetailedSalesReport.jsx'); break;
             case '/empleados': import('./Empleados.jsx'); break; // Corrected path
+            case '/bi-console': import('./BiConsole.jsx'); break;
             default: break;
         }
     };
@@ -317,6 +318,15 @@ const Dashboard = () => {
                             <CardIcon color="#6366f1"><FaFileInvoiceDollar /></CardIcon>
                             <h2>Reporte de Ventas Detallado</h2>
                             <p>Ventas, devoluciones y rastreo por producto.</p>
+                        </Card>
+                    )}
+
+                    {/* Consola de Inteligencia de Negocios (BI) */}
+                    {canAccessReports && (
+                        <Card to="/bi-console" color="#ED7D31" onMouseEnter={() => prefetch('/bi-console')}>
+                            <CardIcon color="#ED7D31"><FaChartLine /></CardIcon>
+                            <h2>Consola BI & Analítica</h2>
+                            <p>Panel de Inteligencia de Negocios y Proyección.</p>
                         </Card>
                     )}
 
