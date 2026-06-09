@@ -396,6 +396,7 @@ const BiConsole = () => {
   // Estados de datos de la base de datos
   const [metrics, setMetrics] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [chartPeriod, setChartPeriod] = useState('weekly');
 
   // Calcular distribución de pagos
   const getPaymentMethodDistribution = useCallback(() => {
@@ -476,15 +477,17 @@ const BiConsole = () => {
     };
   }, [loadMetrics]);
 
-  // Configuración de Chart - Ventas Semanales y Proyección
+  // Configuración de Chart - Ventas Semanales/Diarias y Proyección
   const getSalesChartData = () => {
-    if (!metrics || !metrics.sales_history) return { labels: [], datasets: [] };
+    if (!metrics) return { labels: [], datasets: [] };
+    const history = chartPeriod === 'daily' ? metrics.sales_history_daily : metrics.sales_history;
+    if (!history) return { labels: [], datasets: [] };
     return {
-      labels: metrics.sales_history.labels,
+      labels: history.labels,
       datasets: [
         {
-          label: 'Ventas Reales (C$)',
-          data: metrics.sales_history.reales,
+          label: chartPeriod === 'daily' ? 'Ventas Reales Diarias (C$)' : 'Ventas Reales Semanales (C$)',
+          data: history.reales,
           borderColor: '#38bdf8',
           backgroundColor: 'rgba(56, 189, 248, 0.08)',
           fill: true,
@@ -494,8 +497,8 @@ const BiConsole = () => {
           pointBackgroundColor: '#38bdf8'
         },
         {
-          label: 'Proyección Analítica (C$)',
-          data: metrics.sales_history.proyeccion,
+          label: chartPeriod === 'daily' ? 'Proyección Diaria (C$)' : 'Proyección Semanal (C$)',
+          data: history.proyeccion,
           borderColor: '#ED7D31',
           borderDash: [5, 5],
           backgroundColor: 'transparent',
@@ -604,9 +607,45 @@ const BiConsole = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <PanelRow>
               <Card>
-                <CardTitle>
-                  <FaChartLine />
-                  Historial de Ventas Semanales e Inyección Analítica
+                <CardTitle style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <FaChartLine />
+                    Historial de Ventas e Inyección Analítica
+                  </div>
+                  <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px' }}>
+                    <button 
+                      onClick={() => setChartPeriod('daily')} 
+                      style={{
+                        background: chartPeriod === 'daily' ? 'rgba(255,255,255,0.08)' : 'none',
+                        border: 'none',
+                        color: chartPeriod === 'daily' ? '#fff' : '#9ca3af',
+                        padding: '0.3rem 0.6rem',
+                        fontSize: '0.75rem',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                      }}
+                    >
+                      Diario
+                    </button>
+                    <button 
+                      onClick={() => setChartPeriod('weekly')} 
+                      style={{
+                        background: chartPeriod === 'weekly' ? 'rgba(255,255,255,0.08)' : 'none',
+                        border: 'none',
+                        color: chartPeriod === 'weekly' ? '#fff' : '#9ca3af',
+                        padding: '0.3rem 0.6rem',
+                        fontSize: '0.75rem',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                      }}
+                    >
+                      Semanal
+                    </button>
+                  </div>
                 </CardTitle>
                 <CardDesc>
                   Registros transaccionales reales comparados con la proyección analítica calculada mediante regresión lineal basada en el histórico de ventas.
