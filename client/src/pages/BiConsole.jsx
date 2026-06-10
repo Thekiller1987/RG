@@ -510,17 +510,40 @@ const LoadingOverlay = styled.div`
   }
 `;
 
+const TopLoadingBar = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, #ED7D31, #38bdf8, #10b981);
+  background-size: 200% 100%;
+  animation: loadingShift 1.5s infinite linear;
+  z-index: 9999;
+  opacity: ${props => props.visible ? 1 : 0};
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+
+  @keyframes loadingShift {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+  }
+`;
+
 const BiConsole = () => {
   const navigate = useNavigate();
 
   // Estados de datos de la base de datos y filtros
   const [metrics, setMetrics] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [chartPeriod, setChartPeriod] = useState('weekly');
+  const [chartPeriod, setChartPeriod] = useState('daily');
   const [filterType, setFilterType] = useState('all'); // 'today', 'yesterday', 'thisMonth', 'last30', 'all', 'custom'
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [activeTab, setActiveTab] = useState('caja'); // 'caja', 'rotacion', 'proyeccion'
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [showBacktest, setShowBacktest] = useState(true);
+  const [stagnantSearch, setStagnantSearch] = useState('');
 
   // Calcular parámetros de filtro
   const getFilterParams = useCallback(() => {
@@ -639,13 +662,15 @@ const BiConsole = () => {
   };
   const maxCategoryMargin = getMaxCategoryMargin();
 
-  // Fetch metrics de la BD
-  const loadMetrics = useCallback(async () => {
+  // Fetch metrics de la BD (admite spinner general o silencioso para rapidez)
+  const loadMetrics = useCallback(async (showFull = false, showSilent = false) => {
     const token = localStorage.getItem('token');
     if (!token) {
       navigate('/login');
       return;
     }
+    if (showFull) setIsLoading(true);
+    if (showSilent) setIsUpdating(true);
     try {
       const params = getFilterParams();
       const data = await fetchBiMetricsReport(token, params);
@@ -654,22 +679,60 @@ const BiConsole = () => {
       console.error('Error al cargar métricas BI:', error);
     } finally {
       setIsLoading(false);
+      setIsUpdating(false);
     }
   }, [navigate, getFilterParams]);
 
-  // Cargar métricas e iniciar interval de 5s para tiempo real
+  // Cargar métricas iniciales y configurar polling de 15 segundos
   useEffect(() => {
-    // Activar tema BI en el body
     document.body.classList.add('bi-theme');
-    loadMetrics();
+    loadMetrics(metrics === null, false);
 
-    const interval = setInterval(loadMetrics, 5000);
+    const interval = setInterval(() => {
+      loadMetrics(false, false);
+    }, 15000);
 
     return () => {
       document.body.classList.remove('bi-theme');
       clearInterval(interval);
     };
   }, [loadMetrics]);
+
+  // Ejecutar cambio de filtro con retroalimentación instantánea
+  const handleFilterClick = (type) => {
+    setFilterType(type);
+    setIsUpdating(true);
+  };
+
+  // Helper para procesar la proyección histórica (backtesting)
+  const getProyeccionData = (history) => {
+    if (!history || !history.proyeccion) return [];
+    if (showBacktest) return history.proyeccion;
+
+    const reales = history.reales || [];
+    const proyeccion = history.proyeccion || [];
+
+    // Encontrar el último índice con dato real no nulo
+    let lastRealIdx = -1;
+    for (let i = reales.length - 1; i >= 0; i--) {
+      if (reales[i] !== null) {
+        lastRealIdx = i;
+        break;
+      }
+    }
+
+    return proyeccion.map((val, idx) => {
+      // Reemplazar predicciones pasadas con null para no dibujarlas
+      if (idx < lastRealIdx) return null;
+      return val;
+    });
+  };
+
+  // Filtro cliente para productos estancados
+  const filteredStagnantProducts = metrics?.stagnant_products?.filter(p => 
+    (p.nombre || '').toLowerCase().includes(stagnantSearch.toLowerCase()) ||
+    (p.codigo || '').toLowerCase().includes(stagnantSearch.toLowerCase())
+  ) || [];
 
   // Configuración de Chart - Ventas Semanales/Diarias y Proyección
   const getSalesChartData = () => {
@@ -692,7 +755,7 @@ const BiConsole = () => {
         },
         {
           label: chartPeriod === 'daily' ? 'Proyección Diaria (C$)' : 'Proyección Semanal (C$)',
-          data: history.proyeccion,
+          data: getProyeccionData(history),
           borderColor: '#ED7D31',
           borderDash: [5, 5],
           backgroundColor: 'transparent',
@@ -731,6 +794,7 @@ const BiConsole = () => {
 
   return (
     <PageWrapper>
+      <TopLoadingBar visible={isUpdating} />
       <BIBodyStyles />
       <Header>
         <HeaderContainer>
@@ -781,12 +845,12 @@ const BiConsole = () => {
           {/* FILTRO DE FECHAS */}
           <FilterBar>
             <FilterOptions>
-              <FilterButton active={filterType === 'all'} onClick={() => setFilterType('all')}>Histórico</FilterButton>
-              <FilterButton active={filterType === 'today'} onClick={() => setFilterType('today')}>Hoy</FilterButton>
-              <FilterButton active={filterType === 'yesterday'} onClick={() => setFilterType('yesterday')}>Ayer</FilterButton>
-              <FilterButton active={filterType === 'thisMonth'} onClick={() => setFilterType('thisMonth')}>Este Mes</FilterButton>
-              <FilterButton active={filterType === 'last30'} onClick={() => setFilterType('last30')}>Últimos 30 días</FilterButton>
-              <FilterButton active={filterType === 'custom'} onClick={() => setFilterType('custom')}>Personalizado</FilterButton>
+              <FilterButton active={filterType === 'all'} onClick={() => handleFilterClick('all')}>Histórico</FilterButton>
+              <FilterButton active={filterType === 'today'} onClick={() => handleFilterClick('today')}>Hoy</FilterButton>
+              <FilterButton active={filterType === 'yesterday'} onClick={() => handleFilterClick('yesterday')}>Ayer</FilterButton>
+              <FilterButton active={filterType === 'thisMonth'} onClick={() => handleFilterClick('thisMonth')}>Este Mes</FilterButton>
+              <FilterButton active={filterType === 'last30'} onClick={() => handleFilterClick('last30')}>Últimos 30 días</FilterButton>
+              <FilterButton active={filterType === 'custom'} onClick={() => handleFilterClick('custom')}>Personalizado</FilterButton>
             </FilterOptions>
 
             {filterType === 'custom' && (
@@ -795,13 +859,19 @@ const BiConsole = () => {
                 <DateInput 
                   type="date" 
                   value={customStart} 
-                  onChange={(e) => setCustomStart(e.target.value)} 
+                  onChange={(e) => {
+                    setCustomStart(e.target.value);
+                    if (e.target.value && customEnd) setIsUpdating(true);
+                  }} 
                 />
                 <label>Hasta:</label>
                 <DateInput 
                   type="date" 
                   value={customEnd} 
-                  onChange={(e) => setCustomEnd(e.target.value)} 
+                  onChange={(e) => {
+                    setCustomEnd(e.target.value);
+                    if (customStart && e.target.value) setIsUpdating(true);
+                  }} 
                 />
               </CustomDateRange>
             )}
@@ -926,44 +996,58 @@ const BiConsole = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
               <PanelRow>
                 <Card>
-                  <CardTitle style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <CardTitle style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <FaChartLine />
                       Historial de Ventas e Inyección Analítica
                     </div>
-                    <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px' }}>
-                      <button 
-                        onClick={() => setChartPeriod('daily')} 
-                        style={{
-                          background: chartPeriod === 'daily' ? 'rgba(255,255,255,0.08)' : 'none',
-                          border: 'none',
-                          color: chartPeriod === 'daily' ? '#fff' : '#9ca3af',
-                          padding: '0.3rem 0.6rem',
-                          fontSize: '0.75rem',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                        }}
-                      >
-                        Diario
-                      </button>
-                      <button 
-                        onClick={() => setChartPeriod('weekly')} 
-                        style={{
-                          background: chartPeriod === 'weekly' ? 'rgba(255,255,255,0.08)' : 'none',
-                          border: 'none',
-                          color: chartPeriod === 'weekly' ? '#fff' : '#9ca3af',
-                          padding: '0.3rem 0.6rem',
-                          fontSize: '0.75rem',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                        }}
-                      >
-                        Semanal
-                      </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '4px 8px' }}>
+                        <input 
+                          type="checkbox" 
+                          id="backtestToggleCaja" 
+                          checked={showBacktest} 
+                          onChange={(e) => setShowBacktest(e.target.checked)}
+                          style={{ cursor: 'pointer', accentColor: '#ED7D31' }}
+                        />
+                        <label htmlFor="backtestToggleCaja" style={{ fontSize: '0.75rem', color: '#9ca3af', cursor: 'pointer', userSelect: 'none', fontWeight: 600 }}>
+                          Comparar con Predicción Pasada
+                        </label>
+                      </div>
+                      <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px' }}>
+                        <button 
+                          onClick={() => setChartPeriod('daily')} 
+                          style={{
+                            background: chartPeriod === 'daily' ? 'rgba(255,255,255,0.08)' : 'none',
+                            border: 'none',
+                            color: chartPeriod === 'daily' ? '#fff' : '#9ca3af',
+                            padding: '0.3rem 0.6rem',
+                            fontSize: '0.75rem',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                          }}
+                        >
+                          Diario
+                        </button>
+                        <button 
+                          onClick={() => setChartPeriod('weekly')} 
+                          style={{
+                            background: chartPeriod === 'weekly' ? 'rgba(255,255,255,0.08)' : 'none',
+                            border: 'none',
+                            color: chartPeriod === 'weekly' ? '#fff' : '#9ca3af',
+                            padding: '0.3rem 0.6rem',
+                            fontSize: '0.75rem',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                          }}
+                        >
+                          Semanal
+                        </button>
+                      </div>
                     </div>
                   </CardTitle>
                   <CardDesc>
@@ -1154,6 +1238,68 @@ const BiConsole = () => {
 
               <PanelRow>
                 <Card style={{ gridColumn: 'span 2' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', paddingBottom: '0.75rem' }}>
+                    <CardTitle style={{ borderBottom: 'none', paddingBottom: 0 }}>
+                      <FaBoxes color="#f43f5e" />
+                      Detalle de Inventario Estancado (Sin Ventas en más de 180 Días)
+                    </CardTitle>
+                    <div style={{ position: 'relative', minWidth: '250px' }}>
+                      <Input 
+                        type="text" 
+                        placeholder="Buscar repuesto estancado..." 
+                        value={stagnantSearch}
+                        onChange={(e) => setStagnantSearch(e.target.value)}
+                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', width: '100%', borderRadius: '8px' }}
+                      />
+                    </div>
+                  </div>
+                  <CardDesc>
+                    Listado de los artículos con stock físico disponible que registran nulo movimiento en los últimos 6 meses, ordenados por capital inmovilizado.
+                  </CardDesc>
+
+                  <div style={{ overflowX: 'auto', maxHeight: '400px', overflowY: 'auto', marginTop: '0.5rem' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid rgba(255, 25, 25, 0.08)', color: '#9ca3af', position: 'sticky', top: 0, background: '#0a0a14', zIndex: 1 }}>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600 }}>CÓDIGO</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600 }}>PRODUCTO</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>EXISTENCIA</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>PRECIO VENTA</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>CAPITAL DETENIDO</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'center' }}>ÚLTIMA VENTA</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredStagnantProducts?.map((p, idx) => {
+                          const capital = p.existencia * p.precio;
+                          return (
+                            <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)', transition: 'background-color 0.2s' }}>
+                              <td style={{ padding: '0.75rem 0.5rem', fontFamily: "'JetBrains Mono', monospace", color: '#38bdf8', fontWeight: 600 }}>{p.codigo || 'S/C'}</td>
+                              <td style={{ padding: '0.75rem 0.5rem', color: '#fff' }}>{p.nombre}</td>
+                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#f43f5e' }}>{p.existencia}</td>
+                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#9ca3af' }}>C$ {Number(p.precio).toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#ED7D31', fontWeight: 700 }}>C$ {capital.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', color: '#9ca3af', fontSize: '0.8rem' }}>
+                                {p.ultima_venta ? new Date(p.ultima_venta).toLocaleDateString('es-NI') : 'Nunca vendido'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {(!filteredStagnantProducts || filteredStagnantProducts.length === 0) && (
+                          <tr>
+                            <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
+                              No hay productos estancados que coincidan con la búsqueda.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </PanelRow>
+
+              <PanelRow>
+                <Card style={{ gridColumn: 'span 2' }}>
                   <CardTitle>
                     <FaBoxes color="#ED7D31" />
                     Recomendaciones BI para la Gestión del Inventario
@@ -1196,44 +1342,58 @@ const BiConsole = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
               <PanelRow>
                 <Card style={{ gridColumn: 'span 2' }}>
-                  <CardTitle style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <CardTitle style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <FaChartLine />
                       Historial de Ventas e Inyección Analítica (Modelo Predictivo)
                     </div>
-                    <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px' }}>
-                      <button 
-                        onClick={() => setChartPeriod('daily')} 
-                        style={{
-                          background: chartPeriod === 'daily' ? 'rgba(255,255,255,0.08)' : 'none',
-                          border: 'none',
-                          color: chartPeriod === 'daily' ? '#fff' : '#9ca3af',
-                          padding: '0.3rem 0.6rem',
-                          fontSize: '0.75rem',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                        }}
-                      >
-                        Diario
-                      </button>
-                      <button 
-                        onClick={() => setChartPeriod('weekly')} 
-                        style={{
-                          background: chartPeriod === 'weekly' ? 'rgba(255,255,255,0.08)' : 'none',
-                          border: 'none',
-                          color: chartPeriod === 'weekly' ? '#fff' : '#9ca3af',
-                          padding: '0.3rem 0.6rem',
-                          fontSize: '0.75rem',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                        }}
-                      >
-                        Semanal
-                      </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '4px 8px' }}>
+                        <input 
+                          type="checkbox" 
+                          id="backtestToggleProy" 
+                          checked={showBacktest} 
+                          onChange={(e) => setShowBacktest(e.target.checked)}
+                          style={{ cursor: 'pointer', accentColor: '#ED7D31' }}
+                        />
+                        <label htmlFor="backtestToggleProy" style={{ fontSize: '0.75rem', color: '#9ca3af', cursor: 'pointer', userSelect: 'none', fontWeight: 600 }}>
+                          Comparar con Predicción Pasada
+                        </label>
+                      </div>
+                      <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px' }}>
+                        <button 
+                          onClick={() => setChartPeriod('daily')} 
+                          style={{
+                            background: chartPeriod === 'daily' ? 'rgba(255,255,255,0.08)' : 'none',
+                            border: 'none',
+                            color: chartPeriod === 'daily' ? '#fff' : '#9ca3af',
+                            padding: '0.3rem 0.6rem',
+                            fontSize: '0.75rem',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                          }}
+                        >
+                          Diario
+                        </button>
+                        <button 
+                          onClick={() => setChartPeriod('weekly')} 
+                          style={{
+                            background: chartPeriod === 'weekly' ? 'rgba(255,255,255,0.08)' : 'none',
+                            border: 'none',
+                            color: chartPeriod === 'weekly' ? '#fff' : '#9ca3af',
+                            padding: '0.3rem 0.6rem',
+                            fontSize: '0.75rem',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                          }}
+                        >
+                          Semanal
+                        </button>
+                      </div>
                     </div>
                   </CardTitle>
                   <CardDesc>

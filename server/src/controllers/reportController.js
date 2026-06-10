@@ -454,17 +454,47 @@ const getBiMetrics = async (req, res) => {
             : 0;
 
         // 3. Riesgo de Estancamiento (existencia > 0 sin ventas en los últimos 180 días)
+        // Usamos NOT EXISTS para evitar fallas si hay NULLs en dv.id_producto
         const [stagnantResult] = await db.query(`
             SELECT COUNT(*) AS total
             FROM productos p
-            WHERE p.activo = 1 AND p.existencia > 0 AND p.id_producto NOT IN (
-                SELECT DISTINCT dv.id_producto
+            WHERE p.activo = 1 AND p.existencia > 0 AND NOT EXISTS (
+                SELECT 1
                 FROM detalle_ventas dv
                 JOIN ventas v ON dv.id_venta = v.id_venta
-                WHERE v.estado = 'COMPLETADA' AND v.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+                WHERE dv.id_producto = p.id_producto
+                  AND v.estado = 'COMPLETADA'
+                  AND v.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
             )
         `);
         const riesgo_estancamiento = stagnantResult[0]?.total || 0;
+
+        // 3b. Obtener lista detallada de Productos Estancados (Top 100 por valor de inventario)
+        const [stagnantProductsList] = await db.query(`
+            SELECT 
+                p.id_producto, 
+                p.codigo, 
+                p.nombre, 
+                p.existencia, 
+                p.venta AS precio,
+                (
+                    SELECT MAX(v2.fecha)
+                    FROM detalle_ventas dv2
+                    JOIN ventas v2 ON dv2.id_venta = v2.id_venta
+                    WHERE dv2.id_producto = p.id_producto AND v2.estado = 'COMPLETADA'
+                ) AS ultima_venta
+            FROM productos p
+            WHERE p.activo = 1 AND p.existencia > 0 AND NOT EXISTS (
+                SELECT 1
+                FROM detalle_ventas dv
+                JOIN ventas v ON dv.id_venta = v.id_venta
+                WHERE dv.id_producto = p.id_producto 
+                  AND v.estado = 'COMPLETADA' 
+                  AND v.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+            )
+            ORDER BY p.existencia * p.venta DESC
+            LIMIT 100;
+        `);
 
         // 4. Historial de Ventas Semanales (Últimas 8 semanas completas, excluyendo la actual)
         let weeklySalesResult;
@@ -531,12 +561,29 @@ const getBiMetrics = async (req, res) => {
 
         const labels = [...pastLabels, 'Proy W9', 'Proy W10'];
         const reales = [...pastTotals, null, null];
-        const proyeccion = [
-            ...Array(pastTotals.length - 1).fill(null), 
-            pastTotals[pastTotals.length - 1], 
-            proj9, 
-            proj10
-        ];
+
+        // Calcular predicciones pasadas (backtesting / retro-proyección)
+        const pastProyecciones = Array(n).fill(null);
+        for (let i = 1; i < n; i++) {
+            let sX = 0, sY = 0, sXY = 0, sXX = 0;
+            const count = i;
+            for (let j = 0; j < count; j++) {
+                sX += j;
+                sY += pastTotals[j];
+                sXY += j * pastTotals[j];
+                sXX += j * j;
+            }
+            if (count >= 2) {
+                const slope = (count * sXY - sX * sY) / (count * sXX - sX * sX) || 0;
+                const intercept = (sY - slope * sX) / count;
+                pastProyecciones[i] = Math.max(0, Number((slope * i + intercept).toFixed(2)));
+            } else if (count === 1) {
+                pastProyecciones[i] = pastTotals[0];
+            }
+        }
+        pastProyecciones[0] = pastTotals[0];
+
+        const proyeccion = [...pastProyecciones, proj9, proj10];
 
         const sales_history = {
             labels,
@@ -609,12 +656,29 @@ const getBiMetrics = async (req, res) => {
 
         const dailyLabels = [...dailyPastLabels, 'Proy D1', 'Proy D2'];
         const dailyReales = [...dailyPastTotals, null, null];
-        const dailyProyeccion = [
-            ...Array(dailyPastTotals.length - 1).fill(null),
-            dailyPastTotals[dailyPastTotals.length - 1],
-            projD1,
-            projD2
-        ];
+
+        // Calcular predicciones pasadas diarias (backtesting)
+        const dailyPastProyecciones = Array(nd).fill(null);
+        for (let i = 1; i < nd; i++) {
+            let sXd = 0, sYd = 0, sXYd = 0, sXXd = 0;
+            const countd = i;
+            for (let j = 0; j < countd; j++) {
+                sXd += j;
+                sYd += dailyPastTotals[j];
+                sXYd += j * dailyPastTotals[j];
+                sXXd += j * j;
+            }
+            if (countd >= 2) {
+                const sloped = (countd * sXYd - sXd * sYd) / (countd * sXXd - sXd * sXd) || 0;
+                const interceptd = (sYd - sloped * sXd) / countd;
+                dailyPastProyecciones[i] = Math.max(0, Number((sloped * i + interceptd).toFixed(2)));
+            } else if (countd === 1) {
+                dailyPastProyecciones[i] = dailyPastTotals[0];
+            }
+        }
+        dailyPastProyecciones[0] = dailyPastTotals[0];
+
+        const dailyProyeccion = [...dailyPastProyecciones, projD1, projD2];
 
         const sales_history_daily = {
             labels: dailyLabels,
@@ -658,7 +722,7 @@ const getBiMetrics = async (req, res) => {
         // 6. Anomalías en tiempo real con detalle de productos
         const anomalies = [];
 
-        // Anomalía A: Ventas inusualmente altas
+        // Anomalía A: Ventas inusualmente altas (últimos 30 días si no hay filtro temporal)
         const [avgSaleResult] = await db.query(`
             SELECT AVG(total_venta) AS promedio FROM ventas WHERE estado = 'COMPLETADA'
         `);
@@ -696,10 +760,10 @@ const getBiMetrics = async (req, res) => {
                 JOIN usuarios u ON v.id_usuario = u.id_usuario
                 JOIN detalle_ventas dv ON v.id_venta = dv.id_venta
                 JOIN productos p ON dv.id_producto = p.id_producto
-                WHERE v.estado = 'COMPLETADA' AND v.total_venta > ?
+                WHERE v.estado = 'COMPLETADA' AND v.total_venta > ? AND v.fecha >= DATE_SUB(NOW(), INTERVAL 30 DAY)
                 GROUP BY v.id_venta, u.nombre_usuario, v.fecha
                 ORDER BY v.fecha DESC
-                LIMIT 2;
+                LIMIT 4;
             `, [thresholdHighSale]);
         }
 
@@ -712,7 +776,7 @@ const getBiMetrics = async (req, res) => {
             });
         });
 
-        // Anomalía B: Descuadres de Caja
+        // Anomalía B: Descuadres de Caja (últimos 30 días si no hay filtro temporal)
         let cashDiscrepancyResult;
         if (startDate && endDate) {
             const { from, to } = getDateRange(startDate, endDate);
@@ -727,9 +791,9 @@ const getBiMetrics = async (req, res) => {
             [cashDiscrepancyResult] = await db.query(`
                 SELECT id, diferencia, usuario_nombre, DATE_FORMAT(fecha_cierre, '%d/%m %H:%i') AS fecha_cierre_fmt
                 FROM cierres_caja
-                WHERE fecha_cierre IS NOT NULL AND diferencia != 0
+                WHERE fecha_cierre IS NOT NULL AND diferencia != 0 AND fecha_cierre >= DATE_SUB(NOW(), INTERVAL 30 DAY)
                 ORDER BY fecha_cierre DESC
-                LIMIT 2;
+                LIMIT 4;
             `);
         }
 
@@ -759,6 +823,123 @@ const getBiMetrics = async (req, res) => {
                 badge: 'Sin Stock',
                 risk: 'Revisar'
             });
+        });
+
+        // Anomalía D: Sesiones de caja abiertas hace más de 24 horas
+        const [openTooLongResult] = await db.query(`
+            SELECT usuario_nombre, fecha_apertura
+            FROM cierres_caja
+            WHERE fecha_cierre IS NULL AND fecha_apertura <= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+            LIMIT 5;
+        `);
+        openTooLongResult.forEach(s => {
+            const hrs = Math.round((new Date() - new Date(s.fecha_apertura)) / (1000 * 60 * 60));
+            anomalies.push({
+                title: 'Caja Abierta por Tiempo Excesivo',
+                desc: `La sesión del Cajero '${s.usuario_nombre}' lleva abierta más de ${hrs} horas. Se aconseja realizar el cierre diario obligatorio.`,
+                badge: 'Auditoría',
+                risk: 'Riesgo Alto'
+            });
+        });
+
+        // Anomalía E: Acumulación de efectivo en caja abierta (límite sugerido C$ 15,000)
+        const [openSessionsResult] = await db.query(`
+            SELECT id, usuario_nombre, monto_inicial, detalles_json
+            FROM cierres_caja
+            WHERE fecha_cierre IS NULL;
+        `);
+        openSessionsResult.forEach(s => {
+            let details = {};
+            try {
+                details = typeof s.detalles_json === 'string' ? JSON.parse(s.detalles_json) : (s.detalles_json || {});
+            } catch { details = {}; }
+            const txs = details.transactions || [];
+            
+            let movNeto = 0;
+            const safe = (v) => { const n = Number(v); return (isNaN(n) || !isFinite(n)) ? 0 : n; };
+            const tasaDefault = safe(details?.tasaDolar) || 36.60;
+
+            txs.forEach(tx => {
+                let tipo = (tx.type || '').toLowerCase().trim();
+                tipo = tipo.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                let d = tx.pagoDetalles || {};
+                if (typeof d === 'string') { try { d = JSON.parse(d); } catch { d = {}; } }
+                if (!d || typeof d !== 'object') d = {};
+
+                const txEfectivo = safe(d.efectivo);
+                const txTarjeta = safe(d.tarjeta);
+                const txTransf = safe(d.transferencia);
+                const txCredito = safe(d.credito);
+                const txDolares = safe(d.dolares);
+                const txCambio = safe(d.cambio);
+                const txIngresoCaja = safe(d.ingresoCaja);
+                const txAmount = safe(tx.amount);
+                const txTotalVenta = safe(d.totalVenta) || txAmount;
+                const txTasa = safe(d.tasaDolarAlMomento) || tasaDefault;
+
+                if (tipo.startsWith('venta')) {
+                    const cashIn = txEfectivo + (txDolares * txTasa);
+                    const cashOut = txCambio;
+                    const calculatedNet = cashIn - cashOut;
+
+                    if (Math.abs(calculatedNet) > 0.001) {
+                        movNeto += calculatedNet;
+                    } else if (Math.abs(txIngresoCaja) > 0.001) {
+                        movNeto += txIngresoCaja;
+                    } else {
+                        const noEfectivo = txTarjeta + txTransf + txCredito;
+                        const residual = txTotalVenta - noEfectivo;
+                        if (residual > 0.001) {
+                            movNeto += residual;
+                        }
+                    }
+                }
+                else if (tipo.includes('abono') || tipo.includes('liquid') || tipo.includes('pedido') || tipo.includes('apartado')) {
+                    const netAbonoCash = (txEfectivo + (txDolares * txTasa)) - txCambio;
+
+                    if (Math.abs(netAbonoCash) > 0.001) {
+                        movNeto += netAbonoCash;
+                    } else if (Math.abs(txIngresoCaja) > 0.001) {
+                        movNeto += txIngresoCaja;
+                    } else {
+                        const noEfectivo = txTarjeta + txTransf;
+                        const residual = Math.max(0, txAmount - noEfectivo);
+                        movNeto += residual;
+                    }
+                }
+                else if (tipo === 'entrada') {
+                    movNeto += Math.abs(txAmount);
+                }
+                else if (tipo === 'salida') {
+                    movNeto -= Math.abs(txAmount);
+                }
+                else if (tipo.includes('devolucion') || tipo.includes('cancelacion') || tipo.includes('anulacion')) {
+                    if (d.ingresoCaja !== undefined && d.ingresoCaja !== null) {
+                        movNeto += safe(d.ingresoCaja);
+                    } else if (txEfectivo > 0.001) {
+                        movNeto -= txEfectivo;
+                    } else {
+                        const noEfectivo = txTarjeta + txTransf + txCredito;
+                        const cashPart = Math.abs(txAmount) - noEfectivo;
+                        if (cashPart > 0.001) {
+                            movNeto -= cashPart;
+                        }
+                    }
+                }
+                else if (tipo === 'ajuste' && d.target === 'efectivo') {
+                    movNeto += txAmount;
+                }
+            });
+
+            const totalCash = Number(s.monto_inicial || 0) + movNeto;
+            if (totalCash > 15000) {
+                anomalies.push({
+                    title: 'Límite de Efectivo Superado',
+                    desc: `La caja activa de '${s.usuario_nombre}' acumula C$ ${Math.round(totalCash).toLocaleString('es-NI')}. Se sugiere un retiro parcial de efectivo por seguridad.`,
+                    badge: 'Seguridad',
+                    risk: 'Revisar'
+                });
+            }
         });
 
         if (anomalies.length === 0) {
@@ -841,6 +1022,7 @@ const getBiMetrics = async (req, res) => {
             total_productos,
             promedio_margen,
             riesgo_estancamiento,
+            stagnant_products: stagnantProductsList,
             sales_history,
             sales_history_daily,
             category_margins,
