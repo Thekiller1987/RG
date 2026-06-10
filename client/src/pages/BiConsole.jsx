@@ -1178,37 +1178,138 @@ const BiConsole = () => {
                 </Card>
               </PanelRow>
 
+              {/* Alertas de Caja Críticas (Solo si existen alertas reales activas, no OK de consistencia) */}
+              {metrics?.cash_anomalies?.filter(a => a.risk !== 'Normal').length > 0 && (
+                <PanelRow>
+                  <Card style={{ gridColumn: 'span 2', background: 'rgba(244, 63, 94, 0.02)', borderColor: 'rgba(244, 63, 94, 0.15)' }}>
+                    <CardTitle style={{ color: '#f43f5e' }}>
+                      <FaExclamationTriangle color="#f43f5e" />
+                      Alertas de Caja y Seguridad de Caja Detectadas
+                    </CardTitle>
+                    <CardDesc>
+                      Se han registrado incidencias que requieren supervisión inmediata o retiros parciales de seguridad.
+                    </CardDesc>
+                    <AlertsList style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.2rem' }}>
+                      {metrics.cash_anomalies.filter(a => a.risk !== 'Normal').map((a, i) => (
+                        <AlertItem key={i} accent={a.risk === 'Riesgo Alto' ? '#f43f5e' : '#ED7D31'}>
+                          <AlertText>
+                            <h4>{a.title}</h4>
+                            <p>{a.desc}</p>
+                          </AlertText>
+                          <AlertBadge 
+                            bg={a.risk === 'Riesgo Alto' ? 'rgba(244, 63, 94, 0.15)' : 'rgba(237, 125, 49, 0.15)'}
+                            color={a.risk === 'Riesgo Alto' ? '#f43f5e' : '#ED7D31'}
+                          >
+                            {a.badge}
+                          </AlertBadge>
+                        </AlertItem>
+                      ))}
+                    </AlertsList>
+                  </Card>
+                </PanelRow>
+              )}
+
               <PanelRow>
                 <Card style={{ gridColumn: 'span 2' }}>
                   <CardTitle>
-                    <FaExclamationTriangle color="#f43f5e" />
-                    Detección de Anomalías de Auditoría
+                    <FaChartPie color="#ED7D31" />
+                    Sugerencias de Combos de Repuestos y Venta Cruzada (Motor BI)
                   </CardTitle>
                   <CardDesc>
-                    Alertas dinámicas disparadas por el motor analítico tras auditar la base de datos de manera automatizada.
+                    Asociaciones recomendadas para promociones en caja, calculadas en base a la co-ocurrencia de artículos comprados juntos en el historial de ventas.
                   </CardDesc>
 
-                  <AlertsList style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.2rem' }}>
-                    {metrics?.cash_anomalies?.map((a, i) => (
-                      <AlertItem key={i} accent={a.risk === 'Riesgo Alto' ? '#f43f5e' : '#ED7D31'}>
-                        <AlertText>
-                          <h4>{a.title}</h4>
-                          <p>{a.desc}</p>
-                        </AlertText>
-                        <AlertBadge 
-                          bg={a.risk === 'Riesgo Alto' ? 'rgba(244, 63, 94, 0.15)' : 'rgba(237, 125, 49, 0.15)'}
-                          color={a.risk === 'Riesgo Alto' ? '#f43f5e' : '#ED7D31'}
-                        >
-                          {a.badge}
-                        </AlertBadge>
-                      </AlertItem>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '0.5rem' }}>
+                    {metrics?.combo_suggestions?.map((c, idx) => (
+                      <div 
+                        key={idx} 
+                        style={{ 
+                          background: 'rgba(255, 255, 255, 0.02)', 
+                          border: '1px solid rgba(255, 255, 255, 0.05)', 
+                          borderRadius: '16px', 
+                          padding: '1.25rem',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          gap: '1rem',
+                          transition: 'all 0.3s ease',
+                          boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = 'rgba(237, 125, 49, 0.3)';
+                          e.currentTarget.style.transform = 'translateY(-3px)';
+                          e.currentTarget.style.boxShadow = '0 8px 30px rgba(237, 125, 49, 0.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)';
+                        }}
+                      >
+                        {/* Tipo de sugerencia badge */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.7rem', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
+                            {c.tipo}
+                          </span>
+                          <span style={{ 
+                            background: 'rgba(16, 185, 129, 0.12)', 
+                            color: '#10b981', 
+                            fontSize: '0.7rem', 
+                            padding: '2px 8px', 
+                            borderRadius: '20px', 
+                            fontWeight: 700, 
+                            border: '1px solid rgba(16, 185, 129, 0.2)' 
+                          }}>
+                            Ahorro: C$ {c.ahorro.toLocaleString('es-NI')}
+                          </span>
+                        </div>
+
+                        {/* Contenido del Combo */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                            <div style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontFamily: 'JetBrains Mono', fontWeight: 700, minWidth: '40px', textAlign: 'center' }}>A</div>
+                            <div>
+                              <div style={{ color: '#fff', fontSize: '0.9rem', fontWeight: 600, lineHeight: '1.3' }}>{c.producto_a}</div>
+                              <div style={{ color: '#9ca3af', fontSize: '0.75rem', fontFamily: 'JetBrains Mono' }}>Cód: {c.codigo_a}</div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'center', margin: '0.1rem 0', color: 'rgba(255,255,255,0.15)', fontSize: '1.1rem' }}>+</div>
+
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                            <div style={{ background: 'rgba(237, 125, 49, 0.1)', color: '#ED7D31', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontFamily: 'JetBrains Mono', fontWeight: 700, minWidth: '40px', textAlign: 'center' }}>B</div>
+                            <div>
+                              <div style={{ color: '#fff', fontSize: '0.9rem', fontWeight: 600, lineHeight: '1.3' }}>{c.producto_b}</div>
+                              <div style={{ color: '#9ca3af', fontSize: '0.75rem', fontFamily: 'JetBrains Mono' }}>Cód: {c.codigo_b}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Precios */}
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '0.5rem' }}>
+                          <div>
+                            <span style={{ fontSize: '0.75rem', color: '#9ca3af', textDecoration: 'line-through' }}>
+                              C$ {c.precio_original.toLocaleString('es-NI')}
+                            </span>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>C$</span>
+                              {c.precio_combo.toLocaleString('es-NI')}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#9ca3af', fontStyle: 'italic', textAlign: 'right' }}>
+                            {c.coocurrencias} compras conjuntas
+                          </div>
+                        </div>
+                      </div>
                     ))}
-                    {(!metrics?.cash_anomalies || metrics.cash_anomalies.length === 0) && (
+                    {(!metrics?.combo_suggestions || metrics.combo_suggestions.length === 0) && (
                       <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af', gridColumn: 'span 2' }}>
-                        No se han detectado anomalías en las transacciones de caja del período.
+                        No hay suficientes productos en inventario para sugerir combos.
                       </div>
                     )}
-                  </AlertsList>
+                  </div>
                 </Card>
               </PanelRow>
             </div>
