@@ -544,6 +544,7 @@ const BiConsole = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [showBacktest, setShowBacktest] = useState(true);
   const [stagnantSearch, setStagnantSearch] = useState('');
+  const [stagnantFilter, setStagnantFilter] = useState('sin_ventas');
 
   // Calcular parámetros de filtro
   const getFilterParams = useCallback(() => {
@@ -644,12 +645,15 @@ const BiConsole = () => {
 
   // Cálculo de variables para Dashboard de Proyección y Margen
   const getSalesProjection = () => {
-    if (!metrics || !metrics.sales_history || !metrics.sales_history.proyeccion) {
-      return 54200;
+    if (!metrics) return 0;
+    const history = chartPeriod === 'daily' ? metrics.sales_history_daily : metrics.sales_history;
+    if (!history || !history.proyeccion || history.proyeccion.length < 2) {
+      return 0;
     }
-    const projArray = metrics.sales_history.proyeccion;
-    const sum = projArray.reduce((acc, v) => acc + (v || 0), 0);
-    return sum > 0 ? sum : 54200;
+    const projArray = history.proyeccion;
+    // El índice length - 2 representa la proyección para el período futuro inmediato (ej. Proy D1 o Proy W9)
+    const val = projArray[projArray.length - 2];
+    return val !== null && val !== undefined ? val : 0;
   };
   const salesProjectionVal = getSalesProjection();
 
@@ -729,10 +733,18 @@ const BiConsole = () => {
   };
 
   // Filtro cliente para productos estancados
-  const filteredStagnantProducts = metrics?.stagnant_products?.filter(p => 
-    (p.nombre || '').toLowerCase().includes(stagnantSearch.toLowerCase()) ||
-    (p.codigo || '').toLowerCase().includes(stagnantSearch.toLowerCase())
-  ) || [];
+  const filteredStagnantProducts = metrics?.stagnant_products?.filter(p => {
+    const matchesSearch = (p.nombre || '').toLowerCase().includes(stagnantSearch.toLowerCase()) ||
+                          (p.codigo || '').toLowerCase().includes(stagnantSearch.toLowerCase());
+    if (!matchesSearch) return false;
+
+    const units = Number(p.unidades_vendidas || 0);
+    if (stagnantFilter === 'sin_ventas') {
+      return units === 0;
+    } else {
+      return units >= 1 && units <= 3;
+    }
+  }) || [];
 
   // Configuración de Chart - Ventas Semanales/Diarias y Proyección
   const getSalesChartData = () => {
@@ -919,12 +931,20 @@ const BiConsole = () => {
 
             {activeTab === 'rotacion' && (
               <>
-                <KpiCard accent="#f43f5e" glow="0 0 15px rgba(244, 63, 94, 0.2)">
-                  <KpiTitle>Artículos sin Movimiento</KpiTitle>
+                <KpiCard accent={stagnantFilter === 'sin_ventas' ? '#f43f5e' : '#eab308'} glow={stagnantFilter === 'sin_ventas' ? '0 0 15px rgba(244, 63, 94, 0.2)' : '0 0 15px rgba(234, 179, 8, 0.2)'}>
+                  <KpiTitle>{stagnantFilter === 'sin_ventas' ? 'Artículos sin Movimiento' : 'Artículos de Baja Rotación'}</KpiTitle>
                   <KpiValue>
-                    {metrics?.riesgo_estancamiento?.toLocaleString()} <KpiUnit>Repuestos</KpiUnit>
+                    {stagnantFilter === 'sin_ventas' 
+                      ? metrics?.riesgo_estancamiento?.toLocaleString() 
+                      : metrics?.stagnant_products?.filter(p => Number(p.unidades_vendidas || 0) >= 1).length.toLocaleString()
+                    } <KpiUnit>Repuestos</KpiUnit>
                   </KpiValue>
-                  <KpiDesc>Artículos con existencia física sin ventas en los últimos 180 días.</KpiDesc>
+                  <KpiDesc>
+                    {stagnantFilter === 'sin_ventas'
+                      ? 'Artículos con existencia física sin ventas en los últimos 180 días.'
+                      : 'Artículos con existencia física con 1 a 3 unidades vendidas en los últimos 180 días (Top 150).'
+                    }
+                  </KpiDesc>
                 </KpiCard>
 
                 <KpiCard accent="#ED7D31" glow="0 0 15px rgba(237, 125, 49, 0.2)">
@@ -969,7 +989,9 @@ const BiConsole = () => {
                     <span style={{ fontSize: '1.4rem', color: '#9ca3af', fontWeight: 500, marginRight: '0.2rem' }}>C$</span>
                     {salesProjectionVal.toLocaleString('es-NI', { maximumFractionDigits: 0 })}
                   </KpiValue>
-                  <KpiDesc>Previsión de ingresos del próximo período según regresión lineal.</KpiDesc>
+                  <KpiDesc>
+                    Previsión de ingresos para el próximo {chartPeriod === 'daily' ? 'día' : 'período (semana)'} según regresión lineal.
+                  </KpiDesc>
                 </KpiCard>
 
                 <KpiCard accent="#38bdf8" glow="0 0 15px rgba(56, 189, 248, 0.2)">
@@ -1167,7 +1189,7 @@ const BiConsole = () => {
                   </CardDesc>
 
                   <AlertsList style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.2rem' }}>
-                    {metrics?.anomalies?.map((a, i) => (
+                    {metrics?.cash_anomalies?.map((a, i) => (
                       <AlertItem key={i} accent={a.risk === 'Riesgo Alto' ? '#f43f5e' : '#ED7D31'}>
                         <AlertText>
                           <h4>{a.title}</h4>
@@ -1181,9 +1203,9 @@ const BiConsole = () => {
                         </AlertBadge>
                       </AlertItem>
                     ))}
-                    {(!metrics?.anomalies || metrics.anomalies.length === 0) && (
+                    {(!metrics?.cash_anomalies || metrics.cash_anomalies.length === 0) && (
                       <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af', gridColumn: 'span 2' }}>
-                        No se han detectado anomalías en las transacciones auditadas del período.
+                        No se han detectado anomalías en las transacciones de caja del período.
                       </div>
                     )}
                   </AlertsList>
@@ -1238,23 +1260,63 @@ const BiConsole = () => {
 
               <PanelRow>
                 <Card style={{ gridColumn: 'span 2' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', paddingBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(255, 25, 255, 0.05)', paddingBottom: '0.75rem' }}>
                     <CardTitle style={{ borderBottom: 'none', paddingBottom: 0 }}>
-                      <FaBoxes color="#f43f5e" />
-                      Detalle de Inventario Estancado (Sin Ventas en más de 180 Días)
+                      <FaBoxes color={stagnantFilter === 'sin_ventas' ? '#f43f5e' : '#eab308'} />
+                      {stagnantFilter === 'sin_ventas' 
+                        ? 'Detalle de Inventario Estancado (Sin Ventas en más de 180 Días)' 
+                        : 'Detalle de Inventario de Baja Rotación (1-3 Ventas en 180 Días)'}
                     </CardTitle>
-                    <div style={{ position: 'relative', minWidth: '250px' }}>
-                      <Input 
-                        type="text" 
-                        placeholder="Buscar repuesto estancado..." 
-                        value={stagnantSearch}
-                        onChange={(e) => setStagnantSearch(e.target.value)}
-                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', width: '100%', borderRadius: '8px' }}
-                      />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px' }}>
+                        <button 
+                          onClick={() => setStagnantFilter('sin_ventas')} 
+                          style={{
+                            background: stagnantFilter === 'sin_ventas' ? 'rgba(244, 63, 94, 0.15)' : 'none',
+                            border: 'none',
+                            color: stagnantFilter === 'sin_ventas' ? '#fff' : '#9ca3af',
+                            padding: '0.4rem 0.8rem',
+                            fontSize: '0.8rem',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                          }}
+                        >
+                          Sin Ventas (0)
+                        </button>
+                        <button 
+                          onClick={() => setStagnantFilter('baja_rotacion')} 
+                          style={{
+                            background: stagnantFilter === 'baja_rotacion' ? 'rgba(234, 179, 8, 0.15)' : 'none',
+                            border: 'none',
+                            color: stagnantFilter === 'baja_rotacion' ? '#fff' : '#9ca3af',
+                            padding: '0.4rem 0.8rem',
+                            fontSize: '0.8rem',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                          }}
+                        >
+                          Baja Rotación (1-3)
+                        </button>
+                      </div>
+                      <div style={{ position: 'relative', minWidth: '220px' }}>
+                        <Input 
+                          type="text" 
+                          placeholder="Buscar repuesto..." 
+                          value={stagnantSearch}
+                          onChange={(e) => setStagnantSearch(e.target.value)}
+                          style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', width: '100%', borderRadius: '8px' }}
+                        />
+                      </div>
                     </div>
                   </div>
                   <CardDesc>
-                    Listado de los artículos con stock físico disponible que registran nulo movimiento en los últimos 6 meses, ordenados por capital inmovilizado.
+                    {stagnantFilter === 'sin_ventas'
+                      ? 'Listado de los artículos con stock físico disponible que registran nulo movimiento en los últimos 6 meses, ordenados por capital inmovilizado.'
+                      : 'Listado de los artículos con stock físico disponible que registran bajas ventas (entre 1 y 3 unidades) en los últimos 6 meses.'}
                   </CardDesc>
 
                   <div style={{ overflowX: 'auto', maxHeight: '400px', overflowY: 'auto', marginTop: '0.5rem' }}>
@@ -1266,6 +1328,7 @@ const BiConsole = () => {
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>EXISTENCIA</th>
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>PRECIO VENTA</th>
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>CAPITAL DETENIDO</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>UNIDADES VENDIDAS</th>
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'center' }}>ÚLTIMA VENTA</th>
                         </tr>
                       </thead>
@@ -1279,6 +1342,7 @@ const BiConsole = () => {
                               <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#f43f5e' }}>{p.existencia}</td>
                               <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#9ca3af' }}>C$ {Number(p.precio).toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                               <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#ED7D31', fontWeight: 700 }}>C$ {capital.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 700, color: p.unidades_vendidas === 0 ? '#f43f5e' : '#eab308' }}>{p.unidades_vendidas}</td>
                               <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', color: '#9ca3af', fontSize: '0.8rem' }}>
                                 {p.ultima_venta ? new Date(p.ultima_venta).toLocaleDateString('es-NI') : 'Nunca vendido'}
                               </td>
@@ -1287,14 +1351,48 @@ const BiConsole = () => {
                         })}
                         {(!filteredStagnantProducts || filteredStagnantProducts.length === 0) && (
                           <tr>
-                            <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
-                              No hay productos estancados que coincidan con la búsqueda.
+                            <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
+                              No hay productos en esta categoría que coincidan con la búsqueda.
                             </td>
                           </tr>
                         )}
                       </tbody>
                     </table>
                   </div>
+                </Card>
+              </PanelRow>
+
+              <PanelRow>
+                <Card style={{ gridColumn: 'span 2' }}>
+                  <CardTitle>
+                    <FaExclamationTriangle color="#f43f5e" />
+                    Alertas de Stock e Incidencias de Inventario
+                  </CardTitle>
+                  <CardDesc>
+                    Diagnóstico automatizado de ruptura de stock y desabastecimiento en el catálogo de repuestos.
+                  </CardDesc>
+
+                  <AlertsList style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.2rem' }}>
+                    {metrics?.inventory_anomalies?.map((a, i) => (
+                      <AlertItem key={i} accent={a.risk === 'Riesgo Alto' ? '#f43f5e' : '#ED7D31'}>
+                        <AlertText>
+                          <h4>{a.title}</h4>
+                          <p>{a.desc}</p>
+                        </AlertText>
+                        <AlertBadge 
+                          bg={a.risk === 'Riesgo Alto' ? 'rgba(244, 63, 94, 0.15)' : 'rgba(237, 125, 49, 0.15)'}
+                          color={a.risk === 'Riesgo Alto' ? '#f43f5e' : '#ED7D31'}
+                        >
+                          {a.badge}
+                        </AlertBadge>
+                      </AlertItem>
+                    ))}
+                    {(!metrics?.inventory_anomalies || metrics.inventory_anomalies.length === 0) && (
+                      <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af', gridColumn: 'span 2' }}>
+                        No hay rupturas de stock ni alertas críticas detectadas.
+                      </div>
+                    )}
+                  </AlertsList>
                 </Card>
               </PanelRow>
 

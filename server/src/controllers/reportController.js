@@ -469,7 +469,8 @@ const getBiMetrics = async (req, res) => {
         `);
         const riesgo_estancamiento = stagnantResult[0]?.total || 0;
 
-        // 3b. Obtener lista detallada de Productos Estancados (Top 100 por valor de inventario)
+        // 3b. Obtener lista detallada de Productos Estancados o de Baja Rotación (Top 150 por valor de inventario)
+        // Traemos productos con <= 3 unidades vendidas en los últimos 180 días
         const [stagnantProductsList] = await db.query(`
             SELECT 
                 p.id_producto, 
@@ -477,6 +478,7 @@ const getBiMetrics = async (req, res) => {
                 p.nombre, 
                 p.existencia, 
                 p.venta AS precio,
+                COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas,
                 (
                     SELECT MAX(v2.fecha)
                     FROM detalle_ventas dv2
@@ -484,16 +486,17 @@ const getBiMetrics = async (req, res) => {
                     WHERE dv2.id_producto = p.id_producto AND v2.estado = 'COMPLETADA'
                 ) AS ultima_venta
             FROM productos p
-            WHERE p.activo = 1 AND p.existencia > 0 AND NOT EXISTS (
-                SELECT 1
-                FROM detalle_ventas dv
-                JOIN ventas v ON dv.id_venta = v.id_venta
-                WHERE dv.id_producto = p.id_producto 
-                  AND v.estado = 'COMPLETADA' 
-                  AND v.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
-            )
-            ORDER BY p.existencia * p.venta DESC
-            LIMIT 100;
+            LEFT JOIN (
+                SELECT dv_in.id_producto, dv_in.cantidad
+                FROM detalle_ventas dv_in
+                JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
+                WHERE v_in.estado = 'COMPLETADA' AND v_in.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+            ) dv ON p.id_producto = dv.id_producto
+            WHERE p.activo = 1 AND p.existencia > 0
+            GROUP BY p.id_producto, p.codigo, p.nombre, p.existencia, p.venta
+            HAVING unidades_vendidas <= 3
+            ORDER BY unidades_vendidas ASC, p.existencia * p.venta DESC
+            LIMIT 150;
         `);
 
         // 4. Historial de Ventas Semanales (Últimas 8 semanas completas, excluyendo la actual)
@@ -719,8 +722,9 @@ const getBiMetrics = async (req, res) => {
             values: categoryValues
         };
 
-        // 6. Anomalías en tiempo real con detalle de productos
-        const anomalies = [];
+        // 6. Anomalías en tiempo real con detalle de productos (Separadas por conceptos Caja vs Inventario)
+        const cash_anomalies = [];
+        const inventory_anomalies = [];
 
         // Anomalía A: Ventas inusualmente altas (últimos 30 días si no hay filtro temporal)
         const [avgSaleResult] = await db.query(`
@@ -768,7 +772,7 @@ const getBiMetrics = async (req, res) => {
         }
 
         highSalesResult.forEach(s => {
-            anomalies.push({
+            cash_anomalies.push({
                 title: 'Venta Inusualmente Alta (Alerta BI)',
                 desc: `El cajero '${s.nombre_usuario}' facturó C$ ${Number(s.total_venta).toLocaleString('es-NI')} en repuestos: ${s.productos} a las ${s.hora}.`,
                 badge: 'Auditoría',
@@ -799,7 +803,7 @@ const getBiMetrics = async (req, res) => {
 
         cashDiscrepancyResult.forEach(c => {
             const diffType = Number(c.diferencia) < 0 ? 'Faltante' : 'Sobrante';
-            anomalies.push({
+            cash_anomalies.push({
                 title: 'Descuadre de Caja Registrado',
                 desc: `El cierre de caja del Cajero '${c.usuario_nombre}' el ${c.fecha_cierre_fmt} reportó un ${diffType} de C$ ${Math.abs(Number(c.diferencia)).toLocaleString('es-NI')}.`,
                 badge: diffType,
@@ -807,17 +811,17 @@ const getBiMetrics = async (req, res) => {
             });
         });
 
-        // Anomalía C: Quiebre de stock inminente
+        // Anomalía C: Quiebre de stock inminente -> Se asigna a ANALÍTICAS DE INVENTARIO
         const [stockoutResult] = await db.query(`
             SELECT nombre, codigo
             FROM productos
             WHERE activo = 1 AND existencia = 0
             ORDER BY id_producto DESC
-            LIMIT 2;
+            LIMIT 4;
         `);
 
         stockoutResult.forEach(p => {
-            anomalies.push({
+            inventory_anomalies.push({
                 title: 'Riesgo de Ruptura de Stock',
                 desc: `El repuesto '${p.nombre}' (Código: ${p.codigo}) se encuentra agotado (Existencia: 0).`,
                 badge: 'Sin Stock',
@@ -834,7 +838,7 @@ const getBiMetrics = async (req, res) => {
         `);
         openTooLongResult.forEach(s => {
             const hrs = Math.round((new Date() - new Date(s.fecha_apertura)) / (1000 * 60 * 60));
-            anomalies.push({
+            cash_anomalies.push({
                 title: 'Caja Abierta por Tiempo Excesivo',
                 desc: `La sesión del Cajero '${s.usuario_nombre}' lleva abierta más de ${hrs} horas. Se aconseja realizar el cierre diario obligatorio.`,
                 badge: 'Auditoría',
@@ -933,7 +937,7 @@ const getBiMetrics = async (req, res) => {
 
             const totalCash = Number(s.monto_inicial || 0) + movNeto;
             if (totalCash > 15000) {
-                anomalies.push({
+                cash_anomalies.push({
                     title: 'Límite de Efectivo Superado',
                     desc: `La caja activa de '${s.usuario_nombre}' acumula C$ ${Math.round(totalCash).toLocaleString('es-NI')}. Se sugiere un retiro parcial de efectivo por seguridad.`,
                     badge: 'Seguridad',
@@ -942,10 +946,19 @@ const getBiMetrics = async (req, res) => {
             }
         });
 
-        if (anomalies.length === 0) {
-            anomalies.push({
-                title: 'Consistencia de Base de Datos',
-                desc: 'La auditoría BI analizó el 100% de las transacciones recientes. No se detectaron anomalías.',
+        if (cash_anomalies.length === 0) {
+            cash_anomalies.push({
+                title: 'Consistencia de Caja',
+                desc: 'La auditoría BI analizó las transacciones de caja recientes. No se detectaron descuadres ni alertas.',
+                badge: 'Todo OK',
+                risk: 'Normal'
+            });
+        }
+
+        if (inventory_anomalies.length === 0) {
+            inventory_anomalies.push({
+                title: 'Consistencia de Stock',
+                desc: 'No se detectaron rupturas de stock críticas en el inventario.',
                 badge: 'Todo OK',
                 risk: 'Normal'
             });
@@ -1026,7 +1039,8 @@ const getBiMetrics = async (req, res) => {
             sales_history,
             sales_history_daily,
             category_margins,
-            anomalies,
+            cash_anomalies,
+            inventory_anomalies,
             payment_distribution,
             ticket_promedio,
             total_ventas_bi,
