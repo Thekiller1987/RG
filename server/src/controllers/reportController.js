@@ -424,6 +424,15 @@ const getProviderPaymentsReport = async (req, res) => {
 // --- MÉTRICAS EN VIVO Y ANÁLISIS MULTIDIMENSIONAL BI ---
 const getBiMetrics = async (req, res) => {
     try {
+        const { startDate, endDate } = req.query;
+        let dateFilter = '';
+        const params = [];
+        if (startDate && endDate) {
+            const { from, to } = getDateRange(startDate, endDate);
+            dateFilter = ' AND v.fecha >= ? AND v.fecha <= ?';
+            params.push(from, to);
+        }
+
         // 1. Total Productos Activos
         const [prodCountResult] = await db.query('SELECT COUNT(*) AS total FROM productos WHERE activo = 1');
         const total_productos = prodCountResult[0]?.total || 0;
@@ -436,8 +445,8 @@ const getBiMetrics = async (req, res) => {
             FROM detalle_ventas dv
             JOIN ventas v ON dv.id_venta = v.id_venta
             JOIN productos p ON dv.id_producto = p.id_producto
-            WHERE v.estado = 'COMPLETADA'
-        `);
+            WHERE v.estado = 'COMPLETADA' ${dateFilter}
+        `, params);
         const totalVentasVal = Number(marginResult[0]?.total_ventas || 0);
         const totalCostoVal = Number(marginResult[0]?.total_costo || 0);
         const promedio_margen = totalVentasVal > 0 
@@ -458,20 +467,38 @@ const getBiMetrics = async (req, res) => {
         const riesgo_estancamiento = stagnantResult[0]?.total || 0;
 
         // 4. Historial de Ventas Semanales (Últimas 8 semanas completas, excluyendo la actual)
-        const [weeklySalesResult] = await db.query(`
-            SELECT * FROM (
-                SELECT 
-                    YEARWEEK(fecha, 1) AS año_semana,
-                    DATE_FORMAT(MIN(fecha), '%d/%m') AS etiqueta,
-                    SUM(total_venta) AS total
-                FROM ventas
-                WHERE estado = 'COMPLETADA' AND YEARWEEK(fecha, 1) < YEARWEEK(NOW(), 1)
-                GROUP BY año_semana
-                ORDER BY año_semana DESC
-                LIMIT 8
-            ) sub
-            ORDER BY año_semana ASC;
-        `);
+        let weeklySalesResult;
+        if (startDate && endDate) {
+            const { from, to } = getDateRange(startDate, endDate);
+            [weeklySalesResult] = await db.query(`
+                SELECT * FROM (
+                    SELECT 
+                        YEARWEEK(fecha, 1) AS año_semana,
+                        DATE_FORMAT(MIN(fecha), '%d/%m') AS etiqueta,
+                        SUM(total_venta) AS total
+                    FROM ventas v
+                    WHERE v.estado = 'COMPLETADA' AND v.fecha >= ? AND v.fecha <= ?
+                    GROUP BY año_semana
+                    ORDER BY año_semana DESC
+                ) sub
+                ORDER BY año_semana ASC;
+            `, [from, to]);
+        } else {
+            [weeklySalesResult] = await db.query(`
+                SELECT * FROM (
+                    SELECT 
+                        YEARWEEK(fecha, 1) AS año_semana,
+                        DATE_FORMAT(MIN(fecha), '%d/%m') AS etiqueta,
+                        SUM(total_venta) AS total
+                    FROM ventas
+                    WHERE estado = 'COMPLETADA' AND YEARWEEK(fecha, 1) < YEARWEEK(NOW(), 1)
+                    GROUP BY año_semana
+                    ORDER BY año_semana DESC
+                    LIMIT 8
+                ) sub
+                ORDER BY año_semana ASC;
+            `);
+        }
 
         let pastLabels = weeklySalesResult.map(r => r.etiqueta);
         let pastTotals = weeklySalesResult.map(r => Number(r.total));
@@ -517,21 +544,39 @@ const getBiMetrics = async (req, res) => {
             proyeccion
         };
 
-        // 4b. Historial de Ventas Diarias (Últimos 10 días completos, excluyendo el actual)
-        const [dailySalesResult] = await db.query(`
-            SELECT * FROM (
-                SELECT 
-                    DATE(fecha) AS dia,
-                    DATE_FORMAT(MIN(fecha), '%d/%m') AS etiqueta,
-                    SUM(total_venta) AS total
-                FROM ventas
-                WHERE estado = 'COMPLETADA' AND fecha < CURDATE()
-                GROUP BY dia
-                ORDER BY dia DESC
-                LIMIT 10
-            ) sub
-            ORDER BY dia ASC;
-        `);
+        // 4b. Historial de Ventas Diarias
+        let dailySalesResult;
+        if (startDate && endDate) {
+            const { from, to } = getDateRange(startDate, endDate);
+            [dailySalesResult] = await db.query(`
+                SELECT * FROM (
+                    SELECT 
+                        DATE(fecha) AS dia,
+                        DATE_FORMAT(MIN(fecha), '%d/%m') AS etiqueta,
+                        SUM(total_venta) AS total
+                    FROM ventas v
+                    WHERE v.estado = 'COMPLETADA' AND v.fecha >= ? AND v.fecha <= ?
+                    GROUP BY dia
+                    ORDER BY dia DESC
+                ) sub
+                ORDER BY dia ASC;
+            `, [from, to]);
+        } else {
+            [dailySalesResult] = await db.query(`
+                SELECT * FROM (
+                    SELECT 
+                        DATE(fecha) AS dia,
+                        DATE_FORMAT(MIN(fecha), '%d/%m') AS etiqueta,
+                        SUM(total_venta) AS total
+                    FROM ventas
+                    WHERE estado = 'COMPLETADA' AND fecha < CURDATE()
+                    GROUP BY dia
+                    ORDER BY dia DESC
+                    LIMIT 10
+                ) sub
+                ORDER BY dia ASC;
+            `);
+        }
 
         let dailyPastLabels = dailySalesResult.map(r => r.etiqueta);
         let dailyPastTotals = dailySalesResult.map(r => Number(r.total));
@@ -587,11 +632,11 @@ const getBiMetrics = async (req, res) => {
             JOIN ventas v ON dv.id_venta = v.id_venta
             JOIN productos p ON dv.id_producto = p.id_producto
             LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
-            WHERE v.estado = 'COMPLETADA'
+            WHERE v.estado = 'COMPLETADA' ${dateFilter}
             GROUP BY p.id_categoria, c.nombre
             ORDER BY ventas_categoria DESC
             LIMIT 5;
-        `);
+        `, params);
 
         let categoryLabels = categoryMarginsResult.map(r => r.categoria.toUpperCase());
         let categoryValues = categoryMarginsResult.map(r => {
@@ -613,29 +658,50 @@ const getBiMetrics = async (req, res) => {
         // 6. Anomalías en tiempo real con detalle de productos
         const anomalies = [];
 
-        // Anomalía A: Ventas inusualmente altas (Uniendo con productos para detallar de qué fue)
+        // Anomalía A: Ventas inusualmente altas
         const [avgSaleResult] = await db.query(`
             SELECT AVG(total_venta) AS promedio FROM ventas WHERE estado = 'COMPLETADA'
         `);
         const averageSale = Number(avgSaleResult[0]?.promedio || 150);
         const thresholdHighSale = Math.max(800, averageSale * 3);
 
-        const [highSalesResult] = await db.query(`
-            SELECT 
-                v.id_venta, 
-                v.total_venta, 
-                DATE_FORMAT(v.fecha, '%H:%i') AS hora, 
-                u.nombre_usuario,
-                GROUP_CONCAT(CONCAT(p.nombre, ' (x', dv.cantidad, ')') SEPARATOR ', ') AS productos
-            FROM ventas v
-            JOIN usuarios u ON v.id_usuario = u.id_usuario
-            JOIN detalle_ventas dv ON v.id_venta = dv.id_venta
-            JOIN productos p ON dv.id_producto = p.id_producto
-            WHERE v.estado = 'COMPLETADA' AND v.total_venta > ?
-            GROUP BY v.id_venta, u.nombre_usuario, v.fecha
-            ORDER BY v.fecha DESC
-            LIMIT 2;
-        `, [thresholdHighSale]);
+        let highSalesResult;
+        if (startDate && endDate) {
+            const { from, to } = getDateRange(startDate, endDate);
+            [highSalesResult] = await db.query(`
+                SELECT 
+                    v.id_venta, 
+                    v.total_venta, 
+                    DATE_FORMAT(v.fecha, '%H:%i') AS hora, 
+                    u.nombre_usuario,
+                    GROUP_CONCAT(CONCAT(p.nombre, ' (x', dv.cantidad, ')') SEPARATOR ', ') AS productos
+                FROM ventas v
+                JOIN usuarios u ON v.id_usuario = u.id_usuario
+                JOIN detalle_ventas dv ON v.id_venta = dv.id_venta
+                JOIN productos p ON dv.id_producto = p.id_producto
+                WHERE v.estado = 'COMPLETADA' AND v.total_venta > ? AND v.fecha >= ? AND v.fecha <= ?
+                GROUP BY v.id_venta, u.nombre_usuario, v.fecha
+                ORDER BY v.fecha DESC
+                LIMIT 5;
+            `, [thresholdHighSale, from, to]);
+        } else {
+            [highSalesResult] = await db.query(`
+                SELECT 
+                    v.id_venta, 
+                    v.total_venta, 
+                    DATE_FORMAT(v.fecha, '%H:%i') AS hora, 
+                    u.nombre_usuario,
+                    GROUP_CONCAT(CONCAT(p.nombre, ' (x', dv.cantidad, ')') SEPARATOR ', ') AS productos
+                FROM ventas v
+                JOIN usuarios u ON v.id_usuario = u.id_usuario
+                JOIN detalle_ventas dv ON v.id_venta = dv.id_venta
+                JOIN productos p ON dv.id_producto = p.id_producto
+                WHERE v.estado = 'COMPLETADA' AND v.total_venta > ?
+                GROUP BY v.id_venta, u.nombre_usuario, v.fecha
+                ORDER BY v.fecha DESC
+                LIMIT 2;
+            `, [thresholdHighSale]);
+        }
 
         highSalesResult.forEach(s => {
             anomalies.push({
@@ -647,13 +713,25 @@ const getBiMetrics = async (req, res) => {
         });
 
         // Anomalía B: Descuadres de Caja
-        const [cashDiscrepancyResult] = await db.query(`
-            SELECT id, diferencia, usuario_nombre, DATE_FORMAT(fecha_cierre, '%d/%m %H:%i') AS fecha_cierre_fmt
-            FROM cierres_caja
-            WHERE fecha_cierre IS NOT NULL AND diferencia != 0
-            ORDER BY fecha_cierre DESC
-            LIMIT 2;
-        `);
+        let cashDiscrepancyResult;
+        if (startDate && endDate) {
+            const { from, to } = getDateRange(startDate, endDate);
+            [cashDiscrepancyResult] = await db.query(`
+                SELECT id, diferencia, usuario_nombre, DATE_FORMAT(fecha_cierre, '%d/%m %H:%i') AS fecha_cierre_fmt
+                FROM cierres_caja
+                WHERE fecha_cierre IS NOT NULL AND diferencia != 0 AND fecha_cierre >= ? AND fecha_cierre <= ?
+                ORDER BY fecha_cierre DESC
+                LIMIT 5;
+            `, [from, to]);
+        } else {
+            [cashDiscrepancyResult] = await db.query(`
+                SELECT id, diferencia, usuario_nombre, DATE_FORMAT(fecha_cierre, '%d/%m %H:%i') AS fecha_cierre_fmt
+                FROM cierres_caja
+                WHERE fecha_cierre IS NOT NULL AND diferencia != 0
+                ORDER BY fecha_cierre DESC
+                LIMIT 2;
+            `);
+        }
 
         cashDiscrepancyResult.forEach(c => {
             const diffType = Number(c.diferencia) < 0 ? 'Faltante' : 'Sobrante';
@@ -692,26 +770,72 @@ const getBiMetrics = async (req, res) => {
             });
         }
 
-        // 7. Distribución de Métodos de Pago (Últimos 30 días)
-        const [paymentDistributionResult] = await db.query(`
-            SELECT 
-                COALESCE(metodo_pago, 'Efectivo') AS metodo, 
-                SUM(total_venta) AS total
-            FROM ventas
-            WHERE estado = 'COMPLETADA' AND fecha >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            GROUP BY metodo;
-        `);
+        // 7. Distribución de Métodos de Pago
+        let paymentDistributionResult;
+        if (startDate && endDate) {
+            const { from, to } = getDateRange(startDate, endDate);
+            [paymentDistributionResult] = await db.query(`
+                SELECT 
+                    COALESCE(metodo_pago, 'Efectivo') AS metodo, 
+                    SUM(total_venta) AS total
+                FROM ventas v
+                WHERE v.estado = 'COMPLETADA' AND v.fecha >= ? AND v.fecha <= ?
+                GROUP BY metodo;
+            `, [from, to]);
+        } else {
+            [paymentDistributionResult] = await db.query(`
+                SELECT 
+                    COALESCE(metodo_pago, 'Efectivo') AS metodo, 
+                    SUM(total_venta) AS total
+                FROM ventas
+                WHERE estado = 'COMPLETADA' AND fecha >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                GROUP BY metodo;
+            `);
+        }
         
         const payment_distribution = paymentDistributionResult.map(r => ({
             metodo: r.metodo,
             total: Number(r.total || 0)
         }));
 
-        // 8. Ticket Promedio
-        const [ticketPromedioResult] = await db.query(`
-            SELECT COALESCE(AVG(total_venta), 0) AS ticket_promedio FROM ventas WHERE estado = 'COMPLETADA'
-        `);
-        const ticket_promedio = Number(ticketPromedioResult[0]?.ticket_promedio || 0);
+        // 8. Ticket Promedio y sus datos subyacentes
+        const [ticketDataResult] = await db.query(`
+            SELECT 
+                COALESCE(SUM(total_venta), 0) AS total_ventas,
+                COUNT(*) AS total_tickets
+            FROM ventas v
+            WHERE v.estado = 'COMPLETADA' ${dateFilter}
+        `, params);
+        const total_ventas_bi = Number(ticketDataResult[0]?.total_ventas || 0);
+        const total_tickets_bi = Number(ticketDataResult[0]?.total_tickets || 0);
+        const ticket_promedio = total_tickets_bi > 0 
+            ? Number((total_ventas_bi / total_tickets_bi).toFixed(2))
+            : 0;
+
+        // 9. Productos más vendidos
+        const [topProductsResult] = await db.query(`
+            SELECT 
+                p.id_producto,
+                p.nombre, 
+                p.codigo, 
+                SUM(dv.cantidad) AS total_unidades_vendidas, 
+                SUM(dv.cantidad * dv.precio_unitario) AS total_facturado
+            FROM detalle_ventas dv
+            JOIN productos p ON dv.id_producto = p.id_producto
+            JOIN ventas v ON dv.id_venta = v.id_venta
+            WHERE v.estado = 'COMPLETADA' ${dateFilter}
+            GROUP BY p.id_producto, p.nombre, p.codigo
+            ORDER BY total_unidades_vendidas DESC 
+            LIMIT 10;
+        `, params);
+
+        const top_products = topProductsResult.map(p => ({
+            id_producto: p.id_producto,
+            nombre: p.nombre,
+            codigo: p.codigo,
+            unidades: Number(p.total_unidades_vendidas || 0),
+            monto: Number(p.total_facturado || 0)
+        }));
 
         res.json({
             total_productos,
@@ -722,7 +846,10 @@ const getBiMetrics = async (req, res) => {
             category_margins,
             anomalies,
             payment_distribution,
-            ticket_promedio
+            ticket_promedio,
+            total_ventas_bi,
+            total_tickets_bi,
+            top_products
         });
 
     } catch (error) {

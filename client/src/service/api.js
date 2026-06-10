@@ -403,8 +403,8 @@ export const fetchSalesChartReport = (token, params) => {
     return request('get', '/reports/sales-chart', token, null, { params });
 };
 
-export const fetchBiMetricsReport = (token) => {
-    return request('get', '/reports/bi-metrics', token);
+export const fetchBiMetricsReport = (token, params = null) => {
+    return request('get', '/reports/bi-metrics', token, null, params ? { params } : {});
 };
 
 // ===================================================================
