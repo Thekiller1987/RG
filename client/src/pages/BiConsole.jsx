@@ -545,6 +545,7 @@ const BiConsole = () => {
   const [showBacktest, setShowBacktest] = useState(true);
   const [stagnantSearch, setStagnantSearch] = useState('');
   const [stagnantFilter, setStagnantFilter] = useState('sin_ventas');
+  const [salesGoal, setSalesGoal] = useState(600000);
 
   // Calcular parámetros de filtro
   const getFilterParams = useCallback(() => {
@@ -926,6 +927,14 @@ const BiConsole = () => {
                   </KpiValue>
                   <KpiDesc>Método de pago con mayor volumen de transacciones.</KpiDesc>
                 </KpiCard>
+
+                <KpiCard accent="#ec4899" glow="0 0 15px rgba(236, 72, 153, 0.2)">
+                  <KpiTitle>Eficiencia de Arqueo (30d)</KpiTitle>
+                  <KpiValue>
+                    {metrics?.eficiencia_arqueo !== undefined ? metrics.eficiencia_arqueo : 100.0} <KpiUnit>%</KpiUnit>
+                  </KpiValue>
+                  <KpiDesc>Porcentaje de cierres de caja con cero descuadre financiero.</KpiDesc>
+                </KpiCard>
               </>
             )}
 
@@ -936,7 +945,7 @@ const BiConsole = () => {
                   <KpiValue>
                     {stagnantFilter === 'sin_ventas' 
                       ? metrics?.riesgo_estancamiento?.toLocaleString() 
-                      : metrics?.stagnant_products?.filter(p => Number(p.unidades_vendidas || 0) >= 1).length.toLocaleString()
+                      : (metrics?.stagnant_products?.filter(p => Number(p.unidades_vendidas || 0) >= 1)?.length || 0).toLocaleString()
                     } <KpiUnit>Repuestos</KpiUnit>
                   </KpiValue>
                   <div style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 700, marginTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.4rem' }}>
@@ -972,6 +981,14 @@ const BiConsole = () => {
                     {rotacionIndice} <KpiUnit>Veces al mes</KpiUnit>
                   </KpiValue>
                   <KpiDesc>Velocidad promedio con la que rota el stock del catálogo.</KpiDesc>
+                </KpiCard>
+
+                <KpiCard accent="#f59e0b" glow="0 0 15px rgba(245, 158, 11, 0.2)">
+                  <KpiTitle>Días de Inventario (DIO)</KpiTitle>
+                  <KpiValue>
+                    {metrics?.dio !== undefined ? metrics.dio : 365} <KpiUnit>Días</KpiUnit>
+                  </KpiValue>
+                  <KpiDesc>Días promedio para vender todo el stock según demanda.</KpiDesc>
                 </KpiCard>
               </>
             )}
@@ -1182,7 +1199,7 @@ const BiConsole = () => {
               </PanelRow>
 
               {/* Alertas de Caja Críticas (Solo si existen alertas reales activas, no OK de consistencia) */}
-              {metrics?.cash_anomalies?.filter(a => a.risk !== 'Normal').length > 0 && (
+              {metrics?.cash_anomalies && metrics.cash_anomalies.filter(a => a.risk !== 'Normal').length > 0 && (
                 <PanelRow>
                   <Card style={{ gridColumn: 'span 2', background: 'rgba(244, 63, 94, 0.02)', borderColor: 'rgba(244, 63, 94, 0.15)' }}>
                     <CardTitle style={{ color: '#f43f5e' }}>
@@ -1193,7 +1210,7 @@ const BiConsole = () => {
                       Se han registrado incidencias que requieren supervisión inmediata o retiros parciales de seguridad.
                     </CardDesc>
                     <AlertsList style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.2rem' }}>
-                      {metrics.cash_anomalies.filter(a => a.risk !== 'Normal').map((a, i) => (
+                      {metrics?.cash_anomalies?.filter(a => a.risk !== 'Normal').map((a, i) => (
                         <AlertItem key={i} accent={a.risk === 'Riesgo Alto' ? '#f43f5e' : '#ED7D31'}>
                           <AlertText>
                             <h4>{a.title}</h4>
@@ -1315,7 +1332,7 @@ const BiConsole = () => {
                         </div>
                       </div>
                     ))}
-                    {(!metrics?.combo_suggestions || metrics.combo_suggestions.length === 0) && (
+                    {(!metrics?.combo_suggestions || metrics?.combo_suggestions?.length === 0) && (
                       <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af', gridColumn: 'span 2' }}>
                         No hay suficientes productos en inventario para sugerir combos.
                       </div>
@@ -1357,7 +1374,7 @@ const BiConsole = () => {
                             <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#ED7D31' }}>C$ {p.monto.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                           </tr>
                         ))}
-                        {(!metrics?.top_products || metrics.top_products.length === 0) && (
+                        {(!metrics?.top_products || metrics?.top_products?.length === 0) && (
                           <tr>
                             <td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
                               No hay datos de ventas registradas en el rango seleccionado.
@@ -1366,6 +1383,83 @@ const BiConsole = () => {
                         )}
                       </tbody>
                     </table>
+                  </div>
+                </Card>
+              </PanelRow>
+
+              {/* MÓDULO MEJORADO: Clasificación ABC (Pareto) */}
+              <PanelRow>
+                <Card style={{ gridColumn: 'span 2' }}>
+                  <CardTitle>
+                    <FaBoxes color="#38bdf8" />
+                    Clasificación ABC de Inventario (Principio de Pareto)
+                  </CardTitle>
+                  <CardDesc>
+                    División del inventario activo según su volumen de rotación en los últimos 180 días para priorizar la gestión de stock (Ley de Pareto).
+                  </CardDesc>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginTop: '0.5rem' }}>
+                    <div style={{ background: 'rgba(255,255,255,0.04)', height: '28px', borderRadius: '14px', overflow: 'hidden', display: 'flex', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <div style={{ 
+                        background: '#10b981', 
+                        width: `${metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_a / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 20}%`, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        color: '#fff', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 'bold',
+                        minWidth: '40px' 
+                      }}>
+                        A ({Math.round(metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_a / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 20)}%)
+                      </div>
+                      
+                      <div style={{ 
+                        background: '#eab308', 
+                        width: `${metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_b / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 30}%`, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        color: '#000', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 'bold',
+                        minWidth: '40px' 
+                      }}>
+                        B ({Math.round(metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_b / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 30)}%)
+                      </div>
+                      
+                      <div style={{ 
+                        background: '#f43f5e', 
+                        width: `${metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_c / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 50}%`, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        color: '#fff', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 'bold',
+                        minWidth: '40px' 
+                      }}>
+                        C ({Math.round(metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_c / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 50)}%)
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', fontSize: '0.85rem' }}>
+                       <div style={{ padding: '0.8rem', background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.12)', borderRadius: '12px' }}>
+                         <span style={{ color: '#10b981', fontWeight: 800 }}>🟢 Clase A (Alta Rotación):</span>
+                         <div style={{ color: '#fff', fontSize: '1rem', fontWeight: 700, margin: '2px 0' }}>{metrics?.abc_a || 0} Repuestos</div>
+                         <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>&gt; 10 unidades vendidas. Artículos estrella del inventario.</span>
+                       </div>
+                       <div style={{ padding: '0.8rem', background: 'rgba(234, 179, 8, 0.04)', border: '1px solid rgba(234, 179, 8, 0.12)', borderRadius: '12px' }}>
+                         <span style={{ color: '#eab308', fontWeight: 800 }}>🟡 Clase B (Rotación Media):</span>
+                         <div style={{ color: '#fff', fontSize: '1rem', fontWeight: 700, margin: '2px 0' }}>{metrics?.abc_b || 0} Repuestos</div>
+                         <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>4 a 10 unidades vendidas. Artículos de demanda regular.</span>
+                       </div>
+                       <div style={{ padding: '0.8rem', background: 'rgba(244, 63, 94, 0.04)', border: '1px solid rgba(244, 63, 94, 0.12)', borderRadius: '12px' }}>
+                         <span style={{ color: '#f43f5e', fontWeight: 800 }}>🔴 Clase C (Rotación Baja):</span>
+                         <div style={{ color: '#fff', fontSize: '1rem', fontWeight: 700, margin: '2px 0' }}>{metrics?.abc_c || 0} Repuestos</div>
+                         <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>&le; 3 unidades vendidas en 180 días. Candidatos a combos.</span>
+                       </div>
+                    </div>
                   </div>
                 </Card>
               </PanelRow>
@@ -1627,6 +1721,112 @@ const BiConsole = () => {
                   </ChartBox>
                 </Card>
               </PanelRow>
+
+              {/* MÓDULO MEJORADO: Simulador de Objetivos de Ventas (Run-Rate) */}
+              {(() => {
+                const ventasMesActual = metrics?.ventas_mes_actual || 120000;
+                const diasTranscurridos = metrics?.dias_transcurridos_mes || new Date().getDate();
+                const diasTotales = metrics?.dias_totales_mes || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+                const promedioDiarioVentas = diasTranscurridos > 0 ? (ventasMesActual / diasTranscurridos) : 0;
+                const ventasProyectadasMes = promedioDiarioVentas * diasTotales;
+                const progresoPorcentaje = salesGoal > 0 ? Math.min(100, (ventasMesActual / salesGoal) * 100) : 0;
+                const brechaMeta = ventasProyectadasMes - salesGoal;
+                const porcentajeIncrementoRequerido = (ventasProyectadasMes < salesGoal && promedioDiarioVentas > 0 && (diasTotales > diasTranscurridos))
+                  ? (((salesGoal - ventasMesActual) / (diasTotales - diasTranscurridos)) - promedioDiarioVentas) / promedioDiarioVentas * 100
+                  : 0;
+                
+                return (
+                  <PanelRow>
+                    <Card style={{ gridColumn: 'span 2' }}>
+                      <CardTitle>
+                        <FaChartLine color="#10b981" />
+                        Simulador de Objetivos de Ventas y Proyección Run-Rate
+                      </CardTitle>
+                      <CardDesc>
+                        Monitorea el progreso de la meta de facturación mensual y calcula la proyección de cierre de mes basada en el ritmo de ventas diario (Run-Rate).
+                      </CardDesc>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '0.5rem' }}>
+                        {/* Panel de Controles */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '1.25rem' }}>
+                          <FormGroup>
+                            <label style={{ fontSize: '0.85rem', color: '#9ca3af', fontWeight: 600 }}>Fijar Meta de Ventas Mensual (C$):</label>
+                            <Input 
+                              type="number" 
+                              value={salesGoal} 
+                              onChange={(e) => setSalesGoal(Math.max(0, Number(e.target.value)))}
+                              style={{ width: '100%', boxSizing: 'border-box' }}
+                              placeholder="Ej. 600000"
+                            />
+                          </FormGroup>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', fontSize: '0.8rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.8rem' }}>
+                            <div>
+                              <span style={{ color: '#9ca3af' }}>Días Transcurridos:</span>
+                              <div style={{ color: '#fff', fontSize: '1.1rem', fontWeight: 700 }}>{diasTranscurridos} / {diasTotales} días</div>
+                            </div>
+                            <div>
+                              <span style={{ color: '#9ca3af' }}>Venta Promedio Diaria:</span>
+                              <div style={{ color: '#10b981', fontSize: '1.1rem', fontWeight: 700 }}>C$ {Math.round(promedioDiarioVentas).toLocaleString('es-NI')}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Barra de Progreso y Estadísticas */}
+                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '1.25rem' }}>
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.4rem' }}>
+                              <span style={{ color: '#9ca3af', fontWeight: 600 }}>Progreso de la Meta del Mes</span>
+                              <span style={{ color: '#10b981', fontWeight: 800 }}>{progresoPorcentaje.toFixed(1)}%</span>
+                            </div>
+                            <div style={{ background: 'rgba(255,255,255,0.04)', height: '12px', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+                              <div style={{ background: 'linear-gradient(90deg, #38bdf8, #10b981)', height: '100%', width: `${progresoPorcentaje}%`, borderRadius: '6px', transition: 'width 0.4s ease' }}></div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <div>
+                              <span style={{ color: '#9ca3af', fontSize: '0.75rem', textTransform: 'uppercase' }}>Ventas del Mes Actual</span>
+                              <div style={{ color: '#fff', fontSize: '1.4rem', fontWeight: 800 }}>C$ {Math.round(ventasMesActual).toLocaleString('es-NI')}</div>
+                            </div>
+                            <div>
+                              <span style={{ color: '#9ca3af', fontSize: '0.75rem', textTransform: 'uppercase' }}>Proyección Cierre de Mes</span>
+                              <div style={{ color: '#38bdf8', fontSize: '1.4rem', fontWeight: 800 }}>C$ {Math.round(ventasProyectadasMes).toLocaleString('es-NI')}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Diagnóstico Predictivo de Meta */}
+                      <div style={{ 
+                        padding: '1rem', 
+                        borderRadius: '12px', 
+                        border: '1px solid',
+                        background: brechaMeta >= 0 ? 'rgba(16, 185, 129, 0.05)' : 'rgba(244, 63, 94, 0.05)',
+                        borderColor: brechaMeta >= 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(244, 63, 94, 0.2)',
+                        fontSize: '0.85rem',
+                        lineHeight: '1.5',
+                        marginTop: '0.5rem'
+                      }}>
+                        {brechaMeta >= 0 ? (
+                          <div>
+                            <strong style={{ color: '#10b981' }}>🎉 Meta en Camino a Cumplirse:</strong> Al ritmo de ventas actual (C$ {Math.round(promedioDiarioVentas).toLocaleString('es-NI')}/día), el modelo proyecta que cerrarás el mes con <strong style={{ color: '#fff' }}>C$ {Math.round(ventasProyectadasMes).toLocaleString('es-NI')}</strong>. Esto supera tu objetivo fijado de C$ {salesGoal.toLocaleString('es-NI')} por <strong style={{ color: '#10b981' }}>C$ {Math.round(brechaMeta).toLocaleString('es-NI')}</strong>.
+                          </div>
+                        ) : (
+                          <div>
+                            <strong style={{ color: '#f43f5e' }}>⚠️ Brecha de Ventas Detectada:</strong> Al ritmo de ventas actual, proyectas cerrar el mes con <strong style={{ color: '#fff' }}>C$ {Math.round(ventasProyectadasMes).toLocaleString('es-NI')}</strong>, quedando <strong style={{ color: '#f43f5e' }}>C$ {Math.round(Math.abs(brechaMeta)).toLocaleString('es-NI')}</strong> por debajo de tu objetivo de C$ {salesGoal.toLocaleString('es-NI')}. 
+                            {diasTotales > diasTranscurridos ? (
+                              <span> Para alcanzar la meta, necesitas incrementar la facturación diaria a <strong style={{ color: '#fff' }}>C$ {Math.round((salesGoal - ventasMesActual) / (diasTotales - diasTranscurridos)).toLocaleString('es-NI')}</strong> por los restantes {diasTotales - diasTranscurridos} días (un aumento del <strong style={{ color: '#eab308' }}>{porcentajeIncrementoRequerido.toFixed(1)}%</strong> sobre el promedio diario actual).</span>
+                            ) : (
+                              <span> El mes ha concluido y no se ha alcanzado la meta.</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  </PanelRow>
+                );
+              })()}
 
               <PanelRow>
                 <Card style={{ gridColumn: 'span 2' }}>

@@ -1172,6 +1172,90 @@ const getBiMetrics = async (req, res) => {
             monto: Number(p.total_facturado || 0)
         }));
 
+        // --- NUEVOS MODELOS Y KPIs BI SOLICITADOS ---
+        let eficiencia_arqueo = 100.0;
+        let abc_a = 0, abc_b = 0, abc_c = 0;
+        let dio = 365;
+        let ventas_mes_actual = 0;
+        let dias_transcurridos_mes = 1;
+        let dias_totales_mes = 30;
+
+        try {
+            // 1. KPI: Eficiencia de Arqueo de Caja (Últimos 30 días)
+            const [cashKpiResult] = await db.query(`
+                SELECT 
+                    COUNT(*) AS total_cierres,
+                    SUM(CASE WHEN diferencia = 0 THEN 1 ELSE 0 END) AS closures_perfectos
+                FROM cierres_caja
+                WHERE fecha_cierre IS NOT NULL AND fecha_cierre >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            `);
+            const totalCierres = Number(cashKpiResult[0]?.total_cierres || 0);
+            const closuresPerfectos = Number(cashKpiResult[0]?.closures_perfectos || 0);
+            eficiencia_arqueo = totalCierres > 0 
+                ? Number(((closuresPerfectos / totalCierres) * 100).toFixed(1))
+                : 100.0;
+
+            // 2. Modelo: Clasificación ABC de Inventario (Pareto - 180 días)
+            const [abcResult] = await db.query(`
+                SELECT 
+                    SUM(CASE WHEN unidades_vendidas > 10 THEN 1 ELSE 0 END) AS clase_a,
+                    SUM(CASE WHEN unidades_vendidas BETWEEN 4 AND 10 THEN 1 ELSE 0 END) AS clase_b,
+                    SUM(CASE WHEN unidades_vendidas <= 3 THEN 1 ELSE 0 END) AS clase_c
+                FROM (
+                    SELECT 
+                        p.id_producto,
+                        COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas
+                    FROM productos p
+                    LEFT JOIN (
+                        SELECT dv_in.id_producto, dv_in.cantidad
+                        FROM detalle_ventas dv_in
+                        JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
+                        WHERE v_in.estado = 'COMPLETADA' AND v_in.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+                    ) dv ON p.id_producto = dv.id_producto
+                    WHERE p.activo = 1 AND p.existencia > 0
+                    GROUP BY p.id_producto
+                ) AS sub
+            `);
+            abc_a = Number(abcResult[0]?.clase_a || 0);
+            abc_b = Number(abcResult[0]?.clase_b || 0);
+            abc_c = Number(abcResult[0]?.clase_c || 0);
+
+            // 3. KPI: DIO (Días de Inventario Disponible)
+            const [avgDailyUnitsResult] = await db.query(`
+                SELECT COALESCE(SUM(dv.cantidad), 0) / 30.0 AS avg_daily
+                FROM detalle_ventas dv
+                JOIN ventas v ON dv.id_venta = v.id_venta
+                WHERE v.estado = 'COMPLETADA' AND v.fecha >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            `);
+            const avgDailyUnits = Number(avgDailyUnitsResult[0]?.avg_daily || 0);
+            
+            const [totalStockResult] = await db.query(`
+                SELECT COALESCE(SUM(existencia), 0) AS total_stock
+                FROM productos
+                WHERE activo = 1
+            `);
+            const totalStock = Number(totalStockResult[0]?.total_stock || 0);
+            dio = avgDailyUnits > 0 
+                ? Number((totalStock / avgDailyUnits).toFixed(0))
+                : 365;
+
+            // 4. Datos para el Simulador de Metas de Ventas (Mes Actual)
+            const [currentMonthSalesResult] = await db.query(`
+                SELECT COALESCE(SUM(total_venta), 0) AS total
+                FROM ventas
+                WHERE estado = 'COMPLETADA' 
+                  AND YEAR(fecha) = YEAR(NOW()) 
+                  AND MONTH(fecha) = MONTH(NOW())
+            `);
+            ventas_mes_actual = Number(currentMonthSalesResult[0]?.total || 0);
+            
+            const now = new Date();
+            dias_transcurridos_mes = now.getDate();
+            dias_totales_mes = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        } catch (calcErr) {
+            console.error("Error al calcular KPIs adicionales de BI:", calcErr);
+        }
+
         res.json({
             total_productos,
             promedio_margen,
@@ -1191,7 +1275,15 @@ const getBiMetrics = async (req, res) => {
             ticket_promedio,
             total_ventas_bi,
             total_tickets_bi,
-            top_products
+            top_products,
+            eficiencia_arqueo,
+            abc_a,
+            abc_b,
+            abc_c,
+            dio,
+            ventas_mes_actual,
+            dias_transcurridos_mes,
+            dias_totales_mes
         });
 
     } catch (error) {
