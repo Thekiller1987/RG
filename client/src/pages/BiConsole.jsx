@@ -1235,31 +1235,7 @@ const BiConsole = () => {
           {activeTab === 'caja' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
               <PanelRow>
-                <Card>
-                  <CardTitle>
-                    <FaChartBar color="#f43f5e" />
-                    Historial Forense de Descuadres (C$)
-                  </CardTitle>
-                  <CardDesc>
-                    Diferencia monetaria registrada en los cierres de caja recientes (faltantes en rojo, sobrantes en amarillo, perfecto en verde).
-                  </CardDesc>
-                  <ChartBox style={{ height: '240px' }}>
-                    <Bar 
-                      data={getDiscrepanciesChartData()} 
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
-                          x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 9 } } }
-                        }
-                      }}
-                    />
-                  </ChartBox>
-                </Card>
-
-                <Card>
+                <Card style={{ gridColumn: 'span 2' }}>
                   <CardTitle>
                     <FaCashRegister color="#10b981" />
                     Consolidado de Auditoría Contable (Periodo Seleccionado)
