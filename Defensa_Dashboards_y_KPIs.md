@@ -40,7 +40,10 @@ La seguridad del dinero, los hábitos de compra de los clientes y el comportamie
    - *Descuadres de Caja:* Identifica discrepancias entre el efectivo real y el esperado en los cierres de caja.
    - *Acumulación Excesiva de Efectivo:* Alerta cuando una caja supera los C$ 15,000 en efectivo neto para mitigar riesgos de robo.
    - *Caja Abierta por Tiempo Excesivo:* Detecta turnos de caja sin cerrar por más de 24 horas, exigiendo el cumplimiento de procesos.
-4. **Sugerencias de Combos de Repuestos (Market Basket Analysis):**
+4. **Eficiencia de Arqueo de Caja (30d):**
+   - *Qué es:* El porcentaje de cierres de caja que se completaron con exactamente cero descuadre financiero sobre el total de cierres en los últimos 30 días.
+   - *Qué demuestra:* El nivel de honestidad, cuidado operativo de los cajeros y la efectividad de los controles internos de caja.
+5. **Sugerencias de Combos de Repuestos (Market Basket Analysis):**
    - *El Modelo:* Basado en minería de reglas de asociación de transacciones. El sistema analiza tickets históricos para identificar qué repuestos se compran juntos frecuentemente (ej. aceite + filtro de aceite).
    - *Métricas Científicas que demuestras:*
      - **Soporte (Support):** La probabilidad de que un ticket contenga ambos productos.
@@ -54,11 +57,21 @@ La eficiencia logística de los repuestos. Permite identificar capital estancado
 1. **Tasa de Rotación Mensual:** Cuántas veces se renueva el stock promedio en el mes. Una tasa alta indica que los productos se venden rápido; una baja indica sobrealmacenamiento.
 2. **Capital Estancado (Inmovilizado):** La valoración a precio de venta de los productos con nulo o bajísimo movimiento en los últimos 180 días.
    - Demuestra el costo de oportunidad de tener mercadería ocupando espacio físico sin generar flujo de efectivo.
-3. **Alertas de Stock-out Inminente:** Identifica repuestos populares con existencia en cero o cercana a cero para evitar la pérdida de ventas futuras.
+3. **Clasificación ABC de Inventario (Ley de Pareto - 180 días):**
+   - *Qué es:* Clasificación que divide los productos activos en 3 categorías según unidades vendidas:
+     - **Clase A (Alta rotación, > 10 unidades):** Representa el motor de ingresos físicos.
+     - **Clase B (Rotación media, 4 a 10 unidades):** Productos estables de demanda regular.
+     - **Clase C (Baja rotación, <= 3 unidades):** Productos estancados que inmovilizan capital.
+   - *Qué demuestra:* Permite saber dónde enfocar los esfuerzos de inventario y compras (priorizando el stock de Clase A y aplicando combos/descuentos a Clase C).
+4. **Días de Inventario Disponible (DIO - Days of Inventory Outstanding):**
+   - *Qué es:* El número de días promedio que toma vender todo el stock físico de la empresa dada la demanda diaria promedio de los últimos 30 días.
+     $$\text{DIO} = \frac{\text{Existencia Total}}{\text{Unidades Diarias Promedio Vendidas}}$$
+   - *Qué demuestra:* La velocidad de conversión de inventario a efectivo. Un DIO menor significa alta eficiencia de caja y rotación rápida.
+5. **Alertas de Stock-out Inminente:** Identifica repuestos populares con existencia en cero o cercana a cero para evitar la pérdida de ventas futuras.
 
 ### 🔵 C. Enfoque: Rentabilidad y Proyección
 #### ¿Qué demuestra?
-La capacidad de planificar financieramente el futuro del negocio utilizando modelos predictivos basados en datos históricos.
+La capacidad de planificar financieramente el futuro del negocio utilizando modelos predictivos basados en datos históricos y midiendo brechas respecto a objetivos reales.
 #### KPIs y Modelos Analíticos:
 1. **Margen Comercial Ponderado:** El promedio ponderado de rentabilidad sobre el costo del catálogo de repuestos vendidos.
 2. **Previsión de Ingresos (Modelo Predictivo):**
@@ -71,6 +84,11 @@ La capacidad de planificar financieramente el futuro del negocio utilizando mode
 3. **Confianza Algorítmica ($R^2$ - Coeficiente de Determinación):**
    - *Qué es:* Un valor porcentual real que mide qué tan bien se adapta la línea de regresión a los datos reales de ventas en la fase de entrenamiento/backtesting.
    - *Qué demuestra:* Si el $R^2$ es cercano al 100%, indica que las ventas siguen un comportamiento predecible y la proyección es altamente confiable. Si es bajo, indica que las ventas son muy erráticas o sujetas a factores externos imprevistos.
+4. **Simulador de Objetivos de Venta (Run-Rate):**
+   - *Qué es:* Un widget que permite fijar una meta mensual (ej. C$ 600,000) y calcular el ritmo de ventas diario proyectado hacia el fin de mes.
+   - *Fórmula de Proyección (Run-Rate):*
+     $$\text{Cierre Proyectado} = \frac{\text{Ventas Mes Actual}}{\text{Días Transcurridos}} \times \text{Días Totales del Mes}$$
+   - *Qué demuestra:* Proporciona una herramienta operativa en tiempo real para saber si el negocio cumplirá sus metas comerciales. En caso de brecha negativa, calcula matemáticamente el porcentaje de incremento necesario en facturación diaria para salvar el mes.
 
 ---
 

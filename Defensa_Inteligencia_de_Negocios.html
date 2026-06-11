@@ -179,17 +179,17 @@
 
     <div class="page-break"></div>
 
-    <!-- SECCIÓN 3: LOS 3 KPIs CLAVE -->
-    <h1>3. Los 3 KPIs Críticos Demostrados</h1>
+    <!-- SECCIÓN 3: LOS KPIs ANALÍTICOS Y CLAVE -->
+    <h1>3. Los KPIs Analíticos e Indicadores Clave Demostrados</h1>
     <p>
-        Para la defensa de tu proyecto, estos tres indicadores demuestran el valor de la inteligencia de negocios aplicada a la toma de decisiones operativas y estratégicas:
+        Para la defensa de tu proyecto, estos indicadores demuestran el valor del sistema de Inteligencia de Negocios (BI) y Auditoría para mejorar la eficiencia operativa y optimizar la toma de decisiones:
     </p>
 
     <table style="width: 100%;">
         <thead>
             <tr>
-                <th style="width: 30%;">KPI / Indicador</th>
-                <th style="width: 35%;">¿Cómo se calcula? (Fórmula y Modelo)</th>
+                <th style="width: 25%;">KPI / Indicador</th>
+                <th style="width: 40%;">¿Cómo se calcula? (Fórmula y Modelo)</th>
                 <th style="width: 35%;">¿Qué demuestra al Negocio?</th>
             </tr>
         </thead>
@@ -202,28 +202,58 @@
                     Donde $SS_{res}$ es la suma de los residuos al cuadrado y $SS_{tot}$ es la varianza total de los datos.
                 </td>
                 <td>
-                    Demuestra qué tan predecibles son las ventas diarias/semanales. Un $R^2$ alto asegura al gerente que la proyección de ingresos para el siguiente período es confiable, permitiendo planificar gastos e inversiones con bajo riesgo.
+                    Demuestra la predictibilidad de las ventas. Un $R^2$ alto asegura al gerente que las proyecciones son estables y basadas en tendencias reales de facturación, facilitando decisiones de compra de repuestos.
                 </td>
             </tr>
             <tr>
                 <td><strong>2. Venta Cruzada Inteligente<br>(Soporte, Confianza y Lift)</strong></td>
                 <td>
-                    <strong>Soporte:</strong> $P(A \cap B)$<br>
-                    <strong>Confianza:</strong> $P(B | A) = \frac{\text{Coocurrencias}}{\text{Ventas de A}}$<br>
+                    <strong>Soporte:</strong> $P(A \cap B)$ (probabilidad conjunta)<br>
+                    <strong>Confianza:</strong> $P(B | A) = \frac{\text{Compras de A y B}}{\text{Compras de A}}$<br>
                     <strong>Elevación (Lift):</strong> $\frac{P(A \cap B)}{P(A) \times P(B)}$
                 </td>
                 <td>
-                    Demuestra relaciones de complementariedad científica entre repuestos. Si el Lift es mayor que 1, el sistema sugiere crear promociones en caja (combos), lo que eleva el valor del ticket promedio mediante venta sugerida.
+                    Identifica affinities de compra cruzada (Market Basket Analysis). Un Lift &gt; 1 demuestra al jurado una complementariedad científica (ej. amortiguadores y bases de amortiguador) para crear combos promocionales.
                 </td>
             </tr>
             <tr>
-                <td><strong>3. Capital Estancado e<br>Índice de Rotación</strong></td>
+                <td><strong>3. Clasificación ABC de Inventario</strong></td>
                 <td>
-                    <strong>Capital Inmovilizado:</strong> $\sum (\text{Stock Fisico} \times \text{Precio de Venta})$ de productos sin ventas en 180 días.<br>
-                    <strong>Rotación:</strong> $\frac{\text{Tickets Mensuales} \times 1.8}{\text{Catálogo Total}}$
+                    <strong>Metodología de Pareto (180 días):</strong><br>
+                    - <strong>Clase A (Alta):</strong> Ventas &gt; 10 unidades.<br>
+                    - <strong>Clase B (Media):</strong> Ventas entre 4 y 10 unidades.<br>
+                    - <strong>Clase C (Baja):</strong> Ventas &le; 3 unidades.
                 </td>
                 <td>
-                    Demuestra el capital muerto en bodega. Permite saber exactamente cuánto dinero se está perdiendo por almacenamiento de repuestos de lento movimiento, impulsando campañas de liquidación para recuperar el efectivo.
+                    Clasifica el stock en base a popularidad de demanda física. Demuestra cómo enfocar los recursos financieros del negocio para no tener quiebres de stock en productos Clase A y liquidar productos Clase C.
+                </td>
+            </tr>
+            <tr>
+                <td><strong>4. Días de Inventario (DIO)</strong></td>
+                <td>
+                    $$\text{DIO} = \frac{\text{Existencia Física Total}}{\text{Venta Diaria Promedio (30d)}}$$
+                </td>
+                <td>
+                    Representa el número promedio de días que toma vender todo el stock del local. Un DIO bajo es sinónimo de eficiencia logística y velocidad para recuperar efectivo.
+                </td>
+            </tr>
+            <tr>
+                <td><strong>5. Eficiencia de Arqueo (30d)</strong></td>
+                <td>
+                    $$\text{Eficiencia} = \frac{\text{Cierres sin descuadre}}{\text{Total de Cierres de Caja}} \times 100$$
+                </td>
+                <td>
+                    Audita la consistencia operativa en caja. Demuestra el porcentaje de arqueos de caja con cero descuadre, sirviendo como indicador clave del cumplimiento de normas y prevención de fugas de dinero.
+                </td>
+            </tr>
+            <tr>
+                <td><strong>6. Simulador de Metas y Run-Rate</strong></td>
+                <td>
+                    <strong>Cierre Proyectado:</strong> $\frac{\text{Facturado Mes Actual}}{\text{Días Transcurridos}} \times \text{Días Totales}$<br>
+                    <strong>Ajuste de Brecha:</strong> Ventas restantes necesarias para alcanzar la meta (ej. C$ 600,000) dividido por los días restantes.
+                </td>
+                <td>
+                    Muestra el ritmo financiero mensual. Informa al administrador si el negocio está en camino a alcanzar la meta y calcula el esfuerzo adicional necesario por día si se detecta una brecha negativa.
                 </td>
             </tr>
         </tbody>
