@@ -16,21 +16,21 @@
         }
         h1 {
             color: #1F497D;
-            font-size: 24pt;
+            font-size: 22pt;
             border-bottom: 2px solid #1F497D;
             padding-bottom: 5px;
             margin-top: 30px;
         }
         h2 {
             color: #595959;
-            font-size: 16pt;
+            font-size: 15pt;
             margin-top: 25px;
             border-bottom: 1px solid #D3D3D3;
             padding-bottom: 3px;
         }
         h3 {
             color: #2F5597;
-            font-size: 13pt;
+            font-size: 12pt;
             margin-top: 20px;
         }
         p {
@@ -84,18 +84,18 @@
             justify-content: center;
         }
         .cover-title {
-            font-size: 32pt;
+            font-size: 30pt;
             color: #1F497D;
             font-weight: bold;
             margin-bottom: 10px;
         }
         .cover-subtitle {
-            font-size: 18pt;
+            font-size: 16pt;
             color: #595959;
             margin-bottom: 50px;
         }
         .cover-details {
-            font-size: 12pt;
+            font-size: 11pt;
             margin-top: 150px;
             color: #404040;
             line-height: 2;
@@ -104,14 +104,14 @@
 </head>
 <body>
 
-    <!-- PORTADA DEL DOCUMENTO -->
+    <!-- PORTADA DEL DOCUMENTO (Nativa para MS Word) -->
     <div class="cover-page">
         <div class="cover-title">MULTIREPUESTOS RG</div>
         <div class="cover-subtitle">Sistema de Inteligencia de Negocios y Analítica Avanzada</div>
         <hr style="width: 50%; color: #1F497D; height: 3px; background-color: #1F497D; border: none; margin: 0 auto 50px auto;">
         <div class="cover-details">
-            <strong>Documento de Defensa de Proyecto</strong><br>
-            Módulo de Consola BI, KPIs Avanzados e Indicadores de Gestión Logística y de Caja<br>
+            <strong>Documento de Defensa de Proyecto Oficial</strong><br>
+            Guía Técnica de Dashboards, KPIs Avanzados e Indicadores de Gestión y Auditoría<br>
             Fecha de Presentación: Junio 2026
         </div>
     </div>
@@ -123,7 +123,7 @@
     
     <h3>¿Qué Hace? (Definición del Sistema)</h3>
     <p>
-        El módulo de Inteligencia de Negocios (BI) de Multirepuestos RG es un entorno analítico avanzado que consolida e interpreta en tiempo real los registros transaccionales de ventas, el comportamiento logístico de los repuestos y los flujos financieros en caja. A través de modelos matemáticos y algoritmos de minería de datos (regresión de mínimos cuadrados y reglas de asociación), la consola traduce datos de facturación en directrices comerciales claras para la gerencia.
+        El módulo de Inteligencia de Negocios (BI) de Multirepuestos RG es un entorno analítico avanzado que consolida e interpreta en tiempo real los registros transaccionales de ventas, el comportamiento logístico de los repuestos y los flujos financieros en caja. A través de modelos matemáticos y algoritmos de minería de datos (regresión de mínimos cuadrados y reglas de asociación), la consola traduce datos de facturación en decisiones comerciales claras para la gerencia.
     </p>
 
     <h3>¿Para qué lo hace? (Objetivo Estratégico)</h3>
@@ -149,133 +149,137 @@
     <div class="page-break"></div>
 
     <!-- SECCIÓN 2: ESTRUCTURA DE TABS -->
-    <h1>2. Desglose Operativo de la Consola BI (`/bi-console`)</h1>
+    <h1>2. Desglose Operativo de los 3 Dashboards Principales</h1>
     <p>
-        La consola de BI está organizada en tres pestañas analíticas bien delimitadas para evitar cruces de información:
+        La plataforma cuenta con tres paneles especializados enfocados a diferentes áreas de la toma de decisiones:
     </p>
 
-    <h2>Tab 1: Flujo de Caja y Auditoría (Enfoque de Seguridad)</h2>
+    <h2>Dashboard 1: Consola BI & Analítica (`/bi-console`)</h2>
     <p>
-        Se concentra en el dinero físico y el control operativo de las cajas. Muestra el historial de cierres, arqueos reales vs esperados, y alertas automáticas de seguridad (como acumulación excesiva de efectivo o turnos abiertos por más de 24 horas). Cuenta con un algoritmo autolimpiante que reconstruye los métodos de pago (efectivo, tarjeta, transferencia y dólares) directamente de las transacciones si el registro de cierre está vacío. **No incluye datos de rentabilidad para mantener el enfoque estricto en auditoría.**
+        Es el cerebro estadístico del sistema. Diseñado en un entorno visual cyberpunk (modo oscuro) enfocado en la toma de decisiones gerenciales. Se divide en tres pestañas analíticas bien delimitadas para evitar cruces de información:
+    </p>
+    <ul>
+        <li><strong>Flujo de Caja y Auditoría:</strong> Centrado en la seguridad del punto de venta y en el análisis del comportamiento transaccional sin mezclar rentabilidades.</li>
+        <li><strong>Rotación de Inventario:</strong> Analiza qué productos se están quedando sin ventas, el Pareto de stock, la sugerencia de compra y las pérdidas estimadas por stockout.</li>
+        <li><strong>Rentabilidad y Proyección:</strong> Muestra la dirección del negocio, proyecciones por mínimos cuadrados, metas run-rate y el motor de combos.</li>
+    </ul>
+
+    <h2>Dashboard 2: Dashboard Financiero (`/finances`)</h2>
+    <p>
+        Representa la salud financiera inmediata y consolidada del negocio en formato limpio y profesional (preparado para imprimir en A4 o exportar a PDF). Permite a la administración evaluar la facturación, los márgenes de ganancia bruta frente a costos y visualizar el valor neto del stock en bodega.
     </p>
 
-    <h2>Tab 2: Rotación de Inventario (Enfoque de Logística)</h2>
+    <h2>Dashboard 3: POS y Reporte de Caja (`/cash-report`)</h2>
     <p>
-        Analiza la salud logística de los repuestos. Implementa el modelo de clasificación de inventario ABC de Pareto para identificar productos Clase A (motores de venta), Clase B y Clase C (lento movimiento). Además, calcula el Capital Estancado, los Días de Inventario Disponible (DIO), las sugerencias de compra para productos estrella con stock bajo (Stock &le; 5), y estima las pérdidas financieras diarias ocasionadas por quiebres de stock (Stockout).
-    </p>
-
-    <h2>Tab 3: Rentabilidad y Proyección (Enfoque Estratégico)</h2>
-    <p>
-        Mide la dirección comercial del negocio. Incorpora un modelo de regresión lineal para proyecciones de ingresos a corto plazo con su coeficiente de ajuste ($R^2$), un simulador interactivo de metas Run-Rate (orientado a un objetivo mensual de C$ 600,000), y el motor BI de venta cruzada (combos de repuestos basados en reglas de coocurrencia e índice Lift).
+        Enfocado en el control operativo diario. Permite registrar las ventas minoristas y mayoristas, controlando el flujo del dinero físico en el local. Cuenta con arqueos ciegos de caja, registro de egresos/ingresos adicionales de efectivo, y la generación de cierres de caja detallados para la rendición de cuentas al administrador.
     </p>
 
     <div class="page-break"></div>
 
     <!-- SECCIÓN 3: TABLA DE KPIs -->
-    <h1>3. Los KPIs Analíticos e Indicadores Clave Demostrados</h1>
+    <h1>3. Los KPIs Analíticos e Indicadores Clave Demostrados (Estructura de 5 Ejes)</h1>
     <p>
-        Los siguientes indicadores constituyen el núcleo de la defensa del proyecto, demostrando cómo el sistema aporta valor en la toma de decisiones:
+        Los siguientes indicadores constituyen el núcleo de la defensa del proyecto, desglosados detalladamente bajo el análisis de 5 ejes:
     </p>
 
     <table>
         <thead>
             <tr>
-                <th style="width: 25%;">KPI / Indicador</th>
-                <th style="width: 40%;">¿Cómo se calcula? (Fórmula y Modelo)</th>
-                <th style="width: 35%;">¿Qué demuestra al Negocio?</th>
+                <th style="width: 20%;">Dashboard / KPI</th>
+                <th style="width: 20%;">¿Qué hace? / ¿Qué resuelve?</th>
+                <th style="width: 30%;">¿Cómo lo hace? (Fórmula y Mecánica)</th>
+                <th style="width: 30%;">¿Por qué se diseñó así? / ¿Cómo beneficia al negocio?</th>
             </tr>
         </thead>
         <tbody>
+            <!-- Consola BI - Caja y Auditoría -->
             <tr>
-                <td><strong>1. Eficiencia de Arqueo (30d)</strong></td>
-                <td>
-                    $$\text{Eficiencia} = \left( \frac{\text{Cierres sin descuadre}}{\text{Total cierres en 30 días}} \right) \times 100$$
-                </td>
-                <td>
-                    Mide el rigor operativo en el manejo de caja. Muestra la honestidad y disciplina de los cajeros al comparar dinero físico contado contra el esperado.
-                </td>
+                <td><strong>1. Eficiencia de Arqueo (30d)</strong><br><small>Consola BI (Caja)</small></td>
+                <td><strong>Hace:</strong> Mide el porcentaje de cierres de caja con cero descuadre.<br><strong>Resuelve:</strong> Los descuadres y fugas de efectivo en el local.</td>
+                <td>$$\text{Eficiencia} = \left( \frac{\text{Cierres sin descuadre}}{\text{Total cierres en 30d}} \right) \times 100$$</td>
+                <td><strong>Por qué:</strong> Rango mensual óptimo para valorar la disciplina operativa.<br><strong>Beneficio:</strong> Reduce las pérdidas inexplicadas de dinero y audita el desempeño de cajeros.</td>
             </tr>
             <tr>
-                <td><strong>2. Recálculo Dinámico de Desgloses</strong></td>
-                <td>
-                    <strong>Análisis transaccional forense:</strong> Reconstrucción de métodos de pago sumando abonos netos desde <code>detalles_json</code> de ventas asociadas a la sesión.
-                </td>
-                <td>
-                    Evita la pérdida de datos históricos. Si las columnas de efectivo/tarjeta/transferencia de un arqueo viejo se grabaron en cero, el backend las recalcula en tiempo real para auditoría.
-                </td>
+                <td><strong>2. Recálculo Forense de Métodos de Pago</strong><br><small>Consola BI (Caja)</small></td>
+                <td><strong>Hace:</strong> Reconstruye el desglose de cobros desde los logs.<br><strong>Resuelve:</strong> La pérdida de datos cuando un arqueo antiguo graba columnas en cero.</td>
+                <td><strong>Fórmula:</strong> Suma abonos analizando <code>detalles_json</code> de ventas.<br>$$\text{Efectivo} = \sum (\text{Efectivo} + [\text{Dolares} \times \text{Tasa}]) - \text{Cambio}$$</td>
+                <td><strong>Por qué:</strong> Mecanismo de contingencia autolimpiante en backend.<br><strong>Beneficio:</strong> Garantiza trazabilidad de dinero para conciliar con bancos sin depender de fallos de registro.</td>
             </tr>
             <tr>
-                <td><strong>3. Clasificación ABC (Pareto)</strong></td>
-                <td>
-                    <strong>Ley de Pareto (180 días):</strong><br>
-                    - Clase A: Ventas &gt; 10 unidades.<br>
-                    - Clase B: Ventas entre 4 y 10 unidades.<br>
-                    - Clase C: Ventas &le; 3 unidades.
-                </td>
-                <td>
-                    Segmenta el inventario por popularidad. Ayuda a evitar compras innecesarias de artículos Clase C y garantizar abasto de Clase A.
-                </td>
+                <td><strong>3. Alertas de Anomalía en Caja</strong><br><small>Consola BI (Caja)</small></td>
+                <td><strong>Hace:</strong> Dispara advertencias sobre retiros y turnos activos.<br><strong>Resuelve:</strong> Riesgo de robos por exceso de efectivo e indisciplina de horarios.</td>
+                <td>Alerta de seguridad si efectivo total en caja &gt; C$ 15,000, o si el tiempo de apertura supera las 24 horas continuas.</td>
+                <td><strong>Por qué:</strong> Umbral óptimo de exposición al riesgo tolerable.<br><strong>Beneficio:</strong> Protege el capital del local mediante retiros preventivos a bóveda.</td>
+            </tr>
+            <!-- Consola BI - Rotación -->
+            <tr>
+                <td><strong>4. Clasificación ABC de Inventario</strong><br><small>Consola BI (Rotación)</small></td>
+                <td><strong>Hace:</strong> Segmenta los repuestos en clases de popularidad.<br><strong>Resuelve:</strong> Sobre-almacenamiento y desabastecimiento de piezas clave.</td>
+                <td><strong>Clasificación Pareto (180 días):</strong><br>- Clase A: &gt; 10 unidades vendidas.<br>- Clase B: 4 a 10 unidades.<br>- Clase C: &le; 3 unidades.</td>
+                <td><strong>Por qué:</strong> Ley $80/20$ para concentrarse en lo rentable.<br><strong>Beneficio:</strong> Permite planificar el stock garantizando piezas Clase A y liquidando Clase C.</td>
             </tr>
             <tr>
-                <td><strong>4. Sugerencia de Reposición</strong></td>
-                <td>
-                    Artículos Clase A con stock &le; 5.<br>
-                    $$\text{Cantidad Sugerida} = \max(10, 15 - \text{Existencia})$$<br>
-                    $$\text{Costo Proyectado} = \text{Cantidad Sugerida} \times \text{Costo}$$
-                </td>
-                <td>
-                    Automatiza el reabastecimiento crítico. Sugiere qué comprar y cuánto costará reponer las piezas de alta demanda antes de agotarse.
-                </td>
+                <td><strong>5. Sugerencia de Reposición Clase A</strong><br><small>Consola BI (Rotación)</small></td>
+                <td><strong>Hace:</strong> Calcula el pedido sugerido para productos estrella bajos.<br><strong>Resuelve:</strong> Falta de stock de repuestos de alta rotación.</td>
+                <td>Artículos Clase A con stock &le; 5.<br>$$\text{Pedido} = \max(10, 15 - \text{Stock})$$<br>$$\text{Costo} = \text{Pedido} \times \text{Costo Compra}$$</td>
+                <td><strong>Por qué:</strong> Margen de 15 unidades cubre tiempos de entrega.<br><strong>Beneficio:</strong> Automatiza las órdenes de compra estimando el presupuesto de adquisición requerido.</td>
             </tr>
             <tr>
-                <td><strong>5. Pérdida por Quiebre (Stockout)</strong></td>
-                <td>
-                    Artículos con stock = 0 con ventas en 180d.<br>
-                    $$\text{Pérdida Diaria} = \left( \frac{\text{Unidades Vendidas en 180d}}{180} \right) \times \text{Precio Venta}$$
-                </td>
-                <td>
-                    Cuantifica el costo financiero del desabastecimiento. Demuestra al gerente cuánto dinero está dejando de ganar al día por tener piezas agotadas en percha.
-                </td>
+                <td><strong>6. Pérdida por Quiebre de Stock</strong><br><small>Consola BI (Rotación)</small></td>
+                <td><strong>Hace:</strong> Cuantifica la pérdida monetaria diaria por stock agotado.<br><strong>Resuelve:</strong> Costo invisible de no contar con piezas demandadas.</td>
+                <td>Productos con stock = 0 con ventas en 180 días.<br>$$\text{Pérdida Diaria} = \left( \frac{\text{Unidades vendidas en 180d}}{180} \right) \times \text{Precio Venta}$$</td>
+                <td><strong>Por qué:</strong> Muestra el costo directo de oportunidad al gerente.<br><strong>Beneficio:</strong> Prioriza financieramente qué piezas se deben comprar de inmediato.</td>
             </tr>
             <tr>
-                <td><strong>6. Días de Inventario (DIO)</strong></td>
-                <td>
-                    $$\text{DIO} = \frac{\text{Existencia Física Total}}{\text{Ventas Diarias Promedio (30d)}}$$
-                </td>
-                <td>
-                    Indica el promedio de días que toma vender todo el stock. Un DIO menor significa que el capital invertido en repuestos retorna rápidamente como efectivo.
-                </td>
+                <td><strong>7. Días de Inventario (DIO)</strong><br><small>Consola BI (Rotación)</small></td>
+                <td><strong>Hace:</strong> Calcula los días que tomaría vender el stock actual.<br><strong>Resuelve:</strong> Falta de visibilidad de la velocidad del capital de trabajo.</td>
+                <td>$$\text{DIO} = \frac{\text{Existencia Física Total}}{\text{Ventas Diarias Promedio (30d)}}$$</td>
+                <td><strong>Por qué:</strong> Estándar contable global para evaluar bodega.<br><strong>Beneficio:</strong> Alerta si el inventario se está moviendo demasiado lento, inmovilizando la liquidez.</td>
+            </tr>
+            <!-- Consola BI - Proyección -->
+            <tr>
+                <td><strong>8. Regresión de Ventas e Ingresos</strong><br><small>Consola BI (Proyección)</small></td>
+                <td><strong>Hace:</strong> Proyecta la facturación futura con su precisión R².<br><strong>Resuelve:</strong> La incertidumbre y falta de planeación financiera.</td>
+                <td><strong>Regresión Lineal:</strong> $y = mx + c$<br><strong>Ajuste ($R^2$):</strong> Coeficiente que mide qué tan alineada está la tendencia predictiva.</td>
+                <td><strong>Por qué:</strong> Modelo dinámico basado en mínimos cuadrados.<br><strong>Beneficio:</strong> Permite planificar presupuestos de egresos con base estadística.</td>
             </tr>
             <tr>
-                <td><strong>7. Regresión de Ventas y R²</strong></td>
-                <td>
-                    <strong>Regresión Lineal:</strong> $y = mx + c$<br>
-                    <strong>Ajuste ($R^2$):</strong> Porcentaje de variabilidad de ventas explicada por la tendencia de tiempo.
-                </td>
-                <td>
-                    Prevé la facturación futura. Permite planificar el flujo de caja, identificando si los ingresos proyectados cubrirán los costos de operación del local.
-                </td>
+                <td><strong>9. Simulador Run-Rate y Metas</strong><br><small>Consola BI (Proyección)</small></td>
+                <td><strong>Hace:</strong> Evalúa las ventas del mes actual y proyecta el cierre.<br><strong>Resuelve:</strong> Desviaciones imprevistas respecto al objetivo mensual.</td>
+                <td>$$\text{Cierre Proyectado} = \left( \frac{\text{Vendido Mes}}{\text{Días Transcurridos}} \right) \times \text{Días Totales}$$<br>Calcula la brecha diaria y la aceleración necesaria.</td>
+                <td><strong>Por qué:</strong> Simulador interactivo adaptado para metas (ej. C$ 600k).<br><strong>Beneficio:</strong> Permite tomar acciones comerciales correctivas a mitad de mes.</td>
             </tr>
             <tr>
-                <td><strong>8. Simulador Run-Rate (Meta 600K)</strong></td>
-                <td>
-                    $$\text{Ventas Proyectadas} = \frac{\text{Ventas Mes Actual}}{\text{Días Transcurridos}} \times \text{Días Totales}$$<br>
-                    Compara vs Meta de C$ 600,000.
-                </td>
-                <td>
-                    Indica si el local cumplirá su objetivo mensual. Calcula la facturación diaria necesaria y la aceleración requerida si se prevé quedar por debajo.
-                </td>
+                <td><strong>10. Venta Cruzada (Combos BI)</strong><br><small>Consola BI (Proyección)</small></td>
+                <td><strong>Hace:</strong> Propone combos basados en coocurrencia en tickets.<br><strong>Resuelve:</strong> Oportunidad perdida de incrementar el ticket por cliente.</td>
+                <td><strong>Algoritmo Apriori:</strong><br>- Confianza: $P(B|A)$<br>- Elevación (Lift): $\frac{P(A \cap B)}{P(A) \times P(B)}$ (relación &gt; 1)</td>
+                <td><strong>Por qué:</strong> Minería de datos real en lugar de combos al azar.<br><strong>Beneficio:</strong> Eleva la facturación promedio de caja emparejando piezas complementarias.</td>
+            </tr>
+            <!-- Reporte Financiero -->
+            <tr>
+                <td><strong>11. Margen Comercial y ROI</strong><br><small>Finanzas</small></td>
+                <td><strong>Hace:</strong> Mide el retorno porcentual real sobre costos de compra.<br><strong>Resuelve:</strong> Falta de claridad en márgenes netos por categoría.</td>
+                <td>$$\text{Margen (\%)} = \left( \frac{\text{Precio Venta} - \text{Costo}}{\text{Costo}} \right) \times 100$$</td>
+                <td><strong>Por qué:</strong> Gráficos limpios preparados para reportes contables.<br><strong>Beneficio:</strong> Permite ajustar precios o negociar con proveedores si el ROI es bajo.</td>
             </tr>
             <tr>
-                <td><strong>9. Venta Cruzada (Motor BI)</strong></td>
-                <td>
-                    <strong>Métricas de Asociación (Apriori):</strong><br>
-                    - Confianza: $P(B|A)$<br>
-                    - Lift: $\frac{P(A \cap B)}{P(A) \times P(B)}$
-                </td>
-                <td>
-                    Identifica relaciones estadísticas de compra complementaria. Un Lift &gt; 1.0 valida científicamente empaquetar repuestos en combos para aumentar el ticket promedio.
-                </td>
+                <td><strong>12. Valoración de Capital de Bodega</strong><br><small>Finanzas</small></td>
+                <td><strong>Hace:</strong> Suma el costo y venta potencial de todo el stock.<br><strong>Resuelve:</strong> Ausencia de un balance patrimonial de la mercadería.</td>
+                <td>$$\text{Valor Costo} = \sum (\text{Existencia} \times \text{Costo})$$<br>$$\text{Valor Venta} = \sum (\text{Existencia} \times \text{Venta})$$</td>
+                <td><strong>Por qué:</strong> Comparativa side-by-side del beneficio neto latente.<br><strong>Beneficio:</strong> Otorga balance contable y sirve de garantía ante entidades de crédito.</td>
+            </tr>
+            <!-- POS y Caja -->
+            <tr>
+                <td><strong>13. Arqueo Ciego de Caja</strong><br><small>POS / Caja</small></td>
+                <td><strong>Hace:</strong> Compara el efectivo físico contado contra el esperado.<br><strong>Resuelve:</strong> Hurtos y descuadres operativos en los turnos.</td>
+                <td>El cajero declara el dinero físico sin conocer el cálculo del sistema.<br>$$\text{Diferencia} = \text{Declarado} - \text{Esperado}$$</td>
+                <td><strong>Por qué:</strong> Control ciego que anula la manipulación de montos.<br><strong>Beneficio:</strong> Garantiza arqueos objetivos reportando diferencias al administrador.</td>
+            </tr>
+            <tr>
+                <td><strong>14. Movimientos de Caja Chica</strong><br><small>POS / Caja</small></td>
+                <td><strong>Hace:</strong> Registra entradas y salidas justificadas en el turno.<br><strong>Resuelve:</strong> El descuadre al final del día por compras menores sin registrar.</td>
+                <td>Modifica el esperado sumando/restando el egreso e ingreso documentado:<br>$$V_{\text{esperado}} = V_{\text{inicial}} + \text{Ventas} \pm \text{Movimientos}$$</td>
+                <td><strong>Por qué:</strong> Obliga a ingresar una descripción y monto auditado.<br><strong>Beneficio:</strong> Registra con total transparencia gastos cotidianos (ej. fletes o papelería).</td>
             </tr>
         </tbody>
     </table>
@@ -285,15 +289,15 @@
     <!-- SECCIÓN 4: CÓMO IMPORTAR A WORD -->
     <h1>4. Instrucciones para abrir este documento en Microsoft Word</h1>
     <p>
-        Para convertir este archivo HTML en un documento Word (.docx) nativo manteniendo la estructura, estilos y saltos de página profesionales, sigue estos pasos:
+        Para convertir este archivo HTML en un documento Word (.docx) nativo y mantener todo el formato profesional, sigue estos sencillos pasos:
     </p>
     <ol>
         <li>Abre la aplicación <strong>Microsoft Word</strong> en tu computadora.</li>
-        <li>Haz clic en <strong>Archivo</strong> &gt; <strong>Abrir</strong> y selecciona este archivo: <code>Defensa_Inteligencia_de_Negocios.html</code>.</li>
+        <li>Haz clic en <strong>Archivo</strong> &gt; <strong>Abrir</strong> y busca este archivo: <code>Defensa_Inteligencia_de_Negocios.html</code>.</li>
         <li>Word importará de forma nativa la portada, las fuentes tipográficas, los saltos de página y las tablas de KPIs.</li>
         <li>Una vez cargado, haz clic en <strong>Archivo</strong> &gt; <strong>Guardar como</strong>.</li>
         <li>En la lista desplegable de "Tipo de archivo", selecciona <strong>Documento de Word (*.docx)</strong>.</li>
-        <li>Guárdalo en la ubicación deseada (por ejemplo, en el Escritorio) para su entrega oficial.</li>
+        <li>¡Listo! Ya tienes tu documento oficial con formato profesional para entregar.</li>
     </ol>
 
 </body>

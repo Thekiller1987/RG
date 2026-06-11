@@ -1192,7 +1192,12 @@ const BiConsole = () => {
                           </tr>
                         )}
                       </tbody>
-                               <PanelRow>
+                    </table>
+                  </div>
+                </Card>
+              </PanelRow>
+
+              <PanelRow>
                 <Card style={{ gridColumn: 'span 2' }}>
                   <CardTitle>
                     <FaCheckCircle color="#ED7D31" />
