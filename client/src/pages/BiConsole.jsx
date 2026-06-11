@@ -545,6 +545,8 @@ const BiConsole = () => {
   const [showBacktest, setShowBacktest] = useState(true);
   const [stagnantSearch, setStagnantSearch] = useState('');
   const [stagnantFilter, setStagnantFilter] = useState('sin_ventas');
+  const [abcSearch, setAbcSearch] = useState('');
+  const [abcFilter, setAbcFilter] = useState('all'); // 'all', 'A', 'B', 'C'
   const [salesGoal, setSalesGoal] = useState(600000);
 
   // Calcular parámetros de filtro
@@ -747,6 +749,15 @@ const BiConsole = () => {
     }
   }) || [];
 
+  // Filtro cliente para productos de Pareto ABC
+  const filteredAbcProducts = metrics?.abc_products?.filter(p => {
+    const matchesSearch = (p.nombre || '').toLowerCase().includes(abcSearch.toLowerCase()) ||
+                          (p.codigo || '').toLowerCase().includes(abcSearch.toLowerCase());
+    if (!matchesSearch) return false;
+    if (abcFilter === 'all') return true;
+    return p.clase_abc === abcFilter;
+  }) || [];
+
   // Configuración de Chart - Ventas Semanales/Diarias y Proyección
   const getSalesChartData = () => {
     if (!metrics) return { labels: [], datasets: [] };
@@ -782,21 +793,24 @@ const BiConsole = () => {
     };
   };
 
-  const getMarginsChartData = () => {
-    if (!metrics || !metrics.category_margins) return { labels: [], datasets: [] };
+  const getProviderProfitabilityChartData = () => {
+    if (!metrics || !metrics.provider_profitability) return { labels: [], datasets: [] };
+    const { labels, ventas, utilidades } = metrics.provider_profitability;
     return {
-      labels: metrics.category_margins.labels,
+      labels: labels || [],
       datasets: [
         {
-          label: 'Margen de Retorno (%)',
-          data: metrics.category_margins.values,
-          backgroundColor: [
-            'rgba(237, 125, 49, 0.75)',
-            'rgba(56, 189, 248, 0.75)',
-            'rgba(16, 185, 129, 0.75)',
-            'rgba(168, 85, 247, 0.75)',
-            'rgba(244, 63, 94, 0.75)'
-          ],
+          label: 'Ventas (C$)',
+          data: ventas || [],
+          backgroundColor: 'rgba(56, 189, 248, 0.75)',
+          borderColor: 'rgba(255, 255, 255, 0.1)',
+          borderWidth: 1,
+          borderRadius: 6
+        },
+        {
+          label: 'Utilidad Neta (C$)',
+          data: utilidades || [],
+          backgroundColor: 'rgba(16, 185, 129, 0.75)',
           borderColor: 'rgba(255, 255, 255, 0.1)',
           borderWidth: 1,
           borderRadius: 6
@@ -1696,30 +1710,21 @@ const BiConsole = () => {
                               x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } }
                             }
                           }}
-                        />
-                      </ChartBox>
-                    </div>
-                  </div>
-                </Card>
-              </PanelRow>
-
-              <PanelRow>
+                         <PanelRow>
                 <Card style={{ gridColumn: 'span 2' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(255, 25, 255, 0.05)', paddingBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', paddingBottom: '0.75rem' }}>
                     <CardTitle style={{ borderBottom: 'none', paddingBottom: 0 }}>
-                      <FaBoxes color={stagnantFilter === 'sin_ventas' ? '#f43f5e' : '#eab308'} />
-                      {stagnantFilter === 'sin_ventas' 
-                        ? 'Detalle de Inventario Estancado (Sin Ventas en el Periodo)' 
-                        : 'Detalle de Inventario de Baja Rotación (0-3 Ventas en el Periodo)'}
+                      <FaBoxes color="#10b981" />
+                      Detalle del Catálogo y Clasificación ABC (Pareto)
                     </CardTitle>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px' }}>
                         <button 
-                          onClick={() => setStagnantFilter('sin_ventas')} 
+                          onClick={() => setAbcFilter('all')} 
                           style={{
-                            background: stagnantFilter === 'sin_ventas' ? 'rgba(244, 63, 94, 0.15)' : 'none',
+                            background: abcFilter === 'all' ? 'rgba(255, 255, 255, 0.08)' : 'none',
                             border: 'none',
-                            color: stagnantFilter === 'sin_ventas' ? '#fff' : '#9ca3af',
+                            color: abcFilter === 'all' ? '#fff' : '#9ca3af',
                             padding: '0.4rem 0.8rem',
                             fontSize: '0.8rem',
                             borderRadius: '6px',
@@ -1728,14 +1733,14 @@ const BiConsole = () => {
                             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                           }}
                         >
-                          Sin Ventas (0)
+                          Todos
                         </button>
                         <button 
-                          onClick={() => setStagnantFilter('baja_rotacion')} 
+                          onClick={() => setAbcFilter('A')} 
                           style={{
-                            background: stagnantFilter === 'baja_rotacion' ? 'rgba(234, 179, 8, 0.15)' : 'none',
+                            background: abcFilter === 'A' ? 'rgba(16, 185, 129, 0.15)' : 'none',
                             border: 'none',
-                            color: stagnantFilter === 'baja_rotacion' ? '#fff' : '#9ca3af',
+                            color: abcFilter === 'A' ? '#10b981' : '#9ca3af',
                             padding: '0.4rem 0.8rem',
                             fontSize: '0.8rem',
                             borderRadius: '6px',
@@ -1744,24 +1749,54 @@ const BiConsole = () => {
                             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                           }}
                         >
-                          Baja Rotación (0-3)
+                          Clase A (Alta)
+                        </button>
+                        <button 
+                          onClick={() => setAbcFilter('B')} 
+                          style={{
+                            background: abcFilter === 'B' ? 'rgba(234, 179, 8, 0.15)' : 'none',
+                            border: 'none',
+                            color: abcFilter === 'B' ? '#eab308' : '#9ca3af',
+                            padding: '0.4rem 0.8rem',
+                            fontSize: '0.8rem',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                          }}
+                        >
+                          Clase B (Media)
+                        </button>
+                        <button 
+                          onClick={() => setAbcFilter('C')} 
+                          style={{
+                            background: abcFilter === 'C' ? 'rgba(244, 63, 94, 0.15)' : 'none',
+                            border: 'none',
+                            color: abcFilter === 'C' ? '#f43f5e' : '#9ca3af',
+                            padding: '0.4rem 0.8rem',
+                            fontSize: '0.8rem',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                          }}
+                        >
+                          Clase C (Baja)
                         </button>
                       </div>
                       <div style={{ position: 'relative', minWidth: '220px' }}>
                         <Input 
                           type="text" 
                           placeholder="Buscar repuesto..." 
-                          value={stagnantSearch}
-                          onChange={(e) => setStagnantSearch(e.target.value)}
+                          value={abcSearch}
+                          onChange={(e) => setAbcSearch(e.target.value)}
                           style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', width: '100%', borderRadius: '8px' }}
                         />
                       </div>
                     </div>
                   </div>
                   <CardDesc>
-                    {stagnantFilter === 'sin_ventas'
-                      ? 'Listado de los artículos con stock físico disponible que registran nulo movimiento en el periodo seleccionado, ordenados por capital inmovilizado.'
-                      : 'Listado de los artículos con stock físico disponible que registran bajas ventas (entre 0 y 3 unidades) en el periodo seleccionado.'}
+                    Visualiza los artículos activos del catálogo clasificados según Pareto. Clase A (&gt;10 ventas), Clase B (4 a 10 ventas) y Clase C (&le;3 ventas).
                   </CardDesc>
 
                   <div style={{ overflowX: 'auto', maxHeight: '400px', overflowY: 'auto', marginTop: '0.5rem' }}>
@@ -1772,32 +1807,33 @@ const BiConsole = () => {
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600 }}>PRODUCTO</th>
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>EXISTENCIA</th>
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>PRECIO VENTA</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>CAPITAL DETENIDO</th>
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>UNIDADES VENDIDAS</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'center' }}>ÚLTIMA VENTA</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'center' }}>CLASIFICACIÓN ABC</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredStagnantProducts?.map((p, idx) => {
-                          const capital = p.existencia * p.precio;
-                          return (
-                            <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)', transition: 'background-color 0.2s' }}>
-                              <td style={{ padding: '0.75rem 0.5rem', fontFamily: "'JetBrains Mono', monospace", color: '#38bdf8', fontWeight: 600 }}>{p.codigo || 'S/C'}</td>
-                              <td style={{ padding: '0.75rem 0.5rem', color: '#fff' }}>{p.nombre}</td>
-                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#f43f5e' }}>{p.existencia}</td>
-                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#9ca3af' }}>C$ {Number(p.precio).toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#ED7D31', fontWeight: 700 }}>C$ {capital.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 700, color: p.unidades_vendidas === 0 ? '#f43f5e' : '#eab308' }}>{p.unidades_vendidas}</td>
-                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', color: '#9ca3af', fontSize: '0.8rem' }}>
-                                {p.ultima_venta ? new Date(p.ultima_venta).toLocaleDateString('es-NI') : 'Nunca vendido'}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {(!filteredStagnantProducts || filteredStagnantProducts.length === 0) && (
+                        {filteredAbcProducts?.map((p, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)', transition: 'background-color 0.2s' }}>
+                            <td style={{ padding: '0.75rem 0.5rem', fontFamily: "'JetBrains Mono', monospace", color: '#38bdf8', fontWeight: 600 }}>{p.codigo || 'S/C'}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', color: '#fff' }}>{p.nombre}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 700, color: p.existencia <= 5 ? '#f43f5e' : '#fff' }}>{p.existencia}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#9ca3af' }}>C$ {Number(p.precio).toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#10b981' }}>{p.unidades_vendidas}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                              <Badge 
+                                bg={p.clase_abc === 'A' ? 'rgba(16, 185, 129, 0.15)' : (p.clase_abc === 'B' ? 'rgba(234, 179, 8, 0.15)' : 'rgba(244, 63, 94, 0.15)')}
+                                color={p.clase_abc === 'A' ? '#10b981' : (p.clase_abc === 'B' ? '#eab308' : '#f43f5e')}
+                                border={p.clase_abc === 'A' ? 'rgba(16, 185, 129, 0.3)' : (p.clase_abc === 'B' ? 'rgba(234, 179, 8, 0.3)' : 'rgba(244, 63, 94, 0.3)')}
+                              >
+                                Clase {p.clase_abc}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                        {(!filteredAbcProducts || filteredAbcProducts.length === 0) && (
                           <tr>
-                            <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
-                              No hay productos en esta categoría que coincidan con la búsqueda.
+                            <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
+                              No hay productos clasificados que coincidan con la búsqueda.
                             </td>
                           </tr>
                         )}
@@ -2036,20 +2072,23 @@ const BiConsole = () => {
                 
                 <Card>
                   <CardTitle>
-                    <FaChartBar />
-                    Ganancia por Categoría (ROI Comercial)
+                    <FaChartBar style={{ color: '#10b981' }} />
+                    Rentabilidad y Utilidad por Proveedor (C$)
                   </CardTitle>
                   <CardDesc>
-                    Porcentaje de retorno de inversión real, segmentado por las 5 categorías de repuestos con mayor facturación acumulada.
+                    Comparativa de facturación total por ventas frente a la utilidad neta obtenida por cada uno de los 5 principales proveedores.
                   </CardDesc>
                   <ChartBox style={{ height: '280px' }}>
                     <Bar
-                      data={getMarginsChartData()}
+                      data={getProviderProfitabilityChartData()}
                       options={{
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
-                          legend: { display: false }
+                          legend: {
+                            display: true,
+                            labels: { color: '#9ca3af', font: { family: 'Outfit' } }
+                          }
                         },
                         scales: {
                           y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } },
@@ -2058,51 +2097,6 @@ const BiConsole = () => {
                       }}
                     />
                   </ChartBox>
-                </Card>
-              </PanelRow>
-
-              <PanelRow>
-                <Card style={{ gridColumn: 'span 2' }}>
-                  <CardTitle>
-                    <FaBoxes color="#10b981" />
-                    Top 5 Repuestos de Mayor Rentabilidad (Contribución de Utilidad Neta)
-                  </CardTitle>
-                  <CardDesc>
-                    Listado de los 5 productos que generan mayor beneficio neto (Utilidad Neta = Cantidad * [Precio - Costo]), mostrando nombres de productos no truncados para su fácil identificación.
-                  </CardDesc>
-                  <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid rgba(255, 25, 25, 0.08)', color: '#9ca3af' }}>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600 }}>CÓDIGO</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600 }}>PRODUCTO</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>UNIDADES VENDIDAS</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>INGRESO BRUTO</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>UTILIDAD NETA</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>MARGEN ROI</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {metrics?.top_profitable_products?.map((p, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)', transition: 'background-color 0.2s' }}>
-                            <td style={{ padding: '0.75rem 0.5rem', fontFamily: "'JetBrains Mono', monospace", color: '#38bdf8', fontWeight: 600 }}>{p.codigo || 'S/C'}</td>
-                            <td style={{ padding: '0.75rem 0.5rem', color: '#fff', whiteSpace: 'normal', wordBreak: 'break-word', minWidth: '200px' }}>{p.nombre}</td>
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#fff' }}>{p.unidades.toLocaleString()}</td>
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#9ca3af' }}>C$ {p.monto.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#10b981' }}>C$ {p.utilidad.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#a855f7' }}>{p.margen}%</td>
-                          </tr>
-                        ))}
-                        {(!metrics?.top_profitable_products || metrics?.top_profitable_products?.length === 0) && (
-                          <tr>
-                            <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
-                              No hay datos de rentabilidad de productos en el rango seleccionado.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
                 </Card>
               </PanelRow>
 
