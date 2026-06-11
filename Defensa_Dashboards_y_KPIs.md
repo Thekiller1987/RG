@@ -1,110 +1,123 @@
 # 🎓 Guía de Estudio y Defensa: Dashboards y KPIs de Multirepuestos RG
 
-Este documento contiene toda la información teórica y técnica que necesitas para defender tu proyecto con éxito. Aquí se detalla **qué demuestra** cada dashboard, **qué significan los KPIs** y la **base matemática de los modelos de inteligencia de negocios** implementados en el sistema.
+Este documento contiene toda la información teórica y técnica que necesitas para defender tu proyecto con éxito ante el jurado. Aquí se detalla **qué demuestra** cada dashboard, **qué significan los KPIs** y la **base matemática de los modelos de inteligencia de negocios** implementados en el sistema.
 
 ---
 
 ## 📊 1. Dashboard de Finanzas (`/finances`)
 ### ¿Qué queremos demostrar con este panel?
-Demuestra la **salud financiera y rentabilidad general** del negocio en un periodo determinado. Permite a los administradores y gerentes evaluar si el negocio es rentable en el día a día, cuánto capital está inmovilizado en stock y quiénes son los principales motores de ventas (vendedores y productos).
+Demuestra la **salud financiera e inmediata** del negocio en un período seleccionado, presentado en un formato limpio (preparado para imprimir en A4). Permite a los administradores y contadores evaluar si el negocio es rentable en el día a día, cuánto capital está invertido en mercadería y quiénes son los principales generadores de ingresos (vendedores y productos).
 
 ### KPIs Explicados:
 1. **Ventas Totales (Ingreso Bruto):** 
-   - *Qué es:* La suma total del dinero facturado por ventas completadas en el periodo seleccionado (incluye efectivo, tarjeta y transferencia).
-   - *Qué demuestra:* El volumen de negocio y tracción comercial del local.
-2. **Ganancia Estimada (Utilidad Bruta Ponderada):**
-   - *Qué es:* Calculado como: $\text{Ventas Totales} - \text{Costo de Adquisición de los Productos Vendidos}$.
-   - *Qué demuestra:* La rentabilidad neta real de las transacciones comerciales antes de gastos fijos. Demuestra si el margen de ganancia aplicado es suficiente para cubrir la operación.
-3. **Valor Total del Inventario (Capital en Mercadería):**
-   - *Qué es:* La valoración monetaria actual de todos los repuestos activos en stock: $\sum (\text{Existencia} \times \text{Precio de Costo})$.
-   - *Qué demuestra:* El capital de trabajo que el negocio tiene invertido en el almacén. Es vital para entender la liquidez del negocio.
-4. **Producto Top (Bestseller):**
-   - *Qué es:* El repuesto que ha acumulado la mayor cantidad de unidades vendidas.
-   - *Qué demuestra:* La preferencia de la demanda y el artículo de mayor rotación física.
+   - *Qué es:* La suma total del dinero facturado por ventas completadas (efectivo, tarjeta, transferencia).
+   - *Qué demuestra:* El volumen comercial y tracción del local.
+2. **Ganancia Estimada (Utilidad Bruta):**
+   - *Qué es:* $\text{Ventas} - \text{Costo de Compra}$.
+   - *Qué demuestra:* La rentabilidad neta de las transacciones antes de gastos fijos. Evalúa si el margen de ganancia aplicado es suficiente para cubrir la operación.
+3. **Valor Total del Inventario (Costo vs. Venta):**
+   - *Qué es:* El capital invertido a costo de adquisición ($\sum \text{Existencia} \times \text{Precio Compra}$) y el potencial retorno a precio de venta ($\sum \text{Existencia} \times \text{Precio Venta}$).
+   - *Qué demuestra:* El capital inmovilizado en bodega y su valor comercial proyectado.
+4. **Bestsellers por Facturación:**
+   - *Qué es:* Los repuestos que acumulan mayor volumen de ingresos monetarios.
+   - *Qué demuestra:* El motor de ingresos del negocio.
 
 ---
 
 ## 🧠 2. Consola de Inteligencia de Negocios (BI) (`/bi-console`)
 ### ¿Qué queremos demostrar con este panel?
-Demuestra el **uso de analítica avanzada y modelos matemáticos** para la toma de decisiones estratégicas. A diferencia de un reporte estático, la consola BI realiza auditoría en tiempo real, proyecciones automatizadas de ventas y minería de datos para potenciar ventas cruzadas.
+Demuestra el **uso de analítica avanzada, modelos predictivos y auditorías automatizadas** para la toma de decisiones. No es un reporte plano: realiza minería de datos, proyecciones lineales y auditorías de seguridad en tiempo real.
 
-Este panel se divide en 3 enfoques analíticos clave (Tabs):
+Este panel está estructurado en 3 pestañas especializadas (Tabs) con separación estricta de responsabilidades:
 
-### 🟢 A. Enfoque: Flujo de Caja y Auditoría
+---
+
+### 🟢 TAB 1. Flujo de Caja y Auditoría
 #### ¿Qué demuestra?
-La seguridad del dinero, los hábitos de compra de los clientes y el comportamiento operativo del punto de venta para prevenir pérdidas.
-#### KPIs y Modelos Analíticos:
-1. **Canal de Pago Principal:** Distribución porcentual y monetaria de pagos en Efectivo, Transferencia y Tarjeta. Demuestra el nivel de bancarización y preferencia de pago de los clientes.
-2. **Ticket Promedio:** $\text{Ingresos de Caja} \div \text{Cantidad de Ventas}$. Representa el consumo promedio de un cliente en una visita. Ayuda a planificar estrategias de incremento de ticket (ej. ofertas combo).
-3. **Alertas de Auditoría (Detección de Anomalías):**
-   - *Descuadres de Caja:* Identifica discrepancias entre el efectivo real y el esperado en los cierres de caja.
-   - *Acumulación Excesiva de Efectivo:* Alerta cuando una caja supera los C$ 15,000 en efectivo neto para mitigar riesgos de robo.
-   - *Caja Abierta por Tiempo Excesivo:* Detecta turnos de caja sin cerrar por más de 24 horas, exigiendo el cumplimiento de procesos.
-4. **Eficiencia de Arqueo de Caja (30d):**
-   - *Qué es:* El porcentaje de cierres de caja que se completaron con exactamente cero descuadre financiero sobre el total de cierres en los últimos 30 días.
-   - *Qué demuestra:* El nivel de honestidad, cuidado operativo de los cajeros y la efectividad de los controles internos de caja.
-5. **Sugerencias de Combos de Repuestos (Market Basket Analysis):**
-   - *El Modelo:* Basado en minería de reglas de asociación de transacciones. El sistema analiza tickets históricos para identificar qué repuestos se compran juntos frecuentemente (ej. aceite + filtro de aceite).
-   - *Métricas Científicas que demuestras:*
-     - **Soporte (Support):** La probabilidad de que un ticket contenga ambos productos.
-     - **Confianza (Confidence):** Si un cliente compra el Producto A, qué tan probable (en %) es que compre el Producto B.
-     - **Elevación (Lift):** Qué tanto aumenta la probabilidad de comprar el Producto B al llevar el Producto A, en comparación con comprar el Producto B de forma aislada. Un Lift $> 1$ indica una relación fuertemente complementaria.
+La seguridad del dinero, la consistencia operativa de las cajas y el comportamiento transaccional del punto de venta para mitigar riesgos de pérdidas o "robos hormiga". **No contiene KPIs de rentabilidad o ventas**, concentrándose exclusivamente en dinero real y arqueos.
 
-### 🟡 B. Enfoque: Rotación de Inventario
-#### ¿Qué demuestra?
-La eficiencia logística de los repuestos. Permite identificar capital estancado (dinero congelado) y riesgos de ruptura de stock (desabastecimiento).
-#### KPIs y Modelos Analíticos:
-1. **Tasa de Rotación Mensual:** Cuántas veces se renueva el stock promedio en el mes. Una tasa alta indica que los productos se venden rápido; una baja indica sobrealmacenamiento.
-2. **Capital Estancado (Inmovilizado):** La valoración a precio de venta de los productos con nulo o bajísimo movimiento en los últimos 180 días.
-   - Demuestra el costo de oportunidad de tener mercadería ocupando espacio físico sin generar flujo de efectivo.
-3. **Clasificación ABC de Inventario (Ley de Pareto - 180 días):**
-   - *Qué es:* Clasificación que divide los productos activos en 3 categorías según unidades vendidas:
-     - **Clase A (Alta rotación, > 10 unidades):** Representa el motor de ingresos físicos.
-     - **Clase B (Rotación media, 4 a 10 unidades):** Productos estables de demanda regular.
-     - **Clase C (Baja rotación, <= 3 unidades):** Productos estancados que inmovilizan capital.
-   - *Qué demuestra:* Permite saber dónde enfocar los esfuerzos de inventario y compras (priorizando el stock de Clase A y aplicando combos/descuentos a Clase C).
-4. **Días de Inventario Disponible (DIO - Days of Inventory Outstanding):**
-   - *Qué es:* El número de días promedio que toma vender todo el stock físico de la empresa dada la demanda diaria promedio de los últimos 30 días.
-     $$\text{DIO} = \frac{\text{Existencia Total}}{\text{Unidades Diarias Promedio Vendidas}}$$
-   - *Qué demuestra:* La velocidad de conversión de inventario a efectivo. Un DIO menor significa alta eficiencia de caja y rotación rápida.
-5. **Alertas de Stock-out Inminente:** Identifica repuestos populares con existencia en cero o cercana a cero para evitar la pérdida de ventas futuras.
+#### KPIs y Modelos de Auditoría:
+1. **Historial de Cierres y Auditoría Transaccional:**
+   - *Qué demuestra:* Registro de arqueos. Compara el monto de caja esperado según base de datos frente al conteo físico reportado por el cajero al cerrar el turno.
+2. **Recálculo Dinámico desde JSON (Mecanismo Autolimpiante):**
+   - *Qué es:* Si el sistema registra desgloses en cero (por ej. cierres anteriores), el backend procesa en tiempo real la columna `detalles_json` analizando las transacciones una por una. Separa de forma precisa los abonos netos de efectivo (restando el cambio otorgado al cliente y sumando dólares al tipo de cambio) de los cobros con tarjeta y transferencia bancaria.
+   - *Qué demuestra:* Robustez analítica y capacidad de reconstrucción forense de flujos de pago.
+3. **Eficiencia de Arqueo (30d):**
+   - *Qué es:* El porcentaje de cierres de caja sin descuadre (Diferencia = C$ 0.00) en el último mes.
+   - *Qué demuestra:* La honestidad y rigurosidad operativa de la fuerza de caja.
+4. **Alertas de Seguridad en Tiempo Real:**
+   - *Retiro de Seguridad:* Alerta si la caja acumula más de C$ 15,000 en efectivo para prevenir pérdidas en caso de robo.
+   - *Caja Abierta por Tiempo Excesivo:* Alerta si un turno permanece activo por más de 24 horas continuas sin cerrarse.
 
-### 🔵 C. Enfoque: Rentabilidad y Proyección
+---
+
+### 🟡 TAB 2. Rotación de Inventario
 #### ¿Qué demuestra?
-La capacidad de planificar financieramente el futuro del negocio utilizando modelos predictivos basados en datos históricos y midiendo brechas respecto a objetivos reales.
+La eficiencia logística de los repuestos en percha. Ayuda a liberar capital inmovilizado (dinero congelado en stock sin movimiento) y a prevenir la pérdida de ventas por falta de stock.
+
+#### KPIs y Modelos de Rotación:
+1. **Clasificación ABC de Inventario (Ley de Pareto - 180 días):**
+   - *Qué es:* Segmentación del inventario activo según las unidades vendidas en los últimos 6 meses.
+     - **Clase A (Alta Rotación, > 10 unidades vendidas):** El motor físico del negocio.
+     - **Clase B (Rotación Media, 4 a 10 unidades vendidas):** Artículos estables de demanda regular.
+     - **Clase C (Baja Rotación, <= 3 unidades vendidas):** Artículos estancados.
+   - *Qué demuestra:* El gráfico horizontal de Pareto indica el porcentaje de repuestos por clase. Permite priorizar la compra de Clase A y liquidar la Clase C.
+2. **Capital Estancado (Inventario de Lento Movimiento):**
+   - *Qué es:* Valoración comercial ($\sum \text{Existencia} \times \text{Precio Venta}$) de productos con nulo o muy bajo movimiento en 180 días.
+   - *Qué demuestra:* El costo de oportunidad de tener capital congelado en estantería sin generar flujo.
+3. **Días de Inventario Disponible (DIO - Days of Inventory Outstanding):**
+   - *Fórmula:* $$\text{DIO} = \frac{\text{Existencia Física Total}}{\text{Venta Diaria Promedio (30d)}}$$
+   - *Qué demuestra:* Velocidad de conversión del stock a efectivo. Un DIO menor indica una logística óptima.
+4. **Sugerencias de Reposición (Clase A - Stock Crítico):**
+   - *Qué es:* Algoritmo de reabastecimiento que identifica productos Clase A con existencias <= 5 unidades. Calcula la cantidad sugerida de compra para restablecer el stock óptimo (llevar a 15 unidades, mínimo 10) y calcula el costo estimado de adquisición.
+   - *Qué demuestra:* Automatización de compras basada en demanda para evitar rupturas de stock.
+5. **Pérdida por Quiebre de Stock (Stockout Loss):**
+   - *Qué es:* Calcula la pérdida monetaria diaria estimada de aquellos repuestos con demanda activa pero con stock en cero (existencia = 0).
+   - *Fórmula:* $$\text{Pérdida Diaria} = \left( \frac{\text{Unidades Vendidas en 180d}}{180} \right) \times \text{Precio Venta}$$
+   - *Qué demuestra:* El impacto financiero real de no contar con stock disponible de artículos demandados.
+
+---
+
+### 🔵 TAB 3. Rentabilidad y Proyección
+#### ¿Qué demuestra?
+La dirección futura de las ventas mediante modelado matemático y simulación de metas comerciales, incorporando la optimización del ticket promedio mediante venta cruzada.
+
+#### 📊 Gráficos Integrados (Mínimo 4 Gráficos):
+1. **Historial de Ventas y Proyección Lineal:** Gráfico de líneas temporales (diario/semanal) con la recta predictiva de regresión y el backtesting del modelo.
+2. **Ganancia por Categoría (ROI Comercial):** Retorno real de inversión en porcentaje segmentado por las categorías de repuestos líderes.
+3. **Top 5 Bestsellers por Facturación:** Comparativa de los 5 artículos de mayor rendimiento monetario.
+4. **Volumen de Venta por Canal de Pago:** Distribución del volumen total facturado por Efectivo, Transferencia bancaria y Tarjeta de crédito.
+
 #### KPIs y Modelos Analíticos:
-1. **Margen Comercial Ponderado:** El promedio ponderado de rentabilidad sobre el costo del catálogo de repuestos vendidos.
-2. **Previsión de Ingresos (Modelo Predictivo):**
-   - *El Modelo:* Se utiliza un modelo de **Regresión Lineal por Mínimos Cuadrados** sobre la serie de tiempo de ventas históricas diarias y semanales.
-   - *La Fórmula:* El modelo ajusta la línea $y = mx + c$, donde:
-     - $y$ representa las ventas proyectadas.
-     - $x$ es la unidad de tiempo (días o semanas).
-     - $m$ es la pendiente (la tendencia de crecimiento o decrecimiento).
-     - $c$ es el intercepto de base.
-3. **Confianza Algorítmica ($R^2$ - Coeficiente de Determinación):**
-   - *Qué es:* Un valor porcentual real que mide qué tan bien se adapta la línea de regresión a los datos reales de ventas en la fase de entrenamiento/backtesting.
-   - *Qué demuestra:* Si el $R^2$ es cercano al 100%, indica que las ventas siguen un comportamiento predecible y la proyección es altamente confiable. Si es bajo, indica que las ventas son muy erráticas o sujetas a factores externos imprevistos.
-4. **Simulador de Objetivos de Venta (Run-Rate):**
-   - *Qué es:* Un widget que permite fijar una meta mensual (ej. C$ 600,000) y calcular el ritmo de ventas diario proyectado hacia el fin de mes.
-   - *Fórmula de Proyección (Run-Rate):*
-     $$\text{Cierre Proyectado} = \frac{\text{Ventas Mes Actual}}{\text{Días Transcurridos}} \times \text{Días Totales del Mes}$$
-   - *Qué demuestra:* Proporciona una herramienta operativa en tiempo real para saber si el negocio cumplirá sus metas comerciales. En caso de brecha negativa, calcula matemáticamente el porcentaje de incremento necesario en facturación diaria para salvar el mes.
+1. **Previsión de Ingresos (Regresión Lineal):**
+   - *El Modelo:* Regresión por Mínimos Cuadrados ($y = mx + c$) entrenada con ventas reales del local. Proyecta las ventas esperadas para el próximo período.
+2. **Confianza Algorítmica ($R^2$ - Ajuste):**
+   - *Qué es:* Coeficiente de determinación ($1 - \frac{SS_{res}}{SS_{tot}}$) que mide qué tan confiable es la proyección. Un $R^2$ cercano al 100% indica ventas estables y predecibles.
+3. **Simulador de Objetivos Run-Rate (Meta de C$ 600,000):**
+   - *Fórmula:* $$\text{Venta Proyectada Cierre} = \frac{\text{Ventas Mes Actual}}{\text{Días Transcurridos}} \times \text{Días Totales del Mes}$$
+   - *Qué demuestra:* Calcula la proyección al final del mes basada en el ritmo diario real. Compara el Run-Rate con la meta establecida (ej. C$ 600,000) y calcula la brecha de ventas diaria y el porcentaje de aceleración requerido para alcanzarla.
+4. **Venta Cruzada Inteligente (Combos Sugeridos - Market Basket Analysis):**
+   - *El Modelo:* Basado en minería de reglas de asociación Apriori. Analiza las transacciones del historial para encontrar repuestos comprados juntos con frecuencia.
+   - *Métricas Clave:*
+     - **Confianza:** Probabilidad condicionada de que compren el producto B al llevar el producto A.
+     - **Elevación (Lift):** Factor de asociación entre productos. Un Lift > 1.0 indica que ofrecer ambos en combo es altamente efectivo porque son fuertemente complementarios.
 
 ---
 
 ## 💵 3. Gestión de Cajas (`/cash-report`)
 ### ¿Qué queremos demostrar con este panel?
-Demuestra el **control de auditoría diaria sobre el efectivo físico**. Permite hacer aperturas y cierres ciegos de caja, registrar entradas y salidas de efectivo justificadas (gastos menores o ingresos extraordinarios) y generar reportes en formato impreso para contabilidad. 
+Control de auditoría diaria sobre el efectivo físico en el local. Permite realizar aperturas de caja, registrar movimientos (ingresos y egresos justificados por gastos menores) y realizar arqueos de cierre detallados para la rendición de cuentas al administrador.
 
 ---
 
 ## 📑 4. Reporte Detallado de Ventas (`/detailed-sales-report`)
 ### ¿Qué queremos demostrar con este panel?
-Demuestra la **trazabilidad de transacciones y el rendimiento de la fuerza de ventas**. Permite filtrar por tipo de cliente (Mayorista vs Minorista), tipo de venta, rango de fechas exacto, vendedor, y realizar devoluciones o cancelaciones de facturas con registro de auditoría.
+La trazabilidad transaccional absoluta y el rendimiento comercial de la fuerza de ventas. Permite aplicar filtros cruzados por tipo de cliente (Mayorista vs Minorista), tipo de factura, fechas, vendedor y procesar anulaciones con bitácora de auditoría.
 
 ---
 
-## 💡 Consejos Clave para tu Defensa (Consejos del Jurado)
-1. **Enfócate en la Toma de Decisiones:** No digas solo "este gráfico muestra líneas". Di: *"Este gráfico de regresión lineal permite al gerente proyectar los ingresos del próximo mes y planificar la compra de repuestos antes de quedarse sin caja"*.
-2. **Defiende la Venta Cruzada (Combos):** Explica que los combos no son aleatorios; *"El sistema analiza la coocurrencia en tickets de ventas anteriores y calcula el Lift. Por ejemplo, si el Lift entre pastillas de freno y líquido de frenos es de 2.5x, significa que la campaña de combo tiene 2.5 veces más probabilidad de éxito que ofrecerlos por separado"*.
-3. **Muestra el Control Interno:** Destaca las alertas de caja. Explica que *"el sistema previene robos hormiga y descuadres mediante alertas automáticas si hay demasiado efectivo en caja sin retirar, o si un cajero deja un turno abierto por más de 24 horas"*.
+## 💡 Consejos Clave para tu Defensa (El Enfoque del Jurado)
+1. **Explica la Utilidad de Negocio:** No hables solo del código. Di: *"El gráfico de regresión lineal proyecta la facturación del próximo mes, permitiendo al gerente tomar decisiones anticipadas de compra de repuestos antes de quedarse sin stock"*.
+2. **Defiende la Cientificidad de los Combos:** Resalta que *"los combos no se eligen al azar; el sistema calcula la métrica de Lift a través del historial de ventas para proponer promociones cruzadas con base estadística"*.
+3. **Resalta las Alertas Preventivas:** Explica que *"el sistema minimiza pérdidas operativas mediante alertas automáticas de retiro de efectivo cuando la caja supera los C$ 15,000 o cuando un turno de caja excede las 24 horas abierto"*.
+4. **La Fuerza del Recálculo Forense:** Destaca que *"si una base de datos contiene cierres con desgloses vacíos, el backend analiza dinámicamente el log JSON de transacciones para reconstruir el flujo de pagos exacto por efectivo, tarjeta, dólares y transferencias"*.

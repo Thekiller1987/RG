@@ -1179,6 +1179,10 @@ const getBiMetrics = async (req, res) => {
         let ventas_mes_actual = 0;
         let dias_transcurridos_mes = 1;
         let dias_totales_mes = 30;
+        let recent_closures = [];
+        let dead_stock_risk = [];
+        let total_inventario_costo = 0;
+        let total_inventario_venta = 0;
 
         try {
             // 1. KPI: Eficiencia de Arqueo de Caja (Últimos 30 días)
@@ -1252,6 +1256,226 @@ const getBiMetrics = async (req, res) => {
             const now = new Date();
             dias_transcurridos_mes = now.getDate();
             dias_totales_mes = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+            // 5. Cierres de caja recientes (últimos 10) con desglose de métodos de pago
+            const [recentClosuresResult] = await db.query(`
+                SELECT 
+                    id,
+                    usuario_nombre,
+                    fecha_apertura,
+                    fecha_cierre,
+                    monto_inicial,
+                    final_esperado,
+                    final_real,
+                    diferencia,
+                    total_ventas_efectivo,
+                    total_ventas_tarjeta,
+                    total_ventas_transferencia,
+                    total_dolares,
+                    detalles_json
+                FROM cierres_caja
+                WHERE fecha_cierre IS NOT NULL
+                ORDER BY fecha_cierre DESC
+                LIMIT 10;
+            `);
+            recent_closures = recentClosuresResult.map(c => {
+                let efectivo = Number(c.total_ventas_efectivo || 0);
+                let tarjeta = Number(c.total_ventas_tarjeta || 0);
+                let transferencia = Number(c.total_ventas_transferencia || 0);
+                let dolares = Number(c.total_dolares || 0);
+
+                // Recálculo dinámico si todos son cero pero hay transacciones registradas
+                if (efectivo === 0 && tarjeta === 0 && transferencia === 0) {
+                    try {
+                        let details = {};
+                        if (typeof c.detalles_json === 'string') {
+                            details = JSON.parse(c.detalles_json);
+                        } else {
+                            details = c.detalles_json || {};
+                        }
+                        const txs = details.transactions || [];
+                        const safe = (v) => { const n = Number(v); return (isNaN(n) || !isFinite(n)) ? 0 : n; };
+                        const tasa = safe(details.tasaDolar) || 36.60;
+
+                        txs.forEach(tx => {
+                            let tipo = (tx.type || '').toLowerCase().trim();
+                            tipo = tipo.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                            let d = tx.pagoDetalles || {};
+                            if (typeof d === 'string') { try { d = JSON.parse(d); } catch {} }
+                            if (!d || typeof d !== 'object') d = {};
+
+                            const txEfectivo = safe(d.efectivo);
+                            const txTarjeta = safe(d.tarjeta);
+                            const txTransf = safe(d.transferencia);
+                            const txDolares = safe(d.dolares);
+                            const txAmount = safe(tx.amount);
+                            const txTotalVenta = safe(d.totalVenta) || txAmount;
+
+                            if (tipo.startsWith('venta')) {
+                                if (txEfectivo > 0 || txTarjeta > 0 || txTransf > 0) {
+                                    efectivo += txEfectivo;
+                                    tarjeta += txTarjeta;
+                                    transferencia += txTransf;
+                                } else {
+                                    efectivo += txTotalVenta;
+                                }
+                                dolares += txDolares;
+                            } else if (tipo.includes('abono') || tipo.includes('liquid') || tipo.includes('pedido') || tipo.includes('apartado')) {
+                                const txCambio = safe(d.cambio);
+                                const txTasa = safe(d.tasaDolarAlMomento) || tasa;
+                                const netAbonoCash = (txEfectivo + (txDolares * txTasa)) - txCambio;
+                                
+                                if (txEfectivo > 0 || txTarjeta > 0 || txTransf > 0) {
+                                    if (netAbonoCash > 0) efectivo += netAbonoCash;
+                                    tarjeta += txTarjeta;
+                                    transferencia += txTransf;
+                                } else {
+                                    efectivo += txAmount;
+                                }
+                                dolares += txDolares;
+                            }
+                        });
+                    } catch (err) {
+                        console.error("Error recalculando desglose para cierre", c.id, err);
+                    }
+                }
+
+                return {
+                    id: c.id,
+                    usuario_nombre: c.usuario_nombre,
+                    fecha_apertura: c.fecha_apertura,
+                    fecha_cierre: c.fecha_cierre,
+                    monto_inicial: Number(c.monto_inicial || 0),
+                    final_esperado: Number(c.final_esperado || 0),
+                    final_real: Number(c.final_real || 0),
+                    diferencia: Number(c.diferencia || 0),
+                    efectivo,
+                    tarjeta,
+                    transferencia,
+                    dolares
+                };
+            });
+
+            // 6. Productos con alta existencia pero cero ventas en 180 días (riesgo sobre-almacenamiento)
+            const [deadStockRiskResult] = await db.query(`
+                SELECT 
+                    p.id_producto,
+                    p.codigo,
+                    p.nombre,
+                    p.existencia,
+                    p.venta AS precio,
+                    p.existencia * p.venta AS capital_muerto
+                FROM productos p
+                LEFT JOIN (
+                    SELECT DISTINCT dv_in.id_producto
+                    FROM detalle_ventas dv_in
+                    JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
+                    WHERE v_in.estado = 'COMPLETADA' AND v_in.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+                ) dv ON p.id_producto = dv.id_producto
+                WHERE p.activo = 1 AND p.existencia > 0 AND dv.id_producto IS NULL
+                ORDER BY p.existencia DESC
+                LIMIT 5;
+            `);
+            dead_stock_risk = deadStockRiskResult.map(p => ({
+                id_producto: p.id_producto,
+                codigo: p.codigo,
+                nombre: p.nombre,
+                existencia: Number(p.existencia || 0),
+                precio: Number(p.precio || 0),
+                capital_muerto: Number(p.capital_muerto || 0)
+            }));
+
+            // 7. Valoración total del inventario en bodega (costo y venta)
+            const [totalInventoryValueResult] = await db.query(`
+                SELECT 
+                    COALESCE(SUM(existencia * precio_compra), 0) AS total_costo,
+                    COALESCE(SUM(existencia * venta), 0) AS total_venta
+                FROM productos
+                WHERE activo = 1 AND existencia > 0;
+            `);
+            total_inventario_costo = Number(totalInventoryValueResult[0]?.total_costo || 0);
+            total_inventario_venta = Number(totalInventoryValueResult[0]?.total_venta || 0);
+
+            // 8. Suggested Replenishment of Class A Bestsellers (stock <= 5, sales in 180 days > 5)
+            var suggested_replenishment = [];
+            try {
+                const [replenishResult] = await db.query(`
+                    SELECT 
+                        p.id_producto,
+                        p.codigo,
+                        p.nombre,
+                        p.existencia,
+                        p.costo,
+                        p.venta AS precio,
+                        COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas
+                    FROM productos p
+                    JOIN detalle_ventas dv ON p.id_producto = dv.id_producto
+                    JOIN ventas v ON dv.id_venta = v.id_venta
+                    WHERE p.activo = 1 
+                      AND v.estado = 'COMPLETADA' 
+                      AND v.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+                    GROUP BY p.id_producto, p.codigo, p.nombre, p.existencia, p.costo, p.venta
+                    HAVING unidades_vendidas > 5 AND p.existencia <= 5
+                    ORDER BY unidades_vendidas DESC
+                    LIMIT 5;
+                `);
+                suggested_replenishment = replenishResult.map(r => {
+                    const sug_qty = Math.max(10, 15 - Number(r.existencia));
+                    return {
+                        id_producto: r.id_producto,
+                        codigo: r.codigo,
+                        nombre: r.nombre,
+                        existencia: Number(r.existencia),
+                        costo: Number(r.costo || 0),
+                        precio: Number(r.precio || 0),
+                        unidades_vendidas: Number(r.unidades_vendidas),
+                        sug_qty,
+                        costo_estimado: sug_qty * Number(r.costo || 0)
+                    };
+                });
+            } catch (err) {
+                console.error("Error al calcular sugerencia de reposición:", err);
+            }
+
+            // 9. Lost sales due to stockouts (existence = 0 and sold in last 180 days)
+            var lost_sales_stockout = [];
+            try {
+                const [lostSalesResult] = await db.query(`
+                    SELECT 
+                        p.id_producto,
+                        p.codigo,
+                        p.nombre,
+                        p.venta AS precio,
+                        COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas_180d
+                    FROM productos p
+                    JOIN detalle_ventas dv ON p.id_producto = dv.id_producto
+                    JOIN ventas v ON dv.id_venta = v.id_venta
+                    WHERE p.activo = 1 
+                      AND p.existencia = 0 
+                      AND v.estado = 'COMPLETADA' 
+                      AND v.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+                    GROUP BY p.id_producto, p.codigo, p.nombre, p.venta
+                    ORDER BY unidades_vendidas_180d DESC
+                    LIMIT 5;
+                `);
+                lost_sales_stockout = lostSalesResult.map(r => {
+                    const unidades_180 = Number(r.unidades_vendidas_180d);
+                    const promedio_diario = unidades_180 / 180;
+                    const perdida_diaria = promedio_diario * Number(r.precio || 0);
+                    return {
+                        id_producto: r.id_producto,
+                        codigo: r.codigo,
+                        nombre: r.nombre,
+                        precio: Number(r.precio || 0),
+                        unidades_180,
+                        promedio_diario,
+                        perdida_diaria
+                    };
+                });
+            } catch (err) {
+                console.error("Error al calcular pérdida por stockout:", err);
+            }
+
         } catch (calcErr) {
             console.error("Error al calcular KPIs adicionales de BI:", calcErr);
         }
@@ -1283,7 +1507,13 @@ const getBiMetrics = async (req, res) => {
             dio,
             ventas_mes_actual,
             dias_transcurridos_mes,
-            dias_totales_mes
+            dias_totales_mes,
+            recent_closures,
+            dead_stock_risk,
+            total_inventario_costo,
+            total_inventario_venta,
+            suggested_replenishment,
+            lost_sales_stockout
         });
 
     } catch (error) {

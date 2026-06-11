@@ -805,6 +805,67 @@ const BiConsole = () => {
     };
   };
 
+  const getTopProductsChartData = () => {
+    if (!metrics || !metrics.top_products) return { labels: [], datasets: [] };
+    const top5 = metrics.top_products.slice(0, 5);
+    return {
+      labels: top5.map(p => p.nombre.length > 15 ? p.nombre.substring(0, 13) + '...' : p.nombre),
+      datasets: [
+        {
+          label: 'Facturación por Producto (C$)',
+          data: top5.map(p => p.monto),
+          backgroundColor: 'rgba(56, 189, 248, 0.75)',
+          borderColor: 'rgba(255, 255, 255, 0.1)',
+          borderWidth: 1,
+          borderRadius: 6
+        }
+      ]
+    };
+  };
+
+  const getPaymentMethodChartData = () => {
+    if (!paymentDist) return { labels: [], datasets: [] };
+    const { efectivo, transferencia, tarjeta } = paymentDist;
+    return {
+      labels: ['Efectivo', 'Transferencia', 'Tarjeta'],
+      datasets: [
+        {
+          label: 'Total Facturado (C$)',
+          data: [efectivo?.total || 0, transferencia?.total || 0, tarjeta?.total || 0],
+          backgroundColor: [
+            'rgba(237, 125, 49, 0.75)',
+            'rgba(56, 189, 248, 0.75)',
+            'rgba(168, 85, 247, 0.75)'
+          ],
+          borderColor: 'rgba(255, 255, 255, 0.1)',
+          borderWidth: 1,
+          borderRadius: 6
+        }
+      ]
+    };
+  };
+
+  const getAbcChartData = () => {
+    if (!metrics) return { labels: [], datasets: [] };
+    return {
+      labels: ['Clase A (Alta)', 'Clase B (Media)', 'Clase C (Baja)'],
+      datasets: [
+        {
+          label: 'Cantidad de Repuestos',
+          data: [metrics.abc_a || 0, metrics.abc_b || 0, metrics.abc_c || 0],
+          backgroundColor: [
+            'rgba(16, 185, 129, 0.75)',
+            'rgba(234, 179, 8, 0.75)',
+            'rgba(244, 63, 94, 0.75)'
+          ],
+          borderColor: 'rgba(255, 255, 255, 0.1)',
+          borderWidth: 1,
+          borderRadius: 6
+        }
+      ]
+    };
+  };
+
   return (
     <PageWrapper>
       <TopLoadingBar visible={isUpdating} />
@@ -990,6 +1051,25 @@ const BiConsole = () => {
                   </KpiValue>
                   <KpiDesc>Días promedio para vender todo el stock según demanda.</KpiDesc>
                 </KpiCard>
+
+                <KpiCard accent="#a855f7" glow="0 0 15px rgba(168, 85, 247, 0.2)">
+                  <KpiTitle>Valoración Total de Stock</KpiTitle>
+                  <KpiValue style={{ fontSize: '1.2rem' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>C$</span> {Number(metrics?.total_inventario_costo || 0).toLocaleString('es-NI', { maximumFractionDigits: 0 })} <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>Costo</span>
+                  </KpiValue>
+                  <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 700, marginTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.4rem' }}>
+                    Venta Estimada: C$ {Number(metrics?.total_inventario_venta || 0).toLocaleString('es-NI', { maximumFractionDigits: 0 })}
+                  </div>
+                  <KpiDesc style={{ borderTop: 'none', paddingTop: 0, marginTop: '0.25rem' }}>Valor de adquisición y potencial retorno comercial en bodega.</KpiDesc>
+                </KpiCard>
+
+                <KpiCard accent="#ec4899" glow="0 0 15px rgba(236, 72, 153, 0.2)">
+                  <KpiTitle>Salud de Inventario</KpiTitle>
+                  <KpiValue style={{ fontSize: '1.5rem' }}>
+                    {metrics?.total_productos > 0 ? (Math.max(0, 100 - ((metrics?.riesgo_estancamiento || 0) / metrics.total_productos * 100)).toFixed(1)) : '0.0'} <KpiUnit>% Sano</KpiUnit>
+                  </KpiValue>
+                  <KpiDesc>Porcentaje de productos del catálogo que registran ventas activas.</KpiDesc>
+                </KpiCard>
               </>
             )}
 
@@ -1037,83 +1117,83 @@ const BiConsole = () => {
           {activeTab === 'caja' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
               <PanelRow>
-                <Card>
-                  <CardTitle style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <FaChartLine />
-                      Historial de Ventas e Inyección Analítica
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '4px 8px' }}>
-                        <input 
-                          type="checkbox" 
-                          id="backtestToggleCaja" 
-                          checked={showBacktest} 
-                          onChange={(e) => setShowBacktest(e.target.checked)}
-                          style={{ cursor: 'pointer', accentColor: '#ED7D31' }}
-                        />
-                        <label htmlFor="backtestToggleCaja" style={{ fontSize: '0.75rem', color: '#9ca3af', cursor: 'pointer', userSelect: 'none', fontWeight: 600 }}>
-                          Comparar con Predicción Pasada
-                        </label>
-                      </div>
-                      <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px' }}>
-                        <button 
-                          onClick={() => setChartPeriod('daily')} 
-                          style={{
-                            background: chartPeriod === 'daily' ? 'rgba(255,255,255,0.08)' : 'none',
-                            border: 'none',
-                            color: chartPeriod === 'daily' ? '#fff' : '#9ca3af',
-                            padding: '0.3rem 0.6rem',
-                            fontSize: '0.75rem',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                          }}
-                        >
-                          Diario
-                        </button>
-                        <button 
-                          onClick={() => setChartPeriod('weekly')} 
-                          style={{
-                            background: chartPeriod === 'weekly' ? 'rgba(255,255,255,0.08)' : 'none',
-                            border: 'none',
-                            color: chartPeriod === 'weekly' ? '#fff' : '#9ca3af',
-                            padding: '0.3rem 0.6rem',
-                            fontSize: '0.75rem',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                          }}
-                        >
-                          Semanal
-                        </button>
-                      </div>
-                    </div>
+                <Card style={{ gridColumn: 'span 2' }}>
+                  <CardTitle>
+                    <FaCheckCircle color="#ED7D31" />
+                    Historial de Cierres de Caja y Auditoría Transaccional
                   </CardTitle>
                   <CardDesc>
-                    Registros transaccionales reales comparados con la proyección analítica calculada mediante regresión lineal basada en el histórico de ventas.
+                    Registro cronológico de arqueos de caja cerrados, comparando el monto esperado en base de datos contra el conteo físico, desglosado por métodos de pago.
                   </CardDesc>
-                  <ChartBox>
-                    <Line
-                      data={getSalesChartData()}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: { labels: { color: '#9ca3af', font: { family: 'Outfit' } } }
-                        },
-                        scales: {
-                          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } },
-                          x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } }
-                        }
-                      }}
-                    />
-                  </ChartBox>
-                </Card>
-
-                <Card>
+                  <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '2px solid rgba(255, 255, 255, 0.08)', color: '#9ca3af' }}>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600 }}>CAJERO</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600 }}>CIERRE (FECHA)</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>F. INICIAL</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>ESPERADO</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>CONTADO</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>DESCUADRE</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'center' }}>DESGLOSE C$ (EFEC / TARJ / TRANSF)</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>DÓLARES ($)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {metrics?.recent_closures?.map((c, idx) => {
+                          const diff = Number(c.diferencia || 0);
+                          const isPerfect = Math.abs(diff) < 0.1;
+                          return (
+                            <tr key={c.id || idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)', transition: 'background-color 0.2s' }}>
+                              <td style={{ padding: '0.75rem 0.5rem', color: '#fff', fontWeight: 600 }}>{c.usuario_nombre}</td>
+                              <td style={{ padding: '0.75rem 0.5rem', color: '#9ca3af' }}>
+                                {c.fecha_cierre ? new Date(c.fecha_cierre).toLocaleString('es-NI', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
+                              </td>
+                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: 'JetBrains Mono' }}>C$ {c.monto_inicial.toLocaleString('es-NI', { maximumFractionDigits: 0 })}</td>
+                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: 'JetBrains Mono' }}>C$ {c.final_esperado.toLocaleString('es-NI', { maximumFractionDigits: 0 })}</td>
+                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: 'JetBrains Mono', color: '#fff', fontWeight: 600 }}>C$ {c.final_real.toLocaleString('es-NI', { maximumFractionDigits: 0 })}</td>
+                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>
+                                <span style={{
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  background: isPerfect ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)',
+                                  color: isPerfect ? '#10b981' : '#f43f5e',
+                                  border: `1px solid ${isPerfect ? 'rgba(16, 185, 129, 0.2)' : 'rgba(244, 63, 94, 0.2)'}`
+                                }}>
+                                  {isPerfect ? 'Perfecto' : `C$ ${diff.toLocaleString('es-NI', { maximumFractionDigits: 0 })}`}
+                                </span>
+                              </td>
+                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                                <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                                  <span title="Efectivo" style={{ background: 'rgba(237, 125, 49, 0.1)', color: '#ED7D31', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontFamily: 'JetBrains Mono' }}>
+                                    💵 {c.efectivo.toLocaleString('es-NI', { maximumFractionDigits: 0 })}
+                                  </span>
+                                  <span title="Tarjeta" style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontFamily: 'JetBrains Mono' }}>
+                                    💳 {c.tarjeta.toLocaleString('es-NI', { maximumFractionDigits: 0 })}
+                                  </span>
+                                  <span title="Transferencia" style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontFamily: 'JetBrains Mono' }}>
+                                    🏦 {c.transferencia.toLocaleString('es-NI', { maximumFractionDigits: 0 })}
+                                  </span>
+                                </div>
+                              </td>
+                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: 'JetBrains Mono', color: '#eab308' }}>
+                                ${c.dolares.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {(!metrics?.recent_closures || metrics.recent_closures.length === 0) && (
+                          <tr>
+                            <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
+                              No hay cierres de caja registrados para auditar en este periodo.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                               <PanelRow>
+                <Card style={{ gridColumn: 'span 2' }}>
                   <CardTitle>
                     <FaCheckCircle color="#ED7D31" />
                     Distribución Financiera de Pagos
@@ -1152,7 +1232,7 @@ const BiConsole = () => {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid rgba(255, 255, 25, 0.04)', paddingBottom: '0.4rem' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid rgba(255, 25, 25, 0.04)', paddingBottom: '0.4rem' }}>
                       Distribución de Pagos (Últimos 30 días)
                     </div>
                     
@@ -1228,118 +1308,6 @@ const BiConsole = () => {
                   </Card>
                 </PanelRow>
               )}
-
-              <PanelRow>
-                <Card style={{ gridColumn: 'span 2' }}>
-                  <CardTitle>
-                    <FaChartPie color="#ED7D31" />
-                    Sugerencias de Combos de Repuestos y Venta Cruzada (Motor BI)
-                  </CardTitle>
-                  <CardDesc>
-                    Asociaciones recomendadas para promociones en caja, calculadas en base a la co-ocurrencia de artículos comprados juntos en el historial de ventas.
-                  </CardDesc>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '0.5rem' }}>
-                    {metrics?.combo_suggestions?.map((c, idx) => (
-                      <div 
-                        key={idx} 
-                        style={{ 
-                          background: 'rgba(255, 255, 255, 0.02)', 
-                          border: '1px solid rgba(255, 255, 255, 0.05)', 
-                          borderRadius: '16px', 
-                          padding: '1.25rem',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          gap: '1rem',
-                          transition: 'all 0.3s ease',
-                          boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = 'rgba(237, 125, 49, 0.3)';
-                          e.currentTarget.style.transform = 'translateY(-3px)';
-                          e.currentTarget.style.boxShadow = '0 8px 30px rgba(237, 125, 49, 0.1)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)';
-                        }}
-                      >
-                        {/* Tipo de sugerencia badge */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.7rem', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
-                            {c.tipo}
-                          </span>
-                          <span style={{ 
-                            background: 'rgba(16, 185, 129, 0.12)', 
-                            color: '#10b981', 
-                            fontSize: '0.7rem', 
-                            padding: '2px 8px', 
-                            borderRadius: '20px', 
-                            fontWeight: 700, 
-                            border: '1px solid rgba(16, 185, 129, 0.2)' 
-                          }}>
-                            Ahorro: C$ {c.ahorro.toLocaleString('es-NI')}
-                          </span>
-                        </div>
-
-                        {/* Contenido del Combo */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                            <div style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontFamily: 'JetBrains Mono', fontWeight: 700, minWidth: '40px', textAlign: 'center' }}>A</div>
-                            <div>
-                              <div style={{ color: '#fff', fontSize: '0.9rem', fontWeight: 600, lineHeight: '1.3' }}>{c.producto_a}</div>
-                              <div style={{ color: '#9ca3af', fontSize: '0.75rem', fontFamily: 'JetBrains Mono' }}>Cód: {c.codigo_a}</div>
-                            </div>
-                          </div>
-
-                          <div style={{ display: 'flex', justifyContent: 'center', margin: '0.1rem 0', color: 'rgba(255,255,255,0.15)', fontSize: '1.1rem' }}>+</div>
-
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                            <div style={{ background: 'rgba(237, 125, 49, 0.1)', color: '#ED7D31', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontFamily: 'JetBrains Mono', fontWeight: 700, minWidth: '40px', textAlign: 'center' }}>B</div>
-                            <div>
-                              <div style={{ color: '#fff', fontSize: '0.9rem', fontWeight: 600, lineHeight: '1.3' }}>{c.producto_b}</div>
-                              <div style={{ color: '#9ca3af', fontSize: '0.75rem', fontFamily: 'JetBrains Mono' }}>Cód: {c.codigo_b}</div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Métricas analíticas Apriori */}
-                        {c.confianza !== undefined && c.lift !== undefined && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', fontSize: '0.75rem', color: '#eab308', background: 'rgba(234, 179, 8, 0.04)', border: '1px solid rgba(234, 179, 8, 0.1)', padding: '4px 8px', borderRadius: '8px', fontWeight: 600 }}>
-                            <span>Confianza: {Math.round(c.confianza * 100)}%</span>
-                            <span>Elevación (Lift): {c.lift.toFixed(1)}x</span>
-                          </div>
-                        )}
-
-                        {/* Precios */}
-                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '0.5rem' }}>
-                          <div>
-                            <span style={{ fontSize: '0.75rem', color: '#9ca3af', textDecoration: 'line-through' }}>
-                              C$ {c.precio_original.toLocaleString('es-NI')}
-                            </span>
-                            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>C$</span>
-                              {c.precio_combo.toLocaleString('es-NI')}
-                            </div>
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: '#9ca3af', fontStyle: 'italic', textAlign: 'right' }}>
-                            {c.coocurrencias} compras conjuntas
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {(!metrics?.combo_suggestions || metrics?.combo_suggestions?.length === 0) && (
-                      <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af', gridColumn: 'span 2' }}>
-                        No hay suficientes productos en inventario para sugerir combos.
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </PanelRow>
             </div>
           )}
 
@@ -1387,7 +1355,6 @@ const BiConsole = () => {
                 </Card>
               </PanelRow>
 
-              {/* MÓDULO MEJORADO: Clasificación ABC (Pareto) */}
               <PanelRow>
                 <Card style={{ gridColumn: 'span 2' }}>
                   <CardTitle>
@@ -1398,67 +1365,88 @@ const BiConsole = () => {
                     División del inventario activo según su volumen de rotación en los últimos 180 días para priorizar la gestión de stock (Ley de Pareto).
                   </CardDesc>
                   
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginTop: '0.5rem' }}>
-                    <div style={{ background: 'rgba(255,255,255,0.04)', height: '28px', borderRadius: '14px', overflow: 'hidden', display: 'flex', border: '1px solid rgba(255,255,255,0.08)' }}>
-                      <div style={{ 
-                        background: '#10b981', 
-                        width: `${metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_a / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 20}%`, 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        color: '#fff', 
-                        fontSize: '0.75rem', 
-                        fontWeight: 'bold',
-                        minWidth: '40px' 
-                      }}>
-                        A ({Math.round(metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_a / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 20)}%)
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem', marginTop: '0.5rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                      <div style={{ background: 'rgba(255,255,255,0.04)', height: '28px', borderRadius: '14px', overflow: 'hidden', display: 'flex', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ 
+                          background: '#10b981', 
+                          width: `${metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_a / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 20}%`, 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          color: '#fff', 
+                          fontSize: '0.75rem', 
+                          fontWeight: 'bold',
+                          minWidth: '40px' 
+                        }}>
+                          A ({Math.round(metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_a / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 20)}%)
+                        </div>
+                        
+                        <div style={{ 
+                          background: '#eab308', 
+                          width: `${metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_b / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 30}%`, 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          color: '#000', 
+                          fontSize: '0.75rem', 
+                          fontWeight: 'bold',
+                          minWidth: '40px' 
+                        }}>
+                          B ({Math.round(metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_b / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 30)}%)
+                        </div>
+                        
+                        <div style={{ 
+                          background: '#f43f5e', 
+                          width: `${metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_c / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 50}%`, 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          color: '#fff', 
+                          fontSize: '0.75rem', 
+                          fontWeight: 'bold',
+                          minWidth: '40px' 
+                        }}>
+                          C ({Math.round(metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_c / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 50)}%)
+                        </div>
                       </div>
-                      
-                      <div style={{ 
-                        background: '#eab308', 
-                        width: `${metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_b / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 30}%`, 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        color: '#000', 
-                        fontSize: '0.75rem', 
-                        fontWeight: 'bold',
-                        minWidth: '40px' 
-                      }}>
-                        B ({Math.round(metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_b / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 30)}%)
-                      </div>
-                      
-                      <div style={{ 
-                        background: '#f43f5e', 
-                        width: `${metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_c / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 50}%`, 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        color: '#fff', 
-                        fontSize: '0.75rem', 
-                        fontWeight: 'bold',
-                        minWidth: '40px' 
-                      }}>
-                        C ({Math.round(metrics?.abc_a + metrics?.abc_b + metrics?.abc_c > 0 ? (metrics.abc_c / (metrics.abc_a + metrics.abc_b + metrics.abc_c) * 100) : 50)}%)
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', fontSize: '0.85rem' }}>
+                         <div style={{ padding: '0.8rem', background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.12)', borderRadius: '12px' }}>
+                           <span style={{ color: '#10b981', fontWeight: 800 }}>🟢 Clase A (Alta Rotación):</span>
+                           <div style={{ color: '#fff', fontSize: '1rem', fontWeight: 700, margin: '2px 0' }}>{metrics?.abc_a || 0} Repuestos</div>
+                           <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>&gt; 10 unidades vendidas en 180 días. Artículos estrella del inventario.</span>
+                         </div>
+                         <div style={{ padding: '0.8rem', background: 'rgba(234, 179, 8, 0.04)', border: '1px solid rgba(234, 179, 8, 0.12)', borderRadius: '12px' }}>
+                           <span style={{ color: '#eab308', fontWeight: 800 }}>🟡 Clase B (Rotación Media):</span>
+                           <div style={{ color: '#fff', fontSize: '1rem', fontWeight: 700, margin: '2px 0' }}>{metrics?.abc_b || 0} Repuestos</div>
+                           <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>4 a 10 unidades vendidas. Artículos de demanda regular.</span>
+                         </div>
+                         <div style={{ padding: '0.8rem', background: 'rgba(244, 63, 94, 0.04)', border: '1px solid rgba(244, 63, 94, 0.12)', borderRadius: '12px' }}>
+                           <span style={{ color: '#f43f5e', fontWeight: 800 }}>🔴 Clase C (Rotación Baja):</span>
+                           <div style={{ color: '#fff', fontSize: '1rem', fontWeight: 700, margin: '2px 0' }}>{metrics?.abc_c || 0} Repuestos</div>
+                           <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>&le; 3 unidades vendidas en 180 días. Lento movimiento en percha.</span>
+                         </div>
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', fontSize: '0.85rem' }}>
-                       <div style={{ padding: '0.8rem', background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.12)', borderRadius: '12px' }}>
-                         <span style={{ color: '#10b981', fontWeight: 800 }}>🟢 Clase A (Alta Rotación):</span>
-                         <div style={{ color: '#fff', fontSize: '1rem', fontWeight: 700, margin: '2px 0' }}>{metrics?.abc_a || 0} Repuestos</div>
-                         <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>&gt; 10 unidades vendidas. Artículos estrella del inventario.</span>
-                       </div>
-                       <div style={{ padding: '0.8rem', background: 'rgba(234, 179, 8, 0.04)', border: '1px solid rgba(234, 179, 8, 0.12)', borderRadius: '12px' }}>
-                         <span style={{ color: '#eab308', fontWeight: 800 }}>🟡 Clase B (Rotación Media):</span>
-                         <div style={{ color: '#fff', fontSize: '1rem', fontWeight: 700, margin: '2px 0' }}>{metrics?.abc_b || 0} Repuestos</div>
-                         <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>4 a 10 unidades vendidas. Artículos de demanda regular.</span>
-                       </div>
-                       <div style={{ padding: '0.8rem', background: 'rgba(244, 63, 94, 0.04)', border: '1px solid rgba(244, 63, 94, 0.12)', borderRadius: '12px' }}>
-                         <span style={{ color: '#f43f5e', fontWeight: 800 }}>🔴 Clase C (Rotación Baja):</span>
-                         <div style={{ color: '#fff', fontSize: '1rem', fontWeight: 700, margin: '2px 0' }}>{metrics?.abc_c || 0} Repuestos</div>
-                         <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>&le; 3 unidades vendidas en 180 días. Candidatos a combos.</span>
-                       </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#9ca3af', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Distribución de Clases ABC</span>
+                      <ChartBox style={{ height: '260px' }}>
+                        <Bar
+                          data={getAbcChartData()}
+                          options={{
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                              y: { grid: { display: false }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } },
+                              x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } }
+                            }
+                          }}
+                        />
+                      </ChartBox>
                     </div>
                   </div>
                 </Card>
@@ -1639,71 +1627,145 @@ const BiConsole = () => {
                   </div>
                 </Card>
               </PanelRow>
+
+              <PanelRow style={{ marginTop: '2rem' }}>
+                {/* Sugerencias de Reposición */}
+                <Card>
+                  <CardTitle>
+                    <FaSync color="#10b981" />
+                    Sugerencias de Reposición (Clase A - Stock Crítico &le; 5)
+                  </CardTitle>
+                  <CardDesc>
+                    Artículos de alta demanda con existencias en niveles mínimos. Se calcula la compra sugerida para restablecer el stock óptimo.
+                  </CardDesc>
+                  <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid rgba(255, 25, 25, 0.08)', color: '#9ca3af' }}>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600 }}>CÓDIGO</th>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600 }}>PRODUCTO</th>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600, textAlign: 'right' }}>STOCK</th>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600, textAlign: 'right' }}>VENDIDO (180d)</th>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600, textAlign: 'right' }}>PEDIDO SUG.</th>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600, textAlign: 'right' }}>COSTO ESTIMADO</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {metrics?.suggested_replenishment?.map((r, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                            <td style={{ padding: '0.6rem 0.4rem', fontFamily: "'JetBrains Mono', monospace", color: '#38bdf8', fontWeight: 600 }}>{r.codigo}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', color: '#fff' }}>{r.nombre}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', fontWeight: 700, color: '#f43f5e' }}>{r.existencia}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', color: '#9ca3af' }}>{r.unidades_vendidas}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', fontWeight: 700, color: '#10b981' }}>{r.sug_qty} und</td>
+                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#ED7D31' }}>C$ {r.costo_estimado.toLocaleString('es-NI', { maximumFractionDigits: 0 })}</td>
+                          </tr>
+                        ))}
+                        {(!metrics?.suggested_replenishment || metrics.suggested_replenishment.length === 0) && (
+                          <tr>
+                            <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
+                              No se requiere reposición inmediata de artículos Clase A.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+
+                {/* Pérdidas por Quiebre de Stock */}
+                <Card>
+                  <CardTitle>
+                    <FaExclamationTriangle color="#f43f5e" />
+                    Pérdidas Estimadas por Quiebre de Stock (Stockout)
+                  </CardTitle>
+                  <CardDesc>
+                    Artículos con demanda histórica reciente pero con stock actual en cero. Muestra la pérdida de venta diaria proyectada.
+                  </CardDesc>
+                  <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid rgba(255, 25, 25, 0.08)', color: '#9ca3af' }}>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600 }}>CÓDIGO</th>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600 }}>PRODUCTO</th>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600, textAlign: 'right' }}>PRECIO VENTA</th>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600, textAlign: 'right' }}>VENDIDO (180d)</th>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600, textAlign: 'right' }}>PÉRDIDA DIARIA EST.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {metrics?.lost_sales_stockout?.map((l, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                            <td style={{ padding: '0.6rem 0.4rem', fontFamily: "'JetBrains Mono', monospace", color: '#38bdf8', fontWeight: 600 }}>{l.codigo}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', color: '#fff' }}>{l.nombre}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', color: '#9ca3af' }}>C$ {l.precio.toLocaleString('es-NI', { maximumFractionDigits: 0 })}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', color: '#f43f5e', fontWeight: 600 }}>{l.unidades_180}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#f43f5e', fontWeight: 700 }}>C$ {l.perdida_diaria.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          </tr>
+                        ))}
+                        {(!metrics?.lost_sales_stockout || metrics.lost_sales_stockout.length === 0) && (
+                          <tr>
+                            <td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
+                              No hay pérdidas proyectadas por quiebres de stock.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </PanelRow>
             </div>
           )}
 
           {activeTab === 'proyeccion' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
               <PanelRow>
-                <Card style={{ gridColumn: 'span 2' }}>
+                <Card>
                   <CardTitle style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <FaChartLine />
-                      Historial de Ventas e Inyección Analítica (Modelo Predictivo)
+                      Historial de Ventas y Proyección Lineal
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '4px 8px' }}>
-                        <input 
-                          type="checkbox" 
-                          id="backtestToggleProy" 
-                          checked={showBacktest} 
-                          onChange={(e) => setShowBacktest(e.target.checked)}
-                          style={{ cursor: 'pointer', accentColor: '#ED7D31' }}
-                        />
-                        <label htmlFor="backtestToggleProy" style={{ fontSize: '0.75rem', color: '#9ca3af', cursor: 'pointer', userSelect: 'none', fontWeight: 600 }}>
-                          Comparar con Predicción Pasada
-                        </label>
-                      </div>
-                      <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px' }}>
-                        <button 
-                          onClick={() => setChartPeriod('daily')} 
-                          style={{
-                            background: chartPeriod === 'daily' ? 'rgba(255,255,255,0.08)' : 'none',
-                            border: 'none',
-                            color: chartPeriod === 'daily' ? '#fff' : '#9ca3af',
-                            padding: '0.3rem 0.6rem',
-                            fontSize: '0.75rem',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                          }}
-                        >
-                          Diario
-                        </button>
-                        <button 
-                          onClick={() => setChartPeriod('weekly')} 
-                          style={{
-                            background: chartPeriod === 'weekly' ? 'rgba(255,255,255,0.08)' : 'none',
-                            border: 'none',
-                            color: chartPeriod === 'weekly' ? '#fff' : '#9ca3af',
-                            padding: '0.3rem 0.6rem',
-                            fontSize: '0.75rem',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                          }}
-                        >
-                          Semanal
-                        </button>
-                      </div>
+                    <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px' }}>
+                      <button 
+                        onClick={() => setChartPeriod('daily')} 
+                        style={{
+                          background: chartPeriod === 'daily' ? 'rgba(255,255,255,0.08)' : 'none',
+                          border: 'none',
+                          color: chartPeriod === 'daily' ? '#fff' : '#9ca3af',
+                          padding: '0.3rem 0.6rem',
+                          fontSize: '0.75rem',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                        }}
+                      >
+                        Diario
+                      </button>
+                      <button 
+                        onClick={() => setChartPeriod('weekly')} 
+                        style={{
+                          background: chartPeriod === 'weekly' ? 'rgba(255,255,255,0.08)' : 'none',
+                          border: 'none',
+                          color: chartPeriod === 'weekly' ? '#fff' : '#9ca3af',
+                          padding: '0.3rem 0.6rem',
+                          fontSize: '0.75rem',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                        }}
+                      >
+                        Semanal
+                      </button>
                     </div>
                   </CardTitle>
                   <CardDesc>
                     Registros transaccionales reales comparados con la proyección analítica calculada mediante regresión lineal basada en el histórico de ventas.
                   </CardDesc>
-                  <ChartBox style={{ height: '300px' }}>
+                  <ChartBox style={{ height: '280px' }}>
                     <Line
                       data={getSalesChartData()}
                       options={{
@@ -1720,9 +1782,89 @@ const BiConsole = () => {
                     />
                   </ChartBox>
                 </Card>
+                
+                <Card>
+                  <CardTitle>
+                    <FaChartBar />
+                    Ganancia por Categoría (ROI Comercial)
+                  </CardTitle>
+                  <CardDesc>
+                    Porcentaje de retorno de inversión real, segmentado por las 5 categorías de repuestos con mayor facturación acumulada.
+                  </CardDesc>
+                  <ChartBox style={{ height: '280px' }}>
+                    <Bar
+                      data={getMarginsChartData()}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: { display: false }
+                        },
+                        scales: {
+                          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } },
+                          x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } }
+                        }
+                      }}
+                    />
+                  </ChartBox>
+                </Card>
               </PanelRow>
 
-              {/* MÓDULO MEJORADO: Simulador de Objetivos de Ventas (Run-Rate) */}
+              <PanelRow>
+                <Card>
+                  <CardTitle>
+                    <FaChartBar color="#38bdf8" />
+                    Top 5 Bestsellers por Facturación (C$)
+                  </CardTitle>
+                  <CardDesc>
+                    Facturación total acumulada de los 5 productos con mayor volumen monetario vendido.
+                  </CardDesc>
+                  <ChartBox style={{ height: '280px' }}>
+                    <Bar
+                      data={getTopProductsChartData()}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: { display: false }
+                        },
+                        scales: {
+                          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } },
+                          x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } }
+                        }
+                      }}
+                    />
+                  </ChartBox>
+                </Card>
+
+                <Card>
+                  <CardTitle>
+                    <FaChartBar color="#ED7D31" />
+                    Volumen de Venta por Canal de Pago (C$)
+                  </CardTitle>
+                  <CardDesc>
+                    Volumen monetario total procesado en caja desglosado por Efectivo, Transferencia y Tarjeta.
+                  </CardDesc>
+                  <ChartBox style={{ height: '280px' }}>
+                    <Bar
+                      data={getPaymentMethodChartData()}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: { display: false }
+                        },
+                        scales: {
+                          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } },
+                          x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } }
+                        }
+                      }}
+                    />
+                  </ChartBox>
+                </Card>
+              </PanelRow>
+
+              {/* MÓDULO: Simulador de Objetivos de Ventas (Run-Rate) */}
               {(() => {
                 const ventasMesActual = metrics?.ventas_mes_actual || 120000;
                 const diasTranscurridos = metrics?.dias_transcurridos_mes || new Date().getDate();
@@ -1828,31 +1970,112 @@ const BiConsole = () => {
                 );
               })()}
 
+              {/* Sugerencias de Combos de Repuestos y Venta Cruzada (Motor BI) */}
               <PanelRow>
                 <Card style={{ gridColumn: 'span 2' }}>
                   <CardTitle>
-                    <FaChartBar />
-                    Márgenes de Rentabilidad por Categoría (ROI Comercial)
+                    <FaChartPie color="#ED7D31" />
+                    Sugerencias de Combos de Repuestos y Venta Cruzada (Motor BI)
                   </CardTitle>
                   <CardDesc>
-                    Porcentaje de retorno de inversión real, segmentado por las 5 categorías de repuestos con mayor facturación acumulada.
+                    Asociaciones recomendadas para promociones en caja, calculadas en base a la co-ocurrencia de artículos comprados juntos en el historial de ventas.
                   </CardDesc>
-                  <ChartBox style={{ height: '320px' }}>
-                    <Bar
-                      data={getMarginsChartData()}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: { display: false }
-                        },
-                        scales: {
-                          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } },
-                          x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } }
-                        }
-                      }}
-                    />
-                  </ChartBox>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '0.5rem' }}>
+                    {metrics?.combo_suggestions?.map((c, idx) => (
+                      <div 
+                        key={idx} 
+                        style={{ 
+                          background: 'rgba(255, 255, 255, 0.02)', 
+                          border: '1px solid rgba(255, 255, 255, 0.05)', 
+                          borderRadius: '16px', 
+                          padding: '1.25rem',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          gap: '1rem',
+                          transition: 'all 0.3s ease',
+                          boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = 'rgba(237, 125, 49, 0.3)';
+                          e.currentTarget.style.transform = 'translateY(-3px)';
+                          e.currentTarget.style.boxShadow = '0 8px 30px rgba(237, 125, 49, 0.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)';
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.7rem', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
+                            {c.tipo}
+                          </span>
+                          <span style={{ 
+                            background: 'rgba(16, 185, 129, 0.12)', 
+                            color: '#10b981', 
+                            fontSize: '0.7rem', 
+                            padding: '2px 8px', 
+                            borderRadius: '20px', 
+                            fontWeight: 700, 
+                            border: '1px solid rgba(16, 185, 129, 0.2)' 
+                          }}>
+                            Ahorro: C$ {c.ahorro.toLocaleString('es-NI')}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                            <div style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontFamily: 'JetBrains Mono', fontWeight: 700, minWidth: '40px', textAlign: 'center' }}>A</div>
+                            <div>
+                              <div style={{ color: '#fff', fontSize: '0.9rem', fontWeight: 600, lineHeight: '1.3' }}>{c.producto_a}</div>
+                              <div style={{ color: '#9ca3af', fontSize: '0.75rem', fontFamily: 'JetBrains Mono' }}>Cód: {c.codigo_a}</div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'center', margin: '0.1rem 0', color: 'rgba(255,255,255,0.15)', fontSize: '1.1rem' }}>+</div>
+
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                            <div style={{ background: 'rgba(237, 125, 49, 0.1)', color: '#ED7D31', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontFamily: 'JetBrains Mono', fontWeight: 700, minWidth: '40px', textAlign: 'center' }}>B</div>
+                            <div>
+                              <div style={{ color: '#fff', fontSize: '0.9rem', fontWeight: 600, lineHeight: '1.3' }}>{c.producto_b}</div>
+                              <div style={{ color: '#9ca3af', fontSize: '0.75rem', fontFamily: 'JetBrains Mono' }}>Cód: {c.codigo_b}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {c.confianza !== undefined && c.lift !== undefined && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', fontSize: '0.75rem', color: '#eab308', background: 'rgba(234, 179, 8, 0.04)', border: '1px solid rgba(234, 179, 8, 0.1)', padding: '4px 8px', borderRadius: '8px', fontWeight: 600 }}>
+                            <span>Confianza: {Math.round(c.confianza * 100)}%</span>
+                            <span>Elevación (Lift): {c.lift.toFixed(1)}x</span>
+                          </div>
+                        )}
+
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '0.5rem' }}>
+                          <div>
+                            <span style={{ fontSize: '0.75rem', color: '#9ca3af', textDecoration: 'line-through' }}>
+                              C$ {c.precio_original.toLocaleString('es-NI')}
+                            </span>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>C$</span>
+                              {c.precio_combo.toLocaleString('es-NI')}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#9ca3af', fontStyle: 'italic', textAlign: 'right' }}>
+                            {c.coocurrencias} compras conjuntas
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {(!metrics?.combo_suggestions || metrics?.combo_suggestions?.length === 0) && (
+                      <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af', gridColumn: 'span 2' }}>
+                        No hay suficientes productos en inventario para sugerir combos.
+                      </div>
+                    )}
+                  </div>
                 </Card>
               </PanelRow>
             </div>
