@@ -1644,6 +1644,7 @@ const getBiMetrics = async (req, res) => {
                         p.id_producto,
                         p.codigo,
                         p.nombre,
+                        p.costo,
                         p.venta AS precio,
                         COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas_180d
                     FROM productos p
@@ -1653,7 +1654,7 @@ const getBiMetrics = async (req, res) => {
                       AND p.existencia = 0 
                       AND v.estado = 'COMPLETADA' 
                       AND ${stgFilter.replace(/v_in/g, 'v')}
-                    GROUP BY p.id_producto, p.codigo, p.nombre, p.venta
+                    GROUP BY p.id_producto, p.codigo, p.nombre, p.costo, p.venta
                     ORDER BY unidades_vendidas_180d DESC
                     LIMIT 5;
                 `, stgParams);
@@ -1661,14 +1662,17 @@ const getBiMetrics = async (req, res) => {
                     const unidades_180 = Number(r.unidades_vendidas_180d);
                     const promedio_diario = unidades_180 / 180;
                     const perdida_diaria = promedio_diario * Number(r.precio || 0);
+                    const perdida_ganancia = promedio_diario * (Number(r.precio || 0) - Number(r.costo || 0));
                     return {
                         id_producto: r.id_producto,
                         codigo: r.codigo,
                         nombre: r.nombre,
                         precio: Number(r.precio || 0),
+                        costo: Number(r.costo || 0),
                         unidades_180,
                         promedio_diario,
-                        perdida_diaria
+                        perdida_diaria,
+                        perdida_ganancia
                     };
                 });
             } catch (err) {

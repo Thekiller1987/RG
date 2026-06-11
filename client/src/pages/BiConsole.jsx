@@ -1985,6 +1985,52 @@ const BiConsole = () => {
                   </div>
                 </Card>
               </PanelRow>
+
+              <PanelRow style={{ marginTop: '2rem' }}>
+                {/* Pérdidas por Quiebre de Stock */}
+                <Card style={{ gridColumn: 'span 2' }}>
+                  <CardTitle>
+                    <FaExclamationTriangle color="#f43f5e" />
+                    Pérdidas Estimadas por Quiebre de Stock (Stockout)
+                  </CardTitle>
+                  <CardDesc>
+                    Artículos con demanda histórica reciente pero con stock actual en cero. Muestra la pérdida diaria estimada tanto en ventas brutas como en utilidad neta (ganancia real perdida).
+                  </CardDesc>
+                  <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid rgba(255, 25, 25, 0.08)', color: '#9ca3af' }}>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600 }}>CÓDIGO</th>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600 }}>PRODUCTO</th>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600, textAlign: 'right' }}>PRECIO VENTA</th>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600, textAlign: 'right' }}>VENDIDO (180d)</th>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600, textAlign: 'right' }}>PÉRDIDA DIARIA VENTAS</th>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600, textAlign: 'right' }}>PÉRDIDA DIARIA GANANCIA</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {metrics?.lost_sales_stockout?.map((l, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                            <td style={{ padding: '0.6rem 0.4rem', fontFamily: "'JetBrains Mono', monospace", color: '#38bdf8', fontWeight: 600 }}>{l.codigo || 'S/C'}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', color: '#fff' }}>{l.nombre}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', color: '#9ca3af' }}>C$ {l.precio.toLocaleString('es-NI', { maximumFractionDigits: 0 })}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', color: '#f43f5e', fontWeight: 600 }}>{l.unidades_180}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#f43f5e', fontWeight: 700 }}>C$ {l.perdida_diaria.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#ED7D31', fontWeight: 700 }}>C$ {l.perdida_ganancia.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          </tr>
+                        ))}
+                        {(!metrics?.lost_sales_stockout || metrics.lost_sales_stockout.length === 0) && (
+                          <tr>
+                            <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
+                              No hay pérdidas proyectadas por quiebres de stock.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </PanelRow>
             </div>
           )}
 
