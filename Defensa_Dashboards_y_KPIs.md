@@ -1,187 +1,229 @@
 # 🎓 Guía Suprema de Defensa: Los 3 Dashboards e Inteligencia de Negocios (BI)
 
-Este documento es la guía analítica oficial para la defensa del sistema de **Multirepuestos RG**. Detalla la arquitectura lógica de los 3 dashboards, analizando cada indicador clave mediante cinco ejes fundamentales: **¿Qué hace?**, **¿Qué busca resolver?**, **¿Cómo lo hace? (Fórmula/Mecánica)**, **¿Por qué se diseñó así?** y **¿En qué beneficia directamente al negocio?**
+Este documento es la guía analítica oficial para la defensa del sistema de **Multirepuestos RG**. Detalla la arquitectura lógica de los 3 dashboards, analizando cada indicador clave mediante cinco ejes fundamentales: **¿Por qué existe? (Justificación)**, **¿Qué hace? (Definición Operativa)**, **¿Para qué sirve? (Objetivo Estratégico)**, **¿Cómo se calcula? (Fórmula/Mecánica)** y **Ejemplo Práctico Aplicado**.
 
 ---
 
-# 🧠 DASHBOARD 1: Consola de Inteligencia de Negocios (BI) (`/bi-console`)
+# 🧠 ESTRUCTURA GENERAL Y COHERENCIA DE ROLES
 
-La consola de BI es el cerebro estadístico del sistema. Diseñado en un entorno cyberpunk premium de modo oscuro, está dividido en tres enfoques operativos para garantizar la pureza de los datos y evitar mezclar flujos de efectivo con rentabilidad comercial.
+Para garantizar la máxima seguridad operativa y la pertinencia de la información en todos los niveles jerárquicos de Multirepuestos RG, el sistema se estructuró en **tres dashboards distintos**. Esta separación lógica evita mezclar flujos de efectivo transaccionales con análisis de rentabilidad gerencial, protegiendo información de margen comercial sensible de accesos no autorizados.
 
----
+## 1. Dashboard 1: Consola BI & Analítica Avanzada (`/bi-console`)
+* **Destinatario:** Gerente General y Director Operativo.
+* **Diseño Visual:** Entorno visual Cyberpunk Premium en modo oscuro de alta tecnología. El fondo oscuro con colores vibrantes (naranja, azul cian y verde neón) está diseñado específicamente para reducir la fatiga visual durante largas jornadas de monitoreo de datos.
+* **Propósito:** Centro analítico de la empresa. Se divide en tres enfoques especializados:
+  * **Flujo de Caja y Auditoría:** Centrado en la seguridad del punto de venta y en la auditoría del comportamiento transaccional físico.
+  * **Rotación de Inventario:** Analiza qué productos rotan, el capital inmovilizado en stock y detecta quiebres de mercadería.
+  * **Rentabilidad y Proyección:** Proyecta el rumbo financiero mediante modelos predictivos y propone combos de productos basados en minería de reglas de asociación.
 
-## 🟢 ENFOQUE A: Flujo de Caja y Auditoría (Seguridad Operativa)
+## 2. Dashboard 2: Reporte Financiero Consolidado (`/finances`)
+* **Destinatario:** Contador General y Administrador Financiero.
+* **Diseño Visual:** Estilo corporativo formal, limpio, con fondo blanco y alto contraste. Optimizado para impresión física en formato A4 o exportación directa a PDF.
+* **Propósito:** Mostrar la salud patrimonial y los márgenes del negocio, enfocándose en la valoración de los activos en bodega y el retorno porcentual de inversión (ROI) por familia de repuestos.
 
-Concentra el control del dinero físico en caja y detecta anomalías. Mantiene un enfoque estricto en auditoría contable y control operacional.
-
-### 0. Historial Forense de Descuadres y Consolidado de Auditoría
-* **¿Qué hace?** Grafica el histórico de diferencias monetarias de los arqueos de caja recientes y presenta un panel consolidado de cobros totales auditados agrupados por canal (efectivo, tarjeta, transferencia y dólares) en el rango de fechas seleccionado.
-* **¿Qué busca resolver?** La dificultad del administrador para ver la tendencia de descuadres de los cajeros en el tiempo y la necesidad de conciliar rápidamente los depósitos bancarios del negocio por cada método de pago.
-* **¿Cómo lo hace?** Dibuja un gráfico de barras donde cada barra es una sesión cerrada por un cajero; las barras se colorean de rojo si hay faltantes, amarillo si hay sobrantes, y verde si el arqueo fue perfecto. Paralelamente, el backend consolida y totaliza los fondos auditados de los cierres filtrados.
-* **¿Por qué se diseñó así?** Para dotar al negocio de una vista macro de auditoría que agrupe y visualice el riesgo operativo y el volumen de dinero auditado por canal de cobro en una sola pantalla.
-* **¿En qué beneficia al negocio?** Facilita la conciliación bancaria diaria y permite detectar desviaciones sistemáticas de dinero físico de forma visual e inmediata.
-
-
-### 1. Eficiencia de Arqueo de Caja (30 días)
-* **¿Qué hace?** Mide la exactitud del manejo de dinero físico calculando el porcentaje de cierres de caja que terminaron con un descuadre de exactamente cero.
-* **¿Qué busca resolver?** La inconsistencia en el manejo del dinero, el descuido de los cajeros y la prevención de "robos hormiga".
-* **¿Cómo lo hace?** Compara la diferencia entre el dinero físico contado por el cajero ($V_{\text{real}}$) y el dinero calculado por el sistema ($V_{\text{esperado}}$).
-  $$\text{Diferencia} = V_{\text{real}} - V_{\text{esperado}}$$
-  $$\text{Eficiencia Arqueo (\%)} = \left( \frac{\text{Cantidad de Cierres con Diferencia } = 0}{\text{Total de Cierres en los últimos 30 días}} \right) \times 100$$
-* **¿Por qué se diseñó así?** Se determinó un margen de 30 días para evaluar el desempeño reciente del personal de caja, incentivando la transparencia mediante un indicador de competencia profesional.
-* **¿En qué beneficia al negocio?** Reduce a mínimos históricos las pérdidas inexplicadas de dinero en caja. Genera un registro de auditoría que permite evaluar el desempeño de los cajeros y premiar a quienes mantengan una eficiencia del 100%.
-
-### 2. Recálculo Forense de Desglose de Caja desde JSON
-* **¿Qué hace?** Reconstruye dinámicamente el desglose de métodos de pago (Efectivo, Tarjeta, Transferencia y Dólares) de cierres de caja en tiempo real, incluso si las columnas base de la tabla se grabaron en cero.
-* **¿Qué busca resolver?** La pérdida de trazabilidad e inconsistencias históricas cuando un arqueo no registra las columnas de desglose en la base de datos.
-* **¿Cómo lo hace?** Si el sistema detecta valores en cero al leer un arqueo, el backend extrae el log `detalles_json` del cierre, itera sobre cada transacción grabada y calcula:
-  $$\text{Efectivo Neto C\$} = \sum (\text{Efectivo Aportado} + [\text{Dólares} \times \text{Tipo Cambio}]) - \text{Cambio Entregado}$$
-  $$\text{Tarjeta} = \sum \text{Monto Tarjeta}, \quad \text{Transferencia} = \sum \text{Monto Transferencia}$$
-* **¿Por qué se diseñó así?** Se diseñó como un mecanismo autolimpiante de contingencia en el backend (`reportController.js`), garantizando que la auditoría nunca se rompa debido a fallos o campos vacíos en registros antiguos.
-* **¿En qué beneficia al negocio?** Otorga robustez absoluta al negocio. El administrador siempre verá de dónde provino cada centavo cobrado, permitiendo conciliar perfectamente el dinero físico contra las cuentas de banco y POS de tarjetas.
-
-### 3. Alertas de Anomalías en Caja y Seguridad
-* **¿Qué hace?** Monitorea continuamente las cajas activas y dispara banderas rojas de riesgo administrativo.
-* **¿Qué busca resolver?** El peligro de robos y asaltos por acumulación de efectivo, así como el fraude administrativo por mantener turnos abiertos por tiempo indeterminado.
-* **¿Cómo lo hace?** Analiza las variables en tiempo real:
-  - *Retiro de Seguridad:* Si $\text{Efectivo Neto en Caja} > \text{C\$ 15,000}$.
-  - *Turno Excesivo:* Si $(\text{Fecha/Hora Actual} - \text{Fecha/Hora Apertura}) > 24 \text{ horas}$.
-* **¿Por qué se diseñó así?** Se establecieron umbrales fijos basados en el costo operativo de seguridad (C$ 15,000 es el límite máximo de exposición al riesgo tolerable en caja).
-* **¿En qué beneficia al negocio?** Protege físicamente el patrimonio del local forzando retiros parciales de efectivo a bóveda, y garantiza procesos disciplinados obligando a los cajeros a cerrar e iniciar turnos diariamente.
+## 3. Dashboard 3: POS y Gestión Operativa de Caja (`/cash-report`)
+* **Destinatario:** Cajeros del Local y Supervisor de Caja.
+* **Diseño Visual:** Interfaz rápida de mostrador y alta legibilidad para facturación ágil.
+* **Propósito:** Administrar el efectivo en tiempo real. Proporciona arqueos ciegos obligatorios, control de egresos de caja chica y emisión de cierres diarios.
 
 ---
 
-## 🟡 ENFOQUE B: Rotación de Inventario (Eficiencia Logística)
-
-Optimiza la compra de repuestos y evita tener dinero congelado en productos sin demanda.
-
-### 4. Clasificación ABC de Inventario (Pareto - Tabla y Gráfico de Distribución)
-* **¿Qué hace?** Clasifica y expone detalladamente los repuestos activos del catálogo en tres clases de importancia según su volumen de unidades vendidas en el periodo seleccionado, acompañando el gráfico de Pareto con una tabla de métricas financieras de stock y capital inmovilizado por clase.
-* **¿Qué busca resolver?** La desorganización en las compras a proveedores y la falta de visibilidad del valor del stock detenido, donde se adquieren piezas de lento movimiento y se descuidan las de alta demanda.
-* **¿Cómo lo hace?** Agrupa las ventas completadas por producto y asigna:
-  - **Clase A (Alta Rotación):** Ventas $> 10$ unidades en el periodo seleccionado. Representa los artículos estrella.
-  - **Clase B (Media Rotación):** Ventas entre $4$ y $10$ unidades.
-  - **Clase C (Baja Rotación):** Ventas $\le 3$ unidades.
-  Adicionalmente, calcula dinámicamente y despliega en una tabla el número de repuestos de cada clase, su porcentaje de representación sobre el total de catálogo, la sumatoria física de stock disponible en bodega, y el capital neto inmovilizado en córdobas (C$) para cada clasificación.
-* **¿Por qué se diseñó así?** Aplica la Ley de Pareto ($80/20$), combinando un gráfico de barras horizontales de distribución de clases con una tabla de balance de capital para justificar la importancia financiera de cada segmento.
-* **¿En qué beneficia al negocio?** Permite al administrador enfocar el capital de trabajo: garantizar stock de Clase A (que genera el volumen transaccional), monitorear Clase B, y evaluar el capital congelado en Clase C para tomar decisiones de liquidación o promociones de venta y recuperar liquidez.
-
-
-### 5. Sugerencia de Reposición Automática (Clase A - Stock Crítico)
-* **¿Qué hace?** Genera sugerencias de compras automatizadas para artículos Clase A con stock menor o igual a 5 unidades.
-* **¿Qué busca resolver?** La ruptura de stock (desabastecimiento) de los productos estrella del negocio, lo cual provoca pérdida directa de clientes.
-* **¿Cómo lo hace?** Identifica productos con ventas $> 5$ y existencia $\le 5$. Calcula el pedido óptimo:
-  $$\text{Cantidad a Comprar} = \max(10, 15 - \text{Existencia Actual})$$
-  $$\text{Costo Proyectado} = \text{Cantidad a Comprar} \times \text{Precio de Compra (Costo)}$$
-* **¿Por qué se diseñó así?** Se definió un stock objetivo de 15 unidades para amortiguar el tiempo de entrega de proveedores de repuestos, con una compra mínima de 10 unidades para justificar el flete de envío.
-* **¿En qué beneficia al negocio?** Automatiza el rol del comprador. Proporciona una lista detallada lista para enviar al proveedor con las cantidades exactas y el presupuesto necesario para reponer los bestsellers.
-
-### 6. Pérdida Proyectada por Quiebre de Stock (Stockout Loss)
-* **¿Qué hace?** Cuantifica financieramente en córdobas el costo de tener productos agotados (Existencia = 0) que poseen demanda histórica activa.
-* **¿Qué busca resolver?** El "costo de oportunidad invisible". Los gerentes suelen ignorar cuánto dinero dejan de percibir por no tener existencias.
-* **¿Cómo lo hace?** Analiza repuestos agotados que registran ventas en los últimos 180 días y calcula:
-  $$\text{Demanda Diaria Promedio} = \frac{\text{Unidades Vendidas en 180 días}}{180}$$
-  $$\text{Pérdida Diaria Estimada (C\$)} = \text{Demanda Diaria Promedio} \times \text{Precio Venta del Repuesto}$$
-* **¿Por qué se diseñó así?** Permite cuantificar el impacto diario directo del desabasto, sirviendo como KPI de alarma contable.
-* **¿En qué beneficia al negocio?** Justifica financieramente la prioridad de compra. Si un repuesto agotado genera una pérdida de C$ 1,500 diarios por quiebre de stock, el administrador sabe que debe adquirirlo inmediatamente por encima de otros.
-
-### 7. Días de Inventario Disponible (DIO)
-* **¿Qué hace?** Calcula el número de días promedio que tomaría liquidar todo el stock actual disponible en base al ritmo de venta de los últimos 30 días.
-* **¿Qué busca resolver?** El sobre-almacenamiento y el estancamiento de liquidez en bodega.
-* **¿Cómo lo hace?** 
-  $$\text{DIO} = \frac{\text{Existencia Total de Artículos}}{\text{Unidades Vendidas Diarias Promedio (Últimos 30 días)}}$$
-* **¿Por qué se diseñó así?** Es el estándar internacional financiero para medir la eficiencia del inventario.
-* **¿En qué beneficia al negocio?** Indica la salud logística global. Un DIO alto (ej. $> 300$ días) alerta al gerente que tiene demasiada mercadería guardada y que el dinero tardará demasiado tiempo en regresar a la caja.
+# 📊 DESGLOSE TÉCNICO DE LOS 17 KPIs DE DEFENSA
 
 ---
 
-## 🔵 ENFOQUE C: Rentabilidad y Proyección (Planificación Financiera)
+## 🟢 ENFOQUE 1: Flujo de Caja y Auditoría (Seguridad Operativa)
 
-Mide la trayectoria económica del negocio y analiza tendencias a futuro para prever ingresos.
+### 1. Historial Forense y Consolidado de Auditoría Transaccional
+* **¿Por qué existe? (Justificación):** En tiendas de repuestos con alto tráfico, la conciliación manual de fin de mes de múltiples bancos y pasarelas de pago toma días enteros. Los errores en el registro de si un pago fue efectivo, transferencia o tarjeta distorsionan los estados contables y facilitan fraudes.
+* **¿Qué hace? (Definición Operativa):** Grafica las diferencias de arqueos de caja recientes clasificándolos por colores de alerta de riesgo (Rojo: Faltante, Amarillo: Sobrante, Verde: Cuadre Perfecto) y consolida la sumatoria de todos los fondos cobrados y auditados agrupándolos por su canal de origen.
+* **¿Para qué sirve? (Objetivo Estratégico):** Identificar patrones de descuadre sistemáticos en el tiempo para auditoría interna y posibilitar la conciliación inmediata de depósitos bancarios frente a los cierres diarios de caja.
+* **¿Cómo se calcula? (Fórmula y Mecánica):** Realiza una agregación SQL sobre el histórico de cierres de caja dentro del rango de fechas:
+  `Cobros Consolidados = Suma(Efectivo) + Suma(Tarjeta) + Suma(Transferencia) + Suma(Dólares × Tipo Cambio)`
+* **Ejemplo Práctico:** Del 1 al 10 de junio se realizan 20 cierres de caja. El consolidador de auditoría totaliza de forma inmediata: Efectivo: C$ 80,000; Tarjeta: C$ 55,000; Transferencia: C$ 90,000; Dólares: $1,500 (equivalente a C$ 54,750 con tipo de cambio de 36.5). El auditor abre su banca en línea y confirma que la suma de transferencias en el banco sume exactamente C$ 90,000, detectando cualquier inconsistencia de inmediato.
 
-### 8. Historial Financiero Multiserie y Previsión de Ingresos (Ventas vs. Costo vs. Utilidad)
-* **¿Qué hace?** Muestra un análisis gráfico comparativo en el tiempo de los ingresos por ventas reales y proyectadas contra el costo real/proyectado de la mercadería vendida y la utilidad neta real/proyectada del negocio.
-* **¿Qué busca resolver?** La incertidumbre financiera y la falta de claridad sobre la rentabilidad real. Enfocarse sólo en ventas brutas puede ocultar que el margen de ganancia es bajo o que los costos están aumentando peligrosamente.
-* **¿Cómo lo hace?** Dibuja tres curvas principales: Ventas (azul), Costos de Ventas (rojo) y Utilidad Neta (verde). Para los periodos futuros proyectados, calcula mediante regresión lineal por mínimos cuadrados ($y = mx + c$) las proyecciones correspondientes, dibujándolas de forma segmentada (líneas punteadas).
-* **¿Por qué se diseñó así?** Para integrar en un solo gráfico la perspectiva comercial (ventas) y la perspectiva financiera (costos y beneficios), permitiendo ver el R² (coeficiente de determinación) que valida la precisión matemática del modelo lineal predictivo.
-* **¿En qué beneficia al negocio?** Facilita la toma de decisiones presupuestarias seguras. El gerente puede ver si el crecimiento de las ventas va acompañado de un aumento en la utilidad neta o si los costos operativos están erosionando el beneficio real.
+### 2. Eficiencia de Arqueo de Caja (Últimos 30 días)
+* **¿Por qué existe? (Justificación):** Los faltantes en caja suelen ignorarse si ocurren en montos pequeños ("robo hormiga"). Sin una métrica agregada que mida la disciplina del cajero en un periodo de tiempo, es imposible premiar la honestidad o detectar malos hábitos operativos.
+* **¿Qué hace? (Definición Operativa):** Calcula la exactitud de los arqueos del local midiendo la proporción de cierres que terminaron con un descuadre de exactamente C$ 0.00 sobre el total de arqueos del mes.
+* **¿Para qué sirve? (Objetivo Estratégico):** Fomentar una cultura de precisión en el manejo de efectivo de mostrador y evaluar objetivamente el desempeño laboral del personal de facturación.
+* **¿Cómo se calcula? (Fórmula y Mecánica):**
+  `Diferencia de Turno = Efectivo Declarado Físicamente - Efectivo Esperado por Sistema`
+  `Eficiencia de Arqueo (%) = (Cierres con Diferencia = 0 / Total de Cierres en 30 días) × 100`
+* **Ejemplo Práctico:** En los últimos 30 días, la sucursal registró 40 cierres de caja. En 38 de ellos, la diferencia de arqueo fue de exactamente C$ 0.00. En 2 cierres, se registraron faltantes de C$ 100 y C$ 50 respectivamente. El sistema calcula la eficiencia del periodo en: `(38 / 40) × 100 = 95.0%`, permitiendo al administrador auditar directamente los 2 turnos con fallas.
 
+### 3. Recálculo Forense de Métodos de Pago desde Logs JSON
+* **¿Por qué existe? (Justificación):** El software de punto de venta puede fallar al escribir en la base de datos o registrar desgloses vacíos en cierres debido a caídas de red. Esto causa que registros antiguos muestren cero en tarjetas o efectivo, rompiendo la integridad de reportes históricos.
+* **¿Qué hace? (Definición Operativa):** Reconstruye de forma dinámica el desglose real de cobros leyendo el log completo de ventas en formato JSON del cierre de caja, actuando como un sistema autolimpiante en el backend.
+* **¿Para qué sirve? (Objetivo Estratégico):** Garantizar la auditabilidad del histórico financiero a largo plazo, evitando lagunas en auditorías retrospectivas.
+* **¿Cómo se calcula? (Fórmula y Mecánica):** El backend lee el log en `detalles_json` del cierre y procesa transacción por transacción:
+  `Efectivo Neto = Suma(Monto Efectivo) + Suma(Monto Dólares × Tasa) - Suma(Cambio Entregado)`
+  `Tarjeta = Suma(Monto Tarjeta)`
+  `Transferencia = Suma(Monto Transferencia)`
+* **Ejemplo Práctico:** Un arqueo del año pasado guardó accidentalmente C$ 0.00 en la columna de Tarjetas. Al ser consultado por la Consola BI, el backend detecta el valor vacío, procesa el log `detalles_json` del cierre y suma 5 transacciones que se cobraron vía tarjeta de crédito por un total de C$ 8,400. El tablero muestra instantáneamente C$ 8,400 en tarjetas, corrigiendo de forma transparente el error contable.
 
-### 9. Simulador Run-Rate y Cumplimiento de Metas Mensuales
-* **¿Qué hace?** Evalúa la progresión de las ventas acumuladas del mes en curso frente a una meta configurable (ej. C$ 600,000) y calcula el pronóstico de cierre de mes.
-* **¿Qué busca resolver?** La falta de visibilidad del avance comercial. Evita sorpresas a fin de mes al alertar anticipadamente si se cumplirá la meta.
-* **¿Cómo lo hace?**
-  $$\text{Cierre Proyectado (Run-Rate)} = \left( \frac{\text{Ventas Acumuladas Mes Actual}}{\text{Días Transcurridos del Mes}} \right) \times \text{Días Totales del Mes}$$
-  $$\text{Brecha Meta} = \text{Cierre Proyectado} - \text{Meta de Ventas}$$
-  - Si la brecha es negativa, calcula:
-    $$\text{Venta Diaria Requerida} = \frac{\text{Meta} - \text{Ventas Acumuladas}}{\text{Días Restantes}}$$
-    $$\text{Aceleración Requerida} = \left( \frac{\text{Venta Diaria Requerida} - \text{Promedio Diario Actual}}{\text{Promedio Diario Actual}} \right) \times 100$$
-* **¿Por qué se diseñó así?** Se diseñó con inputs interactivos para que el gerente simule escenarios (ej. *"¿Qué pasa si subo la meta a C$ 800,000?"*).
-* **¿En qué beneficia al negocio?** Permite implementar medidas correctivas a tiempo (como campañas de marketing o incentivos a vendedores) si se detecta que el Run-Rate proyectado quedará por debajo de la meta.
-
-### 10. Venta Cruzada y Minería de Reglas de Asociación (Market Basket Analysis)
-* **¿Qué hace?** Analiza miles de tickets históricos y propone combinaciones óptimas de productos (combos) que suelen ser comprados juntos.
-* **¿Qué busca resolver?** La baja rotación de ciertos repuestos y la oportunidad perdida de incrementar el ticket promedio de compra por cliente.
-* **¿Cómo lo hace?** Aplica el modelo analítico basado en reglas Apriori:
-  - **Soporte:** Probabilidad de que un ticket contenga el Producto A y el Producto B: $P(A \cap B)$.
-  - **Confianza:** Probabilidad de que lleven B si ya compraron A: $P(B|A)$.
-  - **Elevación (Lift):** Fuerza de la regla.
-    $$\text{Lift} = \frac{P(A \cap B)}{P(A) \times P(B)}$$
-    Un $\text{Lift} > 1.0$ indica que los productos son fuertemente complementarios y no se compran juntos por azar.
-* **¿Por qué se diseñó así?** Se programó en el backend para buscar coocurrencias significativas y calcular sugerencias reales de ahorro en caja.
-* **¿En qué beneficia al negocio?** Incrementa directamente la facturación por cliente. Al sugerir combos basados en datos reales (como pastillas de freno + líquido de frenos con descuento), los vendedores pueden ofrecer venta cruzada efectiva y liberar stock complementario.
-
-### 10b. Tabla Detallada de Repuestos de Mayor Rentabilidad (Top 5 más Rentables)
-* **¿Qué hace?** Muestra los 5 productos con mayor contribución a la utilidad neta del negocio (ordenados por Utilidad Neta total acumulada), desplegando sus nombres completos sin recortar y desglosando unidades, ventas totales, costo/margen promedio y utilidad neta.
-* **¿Qué busca resolver?** La distorsión en la toma de decisiones cuando se mide únicamente el volumen de venta (un producto de bajo costo y alto volumen puede generar menos ganancias que uno de alto valor y margen elevado).
-* **¿Cómo lo hace?** Filtra los datos del periodo y calcula para cada producto:
-  $$\text{Utilidad Neta} = \sum (\text{Cantidad Vendida} \times [\text{Precio Unitario Venta} - \text{Costo Producto}])$$
-  Presenta la información en una tabla responsiva con estilos CSS que permiten el ajuste de texto (`white-space: normal`) para facilitar la lectura del nombre completo de cada repuesto.
-* **¿Por qué se diseñó así?** Se determinó que para analizar la rentabilidad, la utilidad neta y el margen ROI comercial promedio son métricas mucho más valiosas e idóneas que el simple volumen físico o la facturación bruta.
-* **¿En qué beneficia al negocio?** Ayuda a optimizar el portafolio de repuestos. La gerencia puede identificar qué piezas son las verdaderas generadoras de dinero y priorizar su abastecimiento o aplicar estrategias de fidelización para clientes de dichos productos.
-
+### 4. Alertas de Anomalía en Caja y Seguridad
+* **¿Por qué existe? (Justificación):** Mantener un exceso de efectivo acumulado en las cajas de mostrador convierte al local en un objetivo atractivo para robos. Asimismo, mantener sesiones abiertas por más de 24 horas desvirtúa el proceso de cuadre y permite que múltiples cajeros operen sin rendir cuentas individuales.
+* **¿Qué hace? (Definición Operativa):** Analiza continuamente las cajas abiertas y muestra banderas rojas de advertencia si los umbrales de dinero físico en caja o de duración del turno superan los límites seguros.
+* **¿Para qué sirve? (Objetivo Estratégico):** Proteger físicamente el dinero de la tienda mediante depósitos oportunos a bóveda y asegurar la disciplina operativa de cierres de turno diarios.
+* **¿Cómo se calcula? (Fórmula y Mecánica):**
+  - Alerta de Retiro: Si `Efectivo Neto Estimado en Turno > C$ 15,000.00`
+  - Alerta de Horario: Si `(Hora Actual - Hora de Apertura de Turno) > 24 horas`
+* **Ejemplo Práctico:** La Caja 1 lleva acumulados C$ 18,200 de ventas en efectivo en un turno que inició hace 26 horas. La consola de BI muestra de inmediato dos alertas parpadeantes en rojo. El gerente acude al punto de venta, realiza un "Retiro de Seguridad" de C$ 13,000 en el POS (enviándolo a bóveda) y ordena al cajero hacer su cierre de turno, restableciendo el saldo esperado a C$ 5,200 y reduciendo la exposición al riesgo de asalto.
 
 ---
 
-# 📊 DASHBOARD 2: Reporte Financiero Consolidado (`/finances`)
+## 🟡 ENFOQUE 2: Rotación de Inventario (Eficiencia Logística)
 
-Enfocado en la administración general y contabilidad del negocio. Ofrece un diseño limpio en tono claro, optimizado para exportarse a PDF o imprimirse en formato físico A4.
+### 5. Clasificación ABC de Inventario (Distribución y Balance Financiero)
+* **¿Por qué existe? (Justificación):** El catálogo de repuestos automotrices suele tener miles de artículos. Si no se conoce qué productos generan el volumen de negocio y cuáles no rotan, se termina invirtiendo el capital de la empresa en piezas obsoletas mientras se descuidan las de mayor demanda.
+* **¿Qué hace? (Definición Operativa):** Segmenta todos los repuestos según la cantidad de unidades vendidas en un periodo y calcula para cada categoría (A: Alta rotación, B: Media rotación, C: Baja rotación) la cantidad de ítems en catálogo, el stock físico acumulado en bodega y la valoración en córdobas del capital inmovilizado en estanterías.
+* **¿Para qué sirve? (Objetivo Estratégico):** Asignar el capital de trabajo de forma inteligente, permitiendo asegurar compras de Clase A y planificar estrategias de liquidación para el inventario de Clase C.
+* **¿Cómo se calcula? (Fórmula y Mecánica):**
+  - Clase A: Ventas > 10 unidades. | Clase B: Ventas de 4 a 10 unidades. | Clase C: Ventas <= 3 unidades.
+  - `Capital Inmovilizado por Clase = Suma(Stock Físico en Bodega × Costo Compra de cada Repuesto)`
+* **Ejemplo Práctico:** El análisis ABC muestra que la Clase C contiene 1,500 productos con un stock acumulado de 4,000 unidades, representando C$ 380,000 de capital congelado en estantes sin generar ventas. En contraste, la Clase A tiene un capital inmovilizado de C$ 90,000 pero rota 12 veces más rápido. El gerente decide congelar las compras de Clase C y crea combos promocionales para liquidar ese stock muerto, liberando flujo de efectivo.
 
-### 11. Margen Comercial y ROI por Categoría
-* **¿Qué hace?** Analiza el retorno porcentual de inversión real obtenido por el negocio sobre las ventas de repuestos, segmentado por las principales categorías de productos.
-* **¿Qué busca resolver?** La incertidumbre sobre qué repuestos están dejando ganancias reales y cuáles tienen márgenes de ganancia demasiado bajos.
-* **¿Cómo lo hace?** Compara el precio de venta ($P_v$) con el costo de adquisición del proveedor ($C_a$).
-  $$\text{Margen Comercial (\%)} = \left( \frac{P_v - C_a}{C_a} \right) \times 100$$
-* **¿Por qué se diseñó así?** Se representa en gráficos de barra claros para identificar de un vistazo las categorías más lucrativas.
-* **¿En qué beneficia al negocio?** Ayuda a redefinir precios. Si la categoría de "Suspensión" tiene un ROI muy bajo, el gerente puede ajustar la lista de precios o buscar un proveedor más económico.
+### 6. Sugerencia de Reposición Automática de Clase A
+* **¿Por qué existe? (Justificación):** Los repuestos de alta rotación (filtros, pastillas de freno, bujías) generan el flujo transaccional diario. Quedarse sin stock de estas piezas clave debido a olvidos en compras provoca pérdida inmediata de ventas y de clientes recurrentes.
+* **¿Qué hace? (Definición Operativa):** Identifica todos los productos de Clase A (alta rotación) cuyo stock disponible ha caído a niveles críticos (5 unidades o menos) y calcula la cantidad óptima a comprar junto con el presupuesto de compra estimado.
+* **¿Para qué sirve? (Objetivo Estratégico):** Automatizar y agilizar el proceso de adquisiciones y evitar la ruptura de stock en productos estrella.
+* **¿Cómo se calcula? (Fórmula y Mecánica):**
+  Si Producto es Clase A y `Existencia Actual <= 5`:
+  - `Cantidad Sugerida a Comprar = Máximo(10, 15 - Existencia Actual)`
+  - `Presupuesto Proyectado = Cantidad Sugerida × Costo de Compra`
+* **Ejemplo Práctico:** El "Filtro de Aceite Hilux" (Clase A) cuenta con solo 2 unidades físicas en la estantería. El motor analítico de la consola BI calcula que se requiere comprar: `15 - 2 = 13` unidades (ya que 13 es mayor al pedido mínimo de 10). A un costo unitario de C$ 180, el sistema genera de forma automática una recomendación de compra de 13 unidades por un valor de C$ 2,340, lista para ser enviada al proveedor.
 
-### 12. Valoración de Capital en Bodega (Costo vs. Venta)
-* **¿Qué hace?** Totaliza el capital neto invertido en la mercadería física almacenada y proyecta el valor total a precio de venta al público.
-* **¿Qué busca resolver?** La falta de un inventario valorado para la declaración de activos y contabilidad general.
-* **¿Cómo lo hace?** Ejecuta la suma de existencias activas multiplicadas por el costo y la venta:
-  $$\text{Valor Costo} = \sum (\text{Existencia} \times \text{Costo})$$
-  $$\text{Valor Venta} = \sum (\text{Existencia} \times \text{Precio Venta})$$
-* **¿Por qué se diseñó así?** Muestra ambos indicadores side-by-side para evidenciar el margen bruto de ganancia latente en la bodega.
-* **¿En qué beneficia al negocio?** Facilita la auditoría patrimonial del local y demuestra el respaldo financiero de la empresa ante solicitudes de crédito bancario.
+### 7. Pérdida Proyectada por Quiebre de Stock (Stockout Loss)
+* **¿Por qué existe? (Justificación):** Tradicionalmente, cuando un producto se agota (stock = 0), su ausencia no se refleja en los balances de pérdidas contables, ya que simplemente "no hubo venta". No obstante, la pérdida es real y afecta directamente la rentabilidad mensual.
+* **¿Qué hace? (Definición Operativa):** Identifica los repuestos que están agotados (Existencia = 0) pero registran ventas históricas en los últimos 180 días, y calcula cuánto dinero diario está dejando de percibir el negocio tanto en ingresos brutos como en utilidad neta.
+* **¿Para qué sirve? (Objetivo Estratégico):** Cuantificar el costo de oportunidad del desabastecimiento, permitiendo al administrador priorizar compras basándose en el impacto financiero de la escasez.
+* **¿Cómo se calcula? (Fórmula y Mecánica):**
+  - `Ventas Diarias Promedio (180d) = Unidades Vendidas en 180 días / 180`
+  - `Pérdida Diaria en Ventas (C$) = Ventas Diarias Promedio × Precio Venta Público`
+  - `Pérdida Diaria en Utilidad (C$) = Ventas Diarias Promedio × (Precio Venta Público - Costo Compra)`
+* **Ejemplo Práctico:** Las "Pastillas de Freno Hilux" están agotadas (stock = 0). Históricamente se vendieron 180 unidades en los últimos 180 días (promedio de 1 unidad diaria). Con un precio de venta de C$ 900 y costo de C$ 600, el sistema alerta que el negocio pierde C$ 900 diarios en facturación y C$ 300 diarios en utilidad neta. Si el repuesto tarda 10 días en llegar, la pérdida total acumulada de ganancia real es de C$ 3,000, justificando realizar un pedido express.
+
+### 8. Riesgo de Capital Estancado (Dead Stock)
+* **¿Por qué existe? (Justificación):** El inventario almacenado en bodega que no rota representa dinero en efectivo congelado. Con el tiempo, estas piezas corren el riesgo de dañarse, volverse obsoletas o requerir altos costos de espacio físico.
+* **¿Qué hace? (Definición Operativa):** Alerta y totaliza el costo financiero de aquellos productos en existencia física (Stock > 0) que no han registrado una sola venta en los últimos 90 días o más.
+* **¿Para qué sirve? (Objetivo Estratégico):** Identificar el stock muerto y diseñar estrategias de salida (como descuentos agresivos o paquetes de promoción) para retornar liquidez al negocio.
+* **¿Cómo se calcula? (Fórmula y Mecánica):** Filtra productos activos donde `Existencia Actual > 0` y la fecha de su última venta registrada sea mayor a 90 días (o no posean ventas en absoluto):
+  - `Capital Estancado (C$) = Suma(Existencia Actual de cada Producto inactivo × Costo Compra)`
+* **Ejemplo Práctico:** Un lote de 8 "Alternadores Toyota Corolla 2005" con un costo unitario de C$ 2,500 (total C$ 20,000) no ha tenido ninguna venta en los últimos 110 días. El sistema los cataloga como "Riesgo de Capital Estancado" sumando C$ 20,000 al indicador global. El administrador decide lanzar una promoción especial ofreciendo el alternador a precio de costo para recuperar el efectivo atrapado y destinarlo a mercadería de alta rotación.
+
+### 9. Días de Inventario Disponible (DIO)
+* **¿Por qué existe? (Justificación):** Para el análisis de salud logística general, el volumen físico bruto de la bodega (ej. 10,000 piezas) no dice nada sobre su velocidad de rotación. Se requiere una métrica de tiempo que traduzca el tamaño físico del stock en tiempo estimado de liquidación.
+* **¿Qué hace? (Definición Operativa):** Calcula cuántos días le tomaría al negocio agotar el inventario actual basándose en el ritmo de ventas de los últimos 30 días.
+* **¿Para qué sirve? (Objetivo Estratégico):** Medir la agilidad de la bodega, comparar la eficiencia logística contra estándares de la industria y evitar el sobrestock.
+* **¿Cómo se calcula? (Fórmula y Mecánica):**
+  - `Venta Diaria Promedio (30d) = Unidades totales vendidas en 30 días / 30`
+  - `DIO = Stock Físico Total en Bodega / Venta Diaria Promedio (30d)`
+* **Ejemplo Práctico:** El almacén de Multirepuestos RG cuenta con 6,000 repuestos en stock. En el último mes, se vendieron un total de 900 repuestos (promedio de 30 unidades al día). El DIO resultante es: `6,000 / 30 = 200 días`. Si el objetivo del negocio es mantener el DIO en 120 días, la administración sabe que debe suspender compras masivas no urgentes hasta que el volumen en bodega baje y la liquidez aumente.
 
 ---
 
-# 💵 DASHBOARD 3: Punto de Venta (POS) y Gestión de Caja (`/cash-report`)
+## 🔵 ENFOQUE 3: Rentabilidad y Proyección (Planificación Financiera)
 
-El panel transaccional cotidiano del local, donde operan los cajeros y se registra la entrada de dinero en efectivo.
+### 10. Regresión Financiera de Ventas, Costos y Utilidad Neta
+* **¿Por qué existe? (Justificación):** Analizar únicamente las ventas históricas de forma empírica impide anticipar la rentabilidad futura. Planificar el crecimiento empresarial requiere modelos matemáticos que estimen por separado cómo evolucionarán los ingresos y los costos para asegurar que las ganancias sigan subiendo.
+* **¿Qué hace? (Definición Operativa):** Procesa el histórico de ventas brutas, costo de adquisición (COGS) y utilidad neta real mediante regresión de mínimos cuadrados e incluye proyecciones para los meses futuros con líneas de tendencia y cálculo de R² (coeficiente de determinación).
+* **¿Para qué sirve? (Objetivo Estratégico):** Evaluar de forma confiable la viabilidad a futuro del negocio, proyectar márgenes de utilidad neta y programar inversiones importantes basándose en tendencias estadísticas sólidas.
+* **¿Cómo se calcula? (Fórmula y Mecánica):**
+  Ajusta la ecuación lineal `y = m · x + b` para cada una de las series (Venta, Costo, Utilidad):
+  - `y` = Monto estimado | `x` = Período de tiempo (mes proyectado)
+  - `m` = Coeficiente de inclinación (tendencia de crecimiento/decrecimiento mensual)
+  - `b` = Intercepto de la recta | Se calcula `R²` para asegurar el ajuste estadístico del modelo lineal.
+* **Ejemplo Práctico:** En los últimos 4 meses, la utilidad neta mensual ha crecido a un ritmo constante de C$ 8,000 mensuales, con un R² de 0.96. El algoritmo proyecta que para los meses 5 y 6 la utilidad neta será de C$ 52,000 y C$ 60,000 respectivamente. El gerente utiliza esta proyección positiva para contratar un ayudante de bodega adicional, sabiendo que el flujo de efectivo proyectado respaldará el gasto operativo extra.
 
-### 13. Arqueo Ciego de Caja y Auditoría de Descuadres
-* **¿Qué hace?** Obliga al cajero a contar y declarar físicamente el dinero de la caja al finalizar el turno, sin que el sistema le muestre la cantidad esperada en pantalla.
-* **¿Qué busca resolver?** El fraude de caja, donde el cajero ajusta o sustrae dinero sabiendo exactamente cuánto calcula el sistema.
-* **¿Cómo lo hace?** El cajero ingresa el monto total físico. El sistema realiza la comparación interna y registra la diferencia:
-  $$\text{Diferencia} = \text{Monto Declarado} - \text{Monto Esperado}$$
-* **¿Por qué se diseñó así?** Es el estándar de control interno contable de "arqueo ciego" para garantizar total objetividad en la rendición de cuentas.
-* **¿En qué beneficia al negocio?** Garantiza la honestidad operacional. Cualquier descuadre es registrado de inmediato con el nombre del usuario y la fecha para que el administrador tome medidas correctivas.
+### 11. Simulador Run-Rate y Cumplimiento de Metas Mensuales
+* **¿Por qué existe? (Justificación):** Evaluar el cumplimiento de las metas comerciales al final del mes es una estrategia pasiva. Si las ventas van a la baja en la primera quincena, se deben tomar acciones comerciales inmediatas (como rebajas o metas dinámicas de ventas) antes de que el periodo termine.
+* **¿Qué hace? (Definición Operativa):** Estima en tiempo real el cierre de ventas del mes en curso basándose en la venta promedio diaria actual, y calcula la brecha respecto a la meta configurada, la venta diaria necesaria para corregir déficits y la aceleración comercial requerida.
+* **¿Para qué sirve? (Objetivo Estratégico):** Controlar el presupuesto de ingresos mensuales de manera proactiva, aplicando correctivos en el transcurso del mes.
+* **¿Cómo se calcula? (Fórmula y Mecánica):**
+  - `Cierre Proyectado = (Venta Acumulada Mes / Días Transcurridos del Mes) × Días Totales del Mes`
+  - `Brecha Meta = Cierre Proyectado - Meta Configurada`
+  Si la brecha es negativa:
+  - `Venta Diaria Requerida = (Meta Configurada - Venta Acumulada Mes) / Días Restantes del Mes`
+  - `Aceleración Requerida (%) = ((Venta Diaria Requerida - Promedio Diario Actual) / Promedio Diario Actual) × 100`
+* **Ejemplo Práctico:** La meta de junio es C$ 600,000. Al día 12 del mes, la venta acumulada es de C$ 200,000 (promedio diario de C$ 16,666). El sistema calcula el cierre proyectado: `(200,000 / 12) × 30 = C$ 500,000`. Esto genera un déficit proyectado de -C$ 100,000. El simulador indica que en los 18 días restantes se debe facturar un promedio diario de C$ 22,222, lo que exige una aceleración del `((22,222 - 16,666) / 16,666) × 100 = +33.3%`. El gerente convoca a los vendedores y lanza una campaña de ventas de kits de afinamiento para lograr la aceleración requerida.
 
-### 14. Control de Egresos e Ingresos Operativos de Caja
-* **¿Qué hace?** Permite registrar entradas y salidas de efectivo justificadas dentro del turno abierto (como pago de fletes o compra de insumos de limpieza).
-* **¿Qué busca resolver?** La pérdida de control sobre los gastos menores (caja chica), que terminan descuadrando los arqueos de caja al final del día.
-* **¿Cómo lo hace?** Modifica dinámicamente el dinero esperado sumando o restando el egreso/ingreso documentado.
-  $$V_{\text{esperado}} = V_{\text{inicial}} + \text{Ventas en Efectivo} + \text{Ingresos Extras} - \text{Egresos Registrados}$$
-* **¿Por qué se diseñó así?** Obliga a ingresar una descripción obligatoria y un monto para cada movimiento transaccional.
-* **¿En qué beneficia al negocio?** Asegura que cada centavo que entra o sale de la caja chica esté plenamente justificado y registrado en el historial de auditoría de cierres del local.
+### 12. Venta Cruzada y Minería de Reglas de Asociación (Algoritmo Apriori)
+* **¿Por qué existe? (Justificación):** En repuestos automotrices, la mayoría de reparaciones requieren piezas complementarias (ej. pastillas con discos de freno, amortiguadores con bases). Si el vendedor no ofrece estos artículos relacionados, el negocio pierde facturación y el cliente sufre retrasos al tener que regresar por piezas olvidadas.
+* **¿Qué hace? (Definición Operativa):** Analiza miles de combinaciones de productos en facturas históricas para identificar qué repuestos se compran juntos con mayor frecuencia, calculando la probabilidad y fuerza de la asociación (Soporte, Confianza y Lift).
+* **¿Para qué sirve? (Objetivo Estratégico):** Diseñar combos comerciales basados en datos duros de consumo para aumentar la venta cruzada y el ticket promedio de compra por cliente.
+* **¿Cómo se calcula? (Fórmula y Mecánica):**
+  - `Soporte(A ∩ B) = Tickets con A y B / Total Tickets`
+  - `Confianza(A -> B) = Tickets con A y B / Tickets con A`
+  - `Lift(A -> B) = Confianza(A -> B) / Soporte(B)`
+  Un valor de `Lift > 1.0` demuestra que la presencia del producto A estimula significativamente la compra del producto B de forma no aleatoria.
+* **Ejemplo Práctico:** El motor Apriori analiza 4,000 facturas y detecta que el 65% de quienes compraron "Bujías de Iridio" compraron también "Cables de Bujía", arrojando un Lift de 3.8. El sistema propone formalmente la creación del "Combo Encendido RG" (Bujías + Cables) con un 8% de descuento. Al ofrecerlo en el mostrador, el ticket de venta promedio sube de C$ 800 a C$ 1,250.
+
+### 13. Top 5 Repuestos de Mayor Rentabilidad (Utilidad Neta total)
+* **¿Por qué existe? (Justificación):** Centrarse solo en los productos que más se venden ("best sellers" por volumen) es un error común. Un producto de bajo costo y alto volumen de venta (ej. arandelas) puede aportar menos ganancia real al negocio que un repuesto de alta gama que rota menos pero genera márgenes masivos.
+* **¿Qué hace? (Definición Operativa):** Clasifica y muestra en una tabla de alta legibilidad (con nombres de productos completos) los 5 repuestos que mayor utilidad neta total han aportado en el rango de fechas seleccionado.
+* **¿Para qué sirve? (Objetivo Estratégico):** Direccionar las estrategias comerciales de marketing y compras a las piezas que realmente sostienen la rentabilidad del negocio.
+* **¿Cómo se calcula? (Fórmula y Mecánica):**
+  Para cada artículo vendido en el periodo:
+  - `Utilidad Neta por Artículo = Cantidad Vendida × (Precio Venta Público - Costo Compra)`
+  - Se ordenan de forma descendente en base a la utilidad neta total y se listan los primeros 5.
+* **Ejemplo Práctico:** La "Cremallera de Dirección Hilux" vendió solo 8 unidades en el mes a un precio de C$ 12,000 (con costo de C$ 8,000), aportando `8 × 4,000 = C$ 32,000` de utilidad neta. En contraste, las "Bujías Standard" vendieron 600 unidades a C$ 100 (con costo de C$ 70), aportando `600 × 30 = C$ 18,000`. El sistema sitúa la cremallera de dirección en el primer puesto de rentabilidad, demostrando que la cremallera merece mayor prioridad de stock y publicidad que la bujía común.
+
+---
+
+## 🔴 ENFOQUE 4: Reporte Financiero Consolidado (`/finances`)
+
+### 14. Margen Comercial y ROI por Categoría Financiera
+* **¿Por qué existe? (Justificación):** Evaluar los márgenes producto por producto impide a la administración tener una visión global. El negocio necesita clasificar su rentabilidad por familias o categorías (Motores, Frenos, Suspensión) para definir políticas de precios generales y presupuestar las compras anuales.
+* **¿Qué hace? (Definición Operativa):** Agrupa las ventas por categoría contable y calcula el Retorno de Inversión (ROI) comercial porcentual promedio obtenido sobre los costos de adquisición de la mercadería vendida.
+* **¿Para qué sirve? (Objetivo Estratégico):** Identificar qué líneas de negocio son sumamente rentables y renegociar precios con proveedores de categorías con bajo rendimiento.
+* **¿Cómo se calcula? (Fórmula y Mecánica):**
+  - `ROI Categoría (%) = ((Ventas Totales de la Categoría - Costo de la Mercadería Vendida) / Costo de la Mercadería Vendida) × 100`
+* **Ejemplo Práctico:** La categoría "Frenos" genera C$ 300,000 en ventas con un costo de compra de C$ 187,500. Su ROI comercial es del `((300,000 - 187,500) / 187,500) × 100 = 60.0%`. Por otro lado, la categoría "Sistema Eléctrico" genera C$ 100,000 en ventas con un costo de C$ 80,000 (ROI de 25.0%). Al ver el reporte contable, el administrador decide ajustar la lista de precios del sistema eléctrico para llevar el ROI de esa línea a un mínimo del 40%.
+
+### 15. Valoración de Capital de Trabajo en Bodega (Costo vs. Venta Proyectada)
+* **¿Por qué existe? (Justificación):** El inventario de una importadora o distribuidora de repuestos representa la mayor parte de su patrimonio. No conocer el valor monetario preciso de las existencias impide presentar balances financieros verídicos a bancos para solicitar créditos o evaluar la salud de la inversión.
+* **¿Qué hace? (Definición Operativa):** Suma el costo de adquisición de todas las existencias en inventario y calcula simultáneamente el valor potencial de venta, detallando de esta forma el margen latente del almacén.
+* **¿Para qué sirve? (Objetivo Estratégico):** Respaldar balances generales corporativos, auditar pérdidas en caso de siniestros cubiertos por seguros y conocer la ganancia potencial latente en bodega.
+* **¿Cómo se calcula? (Fórmula y Mecánica):**
+  - `Valoración a Costo (C$) = Suma(Existencia Actual de cada Repuesto × Costo Compra)`
+  - `Valoración a Venta (C$) = Suma(Existencia Actual de cada Repuesto × Precio Venta)`
+  - `Ganancia Latente en Bodega = Valoración a Venta - Valoración a Costo`
+* **Ejemplo Práctico:** La base de datos registra 12,000 piezas en el inventario. La sumatoria a costo es de C$ 1,400,000, y a precio de venta es de C$ 2,250,000. El administrador puede certificar ante una entidad bancaria que la empresa cuenta con C$ 1.4 millones en activos realizables de inventario y proyecta un beneficio bruto potencial de C$ 850,000 sobre esas existencias.
+
+---
+
+## 🔴 ENFOQUE 5: POS y Gestión Operativa de Caja (`/cash-report`)
+
+### 16. Arqueo Ciego de Caja y Auditoría Operativa
+* **¿Por qué existe? (Justificación):** En un arqueo "abierto", donde el cajero puede ver en pantalla que el sistema espera C$ 7,500 en efectivo, si el cajero cuenta físicamente C$ 7,550 puede sustraer los C$ 50 sobrantes sin levantar sospechas. Si cuenta C$ 7,450, puede rellenarlo con su dinero para ocultar un error de cambio. Ambos escenarios ocultan problemas operativos y distorsionan la auditoría.
+* **¿Qué hace? (Definición Operativa):** Obliga al cajero a ingresar de forma manual el dinero físico contado en caja sin mostrarle el cálculo del sistema. El sistema realiza la comparación a nivel de base de datos e informa de inmediato la diferencia al administrador.
+* **¿Para qué sirve? (Objetivo Estratégico):** Garantizar la veracidad e imparcialidad del proceso de arqueo de caja chica y desalentar irregularidades en el mostrador.
+* **¿Cómo se calcula? (Fórmula y Mecánica):**
+  - `Diferencia de Arqueo = Efectivo Declarado (Ingresado por Cajero) - Efectivo Calculado por el Sistema`
+* **Ejemplo Práctico:** Al finalizar el turno de la tarde, el cajero cuenta el efectivo físico en su gaveta e introduce en el sistema C$ 5,820. El sistema calcula internamente un esperado de C$ 5,850 basándose en los registros de facturación de las ventas del día. El arqueo se procesa con una diferencia de -C$ 30.00 (faltante), enviando la alerta al administrador y guardando un log forense inalterable con fecha, hora y cajero.
+
+### 17. Control de Egresos e Ingresos Operativos de Caja Chica
+* **¿Por qué existe? (Justificación):** Durante la operación diaria, es necesario utilizar efectivo directo de la caja para gastos menores rápidos (fletes, agua embotellada, insumos rápidos). Si estos egresos menores no se registran en el mismo instante, el arqueo final del cajero arrojará un faltante inexplicable, entorpeciendo la auditoría contable.
+* **¿Qué hace? (Definición Operativa):** Registra y clasifica las entradas y salidas excepcionales de efectivo realizadas dentro del turno de caja abierto, detallando el monto, el concepto y recalculando en tiempo real el efectivo que debe haber físicamente.
+* **¿Para qué sirve? (Objetivo Estratégico):** Transparentar el gasto menor operativo del negocio y evitar la generación de falsos descuadres en los cierres de turno.
+* **¿Cómo se calcula? (Fórmula y Mecánica):**
+  - `Efectivo Esperado = Saldo Inicial de Apertura + Ventas en Efectivo + Ingresos Registrados - Egresos Registrados`
+* **Ejemplo Práctico:** Una caja inicia el día con C$ 2,000 de fondo de cambio. Realiza ventas en efectivo por C$ 5,000. Por la tarde, el administrador retira C$ 350 para pagar la papelería de la oficina y registra en el POS: "Egreso de Caja: Compra de Resmas de Papel - C$ 350". El sistema calcula que al final del día el efectivo esperado es de `2,000 + 5,000 - 350 = C$ 6,650`. El cajero entrega C$ 6,650 y la caja cuadra perfectamente gracias al registro oportuno de los egresos.
+
+---
+
+# 🛡️ DEFENSA DE ALINEAMIENTO: CUMPLIMIENTO ABSOLUTO DE KPIs
+
+La arquitectura de tres tableros diseñada para Multirepuestos RG cumple con la totalidad de los KPIs gracias a tres principios metodológicos fundamentales:
+
+1. **Separación de Niveles de Decisión (Roles Coherentes):**
+   * **Operativo:** El cajero opera exclusivamente el *Punto de Venta* (`/cash-report`), interactuando únicamente con el arqueo ciego y los movimientos de egresos cotidianos. Esto evita filtraciones de márgenes de beneficio.
+   * **Táctico:** El contador visualiza el *Reporte Financiero* (`/finances`), encargado del balance de bodega y el ROI contable por categorías para auditoría tributaria y patrimonial.
+   * **Estratégico:** El gerente dispone del *Panel de BI* (`/bi-console`), desde donde toma decisiones críticas y proyecta compras y ventas con la analítica más avanzada sin interferir con la operación diaria.
+
+2. **Diferenciación Estilística por Escenario:**
+   * La Consola BI utiliza el **modo oscuro cyberpunk** para facilitar la concentración analítica y mitigar el agotamiento visual del gerente.
+   * El Reporte Financiero utiliza un **modo claro clásico de alto contraste** optimizado para su exportación limpia y lectura en PDF o impresión en papel físico.
+
+3. **Prevención de Pérdidas y Control de Riesgos Activo:**
+   Los dashboards no son meros visualizadores pasivos de datos; son sistemas activos que **previenen fugas** mediante alarmas operativas en efectivo, automatizan compras críticas de reposición logrando mantener el stock estrella, y visibilizan costos ocultos calculando la utilidad neta diaria que se pierde por desabastecimiento.

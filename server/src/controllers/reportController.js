@@ -479,18 +479,16 @@ const getBiMetrics = async (req, res) => {
             : 0;
 
         // 3. Riesgo de Estancamiento (existencia > 0 sin ventas en el período seleccionado)
-        // Usamos NOT EXISTS para evitar fallas si hay NULLs en dv.id_producto
         const [stagnantResult] = await db.query(`
             SELECT COUNT(*) AS total
             FROM productos p
-            WHERE p.activo = 1 AND p.existencia > 0 AND NOT EXISTS (
-                SELECT 1
+            LEFT JOIN (
+                SELECT DISTINCT dv.id_producto
                 FROM detalle_ventas dv
                 JOIN ventas v ON dv.id_venta = v.id_venta
-                WHERE dv.id_producto = p.id_producto
-                  AND v.estado = 'COMPLETADA'
-                  AND ${stgFilter.replace(/v_in/g, 'v')}
-            )
+                WHERE v.estado = 'COMPLETADA' AND ${stgFilter.replace(/v_in/g, 'v')}
+            ) AS sold ON p.id_producto = sold.id_producto
+            WHERE p.activo = 1 AND p.existencia > 0 AND sold.id_producto IS NULL
         `, stgParams);
         const riesgo_estancamiento = stagnantResult[0]?.total || 0;
 
@@ -503,21 +501,23 @@ const getBiMetrics = async (req, res) => {
                 p.nombre, 
                 p.existencia, 
                 p.venta AS precio,
-                COALESCE((
-                    SELECT SUM(dv_in.cantidad)
-                    FROM detalle_ventas dv_in
-                    JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
-                    WHERE dv_in.id_producto = p.id_producto 
-                      AND v_in.estado = 'COMPLETADA' 
-                      AND ${stgFilter}
-                ), 0) AS unidades_vendidas,
-                (
-                    SELECT MAX(v2.fecha)
-                    FROM detalle_ventas dv2
-                    JOIN ventas v2 ON dv2.id_venta = v2.id_venta
-                    WHERE dv2.id_producto = p.id_producto AND v2.estado = 'COMPLETADA'
-                ) AS ultima_venta
+                COALESCE(sub_sales.unidades, 0) AS unidades_vendidas,
+                sub_last.ultima_venta
             FROM productos p
+            LEFT JOIN (
+                SELECT dv_in.id_producto, SUM(dv_in.cantidad) AS unidades
+                FROM detalle_ventas dv_in
+                JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
+                WHERE v_in.estado = 'COMPLETADA' AND ${stgFilter}
+                GROUP BY dv_in.id_producto
+            ) AS sub_sales ON p.id_producto = sub_sales.id_producto
+            LEFT JOIN (
+                SELECT dv2.id_producto, MAX(v2.fecha) AS ultima_venta
+                FROM detalle_ventas dv2
+                JOIN ventas v2 ON dv2.id_venta = v2.id_venta
+                WHERE v2.estado = 'COMPLETADA'
+                GROUP BY dv2.id_producto
+            ) AS sub_last ON p.id_producto = sub_last.id_producto
             WHERE p.activo = 1 AND p.existencia > 0
             HAVING unidades_vendidas <= 3
             ORDER BY unidades_vendidas ASC, p.existencia * p.venta DESC
@@ -533,15 +533,15 @@ const getBiMetrics = async (req, res) => {
                 SELECT 
                     p.existencia,
                     p.venta AS precio,
-                    COALESCE((
-                        SELECT SUM(dv_in.cantidad)
-                        FROM detalle_ventas dv_in
-                        JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
-                        WHERE dv_in.id_producto = p.id_producto 
-                          AND v_in.estado = 'COMPLETADA' 
-                          AND ${stgFilter}
-                    ), 0) AS unidades_vendidas
+                    COALESCE(sub_sales.unidades, 0) AS unidades_vendidas
                 FROM productos p
+                LEFT JOIN (
+                    SELECT dv_in.id_producto, SUM(dv_in.cantidad) AS unidades
+                    FROM detalle_ventas dv_in
+                    JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
+                    WHERE v_in.estado = 'COMPLETADA' AND ${stgFilter}
+                    GROUP BY dv_in.id_producto
+                ) AS sub_sales ON p.id_producto = sub_sales.id_producto
                 WHERE p.activo = 1 AND p.existencia > 0
             ) AS sub;
         `, stgParams);
@@ -554,57 +554,44 @@ const getBiMetrics = async (req, res) => {
         if (startDate && endDate) {
             const { from, to } = getDateRange(startDate, endDate);
             [weeklySalesResult] = await db.query(`
-                SELECT * FROM (
-                    SELECT 
-                        sub.año_semana,
-                        sub.etiqueta,
-                        SUM(sub.total_venta) AS total,
-                        SUM(sub.total_costo) AS total_costo
-                    FROM (
-                        SELECT 
-                            v.id_venta,
-                            YEARWEEK(v.fecha, 1) AS año_semana,
-                            DATE_FORMAT(v.fecha, '%d/%m') AS etiqueta,
-                            v.total_venta,
-                            COALESCE((
-                                SELECT SUM(dv_in.cantidad * p_in.costo)
-                                FROM detalle_ventas dv_in
-                                JOIN productos p_in ON dv_in.id_producto = p_in.id_producto
-                                WHERE dv_in.id_venta = v.id_venta
-                            ), 0) AS total_costo
-                        FROM ventas v
-                        WHERE v.estado = 'COMPLETADA' AND v.fecha >= ? AND v.fecha <= ?
-                    ) sub
-                    GROUP BY sub.año_semana, sub.etiqueta
-                    ORDER BY sub.año_semana DESC
-                ) sub2
+                SELECT 
+                    YEARWEEK(v.fecha, 1) AS año_semana,
+                    DATE_FORMAT(v.fecha, '%d/%m') AS etiqueta,
+                    SUM(v.total_venta) AS total,
+                    SUM(COALESCE(costos.total_costo, 0)) AS total_costo
+                FROM ventas v
+                LEFT JOIN (
+                    SELECT dv_in.id_venta, SUM(dv_in.cantidad * p_in.costo) AS total_costo
+                    FROM detalle_ventas dv_in
+                    JOIN productos p_in ON dv_in.id_producto = p_in.id_producto
+                    JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
+                    WHERE v_in.estado = 'COMPLETADA' AND v_in.fecha >= ? AND v_in.fecha <= ?
+                    GROUP BY dv_in.id_venta
+                ) AS costos ON v.id_venta = costos.id_venta
+                WHERE v.estado = 'COMPLETADA' AND v.fecha >= ? AND v.fecha <= ?
+                GROUP BY año_semana, etiqueta
                 ORDER BY año_semana ASC;
-            `, [from, to]);
+            `, [from, to, from, to]);
         } else {
             [weeklySalesResult] = await db.query(`
                 SELECT * FROM (
                     SELECT 
-                        sub.año_semana,
-                        sub.etiqueta,
-                        SUM(sub.total_venta) AS total,
-                        SUM(sub.total_costo) AS total_costo
-                    FROM (
-                        SELECT 
-                            v.id_venta,
-                            YEARWEEK(v.fecha, 1) AS año_semana,
-                            DATE_FORMAT(v.fecha, '%d/%m') AS etiqueta,
-                            v.total_venta,
-                            COALESCE((
-                                SELECT SUM(dv_in.cantidad * p_in.costo)
-                                FROM detalle_ventas dv_in
-                                JOIN productos p_in ON dv_in.id_producto = p_in.id_producto
-                                WHERE dv_in.id_venta = v.id_venta
-                            ), 0) AS total_costo
-                        FROM ventas v
-                        WHERE v.estado = 'COMPLETADA' AND YEARWEEK(v.fecha, 1) < YEARWEEK(NOW(), 1)
-                    ) sub
-                    GROUP BY sub.año_semana, sub.etiqueta
-                    ORDER BY sub.año_semana DESC
+                        YEARWEEK(v.fecha, 1) AS año_semana,
+                        DATE_FORMAT(v.fecha, '%d/%m') AS etiqueta,
+                        SUM(v.total_venta) AS total,
+                        SUM(COALESCE(costos.total_costo, 0)) AS total_costo
+                    FROM ventas v
+                    LEFT JOIN (
+                        SELECT dv_in.id_venta, SUM(dv_in.cantidad * p_in.costo) AS total_costo
+                        FROM detalle_ventas dv_in
+                        JOIN productos p_in ON dv_in.id_producto = p_in.id_producto
+                        JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
+                        WHERE v_in.estado = 'COMPLETADA' AND YEARWEEK(v_in.fecha, 1) < YEARWEEK(NOW(), 1)
+                        GROUP BY dv_in.id_venta
+                    ) AS costos ON v.id_venta = costos.id_venta
+                    WHERE v.estado = 'COMPLETADA' AND YEARWEEK(v.fecha, 1) < YEARWEEK(NOW(), 1)
+                    GROUP BY año_semana, etiqueta
+                    ORDER BY año_semana DESC
                     LIMIT 8
                 ) sub2
                 ORDER BY año_semana ASC;
@@ -727,57 +714,44 @@ const getBiMetrics = async (req, res) => {
         if (startDate && endDate) {
             const { from, to } = getDateRange(startDate, endDate);
             [dailySalesResult] = await db.query(`
-                SELECT * FROM (
-                    SELECT 
-                        sub.dia,
-                        sub.etiqueta,
-                        SUM(sub.total_venta) AS total,
-                        SUM(sub.total_costo) AS total_costo
-                    FROM (
-                        SELECT 
-                            v.id_venta,
-                            DATE(v.fecha) AS dia,
-                            DATE_FORMAT(v.fecha, '%d/%m') AS etiqueta,
-                            v.total_venta,
-                            COALESCE((
-                                SELECT SUM(dv_in.cantidad * p_in.costo)
-                                FROM detalle_ventas dv_in
-                                JOIN productos p_in ON dv_in.id_producto = p_in.id_producto
-                                WHERE dv_in.id_venta = v.id_venta
-                            ), 0) AS total_costo
-                        FROM ventas v
-                        WHERE v.estado = 'COMPLETADA' AND v.fecha >= ? AND v.fecha <= ?
-                    ) sub
-                    GROUP BY sub.dia, sub.etiqueta
-                    ORDER BY sub.dia DESC
-                ) sub2
+                SELECT 
+                    DATE(v.fecha) AS dia,
+                    DATE_FORMAT(v.fecha, '%d/%m') AS etiqueta,
+                    SUM(v.total_venta) AS total,
+                    SUM(COALESCE(costos.total_costo, 0)) AS total_costo
+                FROM ventas v
+                LEFT JOIN (
+                    SELECT dv_in.id_venta, SUM(dv_in.cantidad * p_in.costo) AS total_costo
+                    FROM detalle_ventas dv_in
+                    JOIN productos p_in ON dv_in.id_producto = p_in.id_producto
+                    JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
+                    WHERE v_in.estado = 'COMPLETADA' AND v_in.fecha >= ? AND v_in.fecha <= ?
+                    GROUP BY dv_in.id_venta
+                ) AS costos ON v.id_venta = costos.id_venta
+                WHERE v.estado = 'COMPLETADA' AND v.fecha >= ? AND v.fecha <= ?
+                GROUP BY dia, etiqueta
                 ORDER BY dia ASC;
-            `, [from, to]);
+            `, [from, to, from, to]);
         } else {
             [dailySalesResult] = await db.query(`
                 SELECT * FROM (
                     SELECT 
-                        sub.dia,
-                        sub.etiqueta,
-                        SUM(sub.total_venta) AS total,
-                        SUM(sub.total_costo) AS total_costo
-                    FROM (
-                        SELECT 
-                            v.id_venta,
-                            DATE(v.fecha) AS dia,
-                            DATE_FORMAT(v.fecha, '%d/%m') AS etiqueta,
-                            v.total_venta,
-                            COALESCE((
-                                SELECT SUM(dv_in.cantidad * p_in.costo)
-                                FROM detalle_ventas dv_in
-                                JOIN productos p_in ON dv_in.id_producto = p_in.id_producto
-                                WHERE dv_in.id_venta = v.id_venta
-                            ), 0) AS total_costo
-                        FROM ventas v
-                        WHERE v.estado = 'COMPLETADA' AND v.fecha < CURDATE()
-                    ) sub
-                    GROUP BY sub.dia, sub.etiqueta
-                    ORDER BY sub.dia DESC
+                        DATE(v.fecha) AS dia,
+                        DATE_FORMAT(v.fecha, '%d/%m') AS etiqueta,
+                        SUM(v.total_venta) AS total,
+                        SUM(COALESCE(costos.total_costo, 0)) AS total_costo
+                    FROM ventas v
+                    LEFT JOIN (
+                        SELECT dv_in.id_venta, SUM(dv_in.cantidad * p_in.costo) AS total_costo
+                        FROM detalle_ventas dv_in
+                        JOIN productos p_in ON dv_in.id_producto = p_in.id_producto
+                        JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
+                        WHERE v_in.estado = 'COMPLETADA' AND v_in.fecha < CURDATE()
+                        GROUP BY dv_in.id_venta
+                    ) AS costos ON v.id_venta = costos.id_venta
+                    WHERE v.estado = 'COMPLETADA' AND v.fecha < CURDATE()
+                    GROUP BY dia, etiqueta
+                    ORDER BY dia DESC
                     LIMIT 10
                 ) sub2
                 ORDER BY dia ASC;
@@ -967,28 +941,34 @@ const getBiMetrics = async (req, res) => {
                     p2.nombre AS producto_b,
                     p2.codigo AS codigo_b,
                     p2.venta AS precio_b,
-                    COUNT(*) AS coocurrencias,
+                    c.coocurrencias,
                     (
                         SELECT COUNT(DISTINCT dv_a.id_venta) 
                         FROM detalle_ventas dv_a 
                         JOIN ventas v_a ON dv_a.id_venta = v_a.id_venta 
-                        WHERE dv_a.id_producto = p1.id_producto AND v_a.estado = 'COMPLETADA'
+                        WHERE dv_a.id_producto = c.id_a AND v_a.estado = 'COMPLETADA'
                     ) AS count_a,
                     (
                         SELECT COUNT(DISTINCT dv_b.id_venta) 
                         FROM detalle_ventas dv_b 
                         JOIN ventas v_b ON dv_b.id_venta = v_b.id_venta 
-                        WHERE dv_b.id_producto = p2.id_producto AND v_b.estado = 'COMPLETADA'
+                        WHERE dv_b.id_producto = c.id_b AND v_b.estado = 'COMPLETADA'
                     ) AS count_b
-                FROM detalle_ventas dv1
-                JOIN detalle_ventas dv2 ON dv1.id_venta = dv2.id_venta AND dv1.id_producto < dv2.id_producto
-                JOIN productos p1 ON dv1.id_producto = p1.id_producto
-                JOIN productos p2 ON dv2.id_producto = p2.id_producto
-                JOIN ventas v ON dv1.id_venta = v.id_venta
-                WHERE v.estado = 'COMPLETADA'
-                GROUP BY p1.id_producto, p2.id_producto, p1.nombre, p1.codigo, p1.venta, p2.nombre, p2.codigo, p2.venta
-                ORDER BY coocurrencias DESC
-                LIMIT 4;
+                FROM (
+                    SELECT 
+                        dv1.id_producto AS id_a,
+                        dv2.id_producto AS id_b,
+                        COUNT(*) AS coocurrencias
+                    FROM detalle_ventas dv1
+                    JOIN detalle_ventas dv2 ON dv1.id_venta = dv2.id_venta AND dv1.id_producto < dv2.id_producto
+                    JOIN ventas v ON dv1.id_venta = v.id_venta
+                    WHERE v.estado = 'COMPLETADA'
+                    GROUP BY dv1.id_producto, dv2.id_producto
+                    ORDER BY coocurrencias DESC
+                    LIMIT 4
+                ) c
+                JOIN productos p1 ON c.id_a = p1.id_producto
+                JOIN productos p2 ON c.id_b = p2.id_producto;
             `);
 
             comboSuggestions = cooccurrences.map(row => {
@@ -1407,16 +1387,16 @@ const getBiMetrics = async (req, res) => {
                 FROM (
                     SELECT 
                         p.id_producto,
-                        COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas
+                        COALESCE(sub_sales.unidades, 0) AS unidades_vendidas
                     FROM productos p
                     LEFT JOIN (
-                        SELECT dv_in.id_producto, dv_in.cantidad
+                        SELECT dv_in.id_producto, SUM(dv_in.cantidad) AS unidades
                         FROM detalle_ventas dv_in
                         JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
                         WHERE v_in.estado = 'COMPLETADA' AND ${stgFilter}
-                    ) dv ON p.id_producto = dv.id_producto
+                        GROUP BY dv_in.id_producto
+                    ) AS sub_sales ON p.id_producto = sub_sales.id_producto
                     WHERE p.activo = 1 AND p.existencia > 0
-                    GROUP BY p.id_producto
                 ) AS sub
             `, stgParams);
             abc_a = Number(abcResult[0]?.clase_a || 0);
@@ -1606,15 +1586,16 @@ const getBiMetrics = async (req, res) => {
                         p.existencia,
                         p.costo,
                         p.venta AS precio,
-                        COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas
+                        SUM(dv.cantidad) AS unidades_vendidas
                     FROM productos p
                     JOIN detalle_ventas dv ON p.id_producto = dv.id_producto
                     JOIN ventas v ON dv.id_venta = v.id_venta
                     WHERE p.activo = 1 
+                      AND p.existencia <= 5
                       AND v.estado = 'COMPLETADA' 
                       AND ${stgFilter.replace(/v_in/g, 'v')}
                     GROUP BY p.id_producto, p.codigo, p.nombre, p.existencia, p.costo, p.venta
-                    HAVING unidades_vendidas > 5 AND p.existencia <= 5
+                    HAVING unidades_vendidas > 5
                     ORDER BY unidades_vendidas DESC
                     LIMIT 5;
                 `, stgParams);
@@ -1697,21 +1678,21 @@ const getBiMetrics = async (req, res) => {
                             p.id_producto,
                             p.existencia,
                             p.venta AS precio,
-                            COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas,
+                            COALESCE(sub_sales.unidades, 0) AS unidades_vendidas,
                             CASE 
-                                WHEN COALESCE(SUM(dv.cantidad), 0) > 10 THEN 'Clase A'
-                                WHEN COALESCE(SUM(dv.cantidad), 0) BETWEEN 4 AND 10 THEN 'Clase B'
+                                WHEN COALESCE(sub_sales.unidades, 0) > 10 THEN 'Clase A'
+                                WHEN COALESCE(sub_sales.unidades, 0) BETWEEN 4 AND 10 THEN 'Clase B'
                                 ELSE 'Clase C'
                             END AS clase
                         FROM productos p
                         LEFT JOIN (
-                            SELECT dv_in.id_producto, dv_in.cantidad
+                            SELECT dv_in.id_producto, SUM(dv_in.cantidad) AS unidades
                             FROM detalle_ventas dv_in
                             JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
                             WHERE v_in.estado = 'COMPLETADA' AND ${stgFilter}
-                        ) dv ON p.id_producto = dv.id_producto
+                            GROUP BY dv_in.id_producto
+                        ) AS sub_sales ON p.id_producto = sub_sales.id_producto
                         WHERE p.activo = 1 AND p.existencia > 0
-                        GROUP BY p.id_producto, p.existencia, p.venta
                     ) AS sub
                     GROUP BY clase;
                 `, stgParams);
@@ -1744,21 +1725,21 @@ const getBiMetrics = async (req, res) => {
                         p.nombre,
                         p.existencia,
                         p.venta AS precio,
-                        COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas,
+                        COALESCE(sub_sales.unidades, 0) AS unidades_vendidas,
                         CASE 
-                            WHEN COALESCE(SUM(dv.cantidad), 0) > 10 THEN 'A'
-                            WHEN COALESCE(SUM(dv.cantidad), 0) BETWEEN 4 AND 10 THEN 'B'
+                            WHEN COALESCE(sub_sales.unidades, 0) > 10 THEN 'A'
+                            WHEN COALESCE(sub_sales.unidades, 0) BETWEEN 4 AND 10 THEN 'B'
                             ELSE 'C'
                         END AS clase_abc
                     FROM productos p
                     LEFT JOIN (
-                        SELECT dv_in.id_producto, dv_in.cantidad
+                        SELECT dv_in.id_producto, SUM(dv_in.cantidad) AS unidades
                         FROM detalle_ventas dv_in
                         JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
                         WHERE v_in.estado = 'COMPLETADA' AND ${stgFilter}
-                    ) dv ON p.id_producto = dv.id_producto
+                        GROUP BY dv_in.id_producto
+                    ) AS sub_sales ON p.id_producto = sub_sales.id_producto
                     WHERE p.activo = 1
-                    GROUP BY p.id_producto, p.codigo, p.nombre, p.existencia, p.venta
                     ORDER BY unidades_vendidas DESC, p.existencia DESC;
                 `, stgParams);
                 abc_products = abcProductsResult.map(row => ({
