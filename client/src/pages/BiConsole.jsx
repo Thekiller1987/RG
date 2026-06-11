@@ -743,7 +743,7 @@ const BiConsole = () => {
     if (stagnantFilter === 'sin_ventas') {
       return units === 0;
     } else {
-      return units >= 1 && units <= 3;
+      return units <= 3;
     }
   }) || [];
 
@@ -1006,7 +1006,7 @@ const BiConsole = () => {
                   <KpiValue>
                     {stagnantFilter === 'sin_ventas' 
                       ? metrics?.riesgo_estancamiento?.toLocaleString() 
-                      : (metrics?.stagnant_products?.filter(p => Number(p.unidades_vendidas || 0) >= 1)?.length || 0).toLocaleString()
+                      : (metrics?.stagnant_products?.filter(p => Number(p.unidades_vendidas || 0) <= 3)?.length || 0).toLocaleString()
                     } <KpiUnit>Repuestos</KpiUnit>
                   </KpiValue>
                   <div style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 700, marginTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.4rem' }}>
@@ -1014,8 +1014,8 @@ const BiConsole = () => {
                   </div>
                   <KpiDesc style={{ borderTop: 'none', paddingTop: 0, marginTop: '0.25rem' }}>
                     {stagnantFilter === 'sin_ventas'
-                      ? 'Artículos con existencia física sin ventas en los últimos 180 días.'
-                      : 'Artículos con existencia física con 1 a 3 unidades vendidas en los últimos 180 días (Top 150).'
+                      ? 'Artículos con existencia física sin ventas en el periodo seleccionado.'
+                      : 'Artículos con existencia física con 0 a 3 unidades vendidas en el periodo seleccionado (Top 150).'
                     }
                   </KpiDesc>
                 </KpiCard>
@@ -1463,8 +1463,8 @@ const BiConsole = () => {
                     <CardTitle style={{ borderBottom: 'none', paddingBottom: 0 }}>
                       <FaBoxes color={stagnantFilter === 'sin_ventas' ? '#f43f5e' : '#eab308'} />
                       {stagnantFilter === 'sin_ventas' 
-                        ? 'Detalle de Inventario Estancado (Sin Ventas en más de 180 Días)' 
-                        : 'Detalle de Inventario de Baja Rotación (1-3 Ventas en 180 Días)'}
+                        ? 'Detalle de Inventario Estancado (Sin Ventas en el Periodo)' 
+                        : 'Detalle de Inventario de Baja Rotación (0-3 Ventas en el Periodo)'}
                     </CardTitle>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px' }}>
@@ -1498,7 +1498,7 @@ const BiConsole = () => {
                             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                           }}
                         >
-                          Baja Rotación (1-3)
+                          Baja Rotación (0-3)
                         </button>
                       </div>
                       <div style={{ position: 'relative', minWidth: '220px' }}>
@@ -1514,8 +1514,8 @@ const BiConsole = () => {
                   </div>
                   <CardDesc>
                     {stagnantFilter === 'sin_ventas'
-                      ? 'Listado de los artículos con stock físico disponible que registran nulo movimiento en los últimos 6 meses, ordenados por capital inmovilizado.'
-                      : 'Listado de los artículos con stock físico disponible que registran bajas ventas (entre 1 y 3 unidades) en los últimos 6 meses.'}
+                      ? 'Listado de los artículos con stock físico disponible que registran nulo movimiento en el periodo seleccionado, ordenados por capital inmovilizado.'
+                      : 'Listado de los artículos con stock físico disponible que registran bajas ventas (entre 0 y 3 unidades) en el periodo seleccionado.'}
                   </CardDesc>
 
                   <div style={{ overflowX: 'auto', maxHeight: '400px', overflowY: 'auto', marginTop: '0.5rem' }}>
@@ -1816,56 +1816,43 @@ const BiConsole = () => {
               </PanelRow>
 
               <PanelRow>
-                <Card>
+                <Card style={{ gridColumn: 'span 2' }}>
                   <CardTitle>
                     <FaChartBar color="#38bdf8" />
-                    Top 5 Bestsellers por Facturación (C$)
+                    Ranking de Repuestos Estrella (Top 5 Bestsellers)
                   </CardTitle>
                   <CardDesc>
-                    Facturación total acumulada de los 5 productos con mayor volumen monetario vendido.
+                    Listado de los 5 productos con mayor volumen de facturación y demanda acumulada en el periodo seleccionado, mostrando el nombre completo del producto.
                   </CardDesc>
-                  <ChartBox style={{ height: '280px' }}>
-                    <Bar
-                      data={getTopProductsChartData()}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: { display: false }
-                        },
-                        scales: {
-                          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } },
-                          x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } }
-                        }
-                      }}
-                    />
-                  </ChartBox>
-                </Card>
-
-                <Card>
-                  <CardTitle>
-                    <FaChartBar color="#ED7D31" />
-                    Volumen de Venta por Canal de Pago (C$)
-                  </CardTitle>
-                  <CardDesc>
-                    Volumen monetario total procesado en caja desglosado por Efectivo, Transferencia y Tarjeta.
-                  </CardDesc>
-                  <ChartBox style={{ height: '280px' }}>
-                    <Bar
-                      data={getPaymentMethodChartData()}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: { display: false }
-                        },
-                        scales: {
-                          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } },
-                          x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } }
-                        }
-                      }}
-                    />
-                  </ChartBox>
+                  <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid rgba(255, 25, 25, 0.08)', color: '#9ca3af' }}>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600 }}>CÓDIGO</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600 }}>PRODUCTO</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>UNIDADES VENDIDAS</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>TOTAL FACTURADO</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {metrics?.top_products?.slice(0, 5).map((p, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)', transition: 'background-color 0.2s' }}>
+                            <td style={{ padding: '0.75rem 0.5rem', fontFamily: "'JetBrains Mono', monospace", color: '#38bdf8', fontWeight: 600 }}>{p.codigo || 'S/C'}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', color: '#fff', whiteSpace: 'normal', wordBreak: 'break-word' }}>{p.nombre}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#10b981' }}>{p.unidades.toLocaleString()}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#ED7D31' }}>C$ {p.monto.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          </tr>
+                        ))}
+                        {(!metrics?.top_products || metrics?.top_products?.length === 0) && (
+                          <tr>
+                            <td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
+                              No hay datos de ventas registradas en el rango seleccionado.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </Card>
               </PanelRow>
 

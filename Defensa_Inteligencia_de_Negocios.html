@@ -256,10 +256,10 @@
                 <td><strong>Por qué:</strong> Minería de datos real en lugar de combos al azar.<br><strong>Beneficio:</strong> Eleva la facturación promedio de caja emparejando piezas complementarias.</td>
             </tr>
             <tr>
-                <td><strong>10b. Distribución de Métodos de Pago</strong><br><small>Consola BI (Proyección)</small></td>
-                <td><strong>Hace:</strong> Suma dinámicamente los abonos de cobros desde los logs.<br><strong>Resuelve:</strong> El sesgo de que todo se marque como efectivo por falta de registros de base de datos.</td>
-                <td><strong>Fórmula:</strong> Itera sobre <code>pago_detalles</code> JSON de cada venta en el rango.<br>Suma abonos reales en efectivo, tarjeta y transferencia.</td>
-                <td><strong>Por qué:</strong> Evita depender de una columna estática vacía en la base de datos.<br><strong>Beneficio:</strong> Otorga a la gerencia un diagnóstico real de los hábitos de pago de los clientes para conciliar.</td>
+                <td><strong>10b. Tabla Detallada del Top 5 Bestsellers</strong><br><small>Consola BI (Proyección)</small></td>
+                <td><strong>Hace:</strong> Muestra los 5 productos con mayor facturación en una tabla responsiva de ancho completo.<br><strong>Resuelve:</strong> La truncación de nombres largos de repuestos automotrices que ocurre en los gráficos de barras tradicionales.</td>
+                <td>Filtra los datos del periodo seleccionado y extrae los 5 productos con mayor facturación acumulada.<br>Usa <code>white-space: normal</code> para evitar recortes.</td>
+                <td><strong>Por qué:</strong> Una tabla tabulada legible es superior para datos gerenciales precisos que un gráfico de barras comprimido.<br><strong>Beneficio:</strong> Permite planificar recompras sin margen de error al ver nombres de repuestos técnicos completos.</td>
             </tr>
             <!-- Reporte Financiero -->
             <tr>

@@ -427,10 +427,35 @@ const getBiMetrics = async (req, res) => {
         const { startDate, endDate } = req.query;
         let dateFilter = '';
         const params = [];
+        let stgFilter = 'v_in.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)';
+        const stgParams = [];
+
+        let closuresFilter = '';
+        const closuresParams = [];
+        let cashKpiFilter = 'fecha_cierre >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
+        const cashKpiParams = [];
+
+        let dioFilter = 'v.fecha >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
+        let dioDays = 30.0;
+        const dioParams = [];
+
         if (startDate && endDate) {
             const { from, to } = getDateRange(startDate, endDate);
             dateFilter = ' AND v.fecha >= ? AND v.fecha <= ?';
             params.push(from, to);
+            stgFilter = 'v_in.fecha >= ? AND v_in.fecha <= ?';
+            stgParams.push(from, to);
+
+            closuresFilter = ' AND fecha_cierre >= ? AND fecha_cierre <= ?';
+            closuresParams.push(from, to);
+
+            cashKpiFilter = 'fecha_cierre >= ? AND fecha_cierre <= ?';
+            cashKpiParams.push(from, to);
+
+            dioFilter = 'v.fecha >= ? AND v.fecha <= ?';
+            const daysDiff = Math.max(1, Math.round((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1);
+            dioDays = Number(daysDiff);
+            dioParams.push(from, to);
         }
 
         // 1. Total Productos Activos
@@ -453,7 +478,7 @@ const getBiMetrics = async (req, res) => {
             ? Number(((totalVentasVal - totalCostoVal) / totalVentasVal * 100).toFixed(2))
             : 0;
 
-        // 3. Riesgo de Estancamiento (existencia > 0 sin ventas en los últimos 180 días)
+        // 3. Riesgo de Estancamiento (existencia > 0 sin ventas en el período seleccionado)
         // Usamos NOT EXISTS para evitar fallas si hay NULLs en dv.id_producto
         const [stagnantResult] = await db.query(`
             SELECT COUNT(*) AS total
@@ -464,13 +489,13 @@ const getBiMetrics = async (req, res) => {
                 JOIN ventas v ON dv.id_venta = v.id_venta
                 WHERE dv.id_producto = p.id_producto
                   AND v.estado = 'COMPLETADA'
-                  AND v.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+                  AND ${stgFilter.replace(/v_in/g, 'v')}
             )
-        `);
+        `, stgParams);
         const riesgo_estancamiento = stagnantResult[0]?.total || 0;
 
         // 3b. Obtener lista detallada de Productos Estancados o de Baja Rotación (Top 150 por valor de inventario)
-        // Traemos productos con <= 3 unidades vendidas en los últimos 180 días (Calculado dinámicamente)
+        // Traemos productos con <= 3 unidades vendidas en el período seleccionado (Calculado dinámicamente)
         const [stagnantProductsList] = await db.query(`
             SELECT 
                 p.id_producto, 
@@ -484,7 +509,7 @@ const getBiMetrics = async (req, res) => {
                     JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
                     WHERE dv_in.id_producto = p.id_producto 
                       AND v_in.estado = 'COMPLETADA' 
-                      AND v_in.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+                      AND ${stgFilter}
                 ), 0) AS unidades_vendidas,
                 (
                     SELECT MAX(v2.fecha)
@@ -497,13 +522,13 @@ const getBiMetrics = async (req, res) => {
             HAVING unidades_vendidas <= 3
             ORDER BY unidades_vendidas ASC, p.existencia * p.venta DESC
             LIMIT 150;
-        `);
+        `, stgParams);
 
         // NUEVO: Consulta de resumen de capital estancado (inmovilizado) (Calculado dinámicamente)
         const [stagnantSummary] = await db.query(`
             SELECT 
                 COALESCE(SUM(CASE WHEN unidades_vendidas = 0 THEN existencia * precio ELSE 0 END), 0) AS capital_sin_ventas,
-                COALESCE(SUM(CASE WHEN unidades_vendidas > 0 AND unidades_vendidas <= 3 THEN existencia * precio ELSE 0 END), 0) AS capital_baja_rotacion
+                COALESCE(SUM(CASE WHEN unidades_vendidas <= 3 THEN existencia * precio ELSE 0 END), 0) AS capital_baja_rotacion
             FROM (
                 SELECT 
                     p.existencia,
@@ -514,12 +539,12 @@ const getBiMetrics = async (req, res) => {
                         JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
                         WHERE dv_in.id_producto = p.id_producto 
                           AND v_in.estado = 'COMPLETADA' 
-                          AND v_in.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+                          AND ${stgFilter}
                     ), 0) AS unidades_vendidas
                 FROM productos p
                 WHERE p.activo = 1 AND p.existencia > 0
             ) AS sub;
-        `);
+        `, stgParams);
         const capital_sin_ventas = Number(stagnantSummary[0]?.capital_sin_ventas || 0);
         const capital_baja_rotacion = Number(stagnantSummary[0]?.capital_baja_rotacion || 0);
 
@@ -1207,21 +1232,21 @@ const getBiMetrics = async (req, res) => {
         let total_inventario_venta = 0;
 
         try {
-            // 1. KPI: Eficiencia de Arqueo de Caja (Últimos 30 días)
+            // 1. KPI: Eficiencia de Arqueo de Caja (Dinámico o últimos 30 días)
             const [cashKpiResult] = await db.query(`
                 SELECT 
                     COUNT(*) AS total_cierres,
                     SUM(CASE WHEN diferencia = 0 THEN 1 ELSE 0 END) AS closures_perfectos
                 FROM cierres_caja
-                WHERE fecha_cierre IS NOT NULL AND fecha_cierre >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            `);
+                WHERE fecha_cierre IS NOT NULL AND ${cashKpiFilter}
+            `, cashKpiParams);
             const totalCierres = Number(cashKpiResult[0]?.total_cierres || 0);
             const closuresPerfectos = Number(cashKpiResult[0]?.closures_perfectos || 0);
             eficiencia_arqueo = totalCierres > 0 
                 ? Number(((closuresPerfectos / totalCierres) * 100).toFixed(1))
                 : 100.0;
 
-            // 2. Modelo: Clasificación ABC de Inventario (Pareto - 180 días)
+            // 2. Modelo: Clasificación ABC de Inventario (Pareto - Dinámico)
             const [abcResult] = await db.query(`
                 SELECT 
                     SUM(CASE WHEN unidades_vendidas > 10 THEN 1 ELSE 0 END) AS clase_a,
@@ -1236,23 +1261,23 @@ const getBiMetrics = async (req, res) => {
                         SELECT dv_in.id_producto, dv_in.cantidad
                         FROM detalle_ventas dv_in
                         JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
-                        WHERE v_in.estado = 'COMPLETADA' AND v_in.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+                        WHERE v_in.estado = 'COMPLETADA' AND ${stgFilter}
                     ) dv ON p.id_producto = dv.id_producto
                     WHERE p.activo = 1 AND p.existencia > 0
                     GROUP BY p.id_producto
                 ) AS sub
-            `);
+            `, stgParams);
             abc_a = Number(abcResult[0]?.clase_a || 0);
             abc_b = Number(abcResult[0]?.clase_b || 0);
             abc_c = Number(abcResult[0]?.clase_c || 0);
 
-            // 3. KPI: DIO (Días de Inventario Disponible)
+            // 3. KPI: DIO (Días de Inventario Disponible - Dinámico)
             const [avgDailyUnitsResult] = await db.query(`
-                SELECT COALESCE(SUM(dv.cantidad), 0) / 30.0 AS avg_daily
+                SELECT COALESCE(SUM(dv.cantidad), 0) / ? AS avg_daily
                 FROM detalle_ventas dv
                 JOIN ventas v ON dv.id_venta = v.id_venta
-                WHERE v.estado = 'COMPLETADA' AND v.fecha >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            `);
+                WHERE v.estado = 'COMPLETADA' AND ${dioFilter}
+            `, [dioDays, ...dioParams]);
             const avgDailyUnits = Number(avgDailyUnitsResult[0]?.avg_daily || 0);
             
             const [totalStockResult] = await db.query(`
@@ -1279,7 +1304,7 @@ const getBiMetrics = async (req, res) => {
             dias_transcurridos_mes = now.getDate();
             dias_totales_mes = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
-            // 5. Cierres de caja recientes (últimos 10) con desglose de métodos de pago
+            // 5. Cierres de caja recientes (últimos 50 si filtrado) con desglose de métodos de pago (Dinámico)
             const [recentClosuresResult] = await db.query(`
                 SELECT 
                     id,
@@ -1296,10 +1321,10 @@ const getBiMetrics = async (req, res) => {
                     total_dolares,
                     detalles_json
                 FROM cierres_caja
-                WHERE fecha_cierre IS NOT NULL
+                WHERE fecha_cierre IS NOT NULL ${closuresFilter}
                 ORDER BY fecha_cierre DESC
-                LIMIT 10;
-            `);
+                LIMIT 50;
+            `, closuresParams);
             recent_closures = recentClosuresResult.map(c => {
                 let efectivo = Number(c.total_ventas_efectivo || 0);
                 let tarjeta = Number(c.total_ventas_tarjeta || 0);
@@ -1378,7 +1403,7 @@ const getBiMetrics = async (req, res) => {
                 };
             });
 
-            // 6. Productos con alta existencia pero cero ventas en 180 días (riesgo sobre-almacenamiento)
+            // 6. Productos con alta existencia pero cero ventas (riesgo sobre-almacenamiento - Dinámico)
             const [deadStockRiskResult] = await db.query(`
                 SELECT 
                     p.id_producto,
@@ -1392,12 +1417,12 @@ const getBiMetrics = async (req, res) => {
                     SELECT DISTINCT dv_in.id_producto
                     FROM detalle_ventas dv_in
                     JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
-                    WHERE v_in.estado = 'COMPLETADA' AND v_in.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+                    WHERE v_in.estado = 'COMPLETADA' AND ${stgFilter}
                 ) dv ON p.id_producto = dv.id_producto
                 WHERE p.activo = 1 AND p.existencia > 0 AND dv.id_producto IS NULL
                 ORDER BY p.existencia DESC
                 LIMIT 5;
-            `);
+            `, stgParams);
             dead_stock_risk = deadStockRiskResult.map(p => ({
                 id_producto: p.id_producto,
                 codigo: p.codigo,
@@ -1435,12 +1460,12 @@ const getBiMetrics = async (req, res) => {
                     JOIN ventas v ON dv.id_venta = v.id_venta
                     WHERE p.activo = 1 
                       AND v.estado = 'COMPLETADA' 
-                      AND v.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+                      AND ${stgFilter.replace(/v_in/g, 'v')}
                     GROUP BY p.id_producto, p.codigo, p.nombre, p.existencia, p.costo, p.venta
                     HAVING unidades_vendidas > 5 AND p.existencia <= 5
                     ORDER BY unidades_vendidas DESC
                     LIMIT 5;
-                `);
+                `, stgParams);
                 suggested_replenishment = replenishResult.map(r => {
                     const sug_qty = Math.max(10, 15 - Number(r.existencia));
                     return {
@@ -1475,11 +1500,11 @@ const getBiMetrics = async (req, res) => {
                     WHERE p.activo = 1 
                       AND p.existencia = 0 
                       AND v.estado = 'COMPLETADA' 
-                      AND v.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+                      AND ${stgFilter.replace(/v_in/g, 'v')}
                     GROUP BY p.id_producto, p.codigo, p.nombre, p.venta
                     ORDER BY unidades_vendidas_180d DESC
                     LIMIT 5;
-                `);
+                `, stgParams);
                 lost_sales_stockout = lostSalesResult.map(r => {
                     const unidades_180 = Number(r.unidades_vendidas_180d);
                     const promedio_diario = unidades_180 / 180;

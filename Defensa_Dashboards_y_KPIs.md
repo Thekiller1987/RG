@@ -125,13 +125,12 @@ Mide la trayectoria económica del negocio y analiza tendencias a futuro para pr
 * **¿Por qué se diseñó así?** Se programó en el backend para buscar coocurrencias significativas y calcular sugerencias reales de ahorro en caja.
 * **¿En qué beneficia al negocio?** Incrementa directamente la facturación por cliente. Al sugerir combos basados en datos reales (como pastillas de freno + líquido de frenos con descuento), los vendedores pueden ofrecer venta cruzada efectiva y liberar stock complementario.
 
-### 10b. Distribución de Métodos de Pago Dinámica en Proyecciones
-* **¿Qué hace?** Muestra el volumen monetario total facturado desglosado por Efectivo, Transferencia y Tarjeta procesado en los últimos 30 días.
-* **¿Qué busca resolver?** Evitar que la visualización financiera de cobros sea sesgada. Al no estar guardado el método de pago en columnas estáticas de venta, el sistema realiza la sumatoria analizando la propiedad `pago_detalles` de cada ticket.
-* **¿Cómo lo hace?** Analiza en tiempo real el campo JSON de cobro de cada factura completada:
-  - Lee los montos declarados de `efectivo`, `tarjeta` y `transferencia` en la transacción, deduciendo el vuelto y calculando el abono real multicanal.
-* **¿Por qué se diseñó así?** Evita el sesgo de que el 100% de la facturación se marque como efectivo por falta de registros de base de datos.
-* **¿En qué beneficia al negocio?** Otorga un diagnóstico real de los hábitos de cobro del local para negociar comisiones con terminales POS de tarjetas y optimizar los procesos de conciliación bancaria.
+### 10b. Tabla Detallada de Repuestos Estrella (Top 5 Bestsellers)
+* **¿Qué hace?** Muestra los 5 productos estrella con mayor facturación acumulada en una tabla responsiva de ancho completo que permite leer el nombre del producto completo sin ningún tipo de recorte.
+* **¿Qué busca resolver?** La dificultad de visualizar los nombres largos de repuestos automotrices (que suelen incluir marcas, medidas y modelos compatibles) que se truncaban o encimaban en gráficos estándar de barras.
+* **¿Cómo lo hace?** Filtra los datos de ventas del periodo seleccionado, extrae los 5 artículos con mayor monto total facturado y los presenta de forma clara aplicando el estilo `white-space: normal` para evitar la truncación del texto.
+* **¿Por qué se diseñó así?** Se determinó que una tabla tabulada es el formato óptimo para presentar datos de texto largo, mejorando la usabilidad y la experiencia de lectura gerencial sobre gráficos deformados.
+* **¿En qué beneficia al negocio?** Facilita decisiones de reabastecimiento rápidas y sin ambigüedades. El administrador puede ver el nombre exacto de la pieza estrella y su aporte en córdobas a la facturación total del periodo, optimizando la cadena de suministro.
 
 ---
 
