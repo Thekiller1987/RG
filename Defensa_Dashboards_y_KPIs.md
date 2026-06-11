@@ -125,6 +125,14 @@ Mide la trayectoria económica del negocio y analiza tendencias a futuro para pr
 * **¿Por qué se diseñó así?** Se programó en el backend para buscar coocurrencias significativas y calcular sugerencias reales de ahorro en caja.
 * **¿En qué beneficia al negocio?** Incrementa directamente la facturación por cliente. Al sugerir combos basados en datos reales (como pastillas de freno + líquido de frenos con descuento), los vendedores pueden ofrecer venta cruzada efectiva y liberar stock complementario.
 
+### 10b. Distribución de Métodos de Pago Dinámica en Proyecciones
+* **¿Qué hace?** Muestra el volumen monetario total facturado desglosado por Efectivo, Transferencia y Tarjeta procesado en los últimos 30 días.
+* **¿Qué busca resolver?** Evitar que la visualización financiera de cobros sea sesgada. Al no estar guardado el método de pago en columnas estáticas de venta, el sistema realiza la sumatoria analizando la propiedad `pago_detalles` de cada ticket.
+* **¿Cómo lo hace?** Analiza en tiempo real el campo JSON de cobro de cada factura completada:
+  - Lee los montos declarados de `efectivo`, `tarjeta` y `transferencia` en la transacción, deduciendo el vuelto y calculando el abono real multicanal.
+* **¿Por qué se diseñó así?** Evita el sesgo de que el 100% de la facturación se marque como efectivo por falta de registros de base de datos.
+* **¿En qué beneficia al negocio?** Otorga un diagnóstico real de los hábitos de cobro del local para negociar comisiones con terminales POS de tarjetas y optimizar los procesos de conciliación bancaria.
+
 ---
 
 # 📊 DASHBOARD 2: Reporte Financiero Consolidado (`/finances`)

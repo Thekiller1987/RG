@@ -470,7 +470,7 @@ const getBiMetrics = async (req, res) => {
         const riesgo_estancamiento = stagnantResult[0]?.total || 0;
 
         // 3b. Obtener lista detallada de Productos Estancados o de Baja Rotación (Top 150 por valor de inventario)
-        // Traemos productos con <= 3 unidades vendidas en los últimos 180 días
+        // Traemos productos con <= 3 unidades vendidas en los últimos 180 días (Calculado dinámicamente)
         const [stagnantProductsList] = await db.query(`
             SELECT 
                 p.id_producto, 
@@ -478,7 +478,14 @@ const getBiMetrics = async (req, res) => {
                 p.nombre, 
                 p.existencia, 
                 p.venta AS precio,
-                COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas,
+                COALESCE((
+                    SELECT SUM(dv_in.cantidad)
+                    FROM detalle_ventas dv_in
+                    JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
+                    WHERE dv_in.id_producto = p.id_producto 
+                      AND v_in.estado = 'COMPLETADA' 
+                      AND v_in.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+                ), 0) AS unidades_vendidas,
                 (
                     SELECT MAX(v2.fecha)
                     FROM detalle_ventas dv2
@@ -486,20 +493,13 @@ const getBiMetrics = async (req, res) => {
                     WHERE dv2.id_producto = p.id_producto AND v2.estado = 'COMPLETADA'
                 ) AS ultima_venta
             FROM productos p
-            LEFT JOIN (
-                SELECT dv_in.id_producto, dv_in.cantidad
-                FROM detalle_ventas dv_in
-                JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
-                WHERE v_in.estado = 'COMPLETADA' AND v_in.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
-            ) dv ON p.id_producto = dv.id_producto
             WHERE p.activo = 1 AND p.existencia > 0
-            GROUP BY p.id_producto, p.codigo, p.nombre, p.existencia, p.venta
             HAVING unidades_vendidas <= 3
             ORDER BY unidades_vendidas ASC, p.existencia * p.venta DESC
             LIMIT 150;
         `);
 
-        // NUEVO: Consulta de resumen de capital estancado (inmovilizado)
+        // NUEVO: Consulta de resumen de capital estancado (inmovilizado) (Calculado dinámicamente)
         const [stagnantSummary] = await db.query(`
             SELECT 
                 COALESCE(SUM(CASE WHEN unidades_vendidas = 0 THEN existencia * precio ELSE 0 END), 0) AS capital_sin_ventas,
@@ -508,16 +508,16 @@ const getBiMetrics = async (req, res) => {
                 SELECT 
                     p.existencia,
                     p.venta AS precio,
-                    COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas
+                    COALESCE((
+                        SELECT SUM(dv_in.cantidad)
+                        FROM detalle_ventas dv_in
+                        JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
+                        WHERE dv_in.id_producto = p.id_producto 
+                          AND v_in.estado = 'COMPLETADA' 
+                          AND v_in.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+                    ), 0) AS unidades_vendidas
                 FROM productos p
-                LEFT JOIN (
-                    SELECT dv_in.id_producto, dv_in.cantidad
-                    FROM detalle_ventas dv_in
-                    JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
-                    WHERE v_in.estado = 'COMPLETADA' AND v_in.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
-                ) dv ON p.id_producto = dv.id_producto
                 WHERE p.activo = 1 AND p.existencia > 0
-                GROUP BY p.id_producto, p.existencia, p.venta
             ) AS sub;
         `);
         const capital_sin_ventas = Number(stagnantSummary[0]?.capital_sin_ventas || 0);
@@ -1105,33 +1105,55 @@ const getBiMetrics = async (req, res) => {
             });
         }
 
-        // 7. Distribución de Métodos de Pago
-        let paymentDistributionResult;
+        // 7. Distribución de Métodos de Pago (Calculada dinámicamente desde pago_detalles JSON)
+        let paymentSalesResult;
         if (startDate && endDate) {
             const { from, to } = getDateRange(startDate, endDate);
-            [paymentDistributionResult] = await db.query(`
-                SELECT 
-                    COALESCE(metodo_pago, 'Efectivo') AS metodo, 
-                    SUM(total_venta) AS total
-                FROM ventas v
-                WHERE v.estado = 'COMPLETADA' AND v.fecha >= ? AND v.fecha <= ?
-                GROUP BY metodo;
+            [paymentSalesResult] = await db.query(`
+                SELECT total_venta, pago_detalles
+                FROM ventas
+                WHERE estado = 'COMPLETADA' AND fecha >= ? AND fecha <= ?;
             `, [from, to]);
         } else {
-            [paymentDistributionResult] = await db.query(`
-                SELECT 
-                    COALESCE(metodo_pago, 'Efectivo') AS metodo, 
-                    SUM(total_venta) AS total
+            [paymentSalesResult] = await db.query(`
+                SELECT total_venta, pago_detalles
                 FROM ventas
-                WHERE estado = 'COMPLETADA' AND fecha >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-                GROUP BY metodo;
+                WHERE estado = 'COMPLETADA' AND fecha >= DATE_SUB(NOW(), INTERVAL 30 DAY);
             `);
         }
-        
-        const payment_distribution = paymentDistributionResult.map(r => ({
-            metodo: r.metodo,
-            total: Number(r.total || 0)
-        }));
+
+        let efectivoTotal = 0;
+        let tarjetaTotal = 0;
+        let transferenciaTotal = 0;
+
+        paymentSalesResult.forEach(row => {
+            let pd = {};
+            try {
+                pd = typeof row.pago_detalles === 'string' ? JSON.parse(row.pago_detalles) : (row.pago_detalles || {});
+            } catch { pd = {}; }
+
+            const safe = (v) => { const n = Number(v); return (isNaN(n) || !isFinite(n)) ? 0 : n; };
+            const txEfectivo = safe(pd.efectivo);
+            const txTarjeta = safe(pd.tarjeta);
+            const txTransf = safe(pd.transferencia);
+            const txDolares = safe(pd.dolares);
+            const txCambio = safe(pd.cambio);
+            const txTasa = safe(pd.tasaDolarAlMomento) || 36.60;
+
+            if (txEfectivo > 0 || txTarjeta > 0 || txTransf > 0) {
+                efectivoTotal += Math.max(0, (txEfectivo + (txDolares * txTasa)) - txCambio);
+                tarjetaTotal += txTarjeta;
+                transferenciaTotal += txTransf;
+            } else {
+                efectivoTotal += Number(row.total_venta || 0);
+            }
+        });
+
+        const payment_distribution = [
+            { metodo: 'Efectivo', total: efectivoTotal },
+            { metodo: 'Transferencia', total: transferenciaTotal },
+            { metodo: 'Tarjeta', total: tarjetaTotal }
+        ];
 
         // 8. Ticket Promedio y sus datos subyacentes
         const [ticketDataResult] = await db.query(`

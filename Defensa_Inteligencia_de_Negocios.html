@@ -255,6 +255,12 @@
                 <td><strong>Algoritmo Apriori:</strong><br>- Confianza: $P(B|A)$<br>- Elevación (Lift): $\frac{P(A \cap B)}{P(A) \times P(B)}$ (relación &gt; 1)</td>
                 <td><strong>Por qué:</strong> Minería de datos real en lugar de combos al azar.<br><strong>Beneficio:</strong> Eleva la facturación promedio de caja emparejando piezas complementarias.</td>
             </tr>
+            <tr>
+                <td><strong>10b. Distribución de Métodos de Pago</strong><br><small>Consola BI (Proyección)</small></td>
+                <td><strong>Hace:</strong> Suma dinámicamente los abonos de cobros desde los logs.<br><strong>Resuelve:</strong> El sesgo de que todo se marque como efectivo por falta de registros de base de datos.</td>
+                <td><strong>Fórmula:</strong> Itera sobre <code>pago_detalles</code> JSON de cada venta en el rango.<br>Suma abonos reales en efectivo, tarjeta y transferencia.</td>
+                <td><strong>Por qué:</strong> Evita depender de una columna estática vacía en la base de datos.<br><strong>Beneficio:</strong> Otorga a la gerencia un diagnóstico real de los hábitos de pago de los clientes para conciliar.</td>
+            </tr>
             <!-- Reporte Financiero -->
             <tr>
                 <td><strong>11. Margen Comercial y ROI</strong><br><small>Finanzas</small></td>
