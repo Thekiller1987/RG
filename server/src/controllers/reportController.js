@@ -1755,8 +1755,7 @@ const getBiMetrics = async (req, res) => {
                     ) dv ON p.id_producto = dv.id_producto
                     WHERE p.activo = 1
                     GROUP BY p.id_producto, p.codigo, p.nombre, p.existencia, p.venta
-                    ORDER BY unidades_vendidas DESC, p.existencia DESC
-                    LIMIT 150;
+                    ORDER BY unidades_vendidas DESC, p.existencia DESC;
                 `, stgParams);
                 abc_products = abcProductsResult.map(row => ({
                     id_producto: row.id_producto,
