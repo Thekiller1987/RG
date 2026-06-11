@@ -1587,7 +1587,7 @@ const getBiMetrics = async (req, res) => {
             // 7. Valoración total del inventario en bodega (costo y venta)
             const [totalInventoryValueResult] = await db.query(`
                 SELECT 
-                    COALESCE(SUM(existencia * precio_compra), 0) AS total_costo,
+                    COALESCE(SUM(existencia * costo), 0) AS total_costo,
                     COALESCE(SUM(existencia * venta), 0) AS total_venta
                 FROM productos
                 WHERE activo = 1 AND existencia > 0;

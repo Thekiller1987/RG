@@ -1967,14 +1967,14 @@ const BiConsole = () => {
                   </div>
                 </Card>
 
-                {/* Pérdidas por Quiebre de Stock */}
+                {/* Riesgo de Capital Estancado (Dead Stock) */}
                 <Card>
                   <CardTitle>
-                    <FaExclamationTriangle color="#f43f5e" />
-                    Pérdidas Estimadas por Quiebre de Stock (Stockout)
+                    <FaExclamationTriangle color="#ED7D31" />
+                    Riesgo de Capital Estancado (Dead Stock)
                   </CardTitle>
                   <CardDesc>
-                    Artículos con demanda histórica reciente pero con stock actual en cero. Muestra la pérdida de venta diaria proyectada.
+                    Artículos activos con existencias físicas en bodega pero sin ventas registradas en el periodo seleccionado.
                   </CardDesc>
                   <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
@@ -1982,25 +1982,25 @@ const BiConsole = () => {
                         <tr style={{ borderBottom: '1px solid rgba(255, 25, 25, 0.08)', color: '#9ca3af' }}>
                           <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600 }}>CÓDIGO</th>
                           <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600 }}>PRODUCTO</th>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600, textAlign: 'right' }}>EXISTENCIA</th>
                           <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600, textAlign: 'right' }}>PRECIO VENTA</th>
-                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600, textAlign: 'right' }}>VENDIDO (180d)</th>
-                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600, textAlign: 'right' }}>PÉRDIDA DIARIA EST.</th>
+                          <th style={{ padding: '0.6rem 0.4rem', fontWeight: 600, textAlign: 'right' }}>CAPITAL INMOVILIZADO</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {metrics?.lost_sales_stockout?.map((l, idx) => (
+                        {metrics?.dead_stock_risk?.map((d, idx) => (
                           <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                            <td style={{ padding: '0.6rem 0.4rem', fontFamily: "'JetBrains Mono', monospace", color: '#38bdf8', fontWeight: 600 }}>{l.codigo}</td>
-                            <td style={{ padding: '0.6rem 0.4rem', color: '#fff' }}>{l.nombre}</td>
-                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', color: '#9ca3af' }}>C$ {l.precio.toLocaleString('es-NI', { maximumFractionDigits: 0 })}</td>
-                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', color: '#f43f5e', fontWeight: 600 }}>{l.unidades_180}</td>
-                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#f43f5e', fontWeight: 700 }}>C$ {l.perdida_diaria.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', fontFamily: "'JetBrains Mono', monospace", color: '#38bdf8', fontWeight: 600 }}>{d.codigo || 'S/C'}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', color: '#fff' }}>{d.nombre}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', color: '#fff', fontWeight: 600 }}>{d.existencia}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', color: '#9ca3af' }}>C$ {d.precio.toLocaleString('es-NI', { maximumFractionDigits: 0 })}</td>
+                            <td style={{ padding: '0.6rem 0.4rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#ED7D31', fontWeight: 700 }}>C$ {d.capital_muerto.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                           </tr>
                         ))}
-                        {(!metrics?.lost_sales_stockout || metrics.lost_sales_stockout.length === 0) && (
+                        {(!metrics?.dead_stock_risk || metrics.dead_stock_risk.length === 0) && (
                           <tr>
                             <td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
-                              No hay pérdidas proyectadas por quiebres de stock.
+                              No hay artículos con riesgo de capital estancado.
                             </td>
                           </tr>
                         )}
@@ -2019,7 +2019,7 @@ const BiConsole = () => {
                   <CardTitle style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <FaChartLine color="#38bdf8" />
-                      Historial de Ventas, Costos y Utilidad Neta
+                      Historial de Ventas y Proyección Lineal
                     </div>
                     <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px' }}>
                       <button 
@@ -2057,11 +2057,11 @@ const BiConsole = () => {
                     </div>
                   </CardTitle>
                   <CardDesc>
-                    Tendencia comparativa de los ingresos por ventas reales y proyectadas contra el costo total de los repuestos y la utilidad neta obtenida.
+                    Registros transaccionales reales comparados con la proyección analítica calculada mediante regresión lineal basada en el histórico de ventas.
                   </CardDesc>
                   <ChartBox style={{ height: '280px' }}>
                     <Line
-                      data={getFinancialTrendChartData()}
+                      data={getSalesChartData()}
                       options={{
                         responsive: true,
                         maintainAspectRatio: false,
