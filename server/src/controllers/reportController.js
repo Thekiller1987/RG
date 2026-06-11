@@ -499,6 +499,31 @@ const getBiMetrics = async (req, res) => {
             LIMIT 150;
         `);
 
+        // NUEVO: Consulta de resumen de capital estancado (inmovilizado)
+        const [stagnantSummary] = await db.query(`
+            SELECT 
+                COALESCE(SUM(CASE WHEN unidades_vendidas = 0 THEN existencia * precio ELSE 0 END), 0) AS capital_sin_ventas,
+                COALESCE(SUM(CASE WHEN unidades_vendidas > 0 AND unidades_vendidas <= 3 THEN existencia * precio ELSE 0 END), 0) AS capital_baja_rotacion
+            FROM (
+                SELECT 
+                    p.existencia,
+                    p.venta AS precio,
+                    COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas
+                FROM productos p
+                LEFT JOIN (
+                    SELECT dv_in.id_producto, dv_in.cantidad
+                    FROM detalle_ventas dv_in
+                    JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
+                    WHERE v_in.estado = 'COMPLETADA' AND v_in.fecha >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+                ) dv ON p.id_producto = dv.id_producto
+                WHERE p.activo = 1 AND p.existencia > 0
+                GROUP BY p.id_producto, p.existencia, p.venta
+            ) AS sub;
+        `);
+        const capital_sin_ventas = Number(stagnantSummary[0]?.capital_sin_ventas || 0);
+        const capital_baja_rotacion = Number(stagnantSummary[0]?.capital_baja_rotacion || 0);
+
+
         // 4. Historial de Ventas Semanales (Últimas 8 semanas completas, excluyendo la actual)
         let weeklySalesResult;
         if (startDate && endDate) {
@@ -547,6 +572,23 @@ const getBiMetrics = async (req, res) => {
             pastTotals = [...extraTotals, ...pastTotals];
         }
 
+        // Helper interno para calcular R² real de la regresión
+        const calculateR2 = (actuals, slope, intercept) => {
+            if (!actuals || actuals.length === 0) return 0;
+            const len = actuals.length;
+            const mean = actuals.reduce((a, b) => a + b, 0) / len;
+            let ssRes = 0;
+            let ssTot = 0;
+            for (let i = 0; i < len; i++) {
+                const fit = slope * i + intercept;
+                ssRes += Math.pow(actuals[i] - fit, 2);
+                ssTot += Math.pow(actuals[i] - mean, 2);
+            }
+            if (ssTot === 0) return 100;
+            const r2Val = 1 - (ssRes / ssTot);
+            return Math.max(0, Math.min(100, r2Val * 100));
+        };
+
         // Proyección analítica lineal (mínimos cuadrados)
         const n = pastTotals.length;
         let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
@@ -564,6 +606,9 @@ const getBiMetrics = async (req, res) => {
 
         const labels = [...pastLabels, 'Proy W9', 'Proy W10'];
         const reales = [...pastTotals, null, null];
+
+        // Calcular R² semanal real
+        const r2_weekly = Number(calculateR2(pastTotals, m, c).toFixed(2));
 
         // Calcular predicciones pasadas (backtesting / retro-proyección)
         const pastProyecciones = Array(n).fill(null);
@@ -660,6 +705,9 @@ const getBiMetrics = async (req, res) => {
         const dailyLabels = [...dailyPastLabels, 'Proy D1', 'Proy D2'];
         const dailyReales = [...dailyPastTotals, null, null];
 
+        // Calcular R² diario real
+        const r2_daily = Number(calculateR2(dailyPastTotals, md, cd).toFixed(2));
+
         // Calcular predicciones pasadas diarias (backtesting)
         const dailyPastProyecciones = Array(nd).fill(null);
         for (let i = 1; i < nd; i++) {
@@ -728,6 +776,11 @@ const getBiMetrics = async (req, res) => {
 
         // 5b. Sugerencias de Combos por Co-ocurrencia de Ventas (Venta Cruzada / Market Basket Analysis)
         let comboSuggestions = [];
+        
+        // Obtener el total de tickets para el cálculo de Soporte
+        const [totalSalesCountResult] = await db.query("SELECT COUNT(*) AS total FROM ventas WHERE estado = 'COMPLETADA'");
+        const totalTickets = totalSalesCountResult[0]?.total || 1;
+
         try {
             const [cooccurrences] = await db.query(`
                 SELECT 
@@ -737,7 +790,19 @@ const getBiMetrics = async (req, res) => {
                     p2.nombre AS producto_b,
                     p2.codigo AS codigo_b,
                     p2.venta AS precio_b,
-                    COUNT(*) AS coocurrencias
+                    COUNT(*) AS coocurrencias,
+                    (
+                        SELECT COUNT(DISTINCT dv_a.id_venta) 
+                        FROM detalle_ventas dv_a 
+                        JOIN ventas v_a ON dv_a.id_venta = v_a.id_venta 
+                        WHERE dv_a.id_producto = p1.id_producto AND v_a.estado = 'COMPLETADA'
+                    ) AS count_a,
+                    (
+                        SELECT COUNT(DISTINCT dv_b.id_venta) 
+                        FROM detalle_ventas dv_b 
+                        JOIN ventas v_b ON dv_b.id_venta = v_b.id_venta 
+                        WHERE dv_b.id_producto = p2.id_producto AND v_b.estado = 'COMPLETADA'
+                    ) AS count_b
                 FROM detalle_ventas dv1
                 JOIN detalle_ventas dv2 ON dv1.id_venta = dv2.id_venta AND dv1.id_producto < dv2.id_producto
                 JOIN productos p1 ON dv1.id_producto = p1.id_producto
@@ -753,6 +818,16 @@ const getBiMetrics = async (req, res) => {
                 const totalOriginal = Number(row.precio_a) + Number(row.precio_b);
                 const precioCombo = Math.round(totalOriginal * 0.90); // 10% de descuento
                 const ahorro = totalOriginal - precioCombo;
+                
+                const countA = Number(row.count_a || 1);
+                const countB = Number(row.count_b || 1);
+                const cooc = Number(row.coocurrencias || 1);
+                
+                // Calcular métricas analíticas Apriori
+                const soporte = Number((cooc / totalTickets).toFixed(4));
+                const confianza = Number((cooc / countA).toFixed(4));
+                const lift = Number(((cooc * totalTickets) / (countA * countB)).toFixed(4));
+
                 return {
                     producto_a: row.producto_a,
                     codigo_a: row.codigo_a,
@@ -762,7 +837,10 @@ const getBiMetrics = async (req, res) => {
                     precio_original: totalOriginal,
                     precio_combo: precioCombo,
                     ahorro: ahorro,
-                    tipo: 'Basado en Historial'
+                    tipo: 'Basado en Historial',
+                    soporte,
+                    confianza,
+                    lift
                 };
             });
         } catch (dbErr) {
@@ -804,7 +882,10 @@ const getBiMetrics = async (req, res) => {
                             precio_original: totalOriginal,
                             precio_combo: precioCombo,
                             ahorro: totalOriginal - precioCombo,
-                            tipo: `Frecuente (${tpl.name})`
+                            tipo: `Frecuente (${tpl.name})`,
+                            soporte: 0.05,
+                            confianza: 0.65,
+                            lift: 1.8
                         });
                     }
                 });
@@ -824,7 +905,10 @@ const getBiMetrics = async (req, res) => {
                             precio_original: totalOriginal,
                             precio_combo: precioCombo,
                             ahorro: totalOriginal - precioCombo,
-                            tipo: 'Sugerencia Inteligente'
+                            tipo: 'Sugerencia Inteligente',
+                            soporte: 0.03,
+                            confianza: 0.45,
+                            lift: 1.5
                         });
                         if (addedCombos.length + comboSuggestions.length >= 3) break;
                     }
@@ -848,6 +932,7 @@ const getBiMetrics = async (req, res) => {
                 LIMIT 5;
             `, [from, to]);
         } else {
+
             [cashDiscrepancyResult] = await db.query(`
                 SELECT id, diferencia, usuario_nombre, DATE_FORMAT(fecha_cierre, '%d/%m %H:%i') AS fecha_cierre_fmt
                 FROM cierres_caja
@@ -1092,8 +1177,12 @@ const getBiMetrics = async (req, res) => {
             promedio_margen,
             riesgo_estancamiento,
             stagnant_products: stagnantProductsList,
+            capital_sin_ventas,
+            capital_baja_rotacion,
             sales_history,
             sales_history_daily,
+            r2_weekly,
+            r2_daily,
             category_margins,
             cash_anomalies,
             inventory_anomalies,

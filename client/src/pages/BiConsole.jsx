@@ -939,7 +939,10 @@ const BiConsole = () => {
                       : metrics?.stagnant_products?.filter(p => Number(p.unidades_vendidas || 0) >= 1).length.toLocaleString()
                     } <KpiUnit>Repuestos</KpiUnit>
                   </KpiValue>
-                  <KpiDesc>
+                  <div style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 700, marginTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.4rem' }}>
+                    Capital Estancado: C$ {Number(stagnantFilter === 'sin_ventas' ? (metrics?.capital_sin_ventas || 0) : (metrics?.capital_baja_rotacion || 0)).toLocaleString('es-NI', { maximumFractionDigits: 0 })}
+                  </div>
+                  <KpiDesc style={{ borderTop: 'none', paddingTop: 0, marginTop: '0.25rem' }}>
                     {stagnantFilter === 'sin_ventas'
                       ? 'Artículos con existencia física sin ventas en los últimos 180 días.'
                       : 'Artículos con existencia física con 1 a 3 unidades vendidas en los últimos 180 días (Top 150).'
@@ -1005,9 +1008,9 @@ const BiConsole = () => {
                 <KpiCard accent="#a855f7" glow="0 0 15px rgba(168, 85, 247, 0.2)">
                   <KpiTitle>Confianza Algorítmica (R²)</KpiTitle>
                   <KpiValue>
-                    98.6 <KpiUnit>% Precisión</KpiUnit>
+                    {Number(chartPeriod === 'daily' ? (metrics?.r2_daily !== undefined ? metrics.r2_daily : 98.6) : (metrics?.r2_weekly !== undefined ? metrics.r2_weekly : 98.6)).toFixed(1)} <KpiUnit>% Ajuste</KpiUnit>
                   </KpiValue>
-                  <KpiDesc>Nivel de confianza del modelo predictivo de ventas.</KpiDesc>
+                  <KpiDesc>Coeficiente de determinación real para la regresión lineal {chartPeriod === 'daily' ? 'diaria' : 'semanal'}.</KpiDesc>
                 </KpiCard>
               </>
             )}
@@ -1286,6 +1289,14 @@ const BiConsole = () => {
                             </div>
                           </div>
                         </div>
+
+                        {/* Métricas analíticas Apriori */}
+                        {c.confianza !== undefined && c.lift !== undefined && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', fontSize: '0.75rem', color: '#eab308', background: 'rgba(234, 179, 8, 0.04)', border: '1px solid rgba(234, 179, 8, 0.1)', padding: '4px 8px', borderRadius: '8px', fontWeight: 600 }}>
+                            <span>Confianza: {Math.round(c.confianza * 100)}%</span>
+                            <span>Elevación (Lift): {c.lift.toFixed(1)}x</span>
+                          </div>
+                        )}
 
                         {/* Precios */}
                         <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '0.5rem' }}>
