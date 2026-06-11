@@ -1710,7 +1710,14 @@ const BiConsole = () => {
                               x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { family: 'Outfit' } } }
                             }
                           }}
-                         <PanelRow>
+                        />
+                      </ChartBox>
+                    </div>
+                  </div>
+                </Card>
+              </PanelRow>
+
+              <PanelRow>
                 <Card style={{ gridColumn: 'span 2' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', paddingBottom: '0.75rem' }}>
                     <CardTitle style={{ borderBottom: 'none', paddingBottom: 0 }}>
