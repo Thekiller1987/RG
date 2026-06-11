@@ -194,6 +194,12 @@
         <tbody>
             <!-- Consola BI - Caja y Auditoría -->
             <tr>
+                <td><strong>0. Historial Forense y Consolidado de Auditoría</strong><br><small>Consola BI (Caja)</small></td>
+                <td><strong>Hace:</strong> Grafica descuadres históricos y totaliza cobros por canal.<br><strong>Resuelve:</strong> Dificultad para rastrear diferencias y conciliar cobros rápidamente.</td>
+                <td>Gráfico de barras coloreado por riesgo (rojo/amarillo/verde) e integración del arqueo del periodo para sumar efectivo, tarjeta, transferencia y dólares.</td>
+                <td><strong>Por qué:</strong> Vista macro integradora de auditoría contable.<br><strong>Beneficio:</strong> Permite realizar conciliaciones bancarias inmediatas y detectar patrones de descuadre.</td>
+            </tr>
+            <tr>
                 <td><strong>1. Eficiencia de Arqueo (30d)</strong><br><small>Consola BI (Caja)</small></td>
                 <td><strong>Hace:</strong> Mide el porcentaje de cierres de caja con cero descuadre.<br><strong>Resuelve:</strong> Los descuadres y fugas de efectivo en el local.</td>
                 <td>$$\text{Eficiencia} = \left( \frac{\text{Cierres sin descuadre}}{\text{Total cierres en 30d}} \right) \times 100$$</td>
@@ -214,9 +220,9 @@
             <!-- Consola BI - Rotación -->
             <tr>
                 <td><strong>4. Clasificación ABC de Inventario</strong><br><small>Consola BI (Rotación)</small></td>
-                <td><strong>Hace:</strong> Segmenta los repuestos en clases de popularidad.<br><strong>Resuelve:</strong> Sobre-almacenamiento y desabastecimiento de piezas clave.</td>
-                <td><strong>Clasificación Pareto (180 días):</strong><br>- Clase A: &gt; 10 unidades vendidas.<br>- Clase B: 4 a 10 unidades.<br>- Clase C: &le; 3 unidades.</td>
-                <td><strong>Por qué:</strong> Ley $80/20$ para concentrarse en lo rentable.<br><strong>Beneficio:</strong> Permite planificar el stock garantizando piezas Clase A y liquidando Clase C.</td>
+                <td><strong>Hace:</strong> Segmenta repuestos y detalla stock/capital inmovilizado por clase.<br><strong>Resuelve:</strong> Sobre-almacenamiento y falta de visibilidad del valor del stock congelado.</td>
+                <td><strong>Pareto y Tabla de Balance:</strong><br>- Clase A: &gt; 10 unidades vendidas. Artículos estrella.<br>- Clase B: 4 a 10 unidades.<br>- Clase C: &le; 3 unidades.<br>Desglosa ítems, porcentaje, stock en unidades y capital total en C$ por cada clase.</td>
+                <td><strong>Por qué:</strong> Ley $80/20$ con auditoría de capital inmovilizado.<br><strong>Beneficio:</strong> Permite planificar compras de Clase A y liquidar o promocionar Clase C para recuperar liquidez.</td>
             </tr>
             <tr>
                 <td><strong>5. Sugerencia de Reposición Clase A</strong><br><small>Consola BI (Rotación)</small></td>
@@ -238,10 +244,10 @@
             </tr>
             <!-- Consola BI - Proyección -->
             <tr>
-                <td><strong>8. Regresión de Ventas e Ingresos</strong><br><small>Consola BI (Proyección)</small></td>
-                <td><strong>Hace:</strong> Proyecta la facturación futura con su precisión R².<br><strong>Resuelve:</strong> La incertidumbre y falta de planeación financiera.</td>
-                <td><strong>Regresión Lineal:</strong> $y = mx + c$<br><strong>Ajuste ($R^2$):</strong> Coeficiente que mide qué tan alineada está la tendencia predictiva.</td>
-                <td><strong>Por qué:</strong> Modelo dinámico basado en mínimos cuadrados.<br><strong>Beneficio:</strong> Permite planificar presupuestos de egresos con base estadística.</td>
+                <td><strong>8. Regresión Financiera Ventas vs. Costos vs. Utilidad</strong><br><small>Consola BI (Proyección)</small></td>
+                <td><strong>Hace:</strong> Muestra curvas y proyecciones de Ventas, Costos y Utilidad Neta en el tiempo.<br><strong>Resuelve:</strong> La distorsión de analizar solo ventas brutas ocultando costos altos.</td>
+                <td><strong>Regresión Lineal Múltiple:</strong> Proyecta curvas reales e hipotéticas mediante $y = mx + c$ y calcula el coeficiente de determinación $R^2$.</td>
+                <td><strong>Por qué:</strong> Modelo integral de rentabilidad comercial y financiera.<br><strong>Beneficio:</strong> Asegura decisiones de egresos e inversiones basadas en beneficios netos proyectados.</td>
             </tr>
             <tr>
                 <td><strong>9. Simulador Run-Rate y Metas</strong><br><small>Consola BI (Proyección)</small></td>
@@ -256,10 +262,10 @@
                 <td><strong>Por qué:</strong> Minería de datos real en lugar de combos al azar.<br><strong>Beneficio:</strong> Eleva la facturación promedio de caja emparejando piezas complementarias.</td>
             </tr>
             <tr>
-                <td><strong>10b. Tabla Detallada del Top 5 Bestsellers</strong><br><small>Consola BI (Proyección)</small></td>
-                <td><strong>Hace:</strong> Muestra los 5 productos con mayor facturación en una tabla responsiva de ancho completo.<br><strong>Resuelve:</strong> La truncación de nombres largos de repuestos automotrices que ocurre en los gráficos de barras tradicionales.</td>
-                <td>Filtra los datos del periodo seleccionado y extrae los 5 productos con mayor facturación acumulada.<br>Usa <code>white-space: normal</code> para evitar recortes.</td>
-                <td><strong>Por qué:</strong> Una tabla tabulada legible es superior para datos gerenciales precisos que un gráfico de barras comprimido.<br><strong>Beneficio:</strong> Permite planificar recompras sin margen de error al ver nombres de repuestos técnicos completos.</td>
+                <td><strong>10b. Tabla Detallada del Top 5 más Rentables</strong><br><small>Consola BI (Proyección)</small></td>
+                <td><strong>Hace:</strong> Muestra los 5 repuestos con mayor utilidad neta en una tabla sin truncar.<br><strong>Resuelve:</strong> Ignorar qué productos son los verdaderos motores de ganancia del negocio.</td>
+                <td>Filtra por utilidad neta acumulada:<br>$$\text{Utilidad} = \sum (\text{Cant} \times [\text{Precio} - \text{Costo}])$$<br>Usa <code>white-space: normal</code> para evitar recortes en nombres de repuestos.</td>
+                <td><strong>Por qué:</strong> La utilidad y el ROI comercial son mejores que el volumen para medir rentabilidad.<br><strong>Beneficio:</strong> Ayuda a enfocar los esfuerzos de marketing y compras en las piezas de mayor margen.</td>
             </tr>
             <!-- Reporte Financiero -->
             <tr>

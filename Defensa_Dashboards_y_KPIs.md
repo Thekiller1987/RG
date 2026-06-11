@@ -12,7 +12,15 @@ La consola de BI es el cerebro estadístico del sistema. Diseñado en un entorno
 
 ## 🟢 ENFOQUE A: Flujo de Caja y Auditoría (Seguridad Operativa)
 
-Concentra el control del dinero físico en caja y detecta anomalías. **No mezcla rentabilidad** para mantener el enfoque estricto en auditoría contable.
+Concentra el control del dinero físico en caja y detecta anomalías. Mantiene un enfoque estricto en auditoría contable y control operacional.
+
+### 0. Historial Forense de Descuadres y Consolidado de Auditoría
+* **¿Qué hace?** Grafica el histórico de diferencias monetarias de los arqueos de caja recientes y presenta un panel consolidado de cobros totales auditados agrupados por canal (efectivo, tarjeta, transferencia y dólares) en el rango de fechas seleccionado.
+* **¿Qué busca resolver?** La dificultad del administrador para ver la tendencia de descuadres de los cajeros en el tiempo y la necesidad de conciliar rápidamente los depósitos bancarios del negocio por cada método de pago.
+* **¿Cómo lo hace?** Dibuja un gráfico de barras donde cada barra es una sesión cerrada por un cajero; las barras se colorean de rojo si hay faltantes, amarillo si hay sobrantes, y verde si el arqueo fue perfecto. Paralelamente, el backend consolida y totaliza los fondos auditados de los cierres filtrados.
+* **¿Por qué se diseñó así?** Para dotar al negocio de una vista macro de auditoría que agrupe y visualice el riesgo operativo y el volumen de dinero auditado por canal de cobro en una sola pantalla.
+* **¿En qué beneficia al negocio?** Facilita la conciliación bancaria diaria y permite detectar desviaciones sistemáticas de dinero físico de forma visual e inmediata.
+
 
 ### 1. Eficiencia de Arqueo de Caja (30 días)
 * **¿Qué hace?** Mide la exactitud del manejo de dinero físico calculando el porcentaje de cierres de caja que terminaron con un descuadre de exactamente cero.
@@ -47,15 +55,17 @@ Concentra el control del dinero físico en caja y detecta anomalías. **No mezcl
 
 Optimiza la compra de repuestos y evita tener dinero congelado en productos sin demanda.
 
-### 4. Clasificación ABC de Inventario (Pareto - 180 días)
-* **¿Qué hace?** Clasifica los repuestos del catálogo en tres clases de importancia según su volumen de unidades vendidas en los últimos 6 meses.
-* **¿Qué busca resolver?** La desorganización en las compras a proveedores, donde se adquieren piezas de lento movimiento y se descuidan las de alta demanda.
+### 4. Clasificación ABC de Inventario (Pareto - Tabla y Gráfico de Distribución)
+* **¿Qué hace?** Clasifica y expone detalladamente los repuestos activos del catálogo en tres clases de importancia según su volumen de unidades vendidas en el periodo seleccionado, acompañando el gráfico de Pareto con una tabla de métricas financieras de stock y capital inmovilizado por clase.
+* **¿Qué busca resolver?** La desorganización en las compras a proveedores y la falta de visibilidad del valor del stock detenido, donde se adquieren piezas de lento movimiento y se descuidan las de alta demanda.
 * **¿Cómo lo hace?** Agrupa las ventas completadas por producto y asigna:
-  - **Clase A (Alta Rotación):** Ventas $> 10$ unidades en 180 días.
+  - **Clase A (Alta Rotación):** Ventas $> 10$ unidades en el periodo seleccionado. Representa los artículos estrella.
   - **Clase B (Media Rotación):** Ventas entre $4$ y $10$ unidades.
   - **Clase C (Baja Rotación):** Ventas $\le 3$ unidades.
-* **¿Por qué se diseñó así?** Sigue la Ley de Pareto ($80/20$), donde un pequeño porcentaje de repuestos (Clase A) representa el grueso del movimiento físico y comercial de la tienda.
-* **¿En qué beneficia al negocio?** Permite al administrador enfocar el capital de trabajo garantizando stock de Clase A, controlando la Clase B, y aplicando promociones agresivas a la Clase C para recuperar la inversión.
+  Adicionalmente, calcula dinámicamente y despliega en una tabla el número de repuestos de cada clase, su porcentaje de representación sobre el total de catálogo, la sumatoria física de stock disponible en bodega, y el capital neto inmovilizado en córdobas (C$) para cada clasificación.
+* **¿Por qué se diseñó así?** Aplica la Ley de Pareto ($80/20$), combinando un gráfico de barras horizontales de distribución de clases con una tabla de balance de capital para justificar la importancia financiera de cada segmento.
+* **¿En qué beneficia al negocio?** Permite al administrador enfocar el capital de trabajo: garantizar stock de Clase A (que genera el volumen transaccional), monitorear Clase B, y evaluar el capital congelado en Clase C para tomar decisiones de liquidación o promociones de venta y recuperar liquidez.
+
 
 ### 5. Sugerencia de Reposición Automática (Clase A - Stock Crítico)
 * **¿Qué hace?** Genera sugerencias de compras automatizadas para artículos Clase A con stock menor o igual a 5 unidades.
@@ -89,17 +99,13 @@ Optimiza la compra de repuestos y evita tener dinero congelado en productos sin 
 
 Mide la trayectoria económica del negocio y analiza tendencias a futuro para prever ingresos.
 
-### 8. Previsión de Ingresos mediante Regresión Lineal por Mínimos Cuadrados
-* **¿Qué hace?** Proyecta la facturación estimada para el próximo día o semana utilizando modelos estadísticos sobre los datos históricos de ventas.
-* **¿Qué busca resolver?** La incertidumbre financiera y la falta de planificación en compras y presupuestos de egresos.
-* **¿Cómo lo hace?** Ajusta la recta de regresión lineal $y = mx + c$:
-  - $y$: Ventas proyectadas.
-  - $x$: Intervalo de tiempo (días o semanas).
-  - $m$: Pendiente de la tendencia (ritmo de crecimiento/decrecimiento).
-  - $c$: Intercepto base.
-  - **Ajuste del Modelo ($R^2$):** Coeficiente de determinación que mide qué porcentaje de las ventas reales se alinea con la recta predictiva.
-* **¿Por qué se diseñó así?** Se entrena dinámicamente con los filtros de tiempo seleccionados en la consola, permitiendo predicciones adaptables a la estacionalidad del negocio.
-* **¿En qué beneficia al negocio?** Permite planificar el flujo de caja. Si el modelo proyecta ingresos estables, la gerencia puede autorizar inversiones o compras grandes con proveedores sin temor a quedarse sin liquidez.
+### 8. Historial Financiero Multiserie y Previsión de Ingresos (Ventas vs. Costo vs. Utilidad)
+* **¿Qué hace?** Muestra un análisis gráfico comparativo en el tiempo de los ingresos por ventas reales y proyectadas contra el costo real/proyectado de la mercadería vendida y la utilidad neta real/proyectada del negocio.
+* **¿Qué busca resolver?** La incertidumbre financiera y la falta de claridad sobre la rentabilidad real. Enfocarse sólo en ventas brutas puede ocultar que el margen de ganancia es bajo o que los costos están aumentando peligrosamente.
+* **¿Cómo lo hace?** Dibuja tres curvas principales: Ventas (azul), Costos de Ventas (rojo) y Utilidad Neta (verde). Para los periodos futuros proyectados, calcula mediante regresión lineal por mínimos cuadrados ($y = mx + c$) las proyecciones correspondientes, dibujándolas de forma segmentada (líneas punteadas).
+* **¿Por qué se diseñó así?** Para integrar en un solo gráfico la perspectiva comercial (ventas) y la perspectiva financiera (costos y beneficios), permitiendo ver el R² (coeficiente de determinación) que valida la precisión matemática del modelo lineal predictivo.
+* **¿En qué beneficia al negocio?** Facilita la toma de decisiones presupuestarias seguras. El gerente puede ver si el crecimiento de las ventas va acompañado de un aumento en la utilidad neta o si los costos operativos están erosionando el beneficio real.
+
 
 ### 9. Simulador Run-Rate y Cumplimiento de Metas Mensuales
 * **¿Qué hace?** Evalúa la progresión de las ventas acumuladas del mes en curso frente a una meta configurable (ej. C$ 600,000) y calcula el pronóstico de cierre de mes.
@@ -125,12 +131,15 @@ Mide la trayectoria económica del negocio y analiza tendencias a futuro para pr
 * **¿Por qué se diseñó así?** Se programó en el backend para buscar coocurrencias significativas y calcular sugerencias reales de ahorro en caja.
 * **¿En qué beneficia al negocio?** Incrementa directamente la facturación por cliente. Al sugerir combos basados en datos reales (como pastillas de freno + líquido de frenos con descuento), los vendedores pueden ofrecer venta cruzada efectiva y liberar stock complementario.
 
-### 10b. Tabla Detallada de Repuestos Estrella (Top 5 Bestsellers)
-* **¿Qué hace?** Muestra los 5 productos estrella con mayor facturación acumulada en una tabla responsiva de ancho completo que permite leer el nombre del producto completo sin ningún tipo de recorte.
-* **¿Qué busca resolver?** La dificultad de visualizar los nombres largos de repuestos automotrices (que suelen incluir marcas, medidas y modelos compatibles) que se truncaban o encimaban en gráficos estándar de barras.
-* **¿Cómo lo hace?** Filtra los datos de ventas del periodo seleccionado, extrae los 5 artículos con mayor monto total facturado y los presenta de forma clara aplicando el estilo `white-space: normal` para evitar la truncación del texto.
-* **¿Por qué se diseñó así?** Se determinó que una tabla tabulada es el formato óptimo para presentar datos de texto largo, mejorando la usabilidad y la experiencia de lectura gerencial sobre gráficos deformados.
-* **¿En qué beneficia al negocio?** Facilita decisiones de reabastecimiento rápidas y sin ambigüedades. El administrador puede ver el nombre exacto de la pieza estrella y su aporte en córdobas a la facturación total del periodo, optimizando la cadena de suministro.
+### 10b. Tabla Detallada de Repuestos de Mayor Rentabilidad (Top 5 más Rentables)
+* **¿Qué hace?** Muestra los 5 productos con mayor contribución a la utilidad neta del negocio (ordenados por Utilidad Neta total acumulada), desplegando sus nombres completos sin recortar y desglosando unidades, ventas totales, costo/margen promedio y utilidad neta.
+* **¿Qué busca resolver?** La distorsión en la toma de decisiones cuando se mide únicamente el volumen de venta (un producto de bajo costo y alto volumen puede generar menos ganancias que uno de alto valor y margen elevado).
+* **¿Cómo lo hace?** Filtra los datos del periodo y calcula para cada producto:
+  $$\text{Utilidad Neta} = \sum (\text{Cantidad Vendida} \times [\text{Precio Unitario Venta} - \text{Costo Producto}])$$
+  Presenta la información en una tabla responsiva con estilos CSS que permiten el ajuste de texto (`white-space: normal`) para facilitar la lectura del nombre completo de cada repuesto.
+* **¿Por qué se diseñó así?** Se determinó que para analizar la rentabilidad, la utilidad neta y el margen ROI comercial promedio son métricas mucho más valiosas e idóneas que el simple volumen físico o la facturación bruta.
+* **¿En qué beneficia al negocio?** Ayuda a optimizar el portafolio de repuestos. La gerencia puede identificar qué piezas son las verdaderas generadoras de dinero y priorizar su abastecimiento o aplicar estrategias de fidelización para clientes de dichos productos.
+
 
 ---
 

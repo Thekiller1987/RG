@@ -866,6 +866,110 @@ const BiConsole = () => {
     };
   };
 
+  const getDiscrepanciesChartData = () => {
+    if (!metrics || !metrics.recent_closures) return { labels: [], datasets: [] };
+    const closures = [...metrics.recent_closures].slice(0, 10).reverse();
+    const labels = closures.map((c, idx) => {
+      const dateStr = c.fecha_cierre 
+        ? new Date(c.fecha_cierre).toLocaleDateString('es-NI', { day: 'numeric', month: 'numeric' })
+        : `Sesión ${idx + 1}`;
+      return `${c.usuario_nombre.split(' ')[0]} (${dateStr})`;
+    });
+    const data = closures.map(c => c.diferencia);
+    
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Descuadre (C$)',
+          data,
+          backgroundColor: data.map(v => Math.abs(v) < 0.1 ? 'rgba(16, 185, 129, 0.5)' : (v < 0 ? 'rgba(244, 63, 94, 0.65)' : 'rgba(234, 179, 8, 0.65)')),
+          borderColor: data.map(v => Math.abs(v) < 0.1 ? '#10b981' : (v < 0 ? '#f43f5e' : '#eab308')),
+          borderWidth: 1.5,
+          borderRadius: 4
+        }
+      ]
+    };
+  };
+
+  const getFinancialTrendChartData = () => {
+    if (!metrics) return { labels: [], datasets: [] };
+    const history = chartPeriod === 'daily' ? metrics.sales_history_daily : metrics.sales_history;
+    if (!history) return { labels: [], datasets: [] };
+    
+    const labels = history.labels || [];
+    const reales = history.reales || [];
+    const costos = history.costos || [];
+    const utilidad = history.utilidad || [];
+    const proyeccion = history.proyeccion || [];
+    const costoProj = history.costo_proyeccion || [];
+    const utilidadProj = history.utilidad_proyeccion || [];
+    
+    const len = labels.length;
+    // Rellenamos arrays para que tengan la misma longitud que los labels
+    const realData = reales.concat(Array(len - reales.length).fill(null)).slice(0, len);
+    const costData = costos.concat(Array(len - costos.length).fill(null)).slice(0, len);
+    const profitData = utilidad.concat(Array(len - utilidad.length).fill(null)).slice(0, len);
+    
+    const projData = proyeccion.concat(Array(len - proyeccion.length).fill(null)).slice(0, len);
+    const costProjData = costoProj.concat(Array(len - costoProj.length).fill(null)).slice(0, len);
+    const profitProjData = utilidadProj.concat(Array(len - utilidadProj.length).fill(null)).slice(0, len);
+
+    // Encontrar el último índice de datos reales para conectar la proyección
+    const lastRealIdx = reales.findIndex((v) => v === null);
+    const splitIdx = lastRealIdx !== -1 ? lastRealIdx : reales.length;
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Ventas Reales (C$)',
+          data: realData.map((v, i) => i < splitIdx ? v : null),
+          borderColor: '#38bdf8',
+          backgroundColor: 'rgba(56, 189, 248, 0.05)',
+          borderWidth: 2.5,
+          fill: true,
+          tension: 0.3
+        },
+        {
+          label: 'Costo Real (C$)',
+          data: costData.map((v, i) => i < splitIdx ? v : null),
+          borderColor: '#f43f5e',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          tension: 0.3
+        },
+        {
+          label: 'Utilidad Real (C$)',
+          data: profitData.map((v, i) => i < splitIdx ? v : null),
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.05)',
+          borderWidth: 2.5,
+          fill: true,
+          tension: 0.3
+        },
+        {
+          label: 'Ventas Proyectadas (C$)',
+          data: projData.map((v, i) => i >= splitIdx - 1 ? v : null),
+          borderColor: '#38bdf8',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          borderDash: [5, 5],
+          tension: 0.3
+        },
+        {
+          label: 'Utilidad Proyectada (C$)',
+          data: profitProjData.map((v, i) => i >= splitIdx - 1 ? v : null),
+          borderColor: '#10b981',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          borderDash: [5, 5],
+          tension: 0.3
+        }
+      ]
+    };
+  };
+
   return (
     <PageWrapper>
       <TopLoadingBar visible={isUpdating} />
@@ -1116,6 +1220,85 @@ const BiConsole = () => {
           {/* DASHBOARD PANELS */}
           {activeTab === 'caja' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              <PanelRow>
+                <Card>
+                  <CardTitle>
+                    <FaChartBar color="#f43f5e" />
+                    Historial Forense de Descuadres (C$)
+                  </CardTitle>
+                  <CardDesc>
+                    Diferencia monetaria registrada en los cierres de caja recientes (faltantes en rojo, sobrantes en amarillo, perfecto en verde).
+                  </CardDesc>
+                  <ChartBox style={{ height: '240px' }}>
+                    <Bar 
+                      data={getDiscrepanciesChartData()} 
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
+                          x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 9 } } }
+                        }
+                      }}
+                    />
+                  </ChartBox>
+                </Card>
+
+                <Card>
+                  <CardTitle>
+                    <FaCashRegister color="#10b981" />
+                    Consolidado de Auditoría Contable (Periodo Seleccionado)
+                  </CardTitle>
+                  <CardDesc>
+                    Sumatoria totalizada de fondos y cobros auditados de los cierres del periodo seleccionado.
+                  </CardDesc>
+                  {(() => {
+                    const closures = metrics?.recent_closures || [];
+                    const totalEfectivo = closures.reduce((s, c) => s + Number(c.efectivo || 0), 0);
+                    const totalTarjeta = closures.reduce((s, c) => s + Number(c.tarjeta || 0), 0);
+                    const totalTransf = closures.reduce((s, c) => s + Number(c.transferencia || 0), 0);
+                    const totalDolares = closures.reduce((s, c) => s + Number(c.dolares || 0), 0);
+                    const totalEsperado = closures.reduce((s, c) => s + Number(c.final_esperado || 0), 0);
+                    const totalReal = closures.reduce((s, c) => s + Number(c.final_real || 0), 0);
+                    const totalDescuadre = totalReal - totalEsperado;
+                    
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginTop: '0.5rem' }}>
+                        <div style={{ padding: '0.6rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>💵 Total Efectivo Auditado</span>
+                          <div style={{ color: '#ED7D31', fontSize: '1.1rem', fontWeight: 800 }}>C$ {totalEfectivo.toLocaleString('es-NI', { maximumFractionDigits: 0 })}</div>
+                        </div>
+                        <div style={{ padding: '0.6rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>💳 Total Tarjeta Auditado</span>
+                          <div style={{ color: '#a855f7', fontSize: '1.1rem', fontWeight: 800 }}>C$ {totalTarjeta.toLocaleString('es-NI', { maximumFractionDigits: 0 })}</div>
+                        </div>
+                        <div style={{ padding: '0.6rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>🏦 Total Transferencias</span>
+                          <div style={{ color: '#38bdf8', fontSize: '1.1rem', fontWeight: 800 }}>C$ {totalTransf.toLocaleString('es-NI', { maximumFractionDigits: 0 })}</div>
+                        </div>
+                        <div style={{ padding: '0.6rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>🪙 Total Dólares Auditados</span>
+                          <div style={{ color: '#eab308', fontSize: '1.1rem', fontWeight: 800 }}>$ {totalDolares.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        </div>
+                        <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.5rem', fontSize: '0.75rem', marginTop: '0.2rem' }}>
+                          <div>
+                            <span style={{ color: '#9ca3af' }}>Descuadre Neto:</span>
+                            <span style={{ marginLeft: '4px', fontWeight: 700, color: totalDescuadre === 0 ? '#10b981' : (totalDescuadre < 0 ? '#f43f5e' : '#eab308') }}>
+                              C$ {totalDescuadre.toLocaleString('es-NI', { maximumFractionDigits: 0 })}
+                            </span>
+                          </div>
+                          <div>
+                            <span style={{ color: '#9ca3af' }}>Auditoría:</span>
+                            <span style={{ marginLeft: '4px', fontWeight: 700, color: '#fff' }}>{closures.length} Sesiones</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </Card>
+              </PanelRow>
+
               <PanelRow>
                 <Card style={{ gridColumn: 'span 2' }}>
                   <CardTitle>
@@ -1370,7 +1553,8 @@ const BiConsole = () => {
                     División del inventario activo según su volumen de rotación en los últimos 180 días para priorizar la gestión de stock (Ley de Pareto).
                   </CardDesc>
                   
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem', marginTop: '0.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', marginTop: '0.5rem' }}>
+                    {/* Columna 1: Progreso y Descripción */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
                       <div style={{ background: 'rgba(255,255,255,0.04)', height: '28px', borderRadius: '14px', overflow: 'hidden', display: 'flex', border: '1px solid rgba(255,255,255,0.08)' }}>
                         <div style={{ 
@@ -1420,7 +1604,7 @@ const BiConsole = () => {
                          <div style={{ padding: '0.8rem', background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.12)', borderRadius: '12px' }}>
                            <span style={{ color: '#10b981', fontWeight: 800 }}>🟢 Clase A (Alta Rotación):</span>
                            <div style={{ color: '#fff', fontSize: '1rem', fontWeight: 700, margin: '2px 0' }}>{metrics?.abc_a || 0} Repuestos</div>
-                           <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>&gt; 10 unidades vendidas en 180 días. Artículos estrella del inventario.</span>
+                           <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>&gt; 10 unidades vendidas en el periodo. Artículos estrella del inventario.</span>
                          </div>
                          <div style={{ padding: '0.8rem', background: 'rgba(234, 179, 8, 0.04)', border: '1px solid rgba(234, 179, 8, 0.12)', borderRadius: '12px' }}>
                            <span style={{ color: '#eab308', fontWeight: 800 }}>🟡 Clase B (Rotación Media):</span>
@@ -1430,14 +1614,76 @@ const BiConsole = () => {
                          <div style={{ padding: '0.8rem', background: 'rgba(244, 63, 94, 0.04)', border: '1px solid rgba(244, 63, 94, 0.12)', borderRadius: '12px' }}>
                            <span style={{ color: '#f43f5e', fontWeight: 800 }}>🔴 Clase C (Rotación Baja):</span>
                            <div style={{ color: '#fff', fontSize: '1rem', fontWeight: 700, margin: '2px 0' }}>{metrics?.abc_c || 0} Repuestos</div>
-                           <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>&le; 3 unidades vendidas en 180 días. Lento movimiento en percha.</span>
+                           <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>&le; 3 unidades vendidas en el periodo. Lento movimiento en percha.</span>
                          </div>
                       </div>
                     </div>
 
+                    {/* Columna 2: Tabla de Distribución Detallada ABC */}
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#9ca3af', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Métricas de Clasificación ABC</span>
+                      <div style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '0.5rem' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: '#9ca3af' }}>
+                              <th style={{ padding: '0.5rem', fontWeight: 600 }}>CLASE</th>
+                              <th style={{ padding: '0.5rem', fontWeight: 600, textAlign: 'right' }}>ITEMS (%)</th>
+                              <th style={{ padding: '0.5rem', fontWeight: 600, textAlign: 'right' }}>STOCK</th>
+                              <th style={{ padding: '0.5rem', fontWeight: 600, textAlign: 'right' }}>CAPITAL VALUADO</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(() => {
+                              const a = metrics?.abc_analysis?.clase_a || { total: metrics?.abc_a || 0, stock: 0, capital: 0, pct_items: 0 };
+                              const b = metrics?.abc_analysis?.clase_b || { total: metrics?.abc_b || 0, stock: 0, capital: 0, pct_items: 0 };
+                              const c = metrics?.abc_analysis?.clase_c || { total: metrics?.abc_c || 0, stock: 0, capital: 0, pct_items: 0 };
+                              
+                              const totalItems = (a.total || 0) + (b.total || 0) + (c.total || 0);
+                              const totalStock = (a.stock || 0) + (b.stock || 0) + (c.stock || 0);
+                              const totalCapital = (a.capital || 0) + (b.capital || 0) + (c.capital || 0);
+
+                              const pctA = a.pct_items || (totalItems > 0 ? ((a.total / totalItems) * 100).toFixed(1) : 0);
+                              const pctB = b.pct_items || (totalItems > 0 ? ((b.total / totalItems) * 100).toFixed(1) : 0);
+                              const pctC = c.pct_items || (totalItems > 0 ? ((c.total / totalItems) * 100).toFixed(1) : 0);
+
+                              return (
+                                <>
+                                  <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                                    <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: '#10b981' }}>🟢 Clase A</td>
+                                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', color: '#fff' }}>{a.total || 0} ({pctA}%)</td>
+                                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', color: '#fff' }}>{a.stock?.toLocaleString() || 0} und</td>
+                                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#ED7D31' }}>C$ {a.capital?.toLocaleString('es-NI', { maximumFractionDigits: 0 }) || 0}</td>
+                                  </tr>
+                                  <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                                    <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: '#eab308' }}>🟡 Clase B</td>
+                                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', color: '#fff' }}>{b.total || 0} ({pctB}%)</td>
+                                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', color: '#fff' }}>{b.stock?.toLocaleString() || 0} und</td>
+                                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#ED7D31' }}>C$ {b.capital?.toLocaleString('es-NI', { maximumFractionDigits: 0 }) || 0}</td>
+                                  </tr>
+                                  <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                                    <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: '#f43f5e' }}>🔴 Clase C</td>
+                                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', color: '#fff' }}>{c.total || 0} ({pctC}%)</td>
+                                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', color: '#fff' }}>{c.stock?.toLocaleString() || 0} und</td>
+                                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#ED7D31' }}>C$ {c.capital?.toLocaleString('es-NI', { maximumFractionDigits: 0 }) || 0}</td>
+                                  </tr>
+                                  <tr style={{ fontWeight: 800, background: 'rgba(255,255,255,0.03)', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                                    <td style={{ padding: '0.6rem 0.5rem', color: '#fff' }}>Total General</td>
+                                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', color: '#fff' }}>{totalItems} (100%)</td>
+                                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', color: '#10b981' }}>{totalStock.toLocaleString()} und</td>
+                                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#ED7D31' }}>C$ {totalCapital.toLocaleString('es-NI', { maximumFractionDigits: 0 })}</td>
+                                  </tr>
+                                </>
+                              );
+                            })()}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Columna 3: Gráfico de Distribución ABC */}
                     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                       <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#9ca3af', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Distribución de Clases ABC</span>
-                      <ChartBox style={{ height: '260px' }}>
+                      <ChartBox style={{ height: '240px' }}>
                         <Bar
                           data={getAbcChartData()}
                           options={{
@@ -1729,8 +1975,8 @@ const BiConsole = () => {
                 <Card>
                   <CardTitle style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <FaChartLine />
-                      Historial de Ventas y Proyección Lineal
+                      <FaChartLine color="#38bdf8" />
+                      Historial de Ventas, Costos y Utilidad Neta
                     </div>
                     <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px' }}>
                       <button 
@@ -1768,11 +2014,11 @@ const BiConsole = () => {
                     </div>
                   </CardTitle>
                   <CardDesc>
-                    Registros transaccionales reales comparados con la proyección analítica calculada mediante regresión lineal basada en el histórico de ventas.
+                    Tendencia comparativa de los ingresos por ventas reales y proyectadas contra el costo total de los repuestos y la utilidad neta obtenida.
                   </CardDesc>
                   <ChartBox style={{ height: '280px' }}>
                     <Line
-                      data={getSalesChartData()}
+                      data={getFinancialTrendChartData()}
                       options={{
                         responsive: true,
                         maintainAspectRatio: false,
@@ -1818,11 +2064,11 @@ const BiConsole = () => {
               <PanelRow>
                 <Card style={{ gridColumn: 'span 2' }}>
                   <CardTitle>
-                    <FaChartBar color="#38bdf8" />
-                    Ranking de Repuestos Estrella (Top 5 Bestsellers)
+                    <FaBoxes color="#10b981" />
+                    Top 5 Repuestos de Mayor Rentabilidad (Contribución de Utilidad Neta)
                   </CardTitle>
                   <CardDesc>
-                    Listado de los 5 productos con mayor volumen de facturación y demanda acumulada en el periodo seleccionado, mostrando el nombre completo del producto.
+                    Listado de los 5 productos que generan mayor beneficio neto (Utilidad Neta = Cantidad * [Precio - Costo]), mostrando nombres de productos no truncados para su fácil identificación.
                   </CardDesc>
                   <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
@@ -1831,22 +2077,26 @@ const BiConsole = () => {
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600 }}>CÓDIGO</th>
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600 }}>PRODUCTO</th>
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>UNIDADES VENDIDAS</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>TOTAL FACTURADO</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>INGRESO BRUTO</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>UTILIDAD NETA</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>MARGEN ROI</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {metrics?.top_products?.slice(0, 5).map((p, idx) => (
+                        {metrics?.top_profitable_products?.map((p, idx) => (
                           <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)', transition: 'background-color 0.2s' }}>
                             <td style={{ padding: '0.75rem 0.5rem', fontFamily: "'JetBrains Mono', monospace", color: '#38bdf8', fontWeight: 600 }}>{p.codigo || 'S/C'}</td>
-                            <td style={{ padding: '0.75rem 0.5rem', color: '#fff', whiteSpace: 'normal', wordBreak: 'break-word' }}>{p.nombre}</td>
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#10b981' }}>{p.unidades.toLocaleString()}</td>
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#ED7D31' }}>C$ {p.monto.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', color: '#fff', whiteSpace: 'normal', wordBreak: 'break-word', minWidth: '200px' }}>{p.nombre}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#fff' }}>{p.unidades.toLocaleString()}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", color: '#9ca3af' }}>C$ {p.monto.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#10b981' }}>C$ {p.utilidad.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#a855f7' }}>{p.margen}%</td>
                           </tr>
                         ))}
-                        {(!metrics?.top_products || metrics?.top_products?.length === 0) && (
+                        {(!metrics?.top_profitable_products || metrics?.top_profitable_products?.length === 0) && (
                           <tr>
-                            <td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
-                              No hay datos de ventas registradas en el rango seleccionado.
+                            <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
+                              No hay datos de rentabilidad de productos en el rango seleccionado.
                             </td>
                           </tr>
                         )}

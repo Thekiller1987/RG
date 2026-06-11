@@ -556,46 +556,79 @@ const getBiMetrics = async (req, res) => {
             [weeklySalesResult] = await db.query(`
                 SELECT * FROM (
                     SELECT 
-                        YEARWEEK(fecha, 1) AS año_semana,
-                        DATE_FORMAT(MIN(fecha), '%d/%m') AS etiqueta,
-                        SUM(total_venta) AS total
-                    FROM ventas v
-                    WHERE v.estado = 'COMPLETADA' AND v.fecha >= ? AND v.fecha <= ?
-                    GROUP BY año_semana
-                    ORDER BY año_semana DESC
-                ) sub
+                        sub.año_semana,
+                        sub.etiqueta,
+                        SUM(sub.total_venta) AS total,
+                        SUM(sub.total_costo) AS total_costo
+                    FROM (
+                        SELECT 
+                            v.id_venta,
+                            YEARWEEK(v.fecha, 1) AS año_semana,
+                            DATE_FORMAT(v.fecha, '%d/%m') AS etiqueta,
+                            v.total_venta,
+                            COALESCE((
+                                SELECT SUM(dv_in.cantidad * p_in.costo)
+                                FROM detalle_ventas dv_in
+                                JOIN productos p_in ON dv_in.id_producto = p_in.id_producto
+                                WHERE dv_in.id_venta = v.id_venta
+                            ), 0) AS total_costo
+                        FROM ventas v
+                        WHERE v.estado = 'COMPLETADA' AND v.fecha >= ? AND v.fecha <= ?
+                    ) sub
+                    GROUP BY sub.año_semana, sub.etiqueta
+                    ORDER BY sub.año_semana DESC
+                ) sub2
                 ORDER BY año_semana ASC;
             `, [from, to]);
         } else {
             [weeklySalesResult] = await db.query(`
                 SELECT * FROM (
                     SELECT 
-                        YEARWEEK(fecha, 1) AS año_semana,
-                        DATE_FORMAT(MIN(fecha), '%d/%m') AS etiqueta,
-                        SUM(total_venta) AS total
-                    FROM ventas
-                    WHERE estado = 'COMPLETADA' AND YEARWEEK(fecha, 1) < YEARWEEK(NOW(), 1)
-                    GROUP BY año_semana
-                    ORDER BY año_semana DESC
+                        sub.año_semana,
+                        sub.etiqueta,
+                        SUM(sub.total_venta) AS total,
+                        SUM(sub.total_costo) AS total_costo
+                    FROM (
+                        SELECT 
+                            v.id_venta,
+                            YEARWEEK(v.fecha, 1) AS año_semana,
+                            DATE_FORMAT(v.fecha, '%d/%m') AS etiqueta,
+                            v.total_venta,
+                            COALESCE((
+                                SELECT SUM(dv_in.cantidad * p_in.costo)
+                                FROM detalle_ventas dv_in
+                                JOIN productos p_in ON dv_in.id_producto = p_in.id_producto
+                                WHERE dv_in.id_venta = v.id_venta
+                            ), 0) AS total_costo
+                        FROM ventas v
+                        WHERE v.estado = 'COMPLETADA' AND YEARWEEK(v.fecha, 1) < YEARWEEK(NOW(), 1)
+                    ) sub
+                    GROUP BY sub.año_semana, sub.etiqueta
+                    ORDER BY sub.año_semana DESC
                     LIMIT 8
-                ) sub
+                ) sub2
                 ORDER BY año_semana ASC;
             `);
         }
 
         let pastLabels = weeklySalesResult.map(r => r.etiqueta);
         let pastTotals = weeklySalesResult.map(r => Number(r.total));
+        let pastCosts = weeklySalesResult.map(r => Number(r.total_costo || 0));
 
         // Relleno de seguridad si la base de datos es nueva
         if (pastTotals.length === 0) {
             pastLabels = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6', 'Sem 7', 'Sem 8'];
             pastTotals = [105000, 120000, 135000, 130000, 145000, 160000, 155000, 170000];
+            pastCosts = [65000, 74000, 82000, 78000, 88000, 96000, 92000, 102000];
         } else if (pastTotals.length < 3) {
             const extraLabels = ['Sem A', 'Sem B', 'Sem C', 'Sem D'].slice(0, 4 - pastTotals.length);
             const extraTotals = [90000, 95000, 100000, 105000].slice(0, 4 - pastTotals.length);
+            const extraCosts = [55000, 58000, 61000, 64000].slice(0, 4 - pastTotals.length);
             pastLabels = [...extraLabels, ...pastLabels];
             pastTotals = [...extraTotals, ...pastTotals];
+            pastCosts = [...extraCosts, ...pastCosts];
         }
+        let pastProfits = pastTotals.map((t, idx) => Math.max(0, t - pastCosts[idx]));
 
         // Helper interno para calcular R² real de la regresión
         const calculateR2 = (actuals, slope, intercept) => {
@@ -614,7 +647,7 @@ const getBiMetrics = async (req, res) => {
             return Math.max(0, Math.min(100, r2Val * 100));
         };
 
-        // Proyección analítica lineal (mínimos cuadrados)
+        // Proyección analítica lineal de ventas (mínimos cuadrados)
         const n = pastTotals.length;
         let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
         for (let i = 0; i < n; i++) {
@@ -631,6 +664,21 @@ const getBiMetrics = async (req, res) => {
 
         const labels = [...pastLabels, 'Proy W9', 'Proy W10'];
         const reales = [...pastTotals, null, null];
+
+        // Proyección de costos (mínimos cuadrados)
+        let sumXc = 0, sumYc = 0, sumXYc = 0, sumXXc = 0;
+        for (let i = 0; i < n; i++) {
+            sumXc += i;
+            sumYc += pastCosts[i];
+            sumXYc += i * pastCosts[i];
+            sumXXc += i * i;
+        }
+        const mc = (n * sumXYc - sumXc * sumYc) / (n * sumXXc - sumXc * sumXc) || 5;
+        const cc = (sumYc - mc * sumXc) / n;
+        const projCost9 = Math.max(0, Number((mc * n + cc).toFixed(2)));
+        const projCost10 = Math.max(0, Number((mc * (n + 1) + cc).toFixed(2)));
+
+        const costProyeccion = [...pastCosts, projCost9, projCost10];
 
         // Calcular R² semanal real
         const r2_weekly = Number(calculateR2(pastTotals, m, c).toFixed(2));
@@ -657,11 +705,21 @@ const getBiMetrics = async (req, res) => {
         pastProyecciones[0] = pastTotals[0];
 
         const proyeccion = [...pastProyecciones, proj9, proj10];
+        
+        const profitProyeccion = proyeccion.map((val, idx) => {
+            if (val === null) return null;
+            const costVal = costProyeccion[idx];
+            return Math.max(0, Number((val - costVal).toFixed(2)));
+        });
 
         const sales_history = {
             labels,
             reales,
-            proyeccion
+            costos: pastCosts,
+            utilidad: pastProfits,
+            proyeccion,
+            costo_proyeccion: costProyeccion,
+            utilidad_proyeccion: profitProyeccion
         };
 
         // 4b. Historial de Ventas Diarias
@@ -671,46 +729,79 @@ const getBiMetrics = async (req, res) => {
             [dailySalesResult] = await db.query(`
                 SELECT * FROM (
                     SELECT 
-                        DATE(fecha) AS dia,
-                        DATE_FORMAT(MIN(fecha), '%d/%m') AS etiqueta,
-                        SUM(total_venta) AS total
-                    FROM ventas v
-                    WHERE v.estado = 'COMPLETADA' AND v.fecha >= ? AND v.fecha <= ?
-                    GROUP BY dia
-                    ORDER BY dia DESC
-                ) sub
+                        sub.dia,
+                        sub.etiqueta,
+                        SUM(sub.total_venta) AS total,
+                        SUM(sub.total_costo) AS total_costo
+                    FROM (
+                        SELECT 
+                            v.id_venta,
+                            DATE(v.fecha) AS dia,
+                            DATE_FORMAT(v.fecha, '%d/%m') AS etiqueta,
+                            v.total_venta,
+                            COALESCE((
+                                SELECT SUM(dv_in.cantidad * p_in.costo)
+                                FROM detalle_ventas dv_in
+                                JOIN productos p_in ON dv_in.id_producto = p_in.id_producto
+                                WHERE dv_in.id_venta = v.id_venta
+                            ), 0) AS total_costo
+                        FROM ventas v
+                        WHERE v.estado = 'COMPLETADA' AND v.fecha >= ? AND v.fecha <= ?
+                    ) sub
+                    GROUP BY sub.dia, sub.etiqueta
+                    ORDER BY sub.dia DESC
+                ) sub2
                 ORDER BY dia ASC;
             `, [from, to]);
         } else {
             [dailySalesResult] = await db.query(`
                 SELECT * FROM (
                     SELECT 
-                        DATE(fecha) AS dia,
-                        DATE_FORMAT(MIN(fecha), '%d/%m') AS etiqueta,
-                        SUM(total_venta) AS total
-                    FROM ventas
-                    WHERE estado = 'COMPLETADA' AND fecha < CURDATE()
-                    GROUP BY dia
-                    ORDER BY dia DESC
+                        sub.dia,
+                        sub.etiqueta,
+                        SUM(sub.total_venta) AS total,
+                        SUM(sub.total_costo) AS total_costo
+                    FROM (
+                        SELECT 
+                            v.id_venta,
+                            DATE(v.fecha) AS dia,
+                            DATE_FORMAT(v.fecha, '%d/%m') AS etiqueta,
+                            v.total_venta,
+                            COALESCE((
+                                SELECT SUM(dv_in.cantidad * p_in.costo)
+                                FROM detalle_ventas dv_in
+                                JOIN productos p_in ON dv_in.id_producto = p_in.id_producto
+                                WHERE dv_in.id_venta = v.id_venta
+                            ), 0) AS total_costo
+                        FROM ventas v
+                        WHERE v.estado = 'COMPLETADA' AND v.fecha < CURDATE()
+                    ) sub
+                    GROUP BY sub.dia, sub.etiqueta
+                    ORDER BY sub.dia DESC
                     LIMIT 10
-                ) sub
+                ) sub2
                 ORDER BY dia ASC;
             `);
         }
 
         let dailyPastLabels = dailySalesResult.map(r => r.etiqueta);
         let dailyPastTotals = dailySalesResult.map(r => Number(r.total));
+        let dailyPastCosts = dailySalesResult.map(r => Number(r.total_costo || 0));
 
         // Relleno de seguridad si la base de datos es nueva o no tiene suficientes datos
         if (dailyPastTotals.length === 0) {
             dailyPastLabels = ['01/06', '02/06', '03/06', '04/06', '05/06', '06/06', '07/06', '08/06'];
             dailyPastTotals = [12000, 15000, 14000, 18000, 16000, 22000, 19000, 21000];
+            dailyPastCosts = [7200, 9100, 8400, 10800, 9500, 13100, 11500, 12600];
         } else if (dailyPastTotals.length < 3) {
             const extraLabels = ['Día A', 'Día B', 'Día C', 'Día D'].slice(0, 4 - dailyPastTotals.length);
             const extraTotals = [8000, 10000, 12000, 14000].slice(0, 4 - dailyPastTotals.length);
+            const extraCosts = [4800, 6000, 7200, 8400].slice(0, 4 - dailyPastTotals.length);
             dailyPastLabels = [...extraLabels, ...dailyPastLabels];
             dailyPastTotals = [...extraTotals, ...dailyPastTotals];
+            dailyPastCosts = [...extraCosts, ...dailyPastCosts];
         }
+        let dailyPastProfits = dailyPastTotals.map((t, idx) => Math.max(0, t - dailyPastCosts[idx]));
 
         // Proyección diaria lineal (mínimos cuadrados)
         const nd = dailyPastTotals.length;
@@ -729,6 +820,21 @@ const getBiMetrics = async (req, res) => {
 
         const dailyLabels = [...dailyPastLabels, 'Proy D1', 'Proy D2'];
         const dailyReales = [...dailyPastTotals, null, null];
+
+        // Proyección diaria de costos (mínimos cuadrados)
+        let sumXcd = 0, sumYcd = 0, sumXYcd = 0, sumXXcd = 0;
+        for (let i = 0; i < nd; i++) {
+            sumXcd += i;
+            sumYcd += dailyPastCosts[i];
+            sumXYcd += i * dailyPastCosts[i];
+            sumXXcd += i * i;
+        }
+        const mcd = (nd * sumXYcd - sumXcd * sumYcd) / (nd * sumXXcd - sumXcd * sumXcd) || 300;
+        const ccd = (sumYcd - mcd * sumXcd) / nd;
+        const projDCost1 = Math.max(0, Number((mcd * nd + ccd).toFixed(2)));
+        const projDCost2 = Math.max(0, Number((mcd * (nd + 1) + ccd).toFixed(2)));
+
+        const dailyCostProyeccion = [...dailyPastCosts, projDCost1, projDCost2];
 
         // Calcular R² diario real
         const r2_daily = Number(calculateR2(dailyPastTotals, md, cd).toFixed(2));
@@ -756,10 +862,20 @@ const getBiMetrics = async (req, res) => {
 
         const dailyProyeccion = [...dailyPastProyecciones, projD1, projD2];
 
+        const dailyProfitProyeccion = dailyProyeccion.map((val, idx) => {
+            if (val === null) return null;
+            const costVal = dailyCostProyeccion[idx];
+            return Math.max(0, Number((val - costVal).toFixed(2)));
+        });
+
         const sales_history_daily = {
             labels: dailyLabels,
             reales: dailyReales,
-            proyeccion: dailyProyeccion
+            costos: dailyPastCosts,
+            utilidad: dailyPastProfits,
+            proyeccion: dailyProyeccion,
+            costo_proyeccion: dailyCostProyeccion,
+            utilidad_proyeccion: dailyProfitProyeccion
         };
 
         // 5. Márgenes de Rentabilidad por Categoría (Top 5)
@@ -1523,6 +1639,95 @@ const getBiMetrics = async (req, res) => {
                 console.error("Error al calcular pérdida por stockout:", err);
             }
 
+            // 10. Modelo: Análisis detallado de clases ABC (Pareto)
+            var abc_analysis = {
+                clase_a: { total: 0, stock: 0, capital: 0, pct_items: 0 },
+                clase_b: { total: 0, stock: 0, capital: 0, pct_items: 0 },
+                clase_c: { total: 0, stock: 0, capital: 0, pct_items: 0 }
+            };
+            try {
+                const [abcAnalysisResult] = await db.query(`
+                    SELECT 
+                        clase,
+                        COUNT(*) AS total_productos,
+                        COALESCE(SUM(existencia), 0) AS stock_total,
+                        COALESCE(SUM(existencia * precio), 0) AS capital_total
+                    FROM (
+                        SELECT 
+                            p.id_producto,
+                            p.existencia,
+                            p.venta AS precio,
+                            COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas,
+                            CASE 
+                                WHEN COALESCE(SUM(dv.cantidad), 0) > 10 THEN 'Clase A'
+                                WHEN COALESCE(SUM(dv.cantidad), 0) BETWEEN 4 AND 10 THEN 'Clase B'
+                                ELSE 'Clase C'
+                            END AS clase
+                        FROM productos p
+                        LEFT JOIN (
+                            SELECT dv_in.id_producto, dv_in.cantidad
+                            FROM detalle_ventas dv_in
+                            JOIN ventas v_in ON dv_in.id_venta = v_in.id_venta
+                            WHERE v_in.estado = 'COMPLETADA' AND ${stgFilter}
+                        ) dv ON p.id_producto = dv.id_producto
+                        WHERE p.activo = 1 AND p.existencia > 0
+                        GROUP BY p.id_producto, p.existencia, p.venta
+                    ) AS sub
+                    GROUP BY clase;
+                `, stgParams);
+
+                const totalActiveProducts = total_productos || 1;
+                abcAnalysisResult.forEach(row => {
+                    const c = row.clase.toLowerCase().replace('clase ', 'clase_');
+                    if (abc_analysis[c]) {
+                        abc_analysis[c].total = Number(row.total_productos || 0);
+                        abc_analysis[c].stock = Number(row.stock_total || 0);
+                        abc_analysis[c].capital = Number(row.capital_total || 0);
+                        abc_analysis[c].pct_items = Number(((abc_analysis[c].total / totalActiveProducts) * 100).toFixed(1));
+                    }
+                });
+            } catch (err) {
+                console.error("Error al calcular análisis ABC:", err);
+            }
+
+            abc_a = abc_analysis.clase_a.total;
+            abc_b = abc_analysis.clase_b.total;
+            abc_c = abc_analysis.clase_c.total;
+
+            // 11. Productos con mayor contribución de utilidad (Top 5 más rentables)
+            var top_profitable_products = [];
+            try {
+                const [topProfitableResult] = await db.query(`
+                    SELECT 
+                        p.id_producto,
+                        p.nombre, 
+                        p.codigo, 
+                        SUM(dv.cantidad) AS unidades_vendidas, 
+                        SUM(dv.cantidad * dv.precio_unitario) AS total_facturado,
+                        SUM(dv.cantidad * (dv.precio_unitario - p.costo)) AS utilidad_neta,
+                        COALESCE(AVG(((dv.precio_unitario - p.costo) / p.costo) * 100), 0) AS margen_promedio
+                    FROM detalle_ventas dv
+                    JOIN productos p ON dv.id_producto = p.id_producto
+                    JOIN ventas v ON dv.id_venta = v.id_venta
+                    WHERE v.estado = 'COMPLETADA' ${dateFilter}
+                    GROUP BY p.id_producto, p.nombre, p.codigo
+                    ORDER BY utilidad_neta DESC 
+                    LIMIT 5;
+                `, params);
+
+                top_profitable_products = topProfitableResult.map(p => ({
+                    id_producto: p.id_producto,
+                    nombre: p.nombre,
+                    codigo: p.codigo,
+                    unidades: Number(p.unidades_vendidas || 0),
+                    monto: Number(p.total_facturado || 0),
+                    utilidad: Number(p.utilidad_neta || 0),
+                    margen: Number(Number(p.margen_promedio || 0).toFixed(1))
+                }));
+            } catch (err) {
+                console.error("Error al calcular productos más rentables:", err);
+            }
+
         } catch (calcErr) {
             console.error("Error al calcular KPIs adicionales de BI:", calcErr);
         }
@@ -1551,6 +1756,8 @@ const getBiMetrics = async (req, res) => {
             abc_a,
             abc_b,
             abc_c,
+            abc_analysis,
+            top_profitable_products,
             dio,
             ventas_mes_actual,
             dias_transcurridos_mes,
