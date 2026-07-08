@@ -236,28 +236,28 @@ function SalesHistoryModal({
   const [filterStatus, setFilterStatus] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
+  const [activeClientId, setActiveClientId] = useState(initialClientId);
+
   const safeUsers = useMemo(() => (Array.isArray(users) ? users : []), [users]);
   const safeClients = useMemo(() => (Array.isArray(clients) ? clients : []), [clients]);
 
-  // If initialClientId is provided, find that client to pre-fill search or use a dedicated filter
+  // Sync activeClientId when initialClientId changes
   useEffect(() => {
-    if (initialClientId) {
-      // Ideally we want to load ALL history for this client, not just today.
-      // So we trigger fetchSalesByDate(null) to get full history if API supports it, 
-      // or at least filter what we have.
-      // However, default behavior for "null" date in loadSales IS full history (usually).
+    setActiveClientId(initialClientId);
+  }, [initialClientId]);
 
-      // Let's set the search term to the client's name or ID to filter the list.
-      const c = safeClients.find(x => x.id_cliente === initialClientId);
+  // Sync searchTerm and filterDate when activeClientId changes
+  useEffect(() => {
+    if (activeClientId) {
+      const c = safeClients.find(x => x.id_cliente === activeClientId);
       if (c) {
         setSearchTerm(c.nombre);
-        // Also clear date filter to show all history
-        setFilterDate(''); // clearing date usually signals "all time" in our logic below
+        setFilterDate(''); // clear date to fetch all history
       } else {
-        setSearchTerm(String(initialClientId));
+        setSearchTerm(String(activeClientId));
       }
     }
-  }, [initialClientId, safeClients]);
+  }, [activeClientId, safeClients]);
 
   const [selectedSale, setSelectedSale] = useState(null);
   const [showAbonoModal, setShowAbonoModal] = useState(false);
@@ -277,12 +277,12 @@ function SalesHistoryModal({
   const closePrompt = () => setPromptState({ open: false, title: '', message: '', initialValue: '1', onConfirm: null });
 
   // Cargar ventas
-  const fetchSalesByDate = useCallback(async (date = null) => {
+  const fetchSalesByDate = useCallback(async (date = null, clientId = null) => {
     if (!loadSales) return [];
     setLoadingSales(true);
     setCurrentApiDate(date);
     try {
-      const data = await loadSales(date);
+      const data = await loadSales(date, clientId);
       const salesArray = Array.isArray(data) ? data : [];
       setSalesData(salesArray);
       return salesArray;
@@ -296,31 +296,20 @@ function SalesHistoryModal({
   }, [loadSales]);
 
   useEffect(() => {
-    // Logic: If initialClientId is set, we might want to load ALL history immediately.
-    // Logic: If searchTerm is typed, we load ALL history.
-    // Logic: If filterDate is set, we load specific date.
-
-    // If we just opened with a client ID, we want full history:
-    if (initialClientId && !filterDate && !searchTerm) {
-      // Wait for the effect above to set searchTerm, then this will run?
-      // Actually dependencies might conflict.
-      // Let's rely on the searchTerm change triggering this.
-    }
-
-    const loadAllHistory = (searchTerm && searchTerm.length >= 2) || (initialClientId && !filterDate);
+    const loadAllHistory = (searchTerm && searchTerm.length >= 2) || (activeClientId && !filterDate);
     const dateToLoad = loadAllHistory ? null : filterDate;
 
-    fetchSalesByDate(dateToLoad);
+    fetchSalesByDate(dateToLoad, activeClientId);
     setCurrentPage(1);
     setSelectedSale(null);
-  }, [filterDate, fetchSalesByDate, searchTerm, initialClientId]);
+  }, [filterDate, fetchSalesByDate, searchTerm, activeClientId]);
 
-  // Sincroniza HOY con dailySales si no hay búsqueda
+  // Sincroniza HOY con dailySales si no hay búsqueda y no hay cliente seleccionado
   useEffect(() => {
-    if (filterDate === todayLocal() && Array.isArray(dailySales) && !searchTerm) {
+    if (filterDate === todayLocal() && Array.isArray(dailySales) && !searchTerm && !activeClientId) {
       setSalesData(dailySales);
     }
-  }, [dailySales, filterDate, searchTerm]);
+  }, [dailySales, filterDate, searchTerm, activeClientId]);
 
   // Filtros
   const filteredSales = useMemo(() => {
@@ -330,6 +319,10 @@ function SalesHistoryModal({
       return { ...s, _clientName: clientName, _idStr: String(s.id) };
     });
 
+    if (activeClientId) {
+      data = data.filter(s => (s.clientId || s.idCliente) === activeClientId);
+    }
+
     if (filterUser) {
       data = data.filter(s => String(s.userId) === String(filterUser));
     }
@@ -337,8 +330,12 @@ function SalesHistoryModal({
       data = data.filter(s => s.estado === filterStatus);
     }
 
-    return rankItems(data, searchTerm, ['_idStr', '_clientName']).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-  }, [salesData, filterUser, filterStatus, searchTerm, safeClients]);
+    if (searchTerm && !activeClientId) {
+      data = rankItems(data, searchTerm, ['_idStr', '_clientName']);
+    }
+
+    return data.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  }, [salesData, filterUser, filterStatus, searchTerm, safeClients, activeClientId]);
 
   // Paginación
   const totalPages = Math.max(1, Math.ceil(filteredSales.length / ITEMS_PER_PAGE));
@@ -352,14 +349,14 @@ function SalesHistoryModal({
   }, [pageItems, selectedSale]);
 
   const afterMutationRefresh = useCallback(async (keepSaleId = null) => {
-    const updatedSalesData = await fetchSalesByDate(currentApiDate);
+    const updatedSalesData = await fetchSalesByDate(currentApiDate, activeClientId);
     if (keepSaleId) {
       const updated = (updatedSalesData || []).find(v => String(v.id) === String(keepSaleId));
       setSelectedSale(updated || null);
     } else {
       setSelectedSale(null);
     }
-  }, [fetchSalesByDate, currentApiDate]);
+  }, [fetchSalesByDate, currentApiDate, activeClientId]);
 
   /* ========== Acciones ========== */
 
@@ -524,19 +521,43 @@ function SalesHistoryModal({
     <ModalOverlay data-history-modal>
       <ModalContent>
         <Header>
-          <h2><FaHistory /> Historial de Transacciones</h2>
+          <h2>
+            <FaHistory />{' '}
+            {activeClientId
+              ? `Historial de ${safeClients.find(c => c.id_cliente === activeClientId)?.nombre || 'Cliente'}`
+              : 'Historial de Transacciones'}
+          </h2>
           <OriginalButton $cancel onClick={onClose}><FaWindowClose /></OriginalButton>
         </Header>
 
         <FilterGrid>
           <div>
             <label><FaSearch /> Buscar ID/Cliente:</label>
-            <SearchInput
-              type="text"
-              placeholder="ID o nombre"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
+            {activeClientId ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#e9f2ff', border: '1px solid #b3d7ff', borderRadius: '8px', padding: '0.4rem 0.75rem', height: '38px', boxSizing: 'border-box' }}>
+                <span style={{ fontSize: '0.9rem', color: '#0056b3', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                  {safeClients.find(c => c.id_cliente === activeClientId)?.nombre || 'Cliente seleccionado'}
+                </span>
+                <button 
+                  onClick={() => {
+                    setActiveClientId(null);
+                    setSearchTerm('');
+                    setFilterDate(todayLocal());
+                  }} 
+                  style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px' }}
+                  title="Quitar filtro de cliente"
+                >
+                  <FaWindowClose size={16} />
+                </button>
+              </div>
+            ) : (
+              <SearchInput
+                type="text"
+                placeholder="ID o nombre"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            )}
           </div>
           <div>
             <label><FaRegClock /> Fecha:</label>

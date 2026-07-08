@@ -309,17 +309,26 @@ const syncCart = async (req, res) => {
 /* ───────────────────────── getSales ───────────────────────── */
 const getSales = async (req, res) => {
   try {
-    const { date } = req.query;
+    const { date, clientId } = req.query;
     let query = `
       SELECT v.id_venta, v.fecha, v.total_venta, v.subtotal, v.descuento,
              v.estado, v.id_usuario, v.id_cliente, v.pago_detalles, v.tipo_venta
       FROM ventas v
     `;
     const params = [];
+    const conditions = [];
 
     if (date) {
-      query += ` WHERE DATE(DATE_SUB(v.fecha, INTERVAL 6 HOUR)) = ?`;
+      conditions.push(`DATE(DATE_SUB(v.fecha, INTERVAL 6 HOUR)) = ?`);
       params.push(date);
+    }
+    if (clientId) {
+      conditions.push(`v.id_cliente = ?`);
+      params.push(clientId);
+    }
+
+    if (conditions.length > 0) {
+      query += ` WHERE ` + conditions.join(' AND ');
     }
     query += ` ORDER BY v.fecha DESC LIMIT 500`;
 

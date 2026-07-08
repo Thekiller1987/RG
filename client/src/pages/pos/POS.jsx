@@ -1013,10 +1013,10 @@ const POS = () => {
             isOpen={true}
             onClose={closeModal}
             dailySales={[]}
-            loadSales={async (date) => {
+            loadSales={async (date, clientId) => {
               try {
-                // Correctly call fetchSales from api.js with (token, date)
-                const data = await api.fetchSales(token, date);
+                // Correctly call fetchSales from api.js with (token, { date, clientId })
+                const data = await api.fetchSales(token, { date, clientId });
                 return data || [];
               } catch (error) {
                 console.error('Error loading sales:', error);

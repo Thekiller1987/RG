@@ -227,16 +227,19 @@ export const fetchClientStatement = async (clientId, token) => {
 
 // --- Funciones para Ventas ---
 /**
- * Obtiene ventas, opcionalmente filtradas por fecha.
+ * Obtiene ventas, opcionalmente filtradas por fecha o id de cliente.
  * @param {string} token 
- * @param {string} date - Fecha en formato 'YYYY-MM-DD'.
+ * @param {string|object} params - Fecha en formato 'YYYY-MM-DD' o un objeto con query params (p. ej. { date, clientId }).
  * @returns {Promise<Array>}
  */
-export const fetchSales = async (token, date = null) => {
+export const fetchSales = async (token, params = null) => {
     const config = {};
-    if (date) {
-        // Axios usará esto para añadir ?date=YYYY-MM-DD a la URL
-        config.params = { date };
+    if (params) {
+        if (typeof params === 'string') {
+            config.params = { date: params };
+        } else {
+            config.params = params;
+        }
     }
     return await request('get', '/sales', token, null, config);
 };
