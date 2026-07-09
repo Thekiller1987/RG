@@ -140,11 +140,13 @@ const PrintWrapper = styled.div`
 `;
 
 const TicketLogo = styled.img`
-  width: 120px;
-  max-width: 160px;
+  max-width: 130px;
+  max-height: 90px;
+  width: auto;
   height: auto;
   display: block;
   margin: 0 auto 6px;
+  object-fit: contain;
 `;
 
 const HeaderBar = styled.div`
@@ -155,13 +157,21 @@ const HeaderBar = styled.div`
 const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
   const { settings } = useSettings();
 
+  // Resolver URL absoluta del logo del backend
+  const logoUrl = React.useMemo(() => {
+    if (!settings?.empresa_logo_url) return null;
+    if (settings.empresa_logo_url.startsWith('http')) return settings.empresa_logo_url;
+    const base = (import.meta.env.VITE_API_URL || 'https://sistema.multirepuestosrg.com/api').replace(/\/api$/, '');
+    return `${base}${settings.empresa_logo_url.startsWith('/') ? '' : '/'}${settings.empresa_logo_url}`;
+  }, [settings?.empresa_logo_url]);
+
   const companyInfo = {
     name: settings?.empresa_nombre || 'Multirepuestos RG',
     ruc: settings?.empresa_ruc || '1211812770001E',
     phone: settings?.empresa_telefono || '84031936 / 84058142',
     address: settings?.empresa_direccion || 'Del portón de la normal 75 varas al este. Juigalpa, Chontales.',
     slogan: settings?.empresa_eslogan || 'Repuestos de confianza al mejor precio — calidad que mantiene tu motor en marcha.',
-    logo: settings?.empresa_logo_url || new URL('/icons/logo.png', window.location.origin).toString()
+    logo: logoUrl || new URL('/icons/logo.png', window.location.origin).toString()
   };
 
   if (!isOpen || !transaction) return null;
@@ -346,7 +356,7 @@ const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
 
               <PrintWrapper id="print-wrapper-outflow">
                 <div className="brand">
-                  <TicketLogo src={getLogoPath()} alt="Logo" onError={(e) => e.target.style.display = 'none'} />
+                  <TicketLogo src={companyInfo.logo} alt="Logo" onError={(e) => e.currentTarget.style.display = 'none'} />
 
                   <div className="brand-info">
                     <h1>{companyInfo.name}</h1>

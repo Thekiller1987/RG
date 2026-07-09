@@ -91,9 +91,10 @@ const ProformaHeader = styled.div`
         justify-content: flex-start;
     }
     .logo {
-        width: 130px;
-        height: auto;
+        max-width: 140px;
         max-height: 90px;
+        width: auto;
+        height: auto;
         object-fit: contain;
     }
     .brand-info {
@@ -391,6 +392,14 @@ const ProformaEmpleadoModal = ({
     const clientName = client?.nombre || proformaFor || 'Consumidor Final';
     const clientPhone = client?.telefono || 'N/D';
 
+    // Resolver URL absoluta del logo del backend
+    const logoUrl = React.useMemo(() => {
+        if (!settings?.empresa_logo_url) return null;
+        if (settings.empresa_logo_url.startsWith('http')) return settings.empresa_logo_url;
+        const base = (import.meta.env.VITE_API_URL || 'https://sistema.multirepuestosrg.com/api').replace(/\/api$/, '');
+        return `${base}${settings.empresa_logo_url.startsWith('/') ? '' : '/'}${settings.empresa_logo_url}`;
+    }, [settings?.empresa_logo_url]);
+
     // Info del negocio cargada desde configuración o valores por defecto
     const companyInfo = {
         name: settings?.empresa_nombre || 'Multirepuestos RG',
@@ -398,7 +407,7 @@ const ProformaEmpleadoModal = ({
         phone: settings?.empresa_telefono || '84031936 / 84058142',
         address: settings?.empresa_direccion || 'Del portón de la normal 75 varas al este. Juigalpa, Chontales.',
         slogan: settings?.empresa_eslogan || 'Tu mejor opción en repuestos de moto y carro',
-        logo: settings?.empresa_logo_url || new URL('/icons/logo.png', window.location.origin).toString()
+        logo: logoUrl || new URL('/icons/logo.png', window.location.origin).toString()
     };
 
     // Initial ticket name based on client

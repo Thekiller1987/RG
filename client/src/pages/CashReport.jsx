@@ -678,7 +678,12 @@ const CashReport = () => {
     // Datos de empresa dinámicos
     const companyName = settings?.empresa_nombre || 'Multirepuestos RG';
     const slogan = settings?.empresa_eslogan || 'Repuestos de confianza al mejor precio';
-    const logoUrl = settings?.empresa_logo_url || (window.location.origin + '/icons/logo.png');
+    const logoUrl = (() => {
+      if (!settings?.empresa_logo_url) return window.location.origin + '/icons/logo.png';
+      if (settings.empresa_logo_url.startsWith('http')) return settings.empresa_logo_url;
+      const base = (import.meta.env.VITE_API_URL || 'https://sistema.multirepuestosrg.com/api').replace(/\/api$/, '');
+      return `${base}${settings.empresa_logo_url.startsWith('/') ? '' : '/'}${settings.empresa_logo_url}`;
+    })();
 
     const cssdetail = `
       @page { size: A4; margin: 15mm; }

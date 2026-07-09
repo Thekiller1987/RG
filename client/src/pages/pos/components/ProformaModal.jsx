@@ -227,12 +227,19 @@ const Wrapper = styled.div`
 `;
 
 const TicketLogo = styled.img`
-  width: 90px;
-  height: 90px;
+  max-width: 90px;
+  max-height: 90px;
+  width: auto;
+  height: auto;
   object-fit: contain;
   display: block;
   border-radius: 8px;
-  .print-a4 & { width: 130px; height: auto; }
+  .print-a4 & { 
+    max-width: 130px; 
+    max-height: 90px;
+    width: auto; 
+    height: auto; 
+  }
 `;
 
 const Tag = styled.span`
@@ -275,13 +282,21 @@ const ProformaModal = ({
 
   const fmt = (n) => new Intl.NumberFormat('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n || 0));
 
+  // Resolver URL absoluta del logo del backend
+  const logoUrl = React.useMemo(() => {
+    if (!settings?.empresa_logo_url) return null;
+    if (settings.empresa_logo_url.startsWith('http')) return settings.empresa_logo_url;
+    const base = (import.meta.env.VITE_API_URL || 'https://sistema.multirepuestosrg.com/api').replace(/\/api$/, '');
+    return `${base}${settings.empresa_logo_url.startsWith('/') ? '' : '/'}${settings.empresa_logo_url}`;
+  }, [settings?.empresa_logo_url]);
+
   const companyInfo = {
     name: settings?.empresa_nombre || 'Multirepuestos RG',
     ruc: settings?.empresa_ruc || '1211812770001E',
     phone: settings?.empresa_telefono || '84031936 / 84058142',
     address: settings?.empresa_direccion || 'Del portón de la normal 75 varas al este. Juigalpa, Chontales.',
     slogan: settings?.empresa_eslogan || 'Tu mejor opción en repuestos',
-    logo: settings?.empresa_logo_url || new URL('/icons/logo.png', window.location.origin).toString()
+    logo: logoUrl || new URL('/icons/logo.png', window.location.origin).toString()
   };
 
   const doPrint = useCallback((mode = '80') => {
@@ -317,8 +332,10 @@ const ProformaModal = ({
       }
 
       #print-wrapper-proforma .brand-logo-container img {
-        width: ${mode === 'A4' ? '130px' : '110px'} !important;
-        height: ${mode === 'A4' ? 'auto' : '110px'} !important;
+        max-width: ${mode === 'A4' ? '130px' : '110px'} !important;
+        max-height: ${mode === 'A4' ? '90px' : '110px'} !important;
+        width: auto !important;
+        height: auto !important;
         object-fit: contain !important;
       }
 

@@ -67,12 +67,19 @@ const PrintWrapper = styled.div`
 `;
 
 const TicketLogo = styled.img`
-  width: 100px;
-  height: 100px;
+  max-width: 100px;
+  max-height: 100px;
+  width: auto;
+  height: auto;
   object-fit: contain;
   display: block;
   border-radius: 6px;
-  .print-a4 & { width: 130px; height: auto; }
+  .print-a4 & { 
+    max-width: 130px; 
+    max-height: 90px;
+    width: auto; 
+    height: auto; 
+  }
 `;
 
 const StatementModal = ({
@@ -97,13 +104,21 @@ const StatementModal = ({
             filterType === 'PAID' ? 'HISTORIAL DE PAGOS (ABONOS)' :
                 'ESTADO DE CUENTA COMPLETO';
 
+    // Resolver URL absoluta del logo del backend
+    const logoUrl = React.useMemo(() => {
+        if (!settings?.empresa_logo_url) return null;
+        if (settings.empresa_logo_url.startsWith('http')) return settings.empresa_logo_url;
+        const base = (import.meta.env.VITE_API_URL || 'https://sistema.multirepuestosrg.com/api').replace(/\/api$/, '');
+        return `${base}${settings.empresa_logo_url.startsWith('/') ? '' : '/'}${settings.empresa_logo_url}`;
+    }, [settings?.empresa_logo_url]);
+
     const companyInfo = {
         name: settings?.empresa_nombre || 'Multirepuestos RG',
         ruc: settings?.empresa_ruc || '1211812770001E',
         phone: settings?.empresa_telefono || '84031936 / 84058142',
         address: settings?.empresa_direccion || 'Del portón de la normal 75 varas al este. Juigalpa, Chontales.',
         slogan: settings?.empresa_eslogan || 'Tu mejor opción en repuestos',
-        logo: settings?.empresa_logo_url || new URL('/icons/logo.png', window.location.origin).toString()
+        logo: logoUrl || new URL('/icons/logo.png', window.location.origin).toString()
     };
 
     const doPrint = useCallback((mode = '80') => {
@@ -136,7 +151,13 @@ const StatementModal = ({
       .brand { text-align: center !important; border-bottom: 2px solid #000 !important; padding-bottom: 6px !important; margin-bottom: 6px !important; }
       .brand h1 { font-size: 18pt !important; letter-spacing: 0.5px !important; margin: 0 0 4px !important; }
       .brand-logo-container { display: flex !important; justify-content: center !important; margin-bottom: 4px !important; }
-      .brand-logo-container img { width: ${mode === 'A4' ? '130px' : '80px'} !important; height: ${mode === 'A4' ? 'auto' : '80px'} !important; object-fit: contain !important; }
+      .brand-logo-container img { 
+        max-width: ${mode === 'A4' ? '130px' : '80px'} !important; 
+        max-height: ${mode === 'A4' ? '90px' : '80px'} !important; 
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important; 
+      }
       .meta p { display: flex !important; justify-content: space-between !important; margin: 2px 0 !important; }
       table { width: 100% !important; border-collapse: collapse !important; margin-bottom: 10px !important; }
       th { border-bottom: 2px solid #000 !important; font-size: 9pt !important; text-align: left !important; }
