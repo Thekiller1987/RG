@@ -35,8 +35,13 @@ async function preloadImages(productIds, concurrency = 4) {
         imageCache.set(id, 'loading');
         try {
             const data = await fetchProductImage(id, token);
-            imageCache.set(id, data?.imagen || 'none');
-        } catch { imageCache.set(id, 'none'); }
+            const img = data?.imagen || 'none';
+            imageCache.set(id, img);
+            window.dispatchEvent(new CustomEvent(`image_loaded_${id}`, { detail: img }));
+        } catch {
+            imageCache.set(id, 'none');
+            window.dispatchEvent(new CustomEvent(`image_loaded_${id}`, { detail: 'none' }));
+        }
         return next();
     }
     await Promise.all(Array.from({ length: concurrency }, next));
@@ -52,11 +57,16 @@ function useLazyEmpleadoImage(productId) {
         const cached = imageCache.get(productId);
         if (cached && cached !== 'loading' && cached !== 'none') { setImgSrc(cached); return; }
         if (cached === 'none') return;
-        const interval = setInterval(() => {
-            const c = imageCache.get(productId);
-            if (c && c !== 'loading' && c !== 'none') { setImgSrc(c); clearInterval(interval); }
-            else if (c === 'none') clearInterval(interval);
-        }, 100);
+
+        const handleImageLoaded = (e) => {
+            const img = e.detail;
+            if (img && img !== 'none') {
+                setImgSrc(img);
+            }
+        };
+
+        window.addEventListener(`image_loaded_${productId}`, handleImageLoaded);
+
         const obs = new IntersectionObserver((entries) => {
             if (entries[0].isIntersecting) {
                 const c = imageCache.get(productId);
@@ -64,13 +74,25 @@ function useLazyEmpleadoImage(productId) {
                     const token = localStorage.getItem('token');
                     imageCache.set(productId, 'loading');
                     fetchProductImage(productId, token)
-                        .then(data => { const img = data?.imagen || null; imageCache.set(productId, img || 'none'); if (img) setImgSrc(img); })
-                        .catch(() => imageCache.set(productId, 'none'));
+                        .then(data => {
+                            const img = data?.imagen || 'none';
+                            imageCache.set(productId, img);
+                            if (img !== 'none') setImgSrc(img);
+                            window.dispatchEvent(new CustomEvent(`image_loaded_${productId}`, { detail: img }));
+                        })
+                        .catch(() => {
+                            imageCache.set(productId, 'none');
+                            window.dispatchEvent(new CustomEvent(`image_loaded_${productId}`, { detail: 'none' }));
+                        });
                 }
             }
         }, { rootMargin: '200px' });
+
         if (ref.current) obs.observe(ref.current);
-        return () => { obs.disconnect(); clearInterval(interval); };
+        return () => {
+            obs.disconnect();
+            window.removeEventListener(`image_loaded_${productId}`, handleImageLoaded);
+        };
     }, [productId]);
     return { imgSrc, ref };
 }

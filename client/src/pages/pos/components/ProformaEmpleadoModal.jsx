@@ -7,6 +7,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { fetchActiveCajaSessions, getCart, saveCart } from '../../../service/api'; // Import API functions
 import { useAuth } from '../../../context/AuthContext.jsx'; // Para sesión de caja fallback
+import { useSettings } from '../../../context/SettingsContext.jsx'; // Cargar configuraciones dinámicas
 
 // --- ESTILOS DE BASE (Requeridos para el funcionamiento del Modal) ---
 const fadeIn = keyframes`from { opacity: 0; } to { opacity: 1; }`;
@@ -48,79 +49,264 @@ const TotalsRow = styled.div`
 const FaSpinnerAnimated = styled(FaSpinner)`animation: ${LoadingSpinner} 1s linear infinite;`;
 
 /* =================================================================
- * DATOS DE TU NEGOCIO 
- * ================================================================= */
-const COMPANY = {
-    NAME: 'Multirepuestos RG',
-    RUC: '1211812770001E',
-    PHONE: '84031936 / 84058142',
-    ADDRESS: 'Del portón de la normal 75 varas al este. Juigalpa, Chontales.',
-    SLOGAN: 'Tu mejor opción en repuestos de moto y carro',
-    LOGO_URL: '/icons/logo.png',
-};
-
-/* =================================================================
- * ESTILOS ESPECÍFICOS DE PROFORMA (Adaptados para Mobile/PWA)
+ * ESTILOS ESPECÍFICOS DE PROFORMA (Consistentes con A4 de caja)
  * ================================================================= */
 const ProformaWrapper = styled.div`
-    width: 100%; max-width: 650px; padding: 1.5rem; background: #fff; border-radius: 8px; display: flex; flex-direction: column; gap: 1.5rem;
+    width: 100%;
+    max-width: 650px;
+    padding: 2rem;
+    background: #fff;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    font-family: 'League Spartan', 'Inter', system-ui, -apple-system, sans-serif;
+    color: #334155;
+    box-shadow: 0 4px 20px rgba(0,0,0,.08);
+    border: 1px solid #e2e8f0;
 
     /* Estilo CLAVE para ocultar los botones al generar el PDF */
     &.proforma-to-print .footer-actions {
         display: none;
     }
-    @media (max-width: 768px) { padding: 1rem; gap: 1rem; }
+    
+    @media (max-width: 768px) {
+        padding: 1rem;
+        gap: 1rem;
+        border-radius: 8px;
+    }
 `;
 
 const ProformaHeader = styled.div`
-    text-align: center; border-bottom: 2px solid #ccc; padding-bottom: 1rem;
-    display: flex; flex-direction: column; align-items: center;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 3px solid #1e3a8a;
+    padding-bottom: 1.2rem;
+    margin-bottom: 1rem;
 
-    .logo {
-        max-width: 120px; max-height: 80px; object-fit: contain; margin-bottom: 8px;
+    .brand-logo-container {
+        width: 140px;
+        display: flex;
+        justify-content: flex-start;
     }
-    h2 { margin: 0; font-size: 1.5rem; color: #0b72b9; }
-    p { margin: 0.25rem 0; font-size: 0.9rem; }
+    .logo {
+        width: 130px;
+        height: auto;
+        max-height: 90px;
+        object-fit: contain;
+    }
+    .brand-info {
+        text-align: right;
+        flex: 1;
+        max-width: 65%;
+    }
+    .brand-info h1 {
+        font-size: 20pt;
+        color: #1e3a8a;
+        margin: 0 0 5px 0;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+    .brand-info small {
+        display: block;
+        font-size: 9pt;
+        color: #475569;
+        margin: 2px 0;
+        line-height: 1.3;
+    }
+    .proforma-tag {
+        display: inline-block;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        padding: 4px 10px;
+        border: 2px solid #0b72b9;
+        border-radius: 4px;
+        color: #0b72b9;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        margin-top: 6px;
+    }
+
+    @media (max-width: 768px) {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 10px;
+        
+        .brand-logo-container {
+            justify-content: center;
+        }
+        .brand-info {
+            text-align: center;
+            max-width: 100%;
+        }
+        .brand-info h1 {
+            font-size: 16pt;
+        }
+    }
 `;
 
-const CompanyDetails = styled.div`
-    font-size: 0.9rem; color: #555; border-bottom: 1px solid #eee; padding-bottom: 1rem;
-    strong { color: #333; }
-    @media (max-width: 768px) { font-size: 0.8rem; }
-`;
+const MetaContainer = styled.div`
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
 
-const ClientDetails = styled.div`
-    display: flex; justify-content: space-between; padding: 0.5rem 1rem; border: 1px solid #ddd; border-radius: 4px; background-color: #f9f9f9; gap: 0.5rem; flex-wrap: wrap;
-    @media (max-width: 768px) { flex-direction: column; padding: 0.5rem; gap: 0.25rem; }
-`;
+    .meta-col {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    .meta-title {
+        font-weight: 800;
+        text-transform: uppercase;
+        color: #1e3a8a;
+        border-bottom: 2px solid #cbd5e1;
+        margin-bottom: 8px;
+        padding-bottom: 4px;
+        font-size: 9pt;
+        display: block;
+    }
+    .meta-col p {
+        margin: 2px 0;
+        font-size: 9pt;
+        display: grid;
+        grid-template-columns: 100px 1fr;
+        border-bottom: 1px dashed #f1f5f9;
+        padding-bottom: 2px;
+    }
+    .meta-label {
+        font-weight: 700;
+        color: #475569;
+    }
+    .meta-value {
+        color: #0f172a;
+    }
 
-const ClientDetailItem = styled.div`
-    flex: 1 1 45%; 
-    p { margin: 3px 0; font-size: 0.9rem; } 
-    span { font-weight: bold; color: #000; }
-    @media (max-width: 768px) { flex-basis: 100%; p { font-size: 0.85rem; } }
+    @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
 `;
 
 const ProformaTable = styled.table`
-    width: 100%; border-collapse: collapse;
-    th, td { padding: 8px 12px; text-align: left; font-size: 0.95rem; border-bottom: 1px dashed #eee; }
-    th { background-color: #f7f7f7; font-weight: bold; color: #333; }
-    .text-right { text-align: right; }
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 0.5rem;
+
+    th, td {
+        padding: 10px 8px;
+        text-align: left;
+        font-size: 9.5pt;
+    }
+    th {
+        background-color: #f1f5f9;
+        color: #334155;
+        font-weight: bold;
+        border-bottom: 2px solid #cbd5e1;
+        text-transform: uppercase;
+        font-size: 8.5pt;
+    }
+    td {
+        border-bottom: 1px solid #f1f5f9;
+        color: #334155;
+    }
+    .text-right {
+        text-align: right;
+    }
+    .col-qty {
+        width: 12%;
+    }
+    .col-unit {
+        width: 20%;
+        text-align: right;
+    }
+    .col-total {
+        width: 20%;
+        text-align: right;
+    }
+
     @media (max-width: 768px) {
-        th, td { padding: 6px 8px; font-size: 0.8rem; }
-        th:nth-child(2), td:nth-child(2) { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        th, td {
+            padding: 6px;
+            font-size: 8pt;
+        }
+        th:nth-child(2), td:nth-child(2) {
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
     }
 `;
 
 const FooterDetails = styled.div`
-    display: flex; justify-content: space-between; align-items: flex-start; padding-top: 1rem; gap: 1rem; flex-wrap: wrap;
-    @media (max-width: 768px) { flex-direction: column; }
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1.5rem;
+    
+    .note-section {
+        flex: 1;
+        font-size: 8.5pt;
+        color: #64748b;
+        p {
+            margin: 3px 0;
+        }
+        strong {
+            color: #475569;
+        }
+    }
+
+    @media (max-width: 768px) {
+        flex-direction: column;
+        gap: 1rem;
+    }
 `;
 
 const TotalsArea = styled.div`
-    width: 260px; max-width: 100%;
-    ${TotalsRow} { padding: 4px 0; }
-    ${TotalsRow}.grand-total { border-top: 2px solid #333; font-size: 1.1rem; }
+    width: 250px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    .grand-total {
+        border-top: 2px solid #0f172a;
+        margin-top: 4px;
+        padding-top: 8px;
+        font-weight: 800;
+        font-size: 1.15rem;
+        color: #0f172a;
+    }
+    .badge-container {
+        text-align: center;
+        margin-top: 8px;
+    }
+    .badge {
+        display: inline-block;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        padding: 4px 8px;
+        border: 2px solid #0f172a;
+        border-radius: 4px;
+        color: #0f172a;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+    }
+
+    @media (max-width: 768px) {
+        width: 100%;
+    }
 `;
 
 // --- CUSTOM ALERT COMPONENT ---
@@ -166,6 +352,9 @@ const ProformaEmpleadoModal = ({
     const [loadingPDF, setLoadingPDF] = React.useState(false);
     const proformaRef = useRef(null);
 
+    // --- SETTINGS CONTEXT ---
+    const { settings } = useSettings();
+
     // --- AUTH CONTEXT (para cajaSession fallback) ---
     const { cajaSession, user: authUser } = useAuth() || {};
 
@@ -202,6 +391,16 @@ const ProformaEmpleadoModal = ({
     const clientName = client?.nombre || proformaFor || 'Consumidor Final';
     const clientPhone = client?.telefono || 'N/D';
 
+    // Info del negocio cargada desde configuración o valores por defecto
+    const companyInfo = {
+        name: settings?.empresa_nombre || 'Multirepuestos RG',
+        ruc: settings?.empresa_ruc || '1211812770001E',
+        phone: settings?.empresa_telefono || '84031936 / 84058142',
+        address: settings?.empresa_direccion || 'Del portón de la normal 75 varas al este. Juigalpa, Chontales.',
+        slogan: settings?.empresa_eslogan || 'Tu mejor opción en repuestos de moto y carro',
+        logo: settings?.empresa_logo_url || new URL('/icons/logo.png', window.location.origin).toString()
+    };
+
     // Initial ticket name based on client
     React.useEffect(() => {
         setTicketName(`Pedido - ${clientName}`);
@@ -211,26 +410,36 @@ const ProformaEmpleadoModal = ({
      * FUNCIÓN CLAVE: Genera el PDF real usando html2canvas y jsPDF
      */
     const handleDownloadPDF = async () => {
-        // ... (Existing PDF logic remains unchanged, just copying it for context or ensuring it's preserved if using replace) ...
         if (cart.length === 0) return;
 
         setLoadingPDF(true);
 
         const input = proformaRef.current;
-        const clientCleaned = proformaFor.replace(/\s/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+        const clientCleaned = clientName.replace(/\s/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
         const numberSuffix = proformaNumber.trim() ? `N${proformaNumber.trim()}` : `TEMP`;
         const filename = `PROFORMA_${clientCleaned}_${numberSuffix}.pdf`;
 
         const elementToCapture = input.cloneNode(true);
         elementToCapture.classList.add('proforma-to-print');
+        
+        // Estilos específicos para la captura A4 perfecta, consistente y fuera de pantalla
+        elementToCapture.style.position = 'absolute';
+        elementToCapture.style.left = '-9999px';
+        elementToCapture.style.top = '0';
+        elementToCapture.style.width = '794px'; // Ancho A4 en pixeles a 96 DPI
+        elementToCapture.style.padding = '40px';
+        elementToCapture.style.boxSizing = 'border-box';
+        elementToCapture.style.background = '#ffffff';
+        elementToCapture.style.boxShadow = 'none';
+        elementToCapture.style.border = 'none';
+
         document.body.appendChild(elementToCapture);
 
         try {
             const canvas = await html2canvas(elementToCapture, {
                 scale: 2,
                 useCORS: true,
-                windowWidth: elementToCapture.offsetWidth,
-                windowHeight: elementToCapture.offsetHeight,
+                windowWidth: 794,
             });
 
             const imgData = canvas.toDataURL('image/jpeg', 1.0);
@@ -342,38 +551,51 @@ const ProformaEmpleadoModal = ({
                 <ModalContent>
                     {/* Asignar la referencia al wrapper que queremos capturar */}
                     <ProformaWrapper ref={proformaRef}>
-                        {/* ... (Existing Proforma Content: Header, Details, Tables, etc.) ... */}
+                        {/* Cabecera de la Proforma A4 */}
                         <ProformaHeader>
-                            <img src={COMPANY.LOGO_URL} alt="Logo del Negocio" className="logo" />
-                            <FaFileInvoice size={32} style={{ color: '#0b72b9', marginBottom: 8 }} />
-                            <h2>PROFORMA {proformaNumber && `N° ${proformaNumber}`}</h2>
-                            <p>Documento No Válido como Factura Fiscal</p>
+                            <div className="brand-logo-container">
+                                <img 
+                                    src={companyInfo.logo} 
+                                    alt="Logo" 
+                                    className="logo" 
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                />
+                            </div>
+                            <div className="brand-info">
+                                <h1>{companyInfo.name}</h1>
+                                <small>{companyInfo.slogan}</small>
+                                <small>RUC: {companyInfo.ruc}</small>
+                                <small>Tel: {companyInfo.phone}</small>
+                                <small>{companyInfo.address}</small>
+                                <div>
+                                    <span className="proforma-tag"><FaFileInvoice style={{ marginRight: 4, verticalAlign: 'middle' }} /> COTIZACIÓN / PROFORMA</span>
+                                </div>
+                            </div>
                         </ProformaHeader>
 
-                        <CompanyDetails>
-                            <p style={{ margin: 0, fontWeight: 'bold' }}>{COMPANY.NAME} - {COMPANY.SLOGAN}</p>
-                            <p style={{ margin: '3px 0' }}>{COMPANY.ADDRESS}</p>
-                            <p style={{ margin: 0 }}>Teléfonos: {COMPANY.PHONE} &nbsp;|&nbsp; RUC: {COMPANY.RUC}</p>
-                        </CompanyDetails>
+                        {/* Metadatos (Detalles y Cliente) */}
+                        <MetaContainer>
+                            <div className="meta-col">
+                                <span className="meta-title">Detalles</span>
+                                <p><span className="meta-label">Fecha:</span><span className="meta-value">{new Date().toLocaleDateString('es-NI')} {new Date().toLocaleTimeString('es-NI', { hour: '2-digit', minute: '2-digit' })}</span></p>
+                                <p><span className="meta-label">ID Temp:</span><span className="meta-value">{Date.now().toString().slice(-6)}</span></p>
+                                <p><span className="meta-label">Atendido por:</span><span className="meta-value">{userName}</span></p>
+                            </div>
+                            <div className="meta-col">
+                                <span className="meta-title">Cliente</span>
+                                <p><span className="meta-label">Nombre:</span><span className="meta-value">{clientName}</span></p>
+                                <p><span className="meta-label">Teléfono:</span><span className="meta-value">{clientPhone}</span></p>
+                            </div>
+                        </MetaContainer>
 
-                        <ClientDetails>
-                            <ClientDetailItem>
-                                <p>Emitida a: <span>{proformaFor || 'Consumidor Final'}</span></p>
-                                <p>Por: <span>{userName}</span></p>
-                            </ClientDetailItem>
-                            <ClientDetailItem>
-                                <p>Teléfono: <span>{clientPhone}</span></p>
-                                <p>Fecha: <span>{new Date().toLocaleDateString('es-NI')}</span></p>
-                            </ClientDetailItem>
-                        </ClientDetails>
-
+                        {/* Tabla de Artículos */}
                         <ProformaTable>
                             <thead>
                                 <tr>
-                                    <th style={{ width: '10%' }}>CANT.</th>
-                                    <th style={{ width: '45%' }}>DESCRIPCIÓN</th>
-                                    <th className="text-right" style={{ width: '25%' }}>PRECIO UNIT.</th>
-                                    <th className="text-right" style={{ width: '20%' }}>TOTAL</th>
+                                    <th className="col-qty">CANT.</th>
+                                    <th>DESCRIPCIÓN</th>
+                                    <th className="col-unit">PRECIO UNIT.</th>
+                                    <th className="col-total">TOTAL</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -384,26 +606,33 @@ const ProformaEmpleadoModal = ({
                                     const qty = parseFloat(item.quantity ?? 0);
                                     return (
                                         <tr key={idx}>
-                                            <td>{qty}</td>
+                                            <td className="col-qty">{qty}</td>
                                             <td>{item.nombre || 'Artículo sin nombre'}</td>
-                                            <td className="text-right">C${fmt(unit)}</td>
-                                            <td className="text-right">C${fmt(qty * unit)}</td>
+                                            <td className="col-unit">C$ {fmt(unit)}</td>
+                                            <td className="col-total">C$ {fmt(qty * unit)}</td>
                                         </tr>
                                     );
                                 })}
                             </tbody>
                         </ProformaTable>
 
+                        {/* Pie de Página y Totales */}
                         <FooterDetails>
-                            <div>
-                                <p style={{ fontWeight: 'bold' }}>Nota:</p>
-                                <p style={{ fontSize: '0.85rem' }}>{COMPANY.SLOGAN}</p>
-                                <p style={{ fontSize: '0.85rem' }}>Precios sujetos a cambios y stock.</p>
+                            <div className="note-section">
+                                <p><strong>Nota:</strong></p>
+                                <p>"{companyInfo.slogan}"</p>
+                                <p>Precios sujetos a cambios y stock. Válido por 3 días.</p>
+                                <p style={{ whiteSpace: 'pre-line', marginTop: '5px', fontWeight: 'bold' }}>
+                                    {settings?.ticket_proforma_footer || '¡Gracias por cotizar con nosotros!'}
+                                </p>
                             </div>
                             <TotalsArea>
-                                <TotalsRow><span>Subtotal:</span><span className="text-right">C${fmt(subtotal)}</span></TotalsRow>
-                                {discount > 0 && <TotalsRow><span>Descuento:</span><span className="text-right">- C${fmt(discount)}</span></TotalsRow>}
-                                <TotalsRow $bold className="grand-total"><span>TOTAL:</span><span className="text-right">C${fmt(total)}</span></TotalsRow>
+                                <TotalsRow><span>Subtotal:</span><span className="text-right">C$ {fmt(subtotal)}</span></TotalsRow>
+                                {discount > 0 && <TotalsRow style={{ color: '#dc3545' }}><span>Descuento:</span><span className="text-right">- C$ {fmt(discount)}</span></TotalsRow>}
+                                <TotalsRow className="grand-total"><span>TOTAL:</span><span className="text-right">C$ {fmt(total)}</span></TotalsRow>
+                                <div className="badge-container">
+                                    <span className="badge">DOCUMENTO NO VÁLIDO COMO FACTURA</span>
+                                </div>
                             </TotalsArea>
                         </FooterDetails>
 
