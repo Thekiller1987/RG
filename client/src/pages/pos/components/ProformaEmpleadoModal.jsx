@@ -104,7 +104,7 @@ const ProformaHeader = styled.div`
     }
     .brand-info h1 {
         font-size: 20pt;
-        color: #1e3a8a;
+        color: #000000;
         margin: 0 0 5px 0;
         font-weight: 800;
         line-height: 1.1;

@@ -1,4 +1,4 @@
-import{R as v,r as x,j as e,C as le,x as ve,a8 as ke,s as i,t as R,a9 as Ce,aa as Se,W as Ne,v as ze,X as Ae,ab as ge,a0 as Ee,a1 as de,$ as ce,G as Te,k as he,ac as pe,ad as Ie,Y as Fe,a5 as Pe,A as $e,m as ae,ae as Oe,a6 as _e,a7 as Re}from"./vendor-C4uQ3a2a.js";import{r as De}from"./searchEngine-BMYcElFi.js";import{a as Le,u as ue,e as Me,h as Be,i as We,j as qe,k as Ve,f as be}from"./index-BmgTIz9w.js";import{h as He,E as Ge}from"./pdf-vendor-BMvqz6Um.js";import{H as Ue}from"./scanner-vendor-DfxRpMWJ.js";const Ye=R`from { opacity: 0; } to { opacity: 1; }`,Qe=R`from { transform: scale(0.95); } to { transform: scale(1); }`,Ke=R`0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); }`,ne=i.div`
+import{R as v,r as x,j as e,C as le,x as ve,a8 as ke,s as i,t as R,a9 as Ce,aa as Se,W as Ne,v as ze,X as Ae,ab as ge,a0 as Ee,a1 as de,$ as ce,G as Te,k as he,ac as pe,ad as Ie,Y as Fe,a5 as Pe,A as $e,m as ae,ae as Oe,a6 as _e,a7 as Re}from"./vendor-C4uQ3a2a.js";import{r as De}from"./searchEngine-BMYcElFi.js";import{a as Le,u as ue,e as Me,h as Be,i as We,j as qe,k as Ve,f as be}from"./index-DrTQe3aZ.js";import{h as He,E as Ge}from"./pdf-vendor-BMvqz6Um.js";import{H as Ue}from"./scanner-vendor-DfxRpMWJ.js";const Ye=R`from { opacity: 0; } to { opacity: 1; }`,Qe=R`from { transform: scale(0.95); } to { transform: scale(1); }`,Ke=R`0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); }`,ne=i.div`
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px);
     display: flex; justify-content: center; align-items: center; z-index: 1100;
@@ -77,7 +77,7 @@ import{R as v,r as x,j as e,C as le,x as ve,a8 as ke,s as i,t as R,a9 as Ce,aa a
     }
     .brand-info h1 {
         font-size: 20pt;
-        color: #1e3a8a;
+        color: #000000;
         margin: 0 0 5px 0;
         font-weight: 800;
         line-height: 1.1;

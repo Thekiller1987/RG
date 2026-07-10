@@ -79,7 +79,7 @@ const PrintWrapper = styled.div`
     margin: 6px 0 2px;
     font-size: 1.35rem;
     font-weight: 700;
-    color: #1e3a8a;
+    color: #000000;
     line-height: 1.25;
   }
   .brand small {

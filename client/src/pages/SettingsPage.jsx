@@ -123,6 +123,13 @@ const SettingsPage = () => {
     const { token } = useAuth();
     const [formData, setFormData] = useState({});
     const [loading, setLoading] = useState(false);
+
+    const resolveLogoUrl = (url) => {
+        if (!url) return null;
+        if (url.startsWith('http') || url.startsWith('data:')) return url;
+        const base = (import.meta.env.VITE_API_URL || 'https://sistema.multirepuestosrg.com/api').replace(/\/api$/, '');
+        return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+    };
     const [message, setMessage] = useState(null);
     const [uploadingLogo, setUploadingLogo] = useState(false);
 
@@ -239,7 +246,7 @@ const SettingsPage = () => {
                     </div>
 
                     {formData.empresa_logo_url && (
-                        <LogoPreview src={formData.empresa_logo_url} alt="Vista previa logo" />
+                        <LogoPreview src={resolveLogoUrl(formData.empresa_logo_url)} alt="Vista previa logo" />
                     )}
 
                     <Input

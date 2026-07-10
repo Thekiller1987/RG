@@ -1,4 +1,4 @@
-import{r as s,j as e,k as le,D as pe,s as r,R as ee,I as G,x as me,af as te,q as xe,n as L,J as K,ag as P,ah as he,aa as ge,ai as fe,v as ue,T as Y,Y as be,aj as je,X as ye,ak as we,al as Ce,$ as ve,a4 as ae,Z as re,am as ne,an as H,V as ke}from"./vendor-C4uQ3a2a.js";import{m as Se,n as $e,a as Ne,u as de,o as Ae,p as ze,q as De,r as Te,t as _e,j as Ie,v as Fe,w as Ee}from"./index-BmgTIz9w.js";import{T as ce,A as Le,S as Pe}from"./SalesHistoryModal-CSHuaVH1.js";import{M as Me,a as Oe,B as U}from"./POS.styles-yJMpH_iU.js";import{A as Be}from"./AlertModal-Chz8o6FH.js";import"./scanner-vendor-DfxRpMWJ.js";import"./pdf-vendor-BMvqz6Um.js";import"./searchEngine-BMYcElFi.js";const Re=r.div`
+import{r as s,j as e,k as le,D as pe,s as r,R as ee,I as G,x as me,af as te,q as xe,n as L,J as K,ag as P,ah as he,aa as ge,ai as fe,v as ue,T as Y,Y as be,aj as je,X as ye,ak as we,al as Ce,$ as ve,a4 as ae,Z as re,am as ne,an as H,V as ke}from"./vendor-C4uQ3a2a.js";import{m as Se,n as $e,a as Ne,u as de,o as Ae,p as ze,q as De,r as Te,t as _e,j as Ie,v as Fe,w as Ee}from"./index-DrTQe3aZ.js";import{T as ce,A as Le,S as Pe}from"./SalesHistoryModal-8CIU8Gu6.js";import{M as Me,a as Oe,B as U}from"./POS.styles-yJMpH_iU.js";import{A as Be}from"./AlertModal-Chz8o6FH.js";import"./scanner-vendor-DfxRpMWJ.js";import"./pdf-vendor-BMvqz6Um.js";import"./searchEngine-BMYcElFi.js";const Re=r.div`
   position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:50;
 `,He=r.div`
   background:white;padding:2rem;border-radius:8px;width:400px;max-width:90%;
@@ -115,7 +115,7 @@ import{r as s,j as e,k as le,D as pe,s as r,R as ee,I as G,x as me,af as te,q as
         .brand { display: flex !important; justify-content: space-between !important; align-items: flex-start !important; text-align: left !important; border-bottom: 3px solid #1e3a8a !important; margin-bottom: 25px !important; padding-bottom: 15px !important; }
         .brand-logo-container { width: 140px !important; justify-content: flex-start !important; order: 1 !important; }
         .brand-info { flex: 1 !important; text-align: right !important; order: 2 !important; }
-        .brand h1 { font-size: 22pt !important; color: #1e3a8a !important; margin: 0 0 5px 0 !important; }
+        .brand h1 { font-size: 22pt !important; color: #000000 !important; margin: 0 0 5px 0 !important; }
         .brand small { display: block !important; font-size: 9pt !important; margin: 2px 0 !important; color: #000 !important; }
         .meta { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 30px !important; border: 1px solid #000 !important; padding: 15px !important; margin-bottom: 20px !important; border-radius: 8px !important; }
         table { border: 1px solid #000 !important; }

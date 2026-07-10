@@ -170,7 +170,7 @@ const StatementModal = ({
         .brand { display: flex !important; justify-content: space-between !important; align-items: flex-start !important; text-align: left !important; border-bottom: 3px solid #1e3a8a !important; margin-bottom: 25px !important; padding-bottom: 15px !important; }
         .brand-logo-container { width: 140px !important; justify-content: flex-start !important; order: 1 !important; }
         .brand-info { flex: 1 !important; text-align: right !important; order: 2 !important; }
-        .brand h1 { font-size: 22pt !important; color: #1e3a8a !important; margin: 0 0 5px 0 !important; }
+        .brand h1 { font-size: 22pt !important; color: #000000 !important; margin: 0 0 5px 0 !important; }
         .brand small { display: block !important; font-size: 9pt !important; margin: 2px 0 !important; color: #000 !important; }
         .meta { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 30px !important; border: 1px solid #000 !important; padding: 15px !important; margin-bottom: 20px !important; border-radius: 8px !important; }
         table { border: 1px solid #000 !important; }

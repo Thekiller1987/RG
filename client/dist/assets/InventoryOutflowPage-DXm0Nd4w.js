@@ -1,4 +1,4 @@
-import{R as Z,r as s,j as e,A as Q,C as N,P as O,af as q,x as ae,s as i,m as $,b as se,V as le,X as de,Z as ce,$ as pe,g as xe,k as B,a1 as me,a5 as ue,D as he,an as f,W as fe}from"./vendor-C4uQ3a2a.js";import{a as ge,u as E,X as be,Y as ye}from"./index-BmgTIz9w.js";import{r as H}from"./searchEngine-BMYcElFi.js";import"./scanner-vendor-DfxRpMWJ.js";import"./pdf-vendor-BMvqz6Um.js";const je=i($.div)`
+import{R as Z,r as s,j as e,A as Q,C as N,P as O,af as q,x as ae,s as i,m as $,b as se,V as le,X as de,Z as ce,$ as pe,g as xe,k as B,a1 as me,a5 as ue,D as he,an as f,W as fe}from"./vendor-C4uQ3a2a.js";import{a as ge,u as E,X as be,Y as ye}from"./index-DrTQe3aZ.js";import{r as H}from"./searchEngine-BMYcElFi.js";import"./scanner-vendor-DfxRpMWJ.js";import"./pdf-vendor-BMvqz6Um.js";const je=i($.div)`
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0, 0, 0, 0.6);
   z-index: 1100;
@@ -55,7 +55,7 @@ import{R as Z,r as s,j as e,A as Q,C as N,P as O,af as q,x as ae,s as i,m as $,b
     margin: 6px 0 2px;
     font-size: 1.35rem;
     font-weight: 700;
-    color: #1e3a8a;
+    color: #000000;
     line-height: 1.25;
   }
   .brand small {

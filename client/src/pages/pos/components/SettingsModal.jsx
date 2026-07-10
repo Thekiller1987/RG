@@ -94,6 +94,13 @@ const SettingsModal = ({ isOpen, onClose }) => {
     const [uploadingLogo, setUploadingLogo] = useState(false);
     const [logoPreview, setLogoPreview] = useState(null);
 
+    const resolveLogoUrl = (url) => {
+        if (!url) return null;
+        if (url.startsWith('http') || url.startsWith('data:')) return url;
+        const base = (import.meta.env.VITE_API_URL || 'https://sistema.multirepuestosrg.com/api').replace(/\/api$/, '');
+        return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+    };
+
     // Sync from settings context when opening
     useEffect(() => {
         if (isOpen && settings) {
@@ -103,7 +110,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
             }));
             // If settings contains a logo URL, set it
             if (settings.empresa_logo_url) {
-                setLogoPreview(settings.empresa_logo_url);
+                setLogoPreview(resolveLogoUrl(settings.empresa_logo_url));
             }
         }
     }, [isOpen, settings]);
@@ -135,7 +142,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
         setUploadingLogo(true);
         try {
             const logoUrl = await settingsApi.uploadLogo(token, file);
-            setLogoPreview(logoUrl);
+            setLogoPreview(resolveLogoUrl(logoUrl));
             setFormData(prev => ({ ...prev, empresa_logo_url: logoUrl }));
             toast.success('Logo subido correctamente');
         } catch (error) {
