@@ -438,6 +438,12 @@ const ProformaEmpleadoModal = ({
 
         const elementToCapture = input.cloneNode(true);
         elementToCapture.classList.add('proforma-to-print');
+
+        // Eliminar físicamente los botones del clon para evitar que salgan en el PDF
+        const footerActions = elementToCapture.querySelector('.footer-actions');
+        if (footerActions) {
+            footerActions.remove();
+        }
         
         // Estilos específicos para la captura A4 perfecta, consistente y fuera de pantalla
         elementToCapture.style.position = 'absolute';

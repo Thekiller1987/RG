@@ -618,7 +618,7 @@ const ProformaGenerator = () => {
                     </div>
 
                     <input style={{ width: '100%', padding: '12px', marginTop: 15, border: '2px solid #e2e8f0', borderRadius: 12, outline: 'none' }} placeholder="Nombre del Cliente" value={clientName} onChange={e => setClientName(e.target.value)} />
-                    <input style={{ width: '100%', padding: '12px', marginTop: 10, border: '2px solid #e2e8f0', borderRadius: 12, outline: 'none' }} placeholder="Teléfono" value={clientPhone} onChange={e => setClientPhone(e.target.value)} />
+                    <input style={{ width: '100%', padding: '12px', marginTop: 10, border: '2px solid #e2e8f0', borderRadius: 12, outline: 'none' }} placeholder="Teléfono" value={clientPhone} onChange={e => setClientPhone(e.target.value.replace(/\D/g, ''))} />
                 </div>
 
                 <CartList>
