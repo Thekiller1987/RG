@@ -499,6 +499,10 @@ export const deleteProviderPayment = async (abonoId, token) => {
     return await request('delete', `/facturas-proveedores/abonos/${abonoId}`, token);
 };
 
+export const updateProviderPayment = async (abonoId, paymentData, token) => {
+    return await request('put', `/facturas-proveedores/abonos/${abonoId}`, token, paymentData);
+};
+
 // ===================================================================
 // === FUNCIONES PARA EL FLUJO COMPLETO PEDIDOS → POS ===
 // ===================================================================

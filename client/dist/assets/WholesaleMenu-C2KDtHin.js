@@ -1,4 +1,4 @@
-import{j as e,X as i,H as t,G as l,S as d,M as c,s as r,V as n}from"./vendor-C4uQ3a2a.js";import"./scanner-vendor-DfxRpMWJ.js";const x=r.div`
+import{j as e,X as i,H as t,G as l,S as d,M as c,s as r,V as n}from"./vendor-BVroOj2J.js";import"./scanner-vendor-DfxRpMWJ.js";const x=r.div`
     padding: 2rem;
     background-color: #f0f2f5;
     min-height: 100vh;
