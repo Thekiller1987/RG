@@ -681,8 +681,16 @@ const CashReport = () => {
     const logoUrl = (() => {
       if (!settings?.empresa_logo_url) return window.location.origin + '/icons/logo.png';
       if (settings.empresa_logo_url.startsWith('http')) return settings.empresa_logo_url;
+      
+      let cleanUrl = settings.empresa_logo_url;
+      if (cleanUrl.startsWith('/uploads')) {
+        cleanUrl = '/api' + cleanUrl;
+      } else if (cleanUrl.startsWith('uploads')) {
+        cleanUrl = '/api/' + cleanUrl;
+      }
+
       const base = (import.meta.env.VITE_API_URL || 'https://sistema.multirepuestosrg.com/api').replace(/\/api$/, '');
-      return `${base}${settings.empresa_logo_url.startsWith('/') ? '' : '/'}${settings.empresa_logo_url}`;
+      return `${base}${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`;
     })();
 
     const cssdetail = `

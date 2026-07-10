@@ -26,7 +26,7 @@ exports.uploadLogo = async (req, res) => {
 
         res.json({
             msg: 'Logo actualizado correctamente',
-            logoUrl: `/uploads/logo/${filename}?t=${Date.now()}`
+            logoUrl: `/api/uploads/logo/${filename}?t=${Date.now()}`
         });
 
     } catch (err) {

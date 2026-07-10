@@ -75,6 +75,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Servir archivos estáticos (Imágenes subidas)
 const path = require('path');
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+app.use('/api/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 // 4. Definir el puerto
 // Usamos BACKEND_PORT si existe (según tu .env), o PORT, o 3003 por defecto
