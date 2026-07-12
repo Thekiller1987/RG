@@ -36,7 +36,7 @@ const PrintWrapper = styled.div`
 
   /* Encabezado */
   .brand { text-align: center; border-bottom: 3px solid #000; padding-bottom: 12px; margin-bottom: 15px; }
-  .brand img { max-width: 120px; display: block; margin: 0 auto 10px; }
+  .brand img { max-width: 80px; height: auto; display: block; margin: 0 auto 8px; object-fit: contain; }
   .brand h2 { margin: 0 0 6px; font-size: 1.6rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
   .brand p { margin: 3px 0; font-size: 1rem; font-weight: 700; }
 
@@ -186,6 +186,16 @@ const CajaModal = ({
         .row.alert { font-size: 18pt !important; padding: 10px !important; border: 4px solid #000 !important; }
         .text-right { text-align: right !important; }
         
+        .brand img {
+          max-width: 60mm !important;
+          max-height: 25mm !important;
+          width: auto !important;
+          height: auto !important;
+          display: block !important;
+          margin: 0 auto 6px auto !important;
+          object-fit: contain !important;
+          filter: grayscale(100%) contrast(150%) !important;
+        }
         @media print {
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
