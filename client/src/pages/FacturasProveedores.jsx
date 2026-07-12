@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+
 import jsPDF from 'jspdf';
 import {
     FaArrowLeft, FaPlus, FaSearch, FaFileInvoiceDollar,
@@ -12,7 +12,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { rankItems } from '../utils/searchEngine';
 import * as api from '../service/api';
-import { API_URL } from '../service/api';
+
 
 // --- HELPERS DE FECHA (ZONA MANAGUA) ---
 const getTodayManaguaISO = () => {
@@ -641,10 +641,8 @@ const FacturasProveedores = () => {
                 const invData = Array.isArray(invResponse) ? invResponse : (invResponse?.data || []);
                 setInvoices(invData);
 
-                const provResponse = await axios.get(`${API_URL}/providers`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                const provList = Array.isArray(provResponse.data) ? provResponse.data : (provResponse.data.data || []);
+                const provResponse = await api.fetchProviders(token);
+                const provList = Array.isArray(provResponse) ? provResponse : (provResponse?.data || []);
                 setProviders(provList);
 
                 // Cargar Historial Global
@@ -905,7 +903,11 @@ const FacturasProveedores = () => {
 
     // --- BI SUMMARY ---
     const biSummary = useMemo(() => {
+        // BI Summary respects provider filter but ignores status tab
         let data = invoices;
+        if (filterProvider) {
+            data = data.filter(inv => inv.proveedor === filterProvider);
+        }
         const summaryMap = {};
         data.forEach(inv => {
             const name = inv.proveedor || 'Sin Proveedor';
@@ -918,7 +920,7 @@ const FacturasProveedores = () => {
         });
 
         return Object.values(summaryMap).sort((a, b) => b.totalAmount - a.totalAmount);
-    }, [invoices]);
+    }, [invoices, filterProvider]);
 
     // --- LISTADO FACTURAS FILTRADO Y SUS TOTALES ---
     const filteredInvoices = useMemo(() => {
@@ -1196,13 +1198,69 @@ const FacturasProveedores = () => {
                         </SearchAndFilters>
                     </Toolbar>
 
-                    {/* GRID FACTURAS */}
+                    {/* GRID FACTURAS o BI SUMMARY */}
                     {loading ? (
                         <div style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>
                             <FaClock className="spin" style={{ fontSize: '2rem', marginBottom: '1rem' }} />
                             <p>Cargando información...</p>
                         </div>
+                    ) : filter === 'BI' ? (
+                        // --- VISTA BI: Siempre muestra la tabla de resumen por proveedor ---
+                        <BISummaryContainer>
+                            <BISummaryHeader>
+                                <h3><FaFilter /> Resumen por Proveedor (BI)</h3>
+                                {filterDateFrom && filterDateTo && (
+                                    <span className="date-range">
+                                        {formatDateManagua(filterDateFrom)} - {formatDateManagua(filterDateTo)}
+                                    </span>
+                                )}
+                            </BISummaryHeader>
+                            <BITable>
+                                <thead>
+                                    <tr>
+                                        <th>Proveedor</th>
+                                        <th style={{ textAlign: 'center' }}>Facturas</th>
+                                        <th style={{ textAlign: 'right' }}>Total Comprado</th>
+                                        <th style={{ textAlign: 'right' }}>Pagado</th>
+                                        <th style={{ textAlign: 'right' }}>Saldo Pendiente</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {biSummary.map(item => (
+                                        <tr key={item.provider}>
+                                            <td className="provider-name">{item.provider}</td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                <span className="count-badge">{item.count}</span>
+                                            </td>
+                                            <td className="amount">C${item.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                            <td className="amount" style={{ color: '#10b981' }}>C${item.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                            <td className="amount" style={{ color: (item.totalAmount - item.totalPaid) > 0.1 ? '#ef4444' : '#10b981' }}>
+                                                C${(item.totalAmount - item.totalPaid).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {biSummary.length === 0 && (
+                                        <tr>
+                                            <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                                                No hay datos para el período seleccionado.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                                {biSummary.length > 0 && (
+                                    <tfoot>
+                                        <tr style={{ background: '#f8fafc', fontWeight: '900' }}>
+                                            <td colSpan="2" style={{ textAlign: 'right', textTransform: 'uppercase', fontSize: '0.8rem', color: '#64748b' }}>Totales Globales:</td>
+                                            <td className="amount">C${biSummary.reduce((acc, curr) => acc + curr.totalAmount, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                            <td className="amount">C${biSummary.reduce((acc, curr) => acc + curr.totalPaid, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                            <td className="amount" style={{ color: '#ef4444' }}>C${(biSummary.reduce((acc, curr) => acc + curr.totalAmount, 0) - biSummary.reduce((acc, curr) => acc + curr.totalPaid, 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                        </tr>
+                                    </tfoot>
+                                )}
+                            </BITable>
+                        </BISummaryContainer>
                     ) : filteredInvoices.length > 0 ? (
+                        // --- VISTA NORMAL: Tarjetas de facturas ---
                         <InvoicesGrid>
                             {filteredInvoices.map(inv => {
                                 const status = inv.effectiveStatus;
@@ -1279,61 +1337,8 @@ const FacturasProveedores = () => {
                                 );
                             })}
                         </InvoicesGrid>
-                    ) : filter === 'BI' ? (
-                        <BISummaryContainer>
-                            <BISummaryHeader>
-                                <h3><FaFilter /> Resumen de Razonamiento de Negocio</h3>
-                                {filterDateFrom && filterDateTo && (
-                                    <span className="date-range">
-                                        {formatDateManagua(filterDateFrom)} - {formatDateManagua(filterDateTo)}
-                                    </span>
-                                )}
-                            </BISummaryHeader>
-                            <BITable>
-                                <thead>
-                                    <tr>
-                                        <th>Proveedor</th>
-                                        <th style={{ textAlign: 'center' }}>Facturas</th>
-                                        <th style={{ textAlign: 'right' }}>Total Comprado</th>
-                                        <th style={{ textAlign: 'right' }}>Pagado</th>
-                                        <th style={{ textAlign: 'right' }}>Saldo Pendiente</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {biSummary.map(item => (
-                                        <tr key={item.provider}>
-                                            <td className="provider-name">{item.provider}</td>
-                                            <td style={{ textAlign: 'center' }}>
-                                                <span className="count-badge">{item.count}</span>
-                                            </td>
-                                            <td className="amount">C${item.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                            <td className="amount" style={{ color: '#10b981' }}>C${item.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                            <td className="amount" style={{ color: (item.totalAmount - item.totalPaid) > 0.1 ? '#ef4444' : '#10b981' }}>
-                                                C${(item.totalAmount - item.totalPaid).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {biSummary.length === 0 && (
-                                        <tr>
-                                            <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
-                                                No hay datos para el período seleccionado.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                                {biSummary.length > 0 && (
-                                    <tfoot>
-                                        <tr style={{ background: '#f8fafc', fontWeight: '900' }}>
-                                            <td colSpan="2" style={{ textAlign: 'right', textTransform: 'uppercase', fontSize: '0.8rem', color: '#64748b' }}>Totales Globales:</td>
-                                            <td className="amount">C${biSummary.reduce((acc, curr) => acc + curr.totalAmount, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                            <td className="amount">C${biSummary.reduce((acc, curr) => acc + curr.totalPaid, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                            <td className="amount" style={{ color: '#ef4444' }}>C${(biSummary.reduce((acc, curr) => acc + curr.totalAmount, 0) - biSummary.reduce((acc, curr) => acc + curr.totalPaid, 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                        </tr>
-                                    </tfoot>
-                                )}
-                            </BITable>
-                        </BISummaryContainer>
                     ) : (
+                        // --- ESTADO VACÍO ---
                         <div style={{
                             textAlign: 'center', padding: '4rem', color: '#94a3b8',
                             border: '2px dashed #e2e8f0', borderRadius: '24px', background: 'white'
