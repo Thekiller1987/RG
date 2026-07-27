@@ -87,11 +87,17 @@ const getAllProducts = async (_req, res) => {
     const [rows] = await db.query(query);
 
     // 1. Obtener carritos activos (últimos 60 min) EXCLUYENDO al usuario actual
-    const requestingUserId = _req.user?.id_usuario || _req.user?.id;
-    const [carts] = await db.query(
-      "SELECT user_id, carts_json FROM active_carts WHERE updated_at > NOW() - INTERVAL 60 MINUTE AND user_id != ?",
-      [requestingUserId || -1]
-    );
+    let carts = [];
+    try {
+      const requestingUserId = _req.user?.id_usuario || _req.user?.id;
+      const [cartRows] = await db.query(
+        "SELECT user_id, carts_json FROM active_carts WHERE updated_at > NOW() - INTERVAL 60 MINUTE AND user_id != ?",
+        [requestingUserId || -1]
+      );
+      carts = cartRows || [];
+    } catch (e) {
+      console.warn('[getAllProducts] Advertencia con active_carts:', e.message);
+    }
 
     // 2. Calcular stock reservado por producto
     const reservedMap = new Map();
