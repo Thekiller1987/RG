@@ -1035,18 +1035,9 @@ const InventoryManagement = () => {
       setError(null);
       const token = localStorage.getItem('token');
       const [full, cats, provs] = await Promise.all([
-        fetchProductList().catch(err => {
-          console.error('Error fetching product list:', err);
-          return [];
-        }),
-        axios.get(`${API_URL}/categories`, { headers: { Authorization: `Bearer ${token}` } }).catch(err => {
-          console.error('Error fetching categories:', err);
-          return { data: [] };
-        }),
-        axios.get(`${API_URL}/providers`, { headers: { Authorization: `Bearer ${token}` } }).catch(err => {
-          console.error('Error fetching providers:', err);
-          return { data: [] };
-        })
+        fetchProductList(),
+        axios.get(`${API_URL}/categories`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API_URL}/providers`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
       const rawList = Array.isArray(full) ? full : [];
@@ -1080,11 +1071,15 @@ const InventoryManagement = () => {
       setError(null);
     } catch (e) {
       console.error('InventoryManagement fetchData error:', e);
-      let errMsg = e?.response?.data?.msg || e?.response?.data?.message || e?.message;
-      if (!errMsg || typeof errMsg !== 'string' || errMsg.includes('is not a function') || errMsg.includes('Cannot read properties') || errMsg.includes('undefined')) {
-        errMsg = 'Error al cargar los datos del inventario. Por favor, intenta de nuevo.';
+      if (e?.response?.status === 401 || e?.response?.status === 403) {
+        setError('Tu sesión ha expirado o no es válida. Por favor inicia sesión nuevamente.');
+      } else {
+        let errMsg = e?.response?.data?.msg || e?.response?.data?.message || e?.message;
+        if (!errMsg || typeof errMsg !== 'string' || errMsg.includes('is not a function') || errMsg.includes('Cannot read properties') || errMsg.includes('undefined')) {
+          errMsg = 'Error al cargar los datos del inventario. Por favor, verifica tu conexión e intenta de nuevo.';
+        }
+        setError(errMsg);
       }
-      setError(errMsg);
     } finally {
       setInitialLoadComplete(true);
     }
