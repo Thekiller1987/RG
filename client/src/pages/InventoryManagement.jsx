@@ -514,7 +514,7 @@ const ManagementModal = ({ title, items, onAdd, onDelete, onClose }) => {
           <SaveButton type="submit"><FaPlus /> Agregar</SaveButton>
         </form>
         <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {items.map((item, idx) => {
+          {(Array.isArray(items) ? items : []).map((item, idx) => {
             // Detectar si es categoría o proveedor
             const id = item.id_categoria || item.id_proveedor || idx;
             const nombre = item.nombre;
@@ -525,7 +525,7 @@ const ManagementModal = ({ title, items, onAdd, onDelete, onClose }) => {
               </div>
             );
           })}
-          {items.length === 0 && <p style={{ textAlign: 'center', color: '#a0aec0' }}>No hay elementos registrados.</p>}
+          {(!Array.isArray(items) || items.length === 0) && <p style={{ textAlign: 'center', color: '#a0aec0' }}>No hay elementos registrados.</p>}
         </div>
         <ModalActions>
           <CancelButton onClick={onClose}>Cerrar</CancelButton>
@@ -626,7 +626,7 @@ const InventoryHistoryModal = ({ onClose }) => {
       const res = await axios.get(`/api/products/inventory/history?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setHistory(res.data);
+      setHistory(Array.isArray(res.data) ? res.data : (Array.isArray(res.data?.history) ? res.data.history : []));
     } catch (err) {
       console.error(err);
       setError('No se pudo cargar el historial.');
@@ -715,7 +715,7 @@ const InventoryHistoryModal = ({ onClose }) => {
                 </tr>
               </thead>
               <tbody>
-                {history.map((h) => (
+                {(Array.isArray(history) ? history : []).map((h) => (
                   <tr key={h.id_movimiento} style={{ borderBottom: '1px solid #edf2f7' }}>
                     <td style={{ padding: '10px' }}>{new Date(h.fecha).toLocaleString()}</td>
                     <td style={{ padding: '10px', fontWeight: '600' }}>{h.nombre_producto || h.codigo_producto || 'N/A'}</td>
@@ -732,7 +732,7 @@ const InventoryHistoryModal = ({ onClose }) => {
                     <td style={{ padding: '10px', color: '#718096' }}>{h.nombre_usuario || 'Sistema'}</td>
                   </tr>
                 ))}
-                {history.length === 0 && (
+                {(!Array.isArray(history) || history.length === 0) && (
                   <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>No hay movimientos registrados para estos filtros.</td></tr>
                 )}
               </tbody>
@@ -801,7 +801,8 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
     if (cost < 0 || price < 0 || stock < 0) { setModalError('Precios y cantidades no pueden ser negativos.'); return; }
     if (price < cost) { setModalError('El precio de venta no puede ser menor que el costo.'); return; }
 
-    const duplicate = allProductsRaw.find(p =>
+    const rawList = Array.isArray(allProductsRaw) ? allProductsRaw : [];
+    const duplicate = rawList.find(p =>
       (p.codigo?.toLowerCase() === f.codigo.trim().toLowerCase() || p.nombre?.toLowerCase() === f.nombre.trim().toLowerCase())
     );
     if (duplicate) {
@@ -841,8 +842,8 @@ const CreateProductModal = ({ isOpen, onClose, onSave, categories, providers, al
               <FormGroup><Label>Stock Mínimo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="minimo" value={formData.minimo} onChange={handleInputChange} /></FormGroup>
               <FormGroup><Label>Stock Máximo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="maximo" value={formData.maximo} onChange={handleInputChange} /></FormGroup>
               <FormGroup><Label>Descripción</Label><Input name="descripcion" value={formData.descripcion} onChange={handleInputChange} placeholder="Detalles del producto" /></FormGroup>
-              <FormGroup><Label>Categoría</Label><Select name="id_categoria" value={formData.id_categoria} onChange={handleInputChange}><option value="">-- Sin Categoría --</option>{categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}</Select></FormGroup>
-              <FormGroup><Label>Proveedor</Label><Select name="id_proveedor" value={formData.id_proveedor} onChange={handleInputChange}><option value="">-- Sin Proveedor --</option>{providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}</Select></FormGroup>
+              <FormGroup><Label>Categoría</Label><Select name="id_categoria" value={formData.id_categoria} onChange={handleInputChange}><option value="">-- Sin Categoría --</option>{(Array.isArray(categories) ? categories : []).map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}</Select></FormGroup>
+              <FormGroup><Label>Proveedor</Label><Select name="id_proveedor" value={formData.id_proveedor} onChange={handleInputChange}><option value="">-- Sin Proveedor --</option>{(Array.isArray(providers) ? providers : []).map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}</Select></FormGroup>
               <FormGroup><Label>Tipo de Venta</Label><Select name="tipo_venta" value={formData.tipo_venta} onChange={handleInputChange}><option value="Unidad">Unidad</option><option value="Juego">Juego</option><option value="Kit">Kit</option></Select></FormGroup>
             </InputGrid>
             <ModalActions>
@@ -949,8 +950,8 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
               <FormGroup><Label>Stock Mínimo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="minimo" value={formData.minimo || ''} onChange={handleInputChange} /></FormGroup>
               <FormGroup><Label>Stock Máximo</Label><Input type="number" inputMode="numeric" pattern="[0-9]*" name="maximo" value={formData.maximo || ''} onChange={handleInputChange} /></FormGroup>
               <FormGroup><Label>Descripción</Label><Input name="descripcion" value={formData.descripcion || ''} onChange={handleInputChange} placeholder="Detalles del producto" /></FormGroup>
-              <FormGroup><Label>Categoría</Label><Select name="id_categoria" value={formData.id_categoria || ''} onChange={handleInputChange}><option value="">-- Sin Categoría --</option>{categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}</Select></FormGroup>
-              <FormGroup><Label>Proveedor</Label><Select name="id_proveedor" value={formData.id_proveedor || ''} onChange={handleInputChange}><option value="">-- Sin Proveedor --</option>{providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}</Select></FormGroup>
+              <FormGroup><Label>Categoría</Label><Select name="id_categoria" value={formData.id_categoria || ''} onChange={handleInputChange}><option value="">-- Sin Categoría --</option>{(Array.isArray(categories) ? categories : []).map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}</Select></FormGroup>
+              <FormGroup><Label>Proveedor</Label><Select name="id_proveedor" value={formData.id_proveedor || ''} onChange={handleInputChange}><option value="">-- Sin Proveedor --</option>{(Array.isArray(providers) ? providers : []).map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}</Select></FormGroup>
               <FormGroup><Label>Tipo de Venta</Label><Select name="tipo_venta" value={formData.tipo_venta || 'Unidad'} onChange={handleInputChange}><option value="Unidad">Unidad</option><option value="Juego">Juego</option><option value="Kit">Kit</option></Select></FormGroup>
             </InputGrid>
             <ModalActions>
@@ -1018,7 +1019,15 @@ const InventoryManagement = () => {
   const fetchProductList = useCallback(async () => {
     const token = localStorage.getItem('token');
     const res = await axios.get(`${API_URL}/products`, { headers: { Authorization: `Bearer ${token}` } });
-    return res.data;
+    const data = res.data;
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.products)) return data.products;
+    if (data && Array.isArray(data.data)) return data.data;
+    if (data && Array.isArray(data.items)) return data.items;
+    if (data && (data.msg || data.message || data.error)) {
+      throw new Error(data.msg || data.message || data.error);
+    }
+    return [];
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -1026,14 +1035,25 @@ const InventoryManagement = () => {
       setError(null);
       const token = localStorage.getItem('token');
       const [full, cats, provs] = await Promise.all([
-        fetchProductList(),
-        axios.get(`${API_URL}/categories`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`${API_URL}/providers`, { headers: { Authorization: `Bearer ${token}` } })
+        fetchProductList().catch(err => {
+          console.error('Error fetching product list:', err);
+          return [];
+        }),
+        axios.get(`${API_URL}/categories`, { headers: { Authorization: `Bearer ${token}` } }).catch(err => {
+          console.error('Error fetching categories:', err);
+          return { data: [] };
+        }),
+        axios.get(`${API_URL}/providers`, { headers: { Authorization: `Bearer ${token}` } }).catch(err => {
+          console.error('Error fetching providers:', err);
+          return { data: [] };
+        })
       ]);
 
-      setAllProductsRaw(full);
+      const rawList = Array.isArray(full) ? full : [];
+      setAllProductsRaw(rawList);
 
-      const indexed = full.map(p => {
+      const indexed = rawList.map(p => {
+        if (!p || typeof p !== 'object') return null;
         const nombre = p.nombre ?? '';
         const codigo = p.codigo ?? '';
         const descripcion = p.descripcion ?? '';
@@ -1052,15 +1072,19 @@ const InventoryManagement = () => {
           q,
           qStarts
         };
-      });
+      }).filter(Boolean);
 
       setAllProducts(indexed);
-      setCategories(cats.data);
-      setProviders(provs.data);
+      setCategories(Array.isArray(cats?.data) ? cats.data : (Array.isArray(cats?.data?.categories) ? cats.data.categories : []));
+      setProviders(Array.isArray(provs?.data) ? provs.data : (Array.isArray(provs?.data?.providers) ? provs.data.providers : []));
       setError(null);
     } catch (e) {
       console.error('InventoryManagement fetchData error:', e);
-      setError(e?.response?.data?.msg || e?.message || 'Error al cargar los datos. Verifica tu conexión.');
+      let errMsg = e?.response?.data?.msg || e?.response?.data?.message || e?.message;
+      if (!errMsg || typeof errMsg !== 'string' || errMsg.includes('is not a function') || errMsg.includes('Cannot read properties') || errMsg.includes('undefined')) {
+        errMsg = 'Error al cargar los datos del inventario. Por favor, intenta de nuevo.';
+      }
+      setError(errMsg);
     } finally {
       setInitialLoadComplete(true);
     }
@@ -1073,7 +1097,7 @@ const InventoryManagement = () => {
     const cat = String(filterCategory || '');
     const prov = String(filterProvider || '');
 
-    let items = allProducts;
+    let items = Array.isArray(allProducts) ? allProducts : [];
     if (cat) items = items.filter(p => String(p.id_categoria) === cat);
     if (prov) items = items.filter(p => String(p.id_proveedor) === prov);
 
@@ -1321,11 +1345,11 @@ const InventoryManagement = () => {
 
         <Select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
           <option value="">Todas las categorías</option>
-          {categories.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}
+          {(Array.isArray(categories) ? categories : []).map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}
         </Select>
         <Select value={filterProvider} onChange={(e) => setFilterProvider(e.target.value)}>
           <option value="">Todos los proveedores</option>
-          {providers.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}
+          {(Array.isArray(providers) ? providers : []).map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}
         </Select>
 
         <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ border: '1px solid #6366f1', background: '#f5f3ff' }}>
@@ -1345,11 +1369,11 @@ const InventoryManagement = () => {
       </FilterContainer>
 
       <div style={{ textAlign: 'right', marginBottom: '.5rem', color: '#4a5568', fontWeight: 'bold', fontSize: '0.9rem' }}>
-        Página {currentPage} de {totalPages || 1} | Mostrando {filtered.length} de {totalFilteredCount} productos filtrados
+        Página {currentPage} de {totalPages || 1} | Mostrando {(Array.isArray(filtered) ? filtered : []).length} de {totalFilteredCount} productos filtrados
       </div>
 
       <MobileCardGrid>
-        {filtered.map((p) => {
+        {(Array.isArray(filtered) ? filtered : []).map((p) => {
           const cardProps = animationsEnabled ? { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, transition: { duration: .12 } } : {};
           const low = p.existencia > 0 && p.existencia <= (p.minimo || 5);
           const out = p.existencia <= 0;

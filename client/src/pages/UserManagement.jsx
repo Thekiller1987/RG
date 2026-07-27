@@ -396,7 +396,7 @@ const UserManagement = () => {
       const token = localStorage.getItem('token');
       const config = { headers: { Authorization: `Bearer ${token}` } };
       const { data } = await axios.get(`${API_URL}/users`, config);
-      setUsers(data);
+      setUsers(Array.isArray(data) ? data : (Array.isArray(data?.users) ? data.users : []));
     } catch (err) {
       setError('Error al cargar los usuarios.');
     } finally {
@@ -520,7 +520,7 @@ const UserManagement = () => {
           </Tr>
         </thead>
         <tbody>
-          {users.map((user) => (
+          {(Array.isArray(users) ? users : []).map((user) => (
             <Tr key={user.id_usuario}>
               <Td>{user.id_usuario}</Td>
               <Td>{user.nombre_usuario}</Td>
@@ -536,7 +536,7 @@ const UserManagement = () => {
       
       {/* 💡 MOBILE VIEW: Tarjetas */}
       <MobileCardContainer>
-        {users.map((user) => (
+        {(Array.isArray(users) ? users : []).map((user) => (
           <UserCard key={user.id_usuario} $roleColor={getRoleColor(user.rol)}>
             <CardName>{user.nombre_usuario}</CardName>
             <CardRole $roleColor={getRoleColor(user.rol)}>{user.rol}</CardRole>
