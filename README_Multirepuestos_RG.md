@@ -75,9 +75,15 @@ https://<tu-sitio>.netlify.app
 - Generación de **Cotizaciones** profesionales en A4.
 - Historial completo de movimientos no comerciales.
 
-## �🆘 Soporte
+## 👥 Equipo de Desarrollo (UNAN-Managua CUR-Chontales)
+* **Waskar Ríos**
+* **Mauricio Rubio**
+* **Amin Marín**
+* **Docente / Guía:** Msc. Jazcar Bravo
+
+## 🆘 Soporte
 Para asistencia técnica futura, mencionar:  
 > Sistema Multirepuestos RG (React + Node + MySQL + Docker + Netlify)
 
 ---
-© 2025 Waskar — Todos los derechos reservados.
+© 2026 Multirepuestos RG — Waskar Ríos, Mauricio Rubio, Amin Marín. Todos los derechos reservados.

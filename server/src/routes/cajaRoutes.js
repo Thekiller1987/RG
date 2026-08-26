@@ -888,6 +888,16 @@ router.post('/cart', async (req, res) => {
       ON DUPLICATE KEY UPDATE carts_json = VALUES(carts_json)
     `, [userId, jsonStr]);
 
+    const io = req.app.get('io');
+    const calculateGlobalReservations = req.app.get('calculateGlobalReservations');
+    if (io) {
+      let resData = { totalByProduct: {}, userReservations: {} };
+      if (typeof calculateGlobalReservations === 'function') {
+        resData = await calculateGlobalReservations();
+      }
+      io.emit('stock:reservations_update', { ...resData, updatedByUserId: userId });
+    }
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error saving cart:', error);

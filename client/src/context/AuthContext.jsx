@@ -18,6 +18,8 @@ export const AuthProvider = ({ children, socket }) => {
     const [token, setToken] = useState(() => localStorage.getItem('token'));
     const [cajaSession, setCajaSession] = useState(null);
 
+    const [globalReservations, setGlobalReservations] = useState({ totalByProduct: {}, userReservations: {} });
+
     // Ref for Debouncing
     const refreshTimeoutRef = useRef(null);
 
@@ -84,17 +86,14 @@ export const AuthProvider = ({ children, socket }) => {
         } catch (err) {
             console.error("Error de Red cargando datos maestros (Esperando reintento):", err);
         }
-    }, [logout]);
+    }, [logout, user]);
 
     const refreshProducts = useCallback(async () => {
         if (!token) return;
         try {
-            // console.log("🔄 [AuthContext] Refreshing products...");
             const data = await api.fetchProducts(token);
             setProducts(data || []);
-            // console.log("✅ [AuthContext] Products updated");
         } catch (e) {
-            // Suppress network errors from duplicate requests (abort controller would be better but this is simpler)
             if (e.name !== 'CanceledError') {
                 console.error("Error updating inventory:", e.message);
             }
@@ -123,6 +122,22 @@ export const AuthProvider = ({ children, socket }) => {
         }
     }, []);
 
+    // Helper: calcular stock disponible excluyendo las reservas de otros usuarios
+    const getAvailableStock = useCallback((product, excludeUserId = null) => {
+        if (!product) return 0;
+        const pid = product.id_producto || product.id;
+        const rawStock = Number(product.existencia || 0);
+        const totalReserved = Number(globalReservations.totalByProduct?.[pid] || 0);
+        
+        let userReserved = 0;
+        if (excludeUserId && globalReservations.userReservations?.[excludeUserId]) {
+            userReserved = Number(globalReservations.userReservations[excludeUserId]?.[pid] || 0);
+        }
+        
+        const otherUsersReserved = Math.max(0, totalReserved - userReserved);
+        return Math.max(0, rawStock - otherUsersReserved);
+    }, [globalReservations]);
+
     // Socket Listeners
     useEffect(() => {
         if (!socket) return;
@@ -132,13 +147,22 @@ export const AuthProvider = ({ children, socket }) => {
             if (data?.id) {
                 api.clearCachedImage(data.id);
             }
-            // Use Debounced version!
             refreshProductsDebounced();
+        };
+
+        const onReservationsUpdate = (data) => {
+            if (data) {
+                setGlobalReservations({
+                    totalByProduct: data.totalByProduct || {},
+                    userReservations: data.userReservations || {}
+                });
+            }
         };
 
         socket.on('inventory_update', onInventoryUpdate);
         socket.on('products:update', onInventoryUpdate);
-        socket.on('clients:update', refreshClients); // Clients usually don't spam, direct call is fine
+        socket.on('stock:reservations_update', onReservationsUpdate);
+        socket.on('clients:update', refreshClients);
         socket.on('users:update', async () => {
             const token = localStorage.getItem('token');
             const currentUser = JSON.parse(localStorage.getItem('user'));
@@ -154,6 +178,7 @@ export const AuthProvider = ({ children, socket }) => {
             if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
             socket.off('inventory_update', onInventoryUpdate);
             socket.off('products:update', onInventoryUpdate);
+            socket.off('stock:reservations_update', onReservationsUpdate);
             socket.off('clients:update', refreshClients);
             socket.off('users:update');
         };
@@ -161,7 +186,6 @@ export const AuthProvider = ({ children, socket }) => {
 
     useEffect(() => {
         const initializeAuth = async () => {
-            // Registrar el manejador de logout global para errores 401/403 de la API
             api.setUnauthorizedHandler(() => {
                 logout('Su sesión ha expirado o es inválida. Por favor, ingrese de nuevo.');
             });
@@ -176,21 +200,13 @@ export const AuthProvider = ({ children, socket }) => {
                         setUser(parsedUser);
                         setToken(tokenInStorage);
 
-                        // ★ CARGA INSTANTÁNEA: Mostrar datos cacheados al instante
-                        // para que el usuario NO vea pantalla en blanco/spinner largo.
                         const cachedProducts = localStorage.getItem('cache_products');
                         const cachedClients = localStorage.getItem('cache_clients');
                         if (cachedProducts) setProducts(JSON.parse(cachedProducts));
                         if (cachedClients) setClients(JSON.parse(cachedClients));
 
-                        // Desbloquear UI inmediatamente con los datos cacheados
                         setIsLoading(false);
-
-                        // ★ BACKGROUND REFRESH: Los datos reales se cargan
-                        // en segundo plano sin bloquear la pantalla.
-                        // La UI ya se ve, y se actualizará sola cuando lleguen
-                        // los datos reales del servidor.
-                        loadMasterData(tokenInStorage, true); // true = background (skip auth check)
+                        loadMasterData(tokenInStorage, true);
 
                     } catch (error) {
                         setIsLoading(false);
@@ -229,15 +245,11 @@ export const AuthProvider = ({ children, socket }) => {
         if (!user) return;
         const userId = user.id_usuario || user.id;
 
-        // --- LÓGICA 100% SERVIDOR ---
-        // Se elimina la actualización local (optimista) para evitar desincronización.
-        // La verdad absoluta reside ahora únicamente en el servidor.
         try {
             await api.addCajaTx({ userId, tx: transaction }, token);
-            // console.log("✅ Transacción de caja sincronizada con servidor");
         } catch (error) {
             console.error("❌ Error sincronizando transacción de caja:", error);
-            throw error; // Propagar para que el modal/UI sepa que falló
+            throw error;
         }
     }, [user, token]);
 
@@ -257,7 +269,10 @@ export const AuthProvider = ({ children, socket }) => {
         refreshClients,
         cajaSession,
         setCajaSession,
-        addCajaTransaction
+        addCajaTransaction,
+        globalReservations,
+        getAvailableStock,
+        socket
     };
 
     if (isLoading && !user) {

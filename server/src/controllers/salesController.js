@@ -63,9 +63,17 @@ const createSale = async (req, res) => {
 
     // ─── SOCKET.IO EMIT ───
     const io = req.app.get('io');
+    const calculateGlobalReservations = req.app.get('calculateGlobalReservations');
     if (io) {
-      io.emit('inventory_update');
+      io.emit('inventory_update', { reason: 'sale_created', saleId });
+      io.emit('products:update', { reason: 'sale_created' });
       if (montoCredito > 0 && clientId) io.emit('clients:update');
+
+      if (typeof calculateGlobalReservations === 'function') {
+        calculateGlobalReservations().then(resData => {
+          io.emit('stock:reservations_update', { ...resData, updatedByUserId: userId });
+        }).catch(() => {});
+      }
     }
 
     const [newSale] = await connection.query('SELECT * FROM ventas WHERE id_venta = ?', [saleId]);

@@ -10,6 +10,7 @@ import {
   FaBarcode, FaFont, FaImage, FaEye
 } from 'react-icons/fa';
 import { rankItems } from '../utils/searchEngine';
+import { useAuth } from '../context/AuthContext';
 
 /* ================================
    STYLED COMPONENTS LOCALES
@@ -970,14 +971,15 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
   COMPONENTE PRINCIPAL: InventoryManagement
 ===================================== */
 const InventoryManagement = () => {
+  const { globalReservations, socket } = useAuth();
   const [allProductsRaw, setAllProductsRaw] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [providers, setProviders] = useState([]);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchType, setSearchType] = useState('description'); // <--- AGREGADO: ESTADO PARA TIPO BÚSQUEDA
-  const [sortBy, setSortBy] = useState('name-asc'); // <--- AGREGADO: ESTADO PARA ORDENAMIENTO
+  const [searchType, setSearchType] = useState('description');
+  const [sortBy, setSortBy] = useState('name-asc');
   const deferredSearch = useDeferredValue(searchTerm);
   const searchRef = useRef(null);
   const [filterCategory, setFilterCategory] = useState('');
@@ -1086,6 +1088,20 @@ const InventoryManagement = () => {
   }, [fetchProductList]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Sincronización en tiempo real vía socket
+  useEffect(() => {
+    if (!socket) return;
+    const handleSync = () => {
+      fetchData();
+    };
+    socket.on('inventory_update', handleSync);
+    socket.on('products:update', handleSync);
+    return () => {
+      socket.off('inventory_update', handleSync);
+      socket.off('products:update', handleSync);
+    };
+  }, [socket, fetchData]);
 
   const { filtered, totalFilteredCount } = useMemo(() => {
     const isCodeSearch = searchType === 'code';
@@ -1382,7 +1398,22 @@ const InventoryManagement = () => {
               <CardBody>
                 <InfoTag><span>Costo</span><strong>{p.__fmt.costo}</strong></InfoTag>
                 <InfoTag><span>Venta</span><strong>{p.__fmt.venta}</strong></InfoTag>
-                <StockTag $low={low} $out={out}><span>Existencia</span><strong>{p.existencia}</strong></StockTag>
+                {(() => {
+                  const reservado = Number(globalReservations?.totalByProduct?.[p.id_producto] || 0);
+                  return (
+                    <StockTag $low={low} $out={out}>
+                      <span>Existencia</span>
+                      <strong>
+                        {p.existencia}
+                        {reservado > 0 && (
+                          <span style={{ fontSize: '0.72rem', color: '#f59e0b', display: 'block', fontWeight: 600 }}>
+                            ({reservado} en caja)
+                          </span>
+                        )}
+                      </strong>
+                    </StockTag>
+                  );
+                })()}
                 <InfoTag><span>Costo Total</span><strong>{p.__fmt.costoTotal}</strong></InfoTag>
               </CardBody>
               <CardFooter>

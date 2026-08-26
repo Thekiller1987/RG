@@ -380,7 +380,7 @@ const BarcodeScannerModal = ({ onClose, onScan }) => {
 };
 
 const ProformaGenerator = () => {
-    const { user, products: authProducts } = useAuth();
+    const { user, products: authProducts, globalReservations, getAvailableStock } = useAuth();
     const { cajaSession } = useCaja();
     const token = localStorage.getItem('token');
 
@@ -400,7 +400,7 @@ const ProformaGenerator = () => {
 
     // MOBILE STATES
     const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
-    const [isScannerOpen, setIsScannerOpen] = useState(false); // <--- NEW STATE FOR CAMERA
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
 
     const searchInputRef = useRef(null);
 
@@ -418,7 +418,6 @@ const ProformaGenerator = () => {
         } finally { setLoading(false); }
     }, [token]);
 
-    // Cargar productos al iniciar la vista
     useEffect(() => {
         fetchProducts();
     }, [fetchProducts]);
@@ -426,28 +425,34 @@ const ProformaGenerator = () => {
     const goToDashboard = () => { window.location.href = '/dashboard'; };
 
     const addToCart = (product) => {
-        const currentQty = cart.find(i => i.id === product.id)?.quantity || 0;
-        if (currentQty >= product.existencia) { return alert(`Stock máximo alcanzado (${product.existencia}).`); }
-
-        // Optional: Auto open cart on mobile when adding first item? 
-        // User requested "custom design", likely prefers smooth experience. Let's show a toast or just update FAB.
+        const pid = product.id_producto || product.id;
+        const currentQty = cart.find(i => (i.id_producto || i.id) === pid)?.quantity || 0;
+        const maxAvailable = getAvailableStock ? getAvailableStock(product, user?.id_usuario || user?.id) : Number(product.existencia || 0);
+        
+        if (currentQty + 1 > maxAvailable) {
+            return alert(`Stock disponible insuficiente (${maxAvailable} unidades disponibles tras considerar cajas y tickets activos).`);
+        }
 
         setCart(prev => {
-            const existing = prev.find(p => p.id === product.id);
-            if (existing) return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
-            return [...prev, { ...product, quantity: 1, precio_venta: parseFloat(product.precio_venta || product.precio || 0) }];
+            const existing = prev.find(p => (p.id_producto || p.id) === pid);
+            if (existing) return prev.map(p => (p.id_producto || p.id) === pid ? { ...p, quantity: p.quantity + 1 } : p);
+            return [...prev, { ...product, id: pid, id_producto: pid, quantity: 1, precio_venta: parseFloat(product.precio_venta || product.precio || 0) }];
         });
     };
 
     const updateQuantity = (id, delta) => {
         setCart(prev => {
-            const item = prev.find(p => p.id === id);
+            const item = prev.find(p => (p.id_producto || p.id) === id);
             if (!item) return prev;
-            const product = products.find(p => p.id === id) || item;
+            const product = products.find(p => (p.id_producto || p.id) === id) || item;
+            const maxAvailable = getAvailableStock ? getAvailableStock(product, user?.id_usuario || user?.id) : Number(product.existencia || 0);
             const newQty = item.quantity + delta;
-            if (newQty > product.existencia) { alert(`Stock máximo alcanzado (${product.existencia}).`); return prev; }
-            if (newQty < 1) return prev.filter(p => p.id !== id);
-            return prev.map(p => p.id === id ? { ...p, quantity: newQty } : p);
+            if (newQty > maxAvailable) {
+                alert(`Stock máximo disponible alcanzado (${maxAvailable} unidades).`);
+                return prev;
+            }
+            if (newQty < 1) return prev.filter(p => (p.id_producto || p.id) !== id);
+            return prev.map(p => (p.id_producto || p.id) === id ? { ...p, quantity: newQty } : p);
         });
     };
 
@@ -560,7 +565,8 @@ const ProformaGenerator = () => {
                     {filteredProducts.map(p => {
                         const pid = p.id_producto || p.id;
                         const enCarrito = cart.find(i => (i.id_producto || i.id) === pid)?.quantity || 0;
-                        const restante = Math.max(0, Number(p.existencia || 0) - enCarrito);
+                        const reservadoEnCajas = Number(globalReservations?.totalByProduct?.[pid] || 0);
+                        const restante = Math.max(0, Number(p.existencia || 0) - enCarrito - reservadoEnCajas);
                         const agotado = restante <= 0;
 
                         return (
@@ -571,7 +577,7 @@ const ProformaGenerator = () => {
                                 title={p.nombre}
                             >
                                 <StockBadge outOfStock={agotado} lowstock={restante < 5 && !agotado}>
-                                    {agotado ? 'Agotado' : `Stock: ${restante}`}
+                                    {agotado ? (reservadoEnCajas > 0 ? 'En Caja' : 'Agotado') : `Stock: ${restante}`}
                                 </StockBadge>
 
                                 <LazyEmpleadoImage

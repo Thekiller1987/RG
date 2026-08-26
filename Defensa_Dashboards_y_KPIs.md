@@ -1,5 +1,18 @@
 # 🎓 Guía Suprema de Defensa: Los 3 Dashboards e Inteligencia de Negocios (BI)
 
+**UNAN-Managua CUR-Chontales**  
+*Facultad de Ciencias e Ingeniería — Carrera de Ingeniería en Sistemas de Información*  
+**Proyecto Integrador VIII | Guía y Sustentación Oficial de Proyecto**  
+
+* **Docente / Guía:** Msc. Jazcar Bravo
+* **Integrantes del Equipo:**
+  1. **Waskar Ríos**
+  2. **Mauricio Rubio**
+  3. **Amin Marín**
+* **Fecha de Presentación:** Junio 2026
+
+---
+
 Este documento es la guía analítica oficial para la defensa del sistema de **Multirepuestos RG**. Detalla la arquitectura lógica de los 3 dashboards, analizando cada indicador clave mediante cinco ejes fundamentales: **¿Por qué existe? (Justificación)**, **¿Qué hace? (Definición Operativa)**, **¿Para qué sirve? (Objetivo Estratégico)**, **¿Cómo se calcula? (Fórmula/Mecánica)** y **Ejemplo Práctico Aplicado**.
 
 ---

@@ -8,14 +8,18 @@ import { SettingsProvider } from './context/SettingsContext.jsx';
 import App from './App.jsx';
 import './index.css';
 
-// Initialize Socket with robust reconnection
+// Initialize Socket with robust reconnection and JWT Authentication
 import { io } from 'socket.io-client';
 
-const URL = 'https://sistema.multirepuestosrg.com';
+const API_ENDPOINT = import.meta.env.VITE_API_URL || 'https://sistema.multirepuestosrg.com';
+const URL = API_ENDPOINT.replace(/\/api\/?$/, '');
 
 const socket = io(URL, {
   path: '/socket.io/',
   transports: ['websocket', 'polling'], // Prefer websocket, fallback to polling
+  auth: {
+    token: localStorage.getItem('token')
+  },
   reconnection: true,
   reconnectionAttempts: Infinity, // Keep trying forever
   reconnectionDelay: 1000,
@@ -23,6 +27,16 @@ const socket = io(URL, {
   timeout: 20000,
   autoConnect: true
 });
+
+// Update socket auth token whenever localStorage changes or token is refreshed
+export const updateSocketAuth = (token) => {
+  if (socket) {
+    socket.auth = { token };
+    if (!socket.connected) {
+      socket.connect();
+    }
+  }
+};
 
 socket.on('connect', () => {
   console.log("✅ Socket Connected:", socket.id);
@@ -46,7 +60,7 @@ const AppProviders = ({ socket }) => {
   return (
     <CajaProvider user={user} socket={socket}>
       <SettingsProvider>
-        <OrdersProvider>
+        <OrdersProvider socket={socket} user={user}>
           <App />
         </OrdersProvider>
       </SettingsProvider>

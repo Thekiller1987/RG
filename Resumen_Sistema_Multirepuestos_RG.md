@@ -62,4 +62,16 @@ El sistema cuenta con un robusto control de acceso basado en roles (RBAC).
 *   **Promociones Mayoristas:** Motor de reglas y descuentos por volumen o montos.
 
 ---
-*Documento generado en base a la estructura actual del proyecto v1.0 (Marzo 2026).*
+
+## 👥 Equipo de Desarrollo y Proyecto
+* **Institución:** UNAN-Managua CUR-Chontales | Carrera de Ingeniería en Sistemas de Información
+* **Proyecto:** Proyecto Integrador VIII
+* **Docente / Guía:** Msc. Jazcar Bravo
+* **Integrantes:**
+  1. **Waskar Ríos**
+  2. **Mauricio Rubio**
+  3. **Amin Marín**
+
+---
+*Documento oficial de sustentación y arquitectura — Multirepuestos RG (2026).*
+

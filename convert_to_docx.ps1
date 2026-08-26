@@ -1,7 +1,7 @@
 try {
     Write-Host "Iniciando la conversión de HTML a DOCX usando Word..."
-    $htmlPath = "c:\Users\alfro\Desktop\RG\Defensa_Inteligencia_de_Negocios.html"
-    $docxPath = "c:\Users\alfro\Desktop\Defensa_Inteligencia_de_Negocios.docx"
+    $htmlPath = "c:\Users\waska\Desktop\Proyectos Personales\RG\Defensa_Inteligencia_de_Negocios.html"
+    $docxPath = "c:\Users\waska\Desktop\Defensa_Inteligencia_de_Negocios.docx"
     
     $word = New-Object -ComObject Word.Application
     $word.Visible = $false
@@ -15,3 +15,4 @@ try {
 } catch {
     Write-Error "No se pudo utilizar Word COM Object. Error: $_"
 }
+

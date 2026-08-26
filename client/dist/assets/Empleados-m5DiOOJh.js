@@ -1,4 +1,4 @@
-import{r as n,j as e,A as M,an as d,s as r,m as C,V as A}from"./vendor-BVroOj2J.js";import{u as _,y as I,W as L,X as N,Y as O}from"./index-sEpZnVGC.js";import"./scanner-vendor-DfxRpMWJ.js";import"./pdf-vendor-C0MaOehg.js";const V=()=>e.jsx("svg",{xmlns:"http://www.w3.org/2000/svg",width:"24",height:"24",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:e.jsx("path",{d:"m15 18-6-6 6-6"})}),w=r.div`
+import{r as n,j as e,A as M,an as d,s as r,m as C,V as A}from"./vendor-BVroOj2J.js";import{u as _,y as I,W as L,X as N,Y as O}from"./index-fl4El2y-.js";import"./scanner-vendor-DfxRpMWJ.js";import"./pdf-vendor-C0MaOehg.js";const V=()=>e.jsx("svg",{xmlns:"http://www.w3.org/2000/svg",width:"24",height:"24",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:e.jsx("path",{d:"m15 18-6-6 6-6"})}),w=r.div`
   padding: 2rem 4rem;
   background-color: #f8f9fa;
   min-height: 100vh;

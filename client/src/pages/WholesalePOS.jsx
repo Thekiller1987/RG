@@ -35,7 +35,7 @@ const fmt = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigit
 const WholesalePOS = () => {
     const navigate = useNavigate();
     // Contextos
-    const { user, products: initialProducts, token, refreshProducts, clients, allUsers } = useAuth();
+    const { user, products: initialProducts, token, refreshProducts, clients, allUsers, globalReservations } = useAuth();
     const { isCajaOpen, setIsCajaOpen, cajaSession, setCajaSession, tasaDolar, setTasaDolar, closeCajaSession, refreshSession } = useCaja();
     const {
         orders, activeOrderId, setActiveOrderId, activeOrder,
@@ -45,6 +45,15 @@ const WholesalePOS = () => {
     const userId = user?.id_usuario || user?.id;
     const currentUser = user;
     const isAdmin = user?.rol === 'admin';
+
+    // Helper para calcular stock máximo disponible considerando otros tickets y otras cajas
+    const getProductMaxAvailable = useCallback((productId, rawStock) => {
+        const localOtherTickets = reservedStock?.get(productId) || 0;
+        const totalGlobal = Number(globalReservations?.totalByProduct?.[productId] || 0);
+        const myGlobal = Number(globalReservations?.userReservations?.[userId]?.[productId] || 0);
+        const otherCashiers = Math.max(0, totalGlobal - myGlobal);
+        return Math.max(0, Number(rawStock || 0) - localOtherTickets - otherCashiers);
+    }, [reservedStock, globalReservations, userId]);
 
     // Estados Locales
     const [searchTerm, setSearchTerm] = useState('');
@@ -239,7 +248,19 @@ const WholesalePOS = () => {
             priceToUse = product.precio_venta || product.precio || 0;
         }
 
-        const existingItemIndex = cart.findIndex(item => (item.id_producto || item.id) === (product.id_producto || product.id));
+        const pid = product.id_producto || product.id;
+        const existingQty = cart.find(i => (i.id_producto || i.id) === pid)?.quantity || 0;
+        const maxAvailable = getProductMaxAvailable(pid, product.existencia);
+
+        if (existingQty + 1 > maxAvailable) {
+            showAlert({
+                title: "Stock Insuficiente / Reservado",
+                message: `Solo hay ${maxAvailable} unidades disponibles para este ticket (${product.existencia} en total menos unidades en otros tickets/cajas).`
+            });
+            return;
+        }
+
+        const existingItemIndex = cart.findIndex(item => (item.id_producto || item.id) === pid);
         let newCart = [...cart];
 
         if (existingItemIndex > -1) {

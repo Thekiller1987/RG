@@ -11,7 +11,7 @@ const pool = mysql.createPool({
   database: process.env.DB_DATABASE || 'multirepuestosrg',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0,
+  queueLimit: 50, // Limitar cola para evitar acumulación de queries en memoria
 });
 
 // Test rápido de conexión

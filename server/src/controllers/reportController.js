@@ -360,6 +360,7 @@ v.id_venta AS idVenta,
                 LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
                 WHERE dv.id_producto IN(${placeHolders})
                 ORDER BY v.fecha DESC
+                LIMIT 200
     `;
 
             // Pass flattened productIds array
@@ -1262,49 +1263,58 @@ const getBiMetrics = async (req, res) => {
             });
         }
 
-        // 7. Distribución de Métodos de Pago (Calculada dinámicamente desde pago_detalles JSON)
-        let paymentSalesResult;
+        // 7. Distribución de Métodos de Pago (Calculada en SQL con JSON_EXTRACT para evitar cargar todos los registros en memoria)
+        let paymentDistResult;
         if (startDate && endDate) {
             const { from, to } = getDateRange(startDate, endDate);
-            [paymentSalesResult] = await db.query(`
-                SELECT total_venta, pago_detalles
+            [paymentDistResult] = await db.query(`
+                SELECT 
+                    COALESCE(SUM(
+                        CASE 
+                            WHEN COALESCE(CAST(JSON_EXTRACT(pago_detalles, '$.efectivo') AS DECIMAL(12,2)), 0) > 0 
+                                 OR COALESCE(CAST(JSON_EXTRACT(pago_detalles, '$.tarjeta') AS DECIMAL(12,2)), 0) > 0
+                                 OR COALESCE(CAST(JSON_EXTRACT(pago_detalles, '$.transferencia') AS DECIMAL(12,2)), 0) > 0
+                            THEN GREATEST(0,
+                                COALESCE(CAST(JSON_EXTRACT(pago_detalles, '$.efectivo') AS DECIMAL(12,2)), 0)
+                                + COALESCE(CAST(JSON_EXTRACT(pago_detalles, '$.dolares') AS DECIMAL(12,2)), 0)
+                                  * COALESCE(NULLIF(CAST(JSON_EXTRACT(pago_detalles, '$.tasaDolarAlMomento') AS DECIMAL(12,2)), 0), 36.60)
+                                - COALESCE(CAST(JSON_EXTRACT(pago_detalles, '$.cambio') AS DECIMAL(12,2)), 0)
+                            )
+                            ELSE total_venta
+                        END
+                    ), 0) AS total_efectivo,
+                    COALESCE(SUM(CAST(JSON_EXTRACT(pago_detalles, '$.transferencia') AS DECIMAL(12,2))), 0) AS total_transferencia,
+                    COALESCE(SUM(CAST(JSON_EXTRACT(pago_detalles, '$.tarjeta') AS DECIMAL(12,2))), 0) AS total_tarjeta
                 FROM ventas
                 WHERE estado = 'COMPLETADA' AND fecha >= ? AND fecha <= ?;
             `, [from, to]);
         } else {
-            [paymentSalesResult] = await db.query(`
-                SELECT total_venta, pago_detalles
+            [paymentDistResult] = await db.query(`
+                SELECT 
+                    COALESCE(SUM(
+                        CASE 
+                            WHEN COALESCE(CAST(JSON_EXTRACT(pago_detalles, '$.efectivo') AS DECIMAL(12,2)), 0) > 0 
+                                 OR COALESCE(CAST(JSON_EXTRACT(pago_detalles, '$.tarjeta') AS DECIMAL(12,2)), 0) > 0
+                                 OR COALESCE(CAST(JSON_EXTRACT(pago_detalles, '$.transferencia') AS DECIMAL(12,2)), 0) > 0
+                            THEN GREATEST(0,
+                                COALESCE(CAST(JSON_EXTRACT(pago_detalles, '$.efectivo') AS DECIMAL(12,2)), 0)
+                                + COALESCE(CAST(JSON_EXTRACT(pago_detalles, '$.dolares') AS DECIMAL(12,2)), 0)
+                                  * COALESCE(NULLIF(CAST(JSON_EXTRACT(pago_detalles, '$.tasaDolarAlMomento') AS DECIMAL(12,2)), 0), 36.60)
+                                - COALESCE(CAST(JSON_EXTRACT(pago_detalles, '$.cambio') AS DECIMAL(12,2)), 0)
+                            )
+                            ELSE total_venta
+                        END
+                    ), 0) AS total_efectivo,
+                    COALESCE(SUM(CAST(JSON_EXTRACT(pago_detalles, '$.transferencia') AS DECIMAL(12,2))), 0) AS total_transferencia,
+                    COALESCE(SUM(CAST(JSON_EXTRACT(pago_detalles, '$.tarjeta') AS DECIMAL(12,2))), 0) AS total_tarjeta
                 FROM ventas
                 WHERE estado = 'COMPLETADA' AND fecha >= DATE_SUB(NOW(), INTERVAL 30 DAY);
             `);
         }
 
-        let efectivoTotal = 0;
-        let tarjetaTotal = 0;
-        let transferenciaTotal = 0;
-
-        paymentSalesResult.forEach(row => {
-            let pd = {};
-            try {
-                pd = typeof row.pago_detalles === 'string' ? JSON.parse(row.pago_detalles) : (row.pago_detalles || {});
-            } catch { pd = {}; }
-
-            const safe = (v) => { const n = Number(v); return (isNaN(n) || !isFinite(n)) ? 0 : n; };
-            const txEfectivo = safe(pd.efectivo);
-            const txTarjeta = safe(pd.tarjeta);
-            const txTransf = safe(pd.transferencia);
-            const txDolares = safe(pd.dolares);
-            const txCambio = safe(pd.cambio);
-            const txTasa = safe(pd.tasaDolarAlMomento) || 36.60;
-
-            if (txEfectivo > 0 || txTarjeta > 0 || txTransf > 0) {
-                efectivoTotal += Math.max(0, (txEfectivo + (txDolares * txTasa)) - txCambio);
-                tarjetaTotal += txTarjeta;
-                transferenciaTotal += txTransf;
-            } else {
-                efectivoTotal += Number(row.total_venta || 0);
-            }
-        });
+        const efectivoTotal = Number(paymentDistResult[0]?.total_efectivo || 0);
+        const transferenciaTotal = Number(paymentDistResult[0]?.total_transferencia || 0);
+        const tarjetaTotal = Number(paymentDistResult[0]?.total_tarjeta || 0);
 
         const payment_distribution = [
             { metodo: 'Efectivo', total: efectivoTotal },
@@ -1740,7 +1750,8 @@ const getBiMetrics = async (req, res) => {
                         GROUP BY dv_in.id_producto
                     ) AS sub_sales ON p.id_producto = sub_sales.id_producto
                     WHERE p.activo = 1
-                    ORDER BY unidades_vendidas DESC, p.existencia DESC;
+                    ORDER BY unidades_vendidas DESC, p.existencia DESC
+                    LIMIT 500;
                 `, stgParams);
                 abc_products = abcProductsResult.map(row => ({
                     id_producto: row.id_producto,

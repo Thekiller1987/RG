@@ -1,14 +1,12 @@
 // client/src/pages/pos/components/ProductPanel.jsx
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import styled from 'styled-components';
-import { FaStore, FaExclamationTriangle, FaTags, FaBarcode, FaFont, FaImage, FaEye, FaTimes } from 'react-icons/fa';
+import { FaStore, FaTags, FaBarcode, FaFont, FaImage, FaEye, FaTimes } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
-import { API_URL, fetchProductImage, getCachedImage, setCachedImage } from '../../../service/api';
+import { fetchProductImage, getCachedImage, setCachedImage } from '../../../service/api';
 import { rankItems } from '../../../utils/searchEngine';
+import { useAuth } from '../../../context/AuthContext';
 import * as S from '../POS.styles.jsx';
-
-const PRODUCTS_PER_PAGE = 100;
 
 const fmt = (n) =>
   Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -18,29 +16,30 @@ async function preloadImages(productIds, concurrency = 4) {
   const token = localStorage.getItem('token');
   const queue = productIds.filter(id => {
     const c = getCachedImage(id);
-    return !c || (c !== 'loading' && c !== 'none'); // Solo los que no estén cargados o en proceso
+    return !c || (c !== 'loading' && c !== 'none');
   });
 
   let i = 0;
   async function next() {
     if (i >= queue.length) return;
     const id = queue[i++];
-    if (getCachedImage(id)) return next(); // Ya en caché, saltar
+    if (getCachedImage(id)) return next();
     setCachedImage(id, 'loading');
     try {
       const data = await fetchProductImage(id, token);
       const img = data?.imagen || null;
       setCachedImage(id, img || 'none');
+      window.dispatchEvent(new CustomEvent(`pos_img_loaded_${id}`, { detail: img || 'none' }));
     } catch {
       setCachedImage(id, 'none');
+      window.dispatchEvent(new CustomEvent(`pos_img_loaded_${id}`, { detail: 'none' }));
     }
     return next();
   }
-  // Lanzar N workers concurrentes
   await Promise.all(Array.from({ length: concurrency }, next));
 }
 
-// Hook: carga la imagen cuando la tarjeta entra en el viewport
+// Hook: carga la imagen cuando la tarjeta entra en el viewport de forma reactiva y sin bugs
 function useLazyPOSImage(productId) {
   const [imgSrc, setImgSrc] = useState(() => {
     const cached = getCachedImage(productId);
@@ -52,7 +51,10 @@ function useLazyPOSImage(productId) {
     if (!productId) return;
     const cached = getCachedImage(productId);
     if (cached === 'loading' || cached === 'none') return;
-    if (cached && cached !== 'loading') { setImgSrc(cached); return; }
+    if (cached && cached !== 'loading') {
+      setImgSrc(cached);
+      return;
+    }
 
     setCachedImage(productId, 'loading');
     try {
@@ -60,39 +62,44 @@ function useLazyPOSImage(productId) {
       const data = await fetchProductImage(productId, token);
       const img = data?.imagen || null;
       setCachedImage(productId, img || 'none');
-      if (img) setImgSrc(img);
-      else setImgSrc(null); // Asegurar que se limpie si ahora no tiene imagen
+      setImgSrc(img || null);
+      window.dispatchEvent(new CustomEvent(`pos_img_loaded_${productId}`, { detail: img || 'none' }));
     } catch {
       setCachedImage(productId, 'none');
       setImgSrc(null);
+      window.dispatchEvent(new CustomEvent(`pos_img_loaded_${productId}`, { detail: 'none' }));
     }
   }, [productId]);
 
   useEffect(() => {
-    // Si ya está en caché, mostrar de inmediato
     const cached = getCachedImage(productId);
     if (cached && cached !== 'loading') {
-        setImgSrc(cached !== 'none' ? cached : null);
-        // Si ya está en caché, no necesitamos el observer ni el interval
-        return;
+      setImgSrc(cached !== 'none' ? cached : null);
+      return;
     }
 
-    // Escuchar cuando el caché se llena (para los pre-cargados)
-    const checkInterval = setInterval(() => {
-      const c = getCachedImage(productId);
-      if (c && c !== 'loading') {
-          setImgSrc(c !== 'none' ? c : null);
-          clearInterval(checkInterval);
-      }
-    }, 200);
+    const handleLoaded = (e) => {
+      const img = e.detail;
+      setImgSrc(img && img !== 'none' ? img : null);
+    };
 
-    // También usar IntersectionObserver como fallback
+    window.addEventListener(`pos_img_loaded_${productId}`, handleLoaded);
+
     const observer = new IntersectionObserver(
-      (entries) => { if (entries[0].isIntersecting) { fetchImage(); } },
-      { rootMargin: '200px' } // Cargar 200px antes de entrar a pantalla
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          fetchImage();
+        }
+      },
+      { rootMargin: '250px' }
     );
+
     if (cardRef.current) observer.observe(cardRef.current);
-    return () => { observer.disconnect(); clearInterval(checkInterval); };
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener(`pos_img_loaded_${productId}`, handleLoaded);
+    };
   }, [productId, fetchImage]);
 
   return { imgSrc, cardRef };
@@ -105,7 +112,16 @@ function LazyPOSImage({ productId, productName, onView }) {
     <div
       ref={cardRef}
       className="image-placeholder"
-      style={{ position: 'relative', height: 160, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f1f5f9', overflow: 'hidden' }}
+      style={{
+        position: 'relative',
+        height: 150,
+        background: '#f8fafc',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderBottom: '1px solid #f1f5f9',
+        overflow: 'hidden'
+      }}
     >
       {imgSrc && (
         <div
@@ -118,15 +134,20 @@ function LazyPOSImage({ productId, productName, onView }) {
             boxShadow: '0 4px 6px rgba(0,0,0,0.1)', cursor: 'pointer',
             transition: 'transform 0.2s',
           }}
-          title="Ver imagen"
+          title="Ver imagen ampliada"
         >
           <FaEye size={14} color="#64748b" />
         </div>
       )}
       {imgSrc ? (
-        <img src={imgSrc} alt={productName} loading="lazy" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+        <img
+          src={imgSrc}
+          alt={productName}
+          loading="lazy"
+          style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '6px' }}
+        />
       ) : (
-        <FaImage className="no-image-icon" size={40} color="#e2e8f0" />
+        <FaImage className="no-image-icon" size={38} color="#e2e8f0" />
       )}
     </div>
   );
@@ -172,7 +193,7 @@ const ImageViewModal = ({ isOpen, imageSrc, onClose }) => {
           style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: '12px', boxShadow: '0 20px 25px rgba(0,0,0,0.2)', background: 'white', objectFit: 'contain' }}
         />
       </motion.div>
-    </S.ModalOverlay >
+    </S.ModalOverlay>
   );
 };
 
@@ -186,28 +207,16 @@ export default function ProductPanel({
   inputRef,
   searchType = 'description',
   setSearchType = () => { },
-  isWholesale = false // NEW PROP
+  isWholesale = false
 }) {
+  const { globalReservations, user } = useAuth();
+  const currentUserId = user?.id_usuario || user?.id;
   const [viewImage, setViewImage] = useState({ isOpen: false, imageUrl: null });
 
-  // ... (keep existing logic unchanged until rendering) ...
-
-  // To avoid rewriting the entire file for just the render map, I will target the map function specifically if possible, 
-  // but since I'm in replace_file_content for a chunk, I have to be careful.
-  // Actually, let's just make the prop available and I'll do a second replace for the render logic if it's too far down.
-  // The user instruction says "Update ProductPanel to support isWholesale mode".
-  // I will do it in two steps or find a way to do it in one if the block is small enough.
-  // The map function is lines 154-218.
-  // The props are lines 57-67.
-  // They are far apart. I should use multi_replace.
-
-
-
-  // Calcular stock disponible
+  // Calcular items en el ticket actual
   const qtyInCart = useMemo(() => {
     const map = new Map();
     for (const it of cartItems) {
-      // Usar id_producto para normalización
       const id = it.id_producto || it.id;
       map.set(id, (map.get(id) || 0) + Number(it.quantity || 0));
     }
@@ -216,33 +225,27 @@ export default function ProductPanel({
 
   const filteredProducts = useMemo(() => {
     const isCodeSearch = searchType === 'code';
-    
-    // Usamos el nuevo motor de búsqueda rankItems
     const ranked = rankItems(products, searchTerm, ['nombre', 'codigo', 'descripcion'], {
-      strict: isCodeSearch // En modo código, usamos búsqueda estricta/exacta
+      strict: isCodeSearch
     });
-
-    return ranked.slice(0, 100); // Límite visual
+    return ranked.slice(0, 100);
   }, [products, searchTerm, searchType]);
 
-  // ★ PRE-CARGA INMEDIATA: carga TODOS los productos visibles (hasta 100) en paralelo
+  // Pre-carga inmediata de imágenes visibles
   useEffect(() => {
     const ids = filteredProducts.map(p => p.id_producto || p.id);
-    preloadImages(ids, 6); // 6 peticiones simultáneas para los visibles
+    preloadImages(ids, 6);
   }, [filteredProducts]);
 
-  // ★ PRECARGA GLOBAL EN SEGUNDO PLANO: carga TODO el catálogo silenciosamente
-  // para que cuando el usuario busque, las imágenes ya estén en caché.
+  // Precarga silenciosa en segundo plano del catálogo completo
   useEffect(() => {
     if (!products.length) return;
-    // Pequeño delay para no competir con los productos visibles
     const timer = setTimeout(() => {
       const allIds = products.map(p => p.id_producto || p.id);
-      preloadImages(allIds, 2); // Solo 2 en paralelo para no saturar el servidor
-    }, 1500); // Esperar 1.5s para que los visibles carguen primero
+      preloadImages(allIds, 2);
+    }, 1500);
     return () => clearTimeout(timer);
-  }, [products]); // Solo se dispara cuando cambia el catálogo
-
+  }, [products]);
 
   const totalResults = useMemo(() => {
     const term = (searchTerm || '').toLowerCase().trim();
@@ -260,7 +263,7 @@ export default function ProductPanel({
       <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem', alignItems: 'center' }}>
         <S.SearchInput
           ref={inputRef}
-          placeholder={searchType === 'code' ? "Escribe código..." : "Buscar producto..."}
+          placeholder={searchType === 'code' ? "Escribe código..." : "Buscar producto por nombre o código..."}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyDown={(e) => {
@@ -268,7 +271,6 @@ export default function ProductPanel({
               const term = (searchTerm || '').trim().toLowerCase();
               if (!term) return;
 
-              // 1. Exact Code Match (Highest Priority)
               const exactMatch = products.find(p =>
                 String(p.codigo || '').toLowerCase() === term ||
                 String(p.codigo_barras || '').toLowerCase() === term
@@ -280,7 +282,6 @@ export default function ProductPanel({
                 return;
               }
 
-              // 2. Single Filtered Result
               if (filteredProducts.length === 1) {
                 onProductClick(filteredProducts[0]);
                 setSearchTerm('');
@@ -306,86 +307,116 @@ export default function ProductPanel({
         </FilterButton>
       </div>
 
-      {/* Grid de Productos */}
+      {/* Grid de Productos Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', padding: '0 4px', fontSize: '0.85rem', color: '#64748b' }}>
         <span><FaStore color="#3b82f6" /> {filteredProducts.length} mostrados</span>
-        <span>Total: {totalResults}</span>
+        <span>Total: {totalResults} productos</span>
       </div>
 
+      {/* Grid sin AnimatePresence para evitar saltos y bloqueos de layout */}
       <S.ProductGrid>
-        <AnimatePresence>
-          {filteredProducts.map((p, index) => {
-            const pid = p.id_producto || p.id;
-            const enCarrito = qtyInCart.get(pid) || 0;
-            const enOtrosTickets = reservedStock?.get(pid) || 0;
-            const restante = Math.max(0, Number(p.existencia || 0) - enCarrito - enOtrosTickets);
-            const agotado = restante <= 0;
+        {filteredProducts.map((p) => {
+          const pid = p.id_producto || p.id;
+          const enCarrito = qtyInCart.get(pid) || 0;
+          const enOtrosTicketsLocales = reservedStock?.get(pid) || 0;
 
-            return (
-              <S.ProductCard
-                as={motion.div}
-                key={pid}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.15 }} // Una animación cortita y limpia
-                whileHover={!agotado ? { scale: 1.02, y: -4 } : {}}
-                whileTap={!agotado ? { scale: 0.96 } : {}}
-                onClick={() => !agotado && onProductClick(p)}
+          // Reservas de otros usuarios / terminales en tiempo real
+          const totalGlobalReservado = Number(globalReservations?.totalByProduct?.[pid] || 0);
+          const miGlobalReservado = Number(globalReservations?.userReservations?.[currentUserId]?.[pid] || 0);
+          const enOtrasCajas = Math.max(0, totalGlobalReservado - miGlobalReservado);
+
+          const totalComprometido = enCarrito + enOtrosTicketsLocales + enOtrasCajas;
+          const restante = Math.max(0, Number(p.existencia || 0) - totalComprometido);
+          const agotado = restante <= 0;
+
+          return (
+            <S.ProductCard
+              key={pid}
+              onClick={() => !agotado && onProductClick(p)}
+              outOfStock={agotado}
+              title={p.nombre}
+              style={{
+                cursor: agotado ? 'not-allowed' : 'pointer',
+                opacity: agotado ? 0.6 : 1,
+                transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease'
+              }}
+            >
+              <S.StockBadge
+                lowstock={restante < 5 && !agotado}
                 outOfStock={agotado}
-                title={p.nombre}
+                style={{
+                  background: agotado
+                    ? '#ef4444'
+                    : restante < 5
+                    ? '#f59e0b'
+                    : '#10b981'
+                }}
               >
-                <S.StockBadge lowstock={restante < 5 && !agotado} outOfStock={agotado}>
-                  {agotado ? 'Agotado' : `Stock: ${restante}`}
-                </S.StockBadge>
+                {agotado
+                  ? (enCarrito > 0 ? 'En Carrito' : enOtrasCajas > 0 ? 'En Otra Caja' : 'Agotado')
+                  : `Stock: ${restante}`}
+              </S.StockBadge>
 
-                <LazyPOSImage
-                  productId={pid}
-                  productName={p.nombre}
-                  onView={(imgSrc) => setViewImage({ isOpen: true, imageUrl: imgSrc })}
-                />
+              <LazyPOSImage
+                productId={pid}
+                productName={p.nombre}
+                onView={(imgSrc) => setViewImage({ isOpen: true, imageUrl: imgSrc })}
+              />
 
-                <div className="info" style={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div className="product-name" style={{
-                    fontWeight: 600, fontSize: '0.88rem', color: '#1e293b',
-                    lineHeight: '1.25', height: '3.8rem', overflow: 'hidden',
-                    display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical'
-                  }}>
-                    {p.nombre}
-                  </div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
-                    {p.codigo || 'S/C'}
-                  </div>
-
-                  {/* LOGICA DE PRECIOS ADAPTATIVA */}
-                  {isWholesale ? (
-                    // MODO MAYORISTA
-                    <>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px', textDecoration: 'line-through' }}>
-                        Tienda: C$ {fmt(p.precio_venta || p.precio)}
-                      </div>
-                      <div className="price" style={{ fontWeight: 800, color: '#8b5cf6', fontSize: '1.1rem' }}>
-                        C$ {fmt(p.mayorista || p.mayoreo || p.distribuidor || p.taller || p.precio_venta)}
-                      </div>
-                    </>
-                  ) : (
-                    // MODO NORMAL (Minoreo)
-                    <>
-                      {(Number(p.mayorista) > 0 || Number(p.mayoreo) > 0 || Number(p.distribuidor) > 0 || Number(p.taller) > 0) && (
-                        <div style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px' }}>
-                          <FaTags size={10} /> May: C$ {fmt(p.mayorista || p.mayoreo || p.distribuidor || p.taller)}
-                        </div>
-                      )}
-                      <div className="price" style={{ fontWeight: 800, color: '#2563eb', fontSize: '1.05rem', marginTop: !((Number(p.mayorista) > 0 || Number(p.mayoreo) > 0 || Number(p.distribuidor) > 0 || Number(p.taller) > 0)) ? 'auto' : 0 }}>
-                        C$ {fmt(p.precio_venta || p.precio)}
-                      </div>
-                    </>
-                  )}
+              <div className="info" style={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div
+                  className="product-name"
+                  style={{
+                    fontWeight: 600,
+                    fontSize: '0.88rem',
+                    color: '#1e293b',
+                    lineHeight: '1.25',
+                    height: '3.8rem',
+                    overflow: 'hidden',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical'
+                  }}
+                >
+                  {p.nombre}
                 </div>
-              </S.ProductCard>
-            );
-          })}
-        </AnimatePresence>
+                <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
+                  {p.codigo || 'S/C'}
+                </div>
+
+                {isWholesale ? (
+                  <>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px', textDecoration: 'line-through' }}>
+                      Tienda: C$ {fmt(p.precio_venta || p.precio)}
+                    </div>
+                    <div className="price" style={{ fontWeight: 800, color: '#8b5cf6', fontSize: '1.1rem' }}>
+                      C$ {fmt(p.mayorista || p.mayoreo || p.distribuidor || p.taller || p.precio_venta)}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {(Number(p.mayorista) > 0 || Number(p.mayoreo) > 0 || Number(p.distribuidor) > 0 || Number(p.taller) > 0) && (
+                      <div style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px' }}>
+                        <FaTags size={10} /> May: C$ {fmt(p.mayorista || p.mayoreo || p.distribuidor || p.taller)}
+                      </div>
+                    )}
+                    <div
+                      className="price"
+                      style={{
+                        fontWeight: 800,
+                        color: '#2563eb',
+                        fontSize: '1.05rem',
+                        marginTop: !((Number(p.mayorista) > 0 || Number(p.mayoreo) > 0 || Number(p.distribuidor) > 0 || Number(p.taller) > 0)) ? 'auto' : 0
+                      }}
+                    >
+                      C$ {fmt(p.precio_venta || p.precio)}
+                    </div>
+                  </>
+                )}
+              </div>
+            </S.ProductCard>
+          );
+        })}
       </S.ProductGrid>
 
       <AnimatePresence>

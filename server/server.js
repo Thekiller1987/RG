@@ -68,9 +68,9 @@ const corsOptions = {
 app.use(compression({ level: 6, threshold: 1024 })); // Solo comprimir si >1KB
 app.use(cors(corsOptions));
 
-// Evita 413: payload grande
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Evita 413: payload grande (10MB cubre imágenes base64 sin consumir RAM excesiva)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Servir archivos estáticos (Imágenes subidas)
 const path = require('path');
@@ -116,9 +116,10 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ message: err.message || 'Error interno del servidor' });
 });
 
-// 7. Configuración de Socket.IO
+// 7. Configuración de Socket.IO con Autenticación JWT y Sincronización en Tiempo Real
 const { Server } = require('socket.io');
 const http = require('http');
+const jwt = require('jsonwebtoken');
 
 // Crear servidor HTTP explícito para soportar Socket.IO + Express
 const httpServer = http.createServer(app);
@@ -127,14 +128,120 @@ const io = new Server(httpServer, {
   cors: corsOptions
 });
 
-io.on('connection', (socket) => {
-  console.log('Cliente conectado al socket:', socket.id);
+// Helper para calcular reservas activas en tiempo real
+async function calculateGlobalReservations() {
+  try {
+    const [cartRows] = await db.query(
+      "SELECT user_id, carts_json FROM active_carts WHERE updated_at > NOW() - INTERVAL 60 MINUTE"
+    );
+    const totalByProduct = {};
+    const userReservations = {};
+
+    (cartRows || []).forEach(c => {
+      const uId = c.user_id;
+      let items = c.carts_json;
+      if (typeof items === 'string') {
+        try { items = JSON.parse(items); } catch (e) { items = []; }
+      }
+      if (!Array.isArray(items)) items = [];
+
+      items.forEach(ticket => {
+        if (ticket.items && Array.isArray(ticket.items)) {
+          ticket.items.forEach(item => {
+            const pid = item.id_producto || item.id;
+            const qty = Number(item.quantity || item.cantidad || 0);
+            if (pid && qty > 0) {
+              totalByProduct[pid] = (totalByProduct[pid] || 0) + qty;
+              if (!userReservations[uId]) userReservations[uId] = {};
+              userReservations[uId][pid] = (userReservations[uId][pid] || 0) + qty;
+            }
+          });
+        }
+      });
+    });
+
+    return { totalByProduct, userReservations };
+  } catch (err) {
+    console.error('[calculateGlobalReservations] Error:', err.message);
+    return { totalByProduct: {}, userReservations: {} };
+  }
+}
+
+// Middleware de autenticación JWT en Socket.IO
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+  if (token) {
+    try {
+      const secret = process.env.JWT_SECRET || 'secret_key_reemplazo_seguro';
+      const decoded = jwt.verify(token, secret);
+      socket.user = decoded;
+    } catch (err) {
+      console.warn('⚠️ Socket auth token inválido o expirado:', err.message);
+      socket.user = null;
+    }
+  }
+  next();
+});
+
+io.on('connection', async (socket) => {
+  const userInfo = socket.user ? `(Usuario: ${socket.user.nombre_usuario || socket.user.id || 'N/A'})` : '(Sin JWT)';
+  console.log(`✅ Cliente conectado al socket: ${socket.id} ${userInfo}`);
+
+  // Enviar estado actual de reservas al conectar
+  try {
+    const reservations = await calculateGlobalReservations();
+    socket.emit('stock:reservations_update', reservations);
+  } catch (e) { }
+
+  // Evento: Sincronización de carrito en tiempo real
+  socket.on('cart:update', async (payload) => {
+    try {
+      const userId = payload?.userId || socket.user?.id_usuario || socket.user?.id;
+      const carts = payload?.carts;
+      if (userId && Array.isArray(carts)) {
+        const jsonStr = JSON.stringify(carts);
+        await db.query(`
+          INSERT INTO active_carts (user_id, carts_json) VALUES (?, ?)
+          ON DUPLICATE KEY UPDATE carts_json = VALUES(carts_json)
+        `, [userId, jsonStr]);
+
+        const resData = await calculateGlobalReservations();
+        io.emit('stock:reservations_update', { ...resData, updatedByUserId: userId });
+      }
+    } catch (err) {
+      console.error('[Socket cart:update] Error:', err.message);
+    }
+  });
+
+  // Evento: Liberar carrito / Ticket eliminado
+  socket.on('cart:release', async (payload) => {
+    try {
+      const userId = payload?.userId || socket.user?.id_usuario || socket.user?.id;
+      if (userId) {
+        if (payload?.carts) {
+          const jsonStr = JSON.stringify(payload.carts);
+          await db.query(`
+            INSERT INTO active_carts (user_id, carts_json) VALUES (?, ?)
+            ON DUPLICATE KEY UPDATE carts_json = VALUES(carts_json)
+          `, [userId, jsonStr]);
+        } else {
+          await db.query('DELETE FROM active_carts WHERE user_id = ?', [userId]);
+        }
+        const resData = await calculateGlobalReservations();
+        io.emit('stock:reservations_update', { ...resData, updatedByUserId: userId });
+      }
+    } catch (err) {
+      console.error('[Socket cart:release] Error:', err.message);
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log('Cliente desconectado:', socket.id);
   });
 });
 
 app.set('io', io);
+app.set('calculateGlobalReservations', calculateGlobalReservations);
 
 // 8. Iniciar Servidor
 // Importante: Usamos httpServer.listen en lugar de app.listen para que WS funcione
