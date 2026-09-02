@@ -2,9 +2,22 @@ const db = require('../config/db.js');
 
 /* ===================== PROCESS OUTFLOW (TRASLADO/SALIDA) ===================== */
 const processOutflow = async (req, res) => {
-    const { motivo, items, tipo = 'SALIDA', id_cliente = null, cliente_nombre = null } = req.body;
+    const { motivo, items, tipo = 'SALIDA', id_cliente = null, cliente_nombre = null, usuario_nombre } = req.body;
     const userId = req.user?.id_usuario || req.user?.id;
-    const userName = req.user?.nombre_usuario || req.user?.nombre || 'Admin';
+
+    // Obtener el nombre real del usuario autenticado
+    let userName = usuario_nombre || req.user?.nombre_usuario || req.user?.nombre;
+    if ((!userName || userName.toLowerCase() === 'admin') && userId) {
+        try {
+            const [uRows] = await db.query('SELECT nombre_usuario, nombre_completo, nombre FROM usuarios WHERE id_usuario = ?', [userId]);
+            if (uRows.length > 0) {
+                userName = uRows[0].nombre_completo || uRows[0].nombre || uRows[0].nombre_usuario;
+            }
+        } catch (e) {
+            console.error('Error fetching user name for outflow:', e);
+        }
+    }
+    userName = userName || 'Usuario';
 
     if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ msg: 'El carrito está vacío.' });

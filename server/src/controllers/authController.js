@@ -62,6 +62,8 @@ const login = async (req, res) => {
     const payload = {
       id: user.id_usuario,
       rol: user.rol,
+      nombre_usuario: user.nombre_usuario,
+      nombre: user.nombre_completo || user.nombre || user.nombre_usuario
     };
 
     const token = jwt.sign(payload, process.env.JWT_SECRET || 'secret_key_reemplazo_seguro', {

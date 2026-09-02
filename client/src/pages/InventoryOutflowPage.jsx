@@ -983,12 +983,14 @@ const InventoryOutflowPage = () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem('token');
+      const operatorName = user?.nombre || user?.nombre_usuario || user?.nombre_completo || 'Usuario';
       const res = await api.createOutflow({
         motivo: reason,
         items: cart,
         tipo: outflowType,
         id_cliente: selectedClient?.id_cliente,
-        cliente_nombre: selectedClient?.nombre
+        cliente_nombre: selectedClient?.nombre,
+        usuario_nombre: operatorName
       }, token);
 
       setCart([]);
@@ -1053,6 +1055,15 @@ const InventoryOutflowPage = () => {
             <FaTruck style={{ color: '#ef4444' }} /> Traslados y Salidas
             <span className="badge">Inventario</span>
           </PageTitle>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: '#ffffff', padding: '6px 14px', borderRadius: '20px',
+            border: '1px solid #e2e8f0', fontSize: '0.84rem', color: '#475569',
+            boxShadow: '0 2px 5px rgba(0,0,0,0.03)'
+          }}>
+            <FaUser size={12} color="#3b82f6" />
+            <span>Operador: <strong style={{ color: '#0f172a' }}>{user?.nombre || user?.nombre_usuario || 'Usuario'}</strong></span>
+          </div>
         </NavLeft>
         <NavRight>
           <HeaderBtn onClick={() => refreshProducts()} title="Sincronizar Catálogo">

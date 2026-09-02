@@ -96,9 +96,16 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
     const resolveLogoUrl = (url) => {
         if (!url) return null;
-        if (url.startsWith('http') || url.startsWith('data:')) return url;
-        const base = (import.meta.env.VITE_API_URL || 'https://sistema.multirepuestosrg.com/api').replace(/\/api$/, '');
-        return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+        if (url.startsWith('data:')) return url;
+        let finalUrl = url;
+        if (!finalUrl.startsWith('http')) {
+            const base = (import.meta.env.VITE_API_URL || 'https://sistema.multirepuestosrg.com/api').replace(/\/api$/, '');
+            finalUrl = `${base}${finalUrl.startsWith('/') ? '' : '/'}${finalUrl}`;
+        }
+        if (!finalUrl.includes('?t=')) {
+            finalUrl += (finalUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`;
+        }
+        return finalUrl;
     };
 
     // Sync from settings context when opening
@@ -108,7 +115,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 ...prev,
                 ...settings
             }));
-            // If settings contains a logo URL, set it
             if (settings.empresa_logo_url) {
                 setLogoPreview(resolveLogoUrl(settings.empresa_logo_url));
             }
@@ -142,14 +148,22 @@ const SettingsModal = ({ isOpen, onClose }) => {
         setUploadingLogo(true);
         try {
             const logoUrl = await settingsApi.uploadLogo(token, file);
-            setLogoPreview(resolveLogoUrl(logoUrl));
-            setFormData(prev => ({ ...prev, empresa_logo_url: logoUrl }));
-            toast.success('Logo subido correctamente');
+            const resolved = resolveLogoUrl(logoUrl);
+            setLogoPreview(resolved);
+
+            // Auto-guardar en la BD para que persista de inmediato
+            const updated = { ...formData, empresa_logo_url: logoUrl };
+            setFormData(updated);
+            await settingsApi.updateSettings(token, updated);
+            await refreshSettings();
+
+            toast.success('Logo subido y guardado correctamente');
         } catch (error) {
-            console.error(error);
+            console.error('Error al subir el logo:', error);
             toast.error('Error al subir el logo');
         } finally {
             setUploadingLogo(false);
+            if (e.target) e.target.value = null;
         }
     };
 
@@ -205,7 +219,15 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                         justifyContent: 'center', background: '#f8fafc', overflow: 'hidden'
                                     }}>
                                         {logoPreview ? (
-                                            <img src={logoPreview} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                            <img
+                                                key={logoPreview}
+                                                src={logoPreview}
+                                                alt="Logo"
+                                                onError={(e) => {
+                                                    console.warn("No se pudo cargar la vista previa del logo:", logoPreview);
+                                                }}
+                                                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                            />
                                         ) : (
                                             <small style={{ color: '#94a3b8' }}>Sin Logo</small>
                                         )}
@@ -214,6 +236,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                         <input
                                             type="file"
                                             accept="image/*"
+                                            onClick={(e) => { e.target.value = null; }}
                                             onChange={handleLogoUpload}
                                             id="logo-upload"
                                             style={{ display: 'none' }}

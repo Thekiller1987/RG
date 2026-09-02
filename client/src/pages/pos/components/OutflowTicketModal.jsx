@@ -160,8 +160,6 @@ const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
   // Resolver URL absoluta del logo del backend
   const logoUrl = React.useMemo(() => {
     if (!settings?.empresa_logo_url) return null;
-    if (settings.empresa_logo_url.startsWith('http')) return settings.empresa_logo_url;
-    
     let cleanUrl = settings.empresa_logo_url;
     if (cleanUrl.startsWith('/uploads')) {
       cleanUrl = '/api' + cleanUrl;
@@ -170,7 +168,11 @@ const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
     }
 
     const base = (import.meta.env.VITE_API_URL || 'https://sistema.multirepuestosrg.com/api').replace(/\/api$/, '');
-    return `${base}${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`;
+    let finalUrl = cleanUrl.startsWith('http') ? cleanUrl : `${base}${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`;
+    if (!finalUrl.includes('?t=')) {
+      finalUrl += (finalUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`;
+    }
+    return finalUrl;
   }, [settings?.empresa_logo_url]);
 
   const companyInfo = {
@@ -364,25 +366,25 @@ const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
 
               <PrintWrapper id="print-wrapper-outflow">
                 <div className="brand">
-                  <TicketLogo src={companyInfo.logo} alt="Logo" onError={(e) => e.currentTarget.style.display = 'none'} />
+                  <TicketLogo src={companyInfo.logo} alt="Logo" onError={(e) => { e.currentTarget.src = '/icons/logo.png'; }} />
 
                   <div className="brand-info">
                     <h1>{companyInfo.name}</h1>
                     <small>{companyInfo.slogan}</small>
                     <small>RUC: {companyInfo.ruc}</small>
                     <small>{companyInfo.address}</small>
-                    <div className="tag">{transaction.isQuote ? 'COTIZACIÓN' : 'COMPROBANTE DE SALIDA'}</div>
+                    <div className="tag">{transaction.isQuote ? 'COTIZACIÓN' : 'COMPROBANTE DE TRASLADO / SALIDA'}</div>
                   </div>
                 </div>
 
                 <div className="meta">
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '4px' }}>
                     <p><span className="meta-label">Fecha:</span> <span className="meta-value">{new Date(transaction.fecha).toLocaleString()}</span></p>
-                    <p><span className="meta-label">{transaction.isQuote ? 'N° Cotización:' : 'N° Comprobante:'}</span> <span className="meta-value">{transaction.id}</span></p>
+                    <p><span className="meta-label">{transaction.isQuote ? 'N° Cotización:' : 'N° Traslado:'}</span> <span className="meta-value">{transaction.id}</span></p>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '4px' }}>
-                    <p><span className="meta-label">{transaction.isQuote ? 'Cliente:' : 'Motivo/Ref:'}</span> <span className="meta-value">{transaction.clienteNombre?.replace('MOTIVO: ', '') || transaction.motivo}</span></p>
-                    <p><span className="meta-label">{transaction.isQuote ? 'Cotizado por:' : 'Autorizado por:'}</span> <span className="meta-value">{transaction.usuarioNombre}</span></p>
+                    <p><span className="meta-label">{transaction.isQuote ? 'Cliente:' : 'Motivo/Destino:'}</span> <span className="meta-value">{transaction.clienteNombre?.replace('MOTIVO: ', '') || transaction.motivo}</span></p>
+                    <p><span className="meta-label">{transaction.isQuote ? 'Cotizado por:' : 'Trasladado por:'}</span> <span className="meta-value" style={{ fontWeight: 700, color: '#0f172a' }}>{transaction.usuarioNombre || transaction.usuario_nombre || 'Personal'}</span></p>
                   </div>
                 </div>
 
@@ -437,11 +439,13 @@ const OutflowTicketModal = ({ isOpen, onClose, transaction }) => {
                   <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '30px' }}>
                     <div style={{ textAlign: 'center' }}>
                       <p>__________________________</p>
-                      <p>Entregado Por</p>
+                      <p style={{ margin: 0, fontWeight: 700 }}>{transaction.usuarioNombre || transaction.usuario_nombre || 'Personal'}</p>
+                      <small style={{ color: '#64748b' }}>Entregado Por (Emisor)</small>
                     </div>
                     <div style={{ textAlign: 'center' }}>
                       <p>__________________________</p>
-                      <p>Recibido Por</p>
+                      <p style={{ margin: 0, fontWeight: 700 }}>Firma / Sello</p>
+                      <small style={{ color: '#64748b' }}>Recibido Por (Destino)</small>
                     </div>
                   </div>
                   <p style={{ marginTop: '20px', whiteSpace: 'pre-line' }}>
