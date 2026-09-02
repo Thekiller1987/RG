@@ -275,10 +275,12 @@ const ProductGrid = styled.div`
 const ProductCard = styled.div`
   background: #ffffff;
   border: 1px solid ${props => props.$outOfStock ? '#fecaca' : '#e2e8f0'};
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  height: 225px;
+  min-height: 225px;
   position: relative;
   cursor: ${props => props.$outOfStock ? 'not-allowed' : 'pointer'};
   opacity: ${props => props.$outOfStock ? 0.6 : 1};
@@ -315,7 +317,10 @@ const StockBadge = styled.div`
 `;
 
 const ImageArea = styled.div`
-  height: 120px;
+  height: 125px;
+  min-height: 125px;
+  max-height: 125px;
+  flex-shrink: 0;
   background: #f8fafc;
   display: flex;
   align-items: center;
