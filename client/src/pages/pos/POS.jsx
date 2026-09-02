@@ -39,6 +39,22 @@ const POS = () => {
   const currentUser = user;
   const isAdmin = user?.rol === 'admin';
 
+  // Calculate Reserved Stock from other open tickets
+  const reservedStock = useMemo(() => {
+    const reserved = new Map();
+    orders.forEach(order => {
+      // Skip the current active order to avoid double counting (ProductPanel handles current cart)
+      if (order.id === activeOrder?.id) return;
+
+      order.items.forEach(item => {
+        const pid = item.id_producto || item.id;
+        const qty = Number(item.cantidad || item.quantity || 0);
+        reserved.set(pid, (reserved.get(pid) || 0) + qty);
+      });
+    });
+    return reserved;
+  }, [orders, activeOrder]);
+
   // Helper para calcular stock máximo disponible considerando otros tickets locales y otras cajas
   const getProductMaxAvailable = useCallback((productId, rawStock) => {
     const localOtherTickets = reservedStock?.get(productId) || 0;
@@ -609,22 +625,6 @@ const POS = () => {
     updateActiveCart(newCart);
     closeModal();
   };
-
-  // Calculate Reserved Stock from other open tickets
-  const reservedStock = useMemo(() => {
-    const reserved = new Map();
-    orders.forEach(order => {
-      // Skip the current active order to avoid double counting (ProductPanel handles current cart)
-      if (order.id === activeOrder?.id) return;
-
-      order.items.forEach(item => {
-        const pid = item.id_producto || item.id;
-        const qty = Number(item.cantidad || item.quantity || 0);
-        reserved.set(pid, (reserved.get(pid) || 0) + qty);
-      });
-    });
-    return reserved;
-  }, [orders, activeOrder]);
 
   // Handler for global wholesale price toggle
   const toggleWholesalePrice = () => {

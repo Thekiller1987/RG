@@ -59,6 +59,24 @@ export const HeaderActions = styled.header`
   }
 `;
 
+export const Header = HeaderActions;
+
+export const ActionButton = styled.button`
+  display: flex; align-items: center; justify-content: center;
+  gap: 6px; padding: 0.5rem 0.85rem; border-radius: 8px;
+  border: 1px solid #e2e8f0; background: white; color: #475569;
+  font-weight: 600; font-size: 0.88rem; cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover { background: #f8fafc; border-color: #cbd5e1; }
+`;
+
+export const CloseCartBtn = styled.button`
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; font-size: 1.25rem;
+  color: #64748b; cursor: pointer; padding: 4px;
+`;
+
 export const PageContentWrapper = styled.div`
   display: flex;
   flex: 1;
