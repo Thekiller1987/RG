@@ -36,17 +36,23 @@ export const AuthProvider = ({ children, socket }) => {
         navigate('/login');
     }, [navigate]);
 
-    const loadMasterData = useCallback(async (token, isBackground = false) => {
+    const isMasterDataLoading = useRef(false);
+
+    const loadMasterData = useCallback(async (tokenToUse, isBackground = false) => {
+        if (isMasterDataLoading.current) return;
+        isMasterDataLoading.current = true;
         try {
-            // Obtener el rol del usuario (desde el estado o desde localStorage si es necesario)
+            const currentToken = tokenToUse || localStorage.getItem('token');
+            if (!currentToken) return;
+
             const storedUser = localStorage.getItem('user');
-            const currentUser = user || (storedUser ? JSON.parse(storedUser) : null);
-            const userRole = (currentUser?.rol || '').trim();
+            const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+            const userRole = (parsedUser?.rol || '').trim();
 
             // Si no es en background, valida el token (solo al hacer login)
             if (!isBackground) {
                 try {
-                    await api.fetchMe(token);
+                    await api.fetchMe(currentToken);
                 } catch (authErr) {
                     if (authErr.status === 401) {
                         console.error("🚫 Fallo en fetchMe (Validación inicial). Redirigiendo al login...");
@@ -57,11 +63,11 @@ export const AuthProvider = ({ children, socket }) => {
             }
 
             const results = await Promise.allSettled([
-                userRole === 'Administrador' ? api.fetchUsers(token) : Promise.resolve(null),
-                api.fetchProducts(token),
-                api.fetchClients(token),
-                api.fetchCategories(token),
-                api.fetchProviders(token),
+                userRole === 'Administrador' ? api.fetchUsers(currentToken) : Promise.resolve(null),
+                api.fetchProducts(currentToken),
+                api.fetchClients(currentToken),
+                api.fetchCategories(currentToken),
+                api.fetchProviders(currentToken),
             ]);
 
             const newUsers = results[0].status === 'fulfilled' ? (results[0].value || []) : null;
@@ -71,22 +77,17 @@ export const AuthProvider = ({ children, socket }) => {
             const newProviders = results[4].status === 'fulfilled' ? (results[4].value || []) : null;
 
             if (newUsers) setAllUsers(newUsers);
-            if (newProducts) {
-                setProducts(newProducts);
-                // Cache productos: para que la próxima carga sea instantánea
-                try { localStorage.setItem('cache_products', JSON.stringify(newProducts)); } catch (e) { }
-            }
-            if (newClients) {
-                setClients(newClients);
-                try { localStorage.setItem('cache_clients', JSON.stringify(newClients)); } catch (e) { }
-            }
+            if (newProducts) setProducts(newProducts);
+            if (newClients) setClients(newClients);
             if (newCategories) setCategories(newCategories);
             if (newProviders) setProviders(newProviders);
 
         } catch (err) {
-            console.error("Error de Red cargando datos maestros (Esperando reintento):", err);
+            console.error("Error cargando datos maestros:", err);
+        } finally {
+            isMasterDataLoading.current = false;
         }
-    }, [logout, user]);
+    }, [logout]);
 
     const refreshProducts = useCallback(async () => {
         if (!token) return;
@@ -184,13 +185,17 @@ export const AuthProvider = ({ children, socket }) => {
         };
     }, [socket, refreshProductsDebounced, refreshClients]);
 
+    const hasInitializedRef = useRef(false);
+
     useEffect(() => {
+        if (hasInitializedRef.current) return;
+        hasInitializedRef.current = true;
+
         const initializeAuth = async () => {
             api.setUnauthorizedHandler(() => {
                 logout('Su sesión ha expirado o es inválida. Por favor, ingrese de nuevo.');
             });
 
-            setIsLoading(true);
             try {
                 const tokenInStorage = localStorage.getItem('token');
                 const storedUser = localStorage.getItem('user');
@@ -199,15 +204,8 @@ export const AuthProvider = ({ children, socket }) => {
                         const parsedUser = JSON.parse(storedUser);
                         setUser(parsedUser);
                         setToken(tokenInStorage);
-
-                        const cachedProducts = localStorage.getItem('cache_products');
-                        const cachedClients = localStorage.getItem('cache_clients');
-                        if (cachedProducts) setProducts(JSON.parse(cachedProducts));
-                        if (cachedClients) setClients(JSON.parse(cachedClients));
-
                         setIsLoading(false);
                         loadMasterData(tokenInStorage, true);
-
                     } catch (error) {
                         setIsLoading(false);
                     }
@@ -219,17 +217,16 @@ export const AuthProvider = ({ children, socket }) => {
             }
         };
         initializeAuth();
-    }, [logout, loadMasterData]);
+    }, []);
 
     const login = async (userData, token) => {
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);
         setToken(token);
-        setIsLoading(true);
-        await loadMasterData(token);
         setIsLoading(false);
         navigate('/dashboard');
+        loadMasterData(token, true);
     };
 
     useEffect(() => {

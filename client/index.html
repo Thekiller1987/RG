@@ -15,6 +15,21 @@
   <link rel="apple-touch-icon" href="/icons/icon-512x512.png" />
 
   <title>MultirepuestosRG</title>
+  <script>
+    // KILL SWITCH: Desregistrar cualquier Service Worker y limpiar caches viejos corruptos
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let r of registrations) {
+          r.unregister();
+        }
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (let name of names) caches.delete(name);
+      });
+    }
+  </script>
   <!-- Google Fonts: League Spartan + Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

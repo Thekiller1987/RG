@@ -66,7 +66,7 @@ const corsOptions = {
 // 3. Configurar Middlewares
 // ★ Compresión gzip/brotli: Reduce JSON de productos de ~2MB a ~250KB
 app.use(compression({ level: 6, threshold: 1024 })); // Solo comprimir si >1KB
-app.use(cors(corsOptions));
+app.use(cors({ origin: true, credentials: true }));
 
 // Evita 413: payload grande (10MB cubre imágenes base64 sin consumir RAM excesiva)
 app.use(express.json({ limit: '10mb' }));

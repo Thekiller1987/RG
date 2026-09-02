@@ -1,0 +1,32 @@
+# Dependencias
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Entornos y variables secretas
+.env
+.env.*
+!.env.example
+.env.save
+
+# Credenciales y archivos sensibles
+contraseña droplet*
+contrasena_droplet*
+*contraseña*
+*password*
+*.pem
+*.key
+
+# Builds y temporales
+client/dist/
+dist/
+build/
+.DS_Store
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Archivos de depuración y temporales
+Nuevo Documento de texto.txt
+scratch/
