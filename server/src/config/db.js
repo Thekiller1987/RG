@@ -10,8 +10,8 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD || 'AppSegura_2025!',
   database: process.env.DB_DATABASE || 'multirepuestosrg',
   waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 50, // Limitar cola para evitar acumulación de queries en memoria
+  connectionLimit: 30,
+  queueLimit: 0, // Sin límite de cola para evitar Queue limit reached bajo concurrencia
 });
 
 // Test rápido de conexión
