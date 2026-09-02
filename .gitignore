@@ -12,6 +12,8 @@ server/node_modules/
 # Credenciales y archivos sensibles
 contraseña droplet*
 contrasena_droplet*
+CONEXION_DROPLET*
+conexion_droplet*
 *contraseña*
 *password*
 *.pem

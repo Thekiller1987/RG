@@ -499,6 +499,7 @@ const FacturasProveedores = () => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showPayModal, setShowPayModal] = useState(false);
     const [showEditPayModal, setShowEditPayModal] = useState(false); // NUEVO
+    const [showEditInvoiceModal, setShowEditInvoiceModal] = useState(false); // NUEVO: Modal Editar Factura
     const [showConfirmDelete, setShowConfirmDelete] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [showGlobalHistory, setShowGlobalHistory] = useState(false);
@@ -510,10 +511,15 @@ const FacturasProveedores = () => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [selectedAbono, setSelectedAbono] = useState(null); // NUEVO
 
-    // Adjuntos
+    // Adjuntos de comprobante de pago
     const [attachmentFile, setAttachmentFile] = useState(null);
     const [attachmentProcessing, setAttachmentProcessing] = useState(false);
     const [attachmentData, setAttachmentData] = useState({ base64: null, name: null });
+
+    // Adjuntos de Factura Escaneada
+    const [facturaFile, setFacturaFile] = useState(null);
+    const [facturaProcessing, setFacturaProcessing] = useState(false);
+    const [facturaData, setFacturaData] = useState({ base64: null, name: null });
 
     // Formularios
     const [formData, setFormData] = useState({
@@ -526,6 +532,16 @@ const FacturasProveedores = () => {
         tipo_compra: 'CREDITO',
         metodo_pago: 'EFECTIVO',
         referencia: ''
+    });
+
+    const [editInvoiceData, setEditInvoiceData] = useState({
+        proveedor: '',
+        numero_factura: '',
+        fecha_emision: getTodayManaguaISO(),
+        fecha_vencimiento: '',
+        monto_total: '',
+        notas: '',
+        tipo_compra: 'CREDITO'
     });
 
     const [payData, setPayData] = useState({ amount: '', reference: '', method: 'EFECTIVO' });
@@ -610,6 +626,25 @@ const FacturasProveedores = () => {
             setAttachmentData({ base64: null, name: null });
         } finally {
             setAttachmentProcessing(false);
+        }
+    };
+
+    const handleFacturaFileSelection = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setFacturaProcessing(true);
+        setFacturaFile(file);
+        try {
+            const processed = await processFileAsPdf(file);
+            setFacturaData(processed);
+        } catch (err) {
+            console.error(err);
+            showAlert("Archivo inválido", err.message || "No se pudo procesar el archivo.", "error");
+            setFacturaFile(null);
+            setFacturaData({ base64: null, name: null });
+        } finally {
+            setFacturaProcessing(false);
         }
     };
 
@@ -760,7 +795,9 @@ const FacturasProveedores = () => {
             await api.createProviderInvoice({
                 ...formData,
                 comprobante_base64: attachmentData.base64,
-                comprobante_name: attachmentData.name
+                comprobante_name: attachmentData.name,
+                factura_base64: facturaData.base64,
+                factura_name: facturaData.name
             }, token);
             
             setRefreshTrigger(prev => prev + 1);
@@ -774,9 +811,49 @@ const FacturasProveedores = () => {
             });
             setAttachmentFile(null);
             setAttachmentData({ base64: null, name: null });
+            setFacturaFile(null);
+            setFacturaData({ base64: null, name: null });
             showAlert("Guardado", "La factura ha sido registrada exitosamente.", "success");
         } catch (error) {
             showAlert("Error", "Error al guardar factura.", "error");
+        }
+    };
+
+    // --- EDITAR FACTURA ---
+    const openEditInvoiceModal = (invoice) => {
+        setSelectedInvoice(invoice);
+        setEditInvoiceData({
+            proveedor: invoice.proveedor || '',
+            numero_factura: invoice.numero_factura || '',
+            fecha_emision: invoice.fecha_emision ? invoice.fecha_emision.split('T')[0] : getTodayManaguaISO(),
+            fecha_vencimiento: invoice.fecha_vencimiento ? invoice.fecha_vencimiento.split('T')[0] : '',
+            monto_total: invoice.monto_total || '',
+            notas: invoice.notas || '',
+            tipo_compra: invoice.tipo_compra || 'CREDITO'
+        });
+        setFacturaFile(null);
+        setFacturaData({ base64: null, name: null });
+        setShowEditInvoiceModal(true);
+    };
+
+    const handleUpdateInvoice = async (e) => {
+        e.preventDefault();
+        if (!selectedInvoice) return;
+        if (!editInvoiceData.proveedor) return showAlert("Falta Proveedor", "Seleccione un proveedor.", "warning");
+
+        try {
+            await api.updateProviderInvoice(selectedInvoice.id, {
+                ...editInvoiceData,
+                factura_base64: facturaData.base64,
+                factura_name: facturaData.name
+            }, token);
+
+            setRefreshTrigger(prev => prev + 1);
+            setShowEditInvoiceModal(false);
+            showAlert("Factura Actualizada", "Los datos de la factura se actualizaron correctamente.", "success");
+        } catch (error) {
+            console.error(error);
+            showAlert("Error", "No se pudo actualizar la factura.", "error");
         }
     };
 
@@ -1320,16 +1397,34 @@ const FacturasProveedores = () => {
                                             </div>
                                         </div>
 
-                                        <div className="card-footer" style={{ flexWrap: 'wrap' }}>
+                                        <div className="card-footer" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
                                             {saldo > 0 && (
-                                                <Button $primary style={{ flex: 1, justifyContent: 'center' }} onClick={() => openPayModal(inv)}>
+                                                <Button $primary style={{ flex: 1, minWidth: '100px', justifyContent: 'center' }} onClick={() => openPayModal(inv)}>
                                                     <FaMoneyBillWave /> Abonar
                                                 </Button>
                                             )}
-                                            <Button $secondary style={{ flex: 1, justifyContent: 'center' }} onClick={() => openHistoryModal(inv)}>
+                                            <Button $secondary style={{ flex: 1, minWidth: '100px', justifyContent: 'center' }} onClick={() => openHistoryModal(inv)}>
                                                 <FaList /> Historial
                                             </Button>
-                                            <Button $danger style={{ padding: '0.75rem' }} onClick={() => { setSelectedInvoice(inv); setShowConfirmDelete(true); }}>
+                                            <Button 
+                                                $secondary 
+                                                title="Editar datos de la factura" 
+                                                style={{ padding: '0.75rem', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }} 
+                                                onClick={() => openEditInvoiceModal(inv)}
+                                            >
+                                                <FaEdit />
+                                            </Button>
+                                            {inv.factura_url && (
+                                                <Button 
+                                                    $secondary 
+                                                    title="Ver Factura Escaneada / Archivo" 
+                                                    style={{ padding: '0.75rem', background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }} 
+                                                    onClick={() => window.open(resolveFileUrl(inv.factura_url), '_blank')}
+                                                >
+                                                    <FaFilePdf />
+                                                </Button>
+                                            )}
+                                            <Button $danger style={{ padding: '0.75rem' }} onClick={() => { setSelectedInvoice(inv); setShowConfirmDelete(true); }} title="Eliminar factura">
                                                 <FaTrashAlt />
                                             </Button>
                                         </div>
@@ -1605,13 +1700,120 @@ const FacturasProveedores = () => {
                             )}
 
                             <FormGroup>
-                                <label>Notas (Opcional)</label>
-                                <textarea rows="3" value={formData.notes} onChange={e => setFormData({ ...formData, notas: e.target.value })} placeholder="Detalles extra..."></textarea>
+                                <label>Factura Escaneada (Foto o PDF de la Factura)</label>
+                                <FileUploadContainer>
+                                    <FaFilePdf className="upload-icon" style={{ color: '#ef4444' }} />
+                                    {facturaFile ? (
+                                        <div className="file-details">
+                                            {facturaProcessing ? "Procesando archivo..." : `✓ Factura Cargada: ${facturaData.name}`}
+                                        </div>
+                                    ) : (
+                                        <div className="file-details">Haz clic para subir foto o PDF de la factura</div>
+                                    )}
+                                    <input type="file" accept="image/*,application/pdf" onChange={handleFacturaFileSelection} disabled={facturaProcessing} />
+                                </FileUploadContainer>
                             </FormGroup>
 
-                            <Button $primary type="submit" disabled={attachmentProcessing} style={{ width: '100%', padding: '1rem', fontSize: '1rem' }}>
+                            <FormGroup>
+                                <label>Notas (Opcional)</label>
+                                <textarea rows="3" value={formData.notas} onChange={e => setFormData({ ...formData, notas: e.target.value })} placeholder="Detalles extra..."></textarea>
+                            </FormGroup>
+
+                            <Button $primary type="submit" disabled={attachmentProcessing || facturaProcessing} style={{ width: '100%', padding: '1rem', fontSize: '1rem' }}>
                                 <FaCheckCircle /> Guardar Factura
                             </Button>
+                        </form>
+                    </ModalContent>
+                </ModalOverlay>
+            )}
+
+            {/* --- MODAL EDITAR FACTURA --- */}
+            {showEditInvoiceModal && (
+                <ModalOverlay onClick={() => setShowEditInvoiceModal(false)}>
+                    <ModalContent onClick={e => e.stopPropagation()}>
+                        <CloseButton onClick={() => setShowEditInvoiceModal(false)}><FaTimes /></CloseButton>
+                        <h2>Editar Factura</h2>
+                        <form onSubmit={handleUpdateInvoice}>
+                            <FormGroup>
+                                <label>Proveedor</label>
+                                <select
+                                    required
+                                    value={editInvoiceData.proveedor}
+                                    onChange={e => setEditInvoiceData({ ...editInvoiceData, proveedor: e.target.value })}
+                                >
+                                    <option value="">Seleccione un proveedor...</option>
+                                    {providers.map(p => (
+                                        <option key={p.id_proveedor || p.id} value={p.nombre}>
+                                            {p.nombre}
+                                        </option>
+                                    ))}
+                                </select>
+                            </FormGroup>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <FormGroup>
+                                    <label>No. Factura</label>
+                                    <input required type="text" value={editInvoiceData.numero_factura} onChange={e => setEditInvoiceData({ ...editInvoiceData, numero_factura: e.target.value })} />
+                                </FormGroup>
+                                <FormGroup>
+                                    <label>Monto Total (C$)</label>
+                                    <input required type="number" step="0.01" value={editInvoiceData.monto_total} onChange={e => setEditInvoiceData({ ...editInvoiceData, monto_total: e.target.value })} />
+                                </FormGroup>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <FormGroup>
+                                    <label>Fecha Emisión</label>
+                                    <input required type="date" value={editInvoiceData.fecha_emision} onChange={e => setEditInvoiceData({ ...editInvoiceData, fecha_emision: e.target.value })} />
+                                </FormGroup>
+                                <FormGroup>
+                                    <label>Fecha Vencimiento</label>
+                                    <input required type="date" value={editInvoiceData.fecha_vencimiento} onChange={e => setEditInvoiceData({ ...editInvoiceData, fecha_vencimiento: e.target.value })} />
+                                </FormGroup>
+                            </div>
+                            <FormGroup>
+                                <label>Tipo de Compra</label>
+                                <select required value={editInvoiceData.tipo_compra} onChange={e => setEditInvoiceData({ ...editInvoiceData, tipo_compra: e.target.value })}>
+                                    <option value="CREDITO">A Crédito</option>
+                                    <option value="CONTADO">De Contado</option>
+                                </select>
+                            </FormGroup>
+
+                            <FormGroup>
+                                <label>Reemplazar Factura Escaneada (Foto o PDF)</label>
+                                <FileUploadContainer>
+                                    <FaFilePdf className="upload-icon" style={{ color: '#ef4444' }} />
+                                    {facturaFile ? (
+                                        <div className="file-details">
+                                            {facturaProcessing ? "Procesando archivo..." : `✓ Nueva Factura: ${facturaData.name}`}
+                                        </div>
+                                    ) : (
+                                        <div className="file-details">
+                                            {selectedInvoice?.factura_url ? "Factura actual guardada. Haz clic para reemplazarla." : "Haz clic para subir foto o PDF de la factura"}
+                                        </div>
+                                    )}
+                                    <input type="file" accept="image/*,application/pdf" onChange={handleFacturaFileSelection} disabled={facturaProcessing} />
+                                </FileUploadContainer>
+                                {selectedInvoice?.factura_url && !facturaFile && (
+                                    <div style={{ marginTop: '0.5rem', textAlign: 'right' }}>
+                                        <a href={resolveFileUrl(selectedInvoice.factura_url)} target="_blank" rel="noreferrer" style={{ fontSize: '0.85rem', color: '#2563eb', fontWeight: 600, textDecoration: 'none' }}>
+                                            📄 Ver factura actual
+                                        </a>
+                                    </div>
+                                )}
+                            </FormGroup>
+
+                            <FormGroup>
+                                <label>Notas</label>
+                                <textarea rows="3" value={editInvoiceData.notas} onChange={e => setEditInvoiceData({ ...editInvoiceData, notas: e.target.value })} placeholder="Detalles extra..."></textarea>
+                            </FormGroup>
+
+                            <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                <Button $secondary type="button" onClick={() => setShowEditInvoiceModal(false)} style={{ flex: 1, padding: '0.85rem' }}>
+                                    Cancelar
+                                </Button>
+                                <Button $primary type="submit" disabled={facturaProcessing} style={{ flex: 1, padding: '0.85rem' }}>
+                                    <FaCheckCircle /> Guardar Cambios
+                                </Button>
+                            </div>
                         </form>
                     </ModalContent>
                 </ModalOverlay>

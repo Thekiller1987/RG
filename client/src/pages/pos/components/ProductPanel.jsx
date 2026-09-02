@@ -105,9 +105,15 @@ function useLazyPOSImage(productId) {
   return { imgSrc, cardRef };
 }
 
-// Componente de imagen lazy para el POS
+// Componente de imagen lazy para el POS con transición suave
 function LazyPOSImage({ productId, productName, onView }) {
   const { imgSrc, cardRef } = useLazyPOSImage(productId);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    setLoaded(false);
+  }, [imgSrc]);
+
   return (
     <div
       ref={cardRef}
@@ -144,14 +150,58 @@ function LazyPOSImage({ productId, productName, onView }) {
           src={imgSrc}
           alt={productName}
           loading="lazy"
-          style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '6px' }}
+          onLoad={() => setLoaded(true)}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            padding: '6px',
+            opacity: loaded ? 1 : 0,
+            transition: 'opacity 0.2s ease-in-out'
+          }}
         />
       ) : (
-        <FaImage className="no-image-icon" size={38} color="#e2e8f0" />
+        <FaImage className="no-image-icon" size={38} color="#cbd5e1" style={{ opacity: 0.5 }} />
       )}
     </div>
   );
 }
+
+const ShimmerGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+  width: 100%;
+`;
+
+const ShimmerItem = styled.div`
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  height: 240px;
+  position: relative;
+  overflow: hidden;
+
+  &::after {
+    position: absolute;
+    top: 0; right: 0; bottom: 0; left: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+      90deg,
+      rgba(241, 245, 249, 0) 0,
+      rgba(241, 245, 249, 0.8) 50%,
+      rgba(241, 245, 249, 0) 100%
+    );
+    animation: shimmerAnim 1.4s infinite;
+    content: '';
+  }
+
+  @keyframes shimmerAnim {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+`;
 
 const FilterButton = styled.button`
   display: flex; align-items: center; justify-content: center;
@@ -313,111 +363,124 @@ export default function ProductPanel({
         <span>Total: {totalResults} productos</span>
       </div>
 
-      {/* Grid sin AnimatePresence para evitar saltos y bloqueos de layout */}
-      <S.ProductGrid>
-        {filteredProducts.map((p) => {
-          const pid = p.id_producto || p.id;
-          const enCarrito = qtyInCart.get(pid) || 0;
-          const enOtrosTicketsLocales = reservedStock?.get(pid) || 0;
+      {products.length === 0 ? (
+        <ShimmerGrid>
+          {Array.from({ length: 12 }).map((_, idx) => (
+            <ShimmerItem key={idx} />
+          ))}
+        </ShimmerGrid>
+      ) : filteredProducts.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3.5rem', color: '#94a3b8', background: 'white', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
+          <FaStore style={{ fontSize: '2.5rem', marginBottom: '0.75rem', opacity: 0.3 }} />
+          <h4 style={{ color: '#64748b', margin: '0 0 0.25rem 0' }}>No se encontraron productos</h4>
+          <p style={{ margin: 0, fontSize: '0.9rem' }}>Prueba con otro término de búsqueda o código.</p>
+        </div>
+      ) : (
+        <S.ProductGrid>
+          {filteredProducts.map((p) => {
+            const pid = p.id_producto || p.id;
+            const enCarrito = qtyInCart.get(pid) || 0;
+            const enOtrosTicketsLocales = reservedStock?.get(pid) || 0;
 
-          // Reservas de otros usuarios / terminales en tiempo real
-          const totalGlobalReservado = Number(globalReservations?.totalByProduct?.[pid] || 0);
-          const miGlobalReservado = Number(globalReservations?.userReservations?.[currentUserId]?.[pid] || 0);
-          const enOtrasCajas = Math.max(0, totalGlobalReservado - miGlobalReservado);
+            // Reservas de otros usuarios / terminales en tiempo real
+            const totalGlobalReservado = Number(globalReservations?.totalByProduct?.[pid] || 0);
+            const miGlobalReservado = Number(globalReservations?.userReservations?.[currentUserId]?.[pid] || 0);
+            const enOtrasCajas = Math.max(0, totalGlobalReservado - miGlobalReservado);
 
-          const totalComprometido = enCarrito + enOtrosTicketsLocales + enOtrasCajas;
-          const restante = Math.max(0, Number(p.existencia || 0) - totalComprometido);
-          const agotado = restante <= 0;
+            const totalComprometido = enCarrito + enOtrosTicketsLocales + enOtrasCajas;
+            const restante = Math.max(0, Number(p.existencia || 0) - totalComprometido);
+            const agotado = restante <= 0;
 
-          return (
-            <S.ProductCard
-              key={pid}
-              onClick={() => !agotado && onProductClick(p)}
-              outOfStock={agotado}
-              title={p.nombre}
-              style={{
-                cursor: agotado ? 'not-allowed' : 'pointer',
-                opacity: agotado ? 0.6 : 1,
-                transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease'
-              }}
-            >
-              <S.StockBadge
-                lowstock={restante < 5 && !agotado}
+            return (
+              <S.ProductCard
+                key={pid}
+                onClick={() => !agotado && onProductClick(p)}
                 outOfStock={agotado}
+                title={p.nombre}
                 style={{
-                  background: agotado
-                    ? '#ef4444'
-                    : restante < 5
-                    ? '#f59e0b'
-                    : '#10b981'
+                  cursor: agotado ? 'not-allowed' : 'pointer',
+                  opacity: agotado ? 0.6 : 1,
+                  transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease'
                 }}
               >
-                {agotado
-                  ? (enCarrito > 0 ? 'En Carrito' : enOtrasCajas > 0 ? 'En Otra Caja' : 'Agotado')
-                  : `Stock: ${restante}`}
-              </S.StockBadge>
-
-              <LazyPOSImage
-                productId={pid}
-                productName={p.nombre}
-                onView={(imgSrc) => setViewImage({ isOpen: true, imageUrl: imgSrc })}
-              />
-
-              <div className="info" style={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div
-                  className="product-name"
+                <S.StockBadge
+                  lowstock={restante < 5 && !agotado}
+                  outOfStock={agotado}
                   style={{
-                    fontWeight: 600,
-                    fontSize: '0.88rem',
-                    color: '#1e293b',
-                    lineHeight: '1.25',
-                    height: '3.8rem',
-                    overflow: 'hidden',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 3,
-                    WebkitBoxOrient: 'vertical'
+                    background: agotado
+                      ? '#ef4444'
+                      : restante < 5
+                      ? '#f59e0b'
+                      : '#10b981'
                   }}
                 >
-                  {p.nombre}
-                </div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
-                  {p.codigo || 'S/C'}
-                </div>
+                  {agotado
+                    ? (enCarrito > 0 ? 'En Carrito' : enOtrasCajas > 0 ? 'En Otra Caja' : 'Agotado')
+                    : `Stock: ${restante}`}
+                </S.StockBadge>
 
-                {isWholesale ? (
-                  <>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px', textDecoration: 'line-through' }}>
-                      Tienda: C$ {fmt(p.precio_venta || p.precio)}
-                    </div>
-                    <div className="price" style={{ fontWeight: 800, color: '#8b5cf6', fontSize: '1.1rem' }}>
-                      C$ {fmt(p.mayorista || p.mayoreo || p.distribuidor || p.taller || p.precio_venta)}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {(Number(p.mayorista) > 0 || Number(p.mayoreo) > 0 || Number(p.distribuidor) > 0 || Number(p.taller) > 0) && (
-                      <div style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px' }}>
-                        <FaTags size={10} /> May: C$ {fmt(p.mayorista || p.mayoreo || p.distribuidor || p.taller)}
+                <LazyPOSImage
+                  productId={pid}
+                  productName={p.nombre}
+                  onView={(imgSrc) => setViewImage({ isOpen: true, imageUrl: imgSrc })}
+                />
+
+                <div className="info" style={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div
+                    className="product-name"
+                    style={{
+                      fontWeight: 600,
+                      fontSize: '0.88rem',
+                      color: '#1e293b',
+                      lineHeight: '1.25',
+                      height: '3.8rem',
+                      overflow: 'hidden',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical'
+                    }}
+                  >
+                    {p.nombre}
+                  </div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
+                    {p.codigo || 'S/C'}
+                  </div>
+
+                  {isWholesale ? (
+                    <>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px', textDecoration: 'line-through' }}>
+                        Tienda: C$ {fmt(p.precio_venta || p.precio)}
                       </div>
-                    )}
-                    <div
-                      className="price"
-                      style={{
-                        fontWeight: 800,
-                        color: '#2563eb',
-                        fontSize: '1.05rem',
-                        marginTop: !((Number(p.mayorista) > 0 || Number(p.mayoreo) > 0 || Number(p.distribuidor) > 0 || Number(p.taller) > 0)) ? 'auto' : 0
-                      }}
-                    >
-                      C$ {fmt(p.precio_venta || p.precio)}
-                    </div>
-                  </>
-                )}
-              </div>
+                      <div className="price" style={{ fontWeight: 800, color: '#8b5cf6', fontSize: '1.1rem' }}>
+                        C$ {fmt(p.mayorista || p.mayoreo || p.distribuidor || p.taller || p.precio_venta)}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {(Number(p.mayorista) > 0 || Number(p.mayoreo) > 0 || Number(p.distribuidor) > 0 || Number(p.taller) > 0) && (
+                        <div style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', marginBottom: '1px' }}>
+                          <FaTags size={10} /> May: C$ {fmt(p.mayorista || p.mayoreo || p.distribuidor || p.taller)}
+                        </div>
+                      )}
+                      <div
+                        className="price"
+                        style={{
+                          fontWeight: 800,
+                          color: '#2563eb',
+                          fontSize: '1.05rem',
+                          marginTop: !((Number(p.mayorista) > 0 || Number(p.mayoreo) > 0 || Number(p.distribuidor) > 0 || Number(p.taller) > 0)) ? 'auto' : 0
+                        }}
+                      >
+                        C$ {fmt(p.precio_venta || p.precio)}
+                      </div>
+                    </>
+                  )}
+                </div>
             </S.ProductCard>
           );
         })}
       </S.ProductGrid>
+      )}
 
       <AnimatePresence>
         {viewImage.isOpen && (

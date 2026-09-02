@@ -30,6 +30,42 @@
         for (let name of names) caches.delete(name);
       });
     }
+
+    // AUTO-VERSION CHECKER: Detecta actualizaciones automáticamente sin que el usuario presione F5
+    (function() {
+      let lastChecked = 0;
+      async function checkVersion() {
+        const now = Date.now();
+        if (now - lastChecked < 45000) return; // Máximo una verificación cada 45 segundos
+        lastChecked = now;
+
+        try {
+          const response = await fetch('/?_v=' + now, { cache: 'no-store' });
+          if (!response.ok) return;
+          const html = await response.text();
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          
+          const currentScript = document.querySelector('script[src*="/assets/index-"]')?.getAttribute('src');
+          const newScript = doc.querySelector('script[src*="/assets/index-"]')?.getAttribute('src');
+
+          if (currentScript && newScript && currentScript !== newScript) {
+            console.log('🔄 Nueva versión detectada:', newScript, '. Actualizando sistema...');
+            window.location.reload();
+          }
+        } catch (e) {
+          // Ignorar silenciosamente si está offline
+        }
+      }
+
+      document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+          checkVersion();
+        }
+      });
+      window.addEventListener('focus', checkVersion);
+      setInterval(checkVersion, 300000); // Chequeo periódico cada 5 minutos
+    })();
   </script>
   <!-- Google Fonts: League Spartan + Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">

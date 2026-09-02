@@ -8,6 +8,7 @@ router.post('/', controller.createInvoice);
 router.delete('/abonos/:abonoId', controller.deletePayment); // Eliminar abono individual (ANTES de /:id)
 router.put('/abonos/:abonoId', controller.updatePayment); // Editar abono individual (ANTES de /:id)
 router.post('/:id/pagar', controller.registerPayment);
+router.put('/:id', controller.updateInvoice);
 router.get('/:id/abonos', controller.getInvoicePayments);
 router.delete('/:id', controller.deleteInvoice);
 

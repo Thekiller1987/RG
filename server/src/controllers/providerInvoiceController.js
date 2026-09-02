@@ -2,11 +2,11 @@ const db = require('../config/db');
 const fs = require('fs');
 const path = require('path');
 
-// Ensure upload directory exists
+// Ensure upload directories exist
 const uploadDir = path.join(__dirname, '../../public/uploads/comprobantes');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
+const facturasDir = path.join(__dirname, '../../public/uploads/facturas');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+if (!fs.existsSync(facturasDir)) fs.mkdirSync(facturasDir, { recursive: true });
 
 // Helpers for files
 const saveComprobante = (base64Data, filename) => {
@@ -43,6 +43,41 @@ const deleteComprobanteFile = (url) => {
     }
 };
 
+// Helpers para Facturas Escaneadas
+const saveFacturaEscaneada = (base64Data, filename) => {
+    if (!base64Data) return null;
+    try {
+        const cleanBase64 = base64Data.replace(/^data:[a-zA-Z0-9\/\-\+\.]+;base64,/, "");
+        const buffer = Buffer.from(cleanBase64, 'base64');
+        
+        const safeName = (filename || 'factura_escaneada.pdf').replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+        const finalName = `factura_${Date.now()}_${safeName}`;
+        const filePath = path.join(facturasDir, finalName);
+        
+        fs.writeFileSync(filePath, buffer);
+        return `/api/uploads/facturas/${finalName}`;
+    } catch (e) {
+        console.error('Error saving factura file:', e);
+        return null;
+    }
+};
+
+const deleteFacturaFile = (url) => {
+    if (!url) return;
+    try {
+        const parts = url.split('/uploads/facturas/');
+        if (parts.length === 2) {
+            const fileName = parts[1];
+            const filePath = path.join(facturasDir, fileName);
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        }
+    } catch (err) {
+        console.error('Error deleting factura file:', err);
+    }
+};
+
 // AUTO-MIGRACIÓN
 (async () => {
     try {
@@ -59,6 +94,7 @@ const deleteComprobanteFile = (url) => {
                 estado VARCHAR(50) DEFAULT 'PENDIENTE',
                 tipo_compra ENUM('CONTADO', 'CREDITO') DEFAULT 'CREDITO',
                 metodo_pago VARCHAR(50) DEFAULT NULL,
+                factura_url TEXT DEFAULT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
@@ -77,6 +113,7 @@ const deleteComprobanteFile = (url) => {
 
         try { await db.query("ALTER TABLE facturas_proveedores ADD COLUMN tipo_compra ENUM('CONTADO', 'CREDITO') DEFAULT 'CREDITO'"); } catch (e) {}
         try { await db.query("ALTER TABLE facturas_proveedores ADD COLUMN metodo_pago VARCHAR(50) DEFAULT NULL"); } catch (e) {}
+        try { await db.query("ALTER TABLE facturas_proveedores ADD COLUMN factura_url TEXT DEFAULT NULL"); } catch (e) {}
         try { await db.query("ALTER TABLE abonos_proveedores ADD COLUMN comprobante_url TEXT DEFAULT NULL"); } catch (e) {}
     } catch (error) {
         console.error('Error migrando facturas_proveedores/abonos_proveedores:', error);
@@ -115,19 +152,21 @@ exports.createInvoice = async (req, res) => {
   const {
     proveedor, numero_factura, fecha_emision, fecha_vencimiento,
     monto_total, notas, tipo_compra, metodo_pago, referencia,
-    comprobante_base64, comprobante_name
+    comprobante_base64, comprobante_name,
+    factura_base64, factura_name
   } = req.body;
 
   try {
     const isContado = tipo_compra === 'CONTADO';
     const estado = isContado ? 'PAGADA' : 'PENDIENTE';
     const monto_abonado = isContado ? monto_total : 0;
+    const facturaUrl = saveFacturaEscaneada(factura_base64, factura_name);
 
     const [result] = await db.query(
       `INSERT INTO facturas_proveedores 
-      (proveedor, numero_factura, fecha_emision, fecha_vencimiento, monto_total, notas, estado, tipo_compra, metodo_pago, monto_abonado) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [proveedor, numero_factura, fecha_emision, fecha_vencimiento, monto_total, notas, estado, tipo_compra || 'CREDITO', isContado ? metodo_pago : null, monto_abonado]
+      (proveedor, numero_factura, fecha_emision, fecha_vencimiento, monto_total, notas, estado, tipo_compra, metodo_pago, monto_abonado, factura_url) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [proveedor, numero_factura, fecha_emision, fecha_vencimiento, monto_total, notas, estado, tipo_compra || 'CREDITO', isContado ? metodo_pago : null, monto_abonado, facturaUrl]
     );
 
     const newInvoiceId = result.insertId;
@@ -140,10 +179,73 @@ exports.createInvoice = async (req, res) => {
       );
     }
 
-    res.status(201).json({ id: newInvoiceId, message: 'Factura creada exitosamente' });
+    res.status(201).json({ id: newInvoiceId, factura_url: facturaUrl, message: 'Factura creada exitosamente' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error al crear factura' });
+  }
+};
+
+// Editar factura completa
+exports.updateInvoice = async (req, res) => {
+  const { id } = req.params;
+  const {
+    proveedor, numero_factura, fecha_emision, fecha_vencimiento,
+    monto_total, notas, tipo_compra,
+    factura_base64, factura_name
+  } = req.body;
+
+  try {
+    const [invoices] = await db.query('SELECT * FROM facturas_proveedores WHERE id = ?', [id]);
+    if (invoices.length === 0) return res.status(404).json({ message: 'Factura no encontrada' });
+
+    const inv = invoices[0];
+    let facturaUrl = inv.factura_url;
+
+    if (factura_base64) {
+      deleteFacturaFile(inv.factura_url);
+      facturaUrl = saveFacturaEscaneada(factura_base64, factura_name);
+    }
+
+    const totalNum = Number(monto_total !== undefined ? monto_total : inv.monto_total);
+    const abonadoNum = Number(inv.monto_abonado || 0);
+    const nuevoEstado = abonadoNum >= totalNum ? 'PAGADA' : (inv.estado === 'PAGADA' && abonadoNum < totalNum ? 'PENDIENTE' : inv.estado);
+
+    await db.query(
+      `UPDATE facturas_proveedores SET 
+        proveedor = ?, 
+        numero_factura = ?, 
+        fecha_emision = ?, 
+        fecha_vencimiento = ?, 
+        monto_total = ?, 
+        notas = ?, 
+        tipo_compra = ?, 
+        factura_url = ?, 
+        estado = ? 
+      WHERE id = ?`,
+      [
+        proveedor ?? inv.proveedor,
+        numero_factura ?? inv.numero_factura,
+        fecha_emision ?? inv.fecha_emision,
+        fecha_vencimiento ?? inv.fecha_vencimiento,
+        totalNum,
+        notas !== undefined ? notas : inv.notas,
+        tipo_compra ?? inv.tipo_compra,
+        facturaUrl,
+        nuevoEstado,
+        id
+      ]
+    );
+
+    res.json({
+      message: 'Factura actualizada exitosamente',
+      id,
+      factura_url: facturaUrl,
+      estado: nuevoEstado
+    });
+  } catch (error) {
+    console.error('Error al actualizar factura:', error);
+    res.status(500).json({ message: 'Error al actualizar factura' });
   }
 };
 
@@ -263,6 +365,12 @@ exports.deleteInvoice = async (req, res) => {
     const [abonos] = await db.query('SELECT * FROM abonos_proveedores WHERE id_factura = ?', [id]);
     for (const abono of abonos) {
         deleteComprobanteFile(abono.comprobante_url);
+    }
+
+    // Borrado de archivo de factura escaneada
+    const [invoices] = await db.query('SELECT factura_url FROM facturas_proveedores WHERE id = ?', [id]);
+    if (invoices.length > 0) {
+        deleteFacturaFile(invoices[0].factura_url);
     }
     
     // Borrado en cascada en BD
