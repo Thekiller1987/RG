@@ -2,83 +2,24 @@ const db = require('../config/db');
 const fs = require('fs');
 const path = require('path');
 
-// Ensure upload directories exist
-const uploadDir = path.join(__dirname, '../../public/uploads/comprobantes');
-const facturasDir = path.join(__dirname, '../../public/uploads/facturas');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-if (!fs.existsSync(facturasDir)) fs.mkdirSync(facturasDir, { recursive: true });
-
-// Helpers for files
-const saveComprobante = (base64Data, filename) => {
-    if (!base64Data) return null;
+// Helper para limpiar archivos físicos antiguos (compatibilidad con registros previos a Base64)
+const cleanLegacyDiskFile = (url) => {
+    if (!url || typeof url !== 'string' || !url.includes('/uploads/')) return;
     try {
-        const cleanBase64 = base64Data.replace(/^data:[a-zA-Z0-9\/\-\+\.]+;base64,/, "");
-        const buffer = Buffer.from(cleanBase64, 'base64');
-        
-        const safeName = (filename || 'comprobante.pdf').replace(/[^a-z0-9.]/gi, '_').toLowerCase();
-        const finalName = `comprobante_${Date.now()}_${safeName}`;
-        const filePath = path.join(uploadDir, finalName);
-        
-        fs.writeFileSync(filePath, buffer);
-        return `/api/uploads/comprobantes/${finalName}`;
-    } catch (e) {
-        console.error('Error saving file:', e);
-        return null;
-    }
-};
-
-const deleteComprobanteFile = (url) => {
-    if (!url) return;
-    try {
-        const parts = url.split('/uploads/comprobantes/');
+        const parts = url.split('/uploads/');
         if (parts.length === 2) {
-            const fileName = parts[1];
-            const filePath = path.join(uploadDir, fileName);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
+            const relPath = parts[1];
+            const fullPath = path.join(__dirname, '../../public/uploads', relPath);
+            if (fs.existsSync(fullPath)) {
+                fs.unlinkSync(fullPath);
             }
         }
     } catch (err) {
-        console.error('Error deleting file:', err);
+        console.warn('Advertencia limpiando archivo antiguo en disco:', err);
     }
 };
 
-// Helpers para Facturas Escaneadas
-const saveFacturaEscaneada = (base64Data, filename) => {
-    if (!base64Data) return null;
-    try {
-        const cleanBase64 = base64Data.replace(/^data:[a-zA-Z0-9\/\-\+\.]+;base64,/, "");
-        const buffer = Buffer.from(cleanBase64, 'base64');
-        
-        const safeName = (filename || 'factura_escaneada.pdf').replace(/[^a-z0-9.]/gi, '_').toLowerCase();
-        const finalName = `factura_${Date.now()}_${safeName}`;
-        const filePath = path.join(facturasDir, finalName);
-        
-        fs.writeFileSync(filePath, buffer);
-        return `/api/uploads/facturas/${finalName}`;
-    } catch (e) {
-        console.error('Error saving factura file:', e);
-        return null;
-    }
-};
-
-const deleteFacturaFile = (url) => {
-    if (!url) return;
-    try {
-        const parts = url.split('/uploads/facturas/');
-        if (parts.length === 2) {
-            const fileName = parts[1];
-            const filePath = path.join(facturasDir, fileName);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-            }
-        }
-    } catch (err) {
-        console.error('Error deleting factura file:', err);
-    }
-};
-
-// AUTO-MIGRACIÓN
+// AUTO-MIGRACIÓN PARA GUARDAR BASE64 EN BD (LONGTEXT)
 (async () => {
     try {
         await db.query(`
@@ -94,7 +35,7 @@ const deleteFacturaFile = (url) => {
                 estado VARCHAR(50) DEFAULT 'PENDIENTE',
                 tipo_compra ENUM('CONTADO', 'CREDITO') DEFAULT 'CREDITO',
                 metodo_pago VARCHAR(50) DEFAULT NULL,
-                factura_url TEXT DEFAULT NULL,
+                factura_url LONGTEXT DEFAULT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
@@ -107,16 +48,21 @@ const deleteFacturaFile = (url) => {
                 metodo_pago VARCHAR(50) NOT NULL,
                 referencia VARCHAR(255),
                 fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+                comprobante_url LONGTEXT DEFAULT NULL,
                 FOREIGN KEY(id_factura) REFERENCES facturas_proveedores(id) ON DELETE CASCADE
             )
         `);
 
         try { await db.query("ALTER TABLE facturas_proveedores ADD COLUMN tipo_compra ENUM('CONTADO', 'CREDITO') DEFAULT 'CREDITO'"); } catch (e) {}
         try { await db.query("ALTER TABLE facturas_proveedores ADD COLUMN metodo_pago VARCHAR(50) DEFAULT NULL"); } catch (e) {}
-        try { await db.query("ALTER TABLE facturas_proveedores ADD COLUMN factura_url TEXT DEFAULT NULL"); } catch (e) {}
-        try { await db.query("ALTER TABLE abonos_proveedores ADD COLUMN comprobante_url TEXT DEFAULT NULL"); } catch (e) {}
+        try { await db.query("ALTER TABLE facturas_proveedores ADD COLUMN factura_url LONGTEXT DEFAULT NULL"); } catch (e) {}
+        try { await db.query("ALTER TABLE abonos_proveedores ADD COLUMN comprobante_url LONGTEXT DEFAULT NULL"); } catch (e) {}
+
+        // Asegurar que las columnas sean LONGTEXT para almacenar Base64 sin límite de 64KB
+        try { await db.query("ALTER TABLE facturas_proveedores MODIFY COLUMN factura_url LONGTEXT DEFAULT NULL"); } catch (e) {}
+        try { await db.query("ALTER TABLE abonos_proveedores MODIFY COLUMN comprobante_url LONGTEXT DEFAULT NULL"); } catch (e) {}
     } catch (error) {
-        console.error('Error migrando facturas_proveedores/abonos_proveedores:', error);
+        console.error('Error migrando facturas_proveedores/abonos_proveedores a LONGTEXT:', error);
     }
 })();
 
@@ -160,22 +106,26 @@ exports.createInvoice = async (req, res) => {
     const isContado = tipo_compra === 'CONTADO';
     const estado = isContado ? 'PAGADA' : 'PENDIENTE';
     const monto_abonado = isContado ? monto_total : 0;
-    const facturaUrl = saveFacturaEscaneada(factura_base64, factura_name);
+    const finalVencimiento = (isContado && !fecha_vencimiento) ? fecha_emision : (fecha_vencimiento || fecha_emision);
+    const finalMetodoPago = isContado ? (metodo_pago || 'EFECTIVO') : (metodo_pago || null);
+    
+    // Guardar directamente Base64 en la base de datos MySQL (LONGTEXT)
+    const facturaUrl = factura_base64 || null;
 
     const [result] = await db.query(
       `INSERT INTO facturas_proveedores 
       (proveedor, numero_factura, fecha_emision, fecha_vencimiento, monto_total, notas, estado, tipo_compra, metodo_pago, monto_abonado, factura_url) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [proveedor, numero_factura, fecha_emision, fecha_vencimiento, monto_total, notas, estado, tipo_compra || 'CREDITO', isContado ? metodo_pago : null, monto_abonado, facturaUrl]
+      [proveedor, numero_factura, fecha_emision, finalVencimiento, monto_total, notas, estado, tipo_compra || 'CREDITO', finalMetodoPago, monto_abonado, facturaUrl]
     );
 
     const newInvoiceId = result.insertId;
 
     if (isContado) {
-      const comprobanteUrl = saveComprobante(comprobante_base64, comprobante_name);
+      const comprobanteUrl = comprobante_base64 || null;
       await db.query(
         `INSERT INTO abonos_proveedores (id_factura, monto, metodo_pago, referencia, comprobante_url) VALUES (?, ?, ?, ?, ?)`,
-        [newInvoiceId, monto_total, metodo_pago || 'EFECTIVO', referencia || 'Pago de Contado', comprobanteUrl]
+        [newInvoiceId, monto_total, finalMetodoPago, referencia || 'Pago de Contado', comprobanteUrl]
       );
     }
 
@@ -191,7 +141,7 @@ exports.updateInvoice = async (req, res) => {
   const { id } = req.params;
   const {
     proveedor, numero_factura, fecha_emision, fecha_vencimiento,
-    monto_total, notas, tipo_compra,
+    monto_total, notas, tipo_compra, metodo_pago,
     factura_base64, factura_name
   } = req.body;
 
@@ -203,12 +153,19 @@ exports.updateInvoice = async (req, res) => {
     let facturaUrl = inv.factura_url;
 
     if (factura_base64) {
-      deleteFacturaFile(inv.factura_url);
-      facturaUrl = saveFacturaEscaneada(factura_base64, factura_name);
+      cleanLegacyDiskFile(inv.factura_url);
+      facturaUrl = factura_base64;
     }
 
     const totalNum = Number(monto_total !== undefined ? monto_total : inv.monto_total);
-    const abonadoNum = Number(inv.monto_abonado || 0);
+    const tipoCompraFinal = tipo_compra ?? inv.tipo_compra;
+    const metodoPagoFinal = metodo_pago !== undefined ? metodo_pago : inv.metodo_pago;
+
+    let abonadoNum = Number(inv.monto_abonado || 0);
+    if (tipoCompraFinal === 'CONTADO' && abonadoNum < totalNum) {
+      abonadoNum = totalNum;
+    }
+
     const nuevoEstado = abonadoNum >= totalNum ? 'PAGADA' : (inv.estado === 'PAGADA' && abonadoNum < totalNum ? 'PENDIENTE' : inv.estado);
 
     await db.query(
@@ -220,6 +177,8 @@ exports.updateInvoice = async (req, res) => {
         monto_total = ?, 
         notas = ?, 
         tipo_compra = ?, 
+        metodo_pago = ?,
+        monto_abonado = ?,
         factura_url = ?, 
         estado = ? 
       WHERE id = ?`,
@@ -230,12 +189,25 @@ exports.updateInvoice = async (req, res) => {
         fecha_vencimiento ?? inv.fecha_vencimiento,
         totalNum,
         notas !== undefined ? notas : inv.notas,
-        tipo_compra ?? inv.tipo_compra,
+        tipoCompraFinal,
+        metodoPagoFinal,
+        abonadoNum,
         facturaUrl,
         nuevoEstado,
         id
       ]
     );
+
+    if (metodoPagoFinal) {
+      try {
+        await db.query(
+          'UPDATE abonos_proveedores SET metodo_pago = ? WHERE id_factura = ? ORDER BY id ASC LIMIT 1',
+          [metodoPagoFinal, id]
+        );
+      } catch (err) {
+        console.warn('Error actualizando abono relacionado:', err);
+      }
+    }
 
     res.json({
       message: 'Factura actualizada exitosamente',
@@ -278,8 +250,8 @@ exports.registerPayment = async (req, res) => {
       [nuevoAbonado, nuevoEstado, id]
     );
 
-    // 4. Registrar Abono en Historial
-    const comprobanteUrl = saveComprobante(comprobante_base64, comprobante_name);
+    // 4. Registrar Abono en Historial (Base64 guardado en MySQL)
+    const comprobanteUrl = comprobante_base64 || null;
     await db.query(
       `INSERT INTO abonos_proveedores (id_factura, monto, metodo_pago, referencia, comprobante_url) VALUES (?, ?, ?, ?, ?)`,
       [id, amount, method || 'EFECTIVO', reference || 'Abono', comprobanteUrl]
@@ -323,13 +295,11 @@ exports.updatePayment = async (req, res) => {
       [nuevoAbonado, nuevoEstado, id_factura]
     );
 
-    // 3. Procesar comprobante
+    // 3. Procesar comprobante Base64 en MySQL
     let comprobanteUrl = oldUrl;
     if (comprobante_base64) {
-      // Eliminar el anterior
-      deleteComprobanteFile(oldUrl);
-      // Guardar el nuevo
-      comprobanteUrl = saveComprobante(comprobante_base64, comprobante_name);
+      cleanLegacyDiskFile(oldUrl);
+      comprobanteUrl = comprobante_base64;
     }
 
     // 4. Actualizar el abono
@@ -361,16 +331,15 @@ exports.getInvoicePayments = async (req, res) => {
 exports.deleteInvoice = async (req, res) => {
   const { id } = req.params;
   try {
-    // Borrado de comprobantes asociados
+    // Limpieza de archivos antiguos de disco si existían
     const [abonos] = await db.query('SELECT * FROM abonos_proveedores WHERE id_factura = ?', [id]);
     for (const abono of abonos) {
-        deleteComprobanteFile(abono.comprobante_url);
+        cleanLegacyDiskFile(abono.comprobante_url);
     }
 
-    // Borrado de archivo de factura escaneada
     const [invoices] = await db.query('SELECT factura_url FROM facturas_proveedores WHERE id = ?', [id]);
     if (invoices.length > 0) {
-        deleteFacturaFile(invoices[0].factura_url);
+        cleanLegacyDiskFile(invoices[0].factura_url);
     }
     
     // Borrado en cascada en BD
@@ -386,15 +355,15 @@ exports.deleteInvoice = async (req, res) => {
 exports.deletePayment = async (req, res) => {
   const { abonoId } = req.params;
   try {
-    // 1. Obtener el abono para saber cuánto revertir y qué archivo borrar
+    // 1. Obtener el abono para saber cuánto revertir
     const [rows] = await db.query('SELECT * FROM abonos_proveedores WHERE id = ?', [abonoId]);
     if (rows.length === 0) return res.status(404).json({ message: 'Abono no encontrado' });
 
     const abono = rows[0];
     const { id_factura, monto, comprobante_url } = abono;
 
-    // 2. Eliminar el archivo del comprobante
-    deleteComprobanteFile(comprobante_url);
+    // 2. Limpieza de archivo antiguo de disco si existía
+    cleanLegacyDiskFile(comprobante_url);
 
     // 3. Eliminar el abono
     await db.query('DELETE FROM abonos_proveedores WHERE id = ?', [abonoId]);

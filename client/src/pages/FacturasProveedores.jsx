@@ -2,12 +2,13 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { Link } from 'react-router-dom';
 
-import jsPDF from 'jspdf';
 import {
     FaArrowLeft, FaPlus, FaSearch, FaFileInvoiceDollar,
     FaCalendarAlt, FaCheckCircle, FaExclamationCircle, FaClock,
     FaMoneyBillWave, FaBuilding, FaList, FaTrashAlt, FaTimes, FaStore,
-    FaFilter, FaReceipt, FaEdit, FaEye, FaFilePdf, FaUpload
+    FaFilter, FaReceipt, FaEdit, FaEye, FaFilePdf, FaUpload,
+    FaImage, FaDownload, FaExternalLinkAlt, FaSearchPlus, FaSearchMinus,
+    FaRedo, FaCreditCard, FaUniversity
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import { rankItems } from '../utils/searchEngine';
@@ -260,13 +261,27 @@ const ModalContent = styled.div`
     position: relative;
     
     h2 { margin: 0 0 1.5rem 0; color: #0f172a; font-size: 1.6rem; font-weight: 800; letter-spacing: -0.025em; }
+
+    .desktop-history { display: block; }
+    .mobile-history { display: none; }
+
+    @media (max-width: 640px) {
+        padding: 1.25rem;
+        border-radius: 18px;
+        width: 100%;
+        max-height: 94vh;
+        h2 { font-size: 1.3rem; margin-bottom: 1rem; }
+        .desktop-history { display: none; }
+        .mobile-history { display: flex; }
+    }
 `;
 
 const FormGroup = styled.div`
     margin-bottom: 1.25rem;
+    min-width: 0;
     label { display: block; font-size: 0.92rem; color: #475569; margin-bottom: 0.5rem; font-weight: 600; }
     input, select, textarea { 
-        width: 100%; padding: 0.9rem 1rem; border: 1px solid #cbd5e1; border-radius: 12px; 
+        width: 100%; box-sizing: border-box; padding: 0.9rem 1rem; border: 1px solid #cbd5e1; border-radius: 12px; 
         font-size: 1rem; color: #0f172a; background: #fff; transition: all 0.2s; 
         &:focus { outline: none; border-color: #0f172a; box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.08); }
         &::placeholder { color: #94a3b8; }
@@ -541,36 +556,85 @@ const FacturasProveedores = () => {
         fecha_vencimiento: '',
         monto_total: '',
         notas: '',
-        tipo_compra: 'CREDITO'
+        tipo_compra: 'CREDITO',
+        metodo_pago: 'EFECTIVO'
     });
 
     const [payData, setPayData] = useState({ amount: '', reference: '', method: 'EFECTIVO' });
-    const [editPayData, setEditPayData] = useState({ amount: '', reference: '', method: 'EFECTIVO' }); // NUEVO
+    const [editPayData, setEditPayData] = useState({ amount: '', reference: '', method: 'EFECTIVO' });
+
+    // --- ESTADO Y CONTROL VISOR INTERACTIVO ---
+    const [previewDoc, setPreviewDoc] = useState({
+        show: false,
+        url: null,
+        title: '',
+        subtitle: '',
+        isPdf: false
+    });
+
+    const isPdfDoc = (url) => {
+        if (!url) return false;
+        const str = String(url).toLowerCase();
+        return str.includes('.pdf') || str.startsWith('data:application/pdf');
+    };
+
+    const openDocPreview = (url, title = 'Documento', subtitle = '') => {
+        if (!url) return;
+        const resolved = resolveFileUrl(url);
+        const isPdf = isPdfDoc(resolved);
+        setPreviewDoc({
+            show: true,
+            url: resolved,
+            title,
+            subtitle,
+            isPdf
+        });
+    };
 
     // --- HELPER ALERTAS ---
     const showAlert = (title, message, type = 'info') => {
         setAlertInfo({ show: true, title, message, type });
     };
 
-    // --- HELPER IMAGEN A PDF EN EL CLIENTE ---
-    const processFileAsPdf = (file) => {
+    // --- MOTOR DE COMPRESIÓN CLIENTE A WEBP / PDF ---
+    const compressAndProcessFile = (file) => {
         return new Promise((resolve, reject) => {
-            if (file.type === 'application/pdf') {
+            if (!file) return resolve({ base64: null, name: null });
+
+            if (file.size > 15 * 1024 * 1024) {
+                return reject(new Error('El archivo supera los 15MB. Por favor sube un archivo más liviano para almacenarlo en la base de datos.'));
+            }
+
+            const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+            const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|bmp|gif|heic|heif)$/i.test(file.name);
+
+            if (isPdf) {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
-                reader.onload = () => resolve({ base64: reader.result, name: file.name });
+                reader.onload = () => {
+                    const origKB = (file.size / 1024).toFixed(0);
+                    resolve({
+                        base64: reader.result,
+                        name: file.name,
+                        type: 'pdf',
+                        sizeInfo: `${origKB} KB (PDF)`
+                    });
+                };
                 reader.onerror = (err) => reject(err);
-            } else if (file.type.startsWith('image/')) {
+                return;
+            }
+
+            if (isImage) {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
                 reader.onload = (e) => {
                     const img = new Image();
                     img.src = e.target.result;
                     img.onload = () => {
-                        // Comprimir y redimensionar la imagen si es muy grande
-                        const maxDim = 1200;
+                        const maxDim = 1280; // Nitidez óptima para documentos y números
                         let width = img.width;
                         let height = img.height;
+
                         if (width > maxDim || height > maxDim) {
                             if (width > height) {
                                 height = Math.round((height * maxDim) / width);
@@ -585,28 +649,37 @@ const FacturasProveedores = () => {
                         canvas.width = width;
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
                         ctx.drawImage(img, 0, 0, width, height);
 
-                        // Exportar a JPEG con 70% de calidad para ahorrar espacio
-                        const compressedImgUrl = canvas.toDataURL('image/jpeg', 0.7);
+                        // Exportar a WebP con calidad 0.75 (alta compresión, peso ~50-80KB)
+                        let compressedDataUrl = canvas.toDataURL('image/webp', 0.75);
+                        let finalExt = '.webp';
+                        if (!compressedDataUrl.startsWith('data:image/webp')) {
+                            compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
+                            finalExt = '.jpg';
+                        }
 
-                        const orientation = width > height ? 'l' : 'p';
-                        const pdf = new jsPDF({
-                            orientation: orientation,
-                            unit: 'px',
-                            format: [width, height]
+                        const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || 'comprobante';
+                        const newFilename = `${baseName.replace(/[^a-z0-9]/gi, '_')}${finalExt}`;
+                        const origKB = (file.size / 1024).toFixed(0);
+                        const compKB = Math.round((compressedDataUrl.length * 3 / 4) / 1024);
+
+                        resolve({
+                            base64: compressedDataUrl,
+                            name: newFilename,
+                            type: 'image',
+                            sizeInfo: `${origKB} KB → ${compKB} KB`
                         });
-                        pdf.addImage(compressedImgUrl, 'JPEG', 0, 0, width, height);
-                        const pdfBase64 = pdf.output('datauristring');
-                        const newFilename = file.name.substring(0, file.name.lastIndexOf('.')) + '.pdf';
-                        resolve({ base64: pdfBase64, name: newFilename });
                     };
-                    img.onerror = (err) => reject(err);
+                    img.onerror = () => reject(new Error('No se pudo procesar la imagen cargada.'));
                 };
                 reader.onerror = (err) => reject(err);
-            } else {
-                reject(new Error('Formato de archivo no soportado. Sube una Imagen o un PDF.'));
+                return;
             }
+
+            reject(new Error('Formato no soportado. Sube una Imagen (JPG, PNG, WebP) o un archivo PDF.'));
         });
     };
 
@@ -617,7 +690,7 @@ const FacturasProveedores = () => {
         setAttachmentProcessing(true);
         setAttachmentFile(file);
         try {
-            const processed = await processFileAsPdf(file);
+            const processed = await compressAndProcessFile(file);
             setAttachmentData(processed);
         } catch (err) {
             console.error(err);
@@ -636,7 +709,7 @@ const FacturasProveedores = () => {
         setFacturaProcessing(true);
         setFacturaFile(file);
         try {
-            const processed = await processFileAsPdf(file);
+            const processed = await compressAndProcessFile(file);
             setFacturaData(processed);
         } catch (err) {
             console.error(err);
@@ -829,7 +902,8 @@ const FacturasProveedores = () => {
             fecha_vencimiento: invoice.fecha_vencimiento ? invoice.fecha_vencimiento.split('T')[0] : '',
             monto_total: invoice.monto_total || '',
             notas: invoice.notas || '',
-            tipo_compra: invoice.tipo_compra || 'CREDITO'
+            tipo_compra: invoice.tipo_compra || 'CREDITO',
+            metodo_pago: invoice.metodo_pago || 'EFECTIVO'
         });
         setFacturaFile(null);
         setFacturaData({ base64: null, name: null });
@@ -1419,9 +1493,9 @@ const FacturasProveedores = () => {
                                                     $secondary 
                                                     title="Ver Factura Escaneada / Archivo" 
                                                     style={{ padding: '0.75rem', background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }} 
-                                                    onClick={() => window.open(resolveFileUrl(inv.factura_url), '_blank')}
+                                                    onClick={() => openDocPreview(inv.factura_url, `Factura #${inv.numero_factura}`, `${inv.proveedor} • C$${parseFloat(inv.monto_total || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`)}
                                                 >
-                                                    <FaFilePdf />
+                                                    {isPdfDoc(inv.factura_url) ? <FaFilePdf /> : <FaImage />}
                                                 </Button>
                                             )}
                                             <Button $danger style={{ padding: '0.75rem' }} onClick={() => { setSelectedInvoice(inv); setShowConfirmDelete(true); }} title="Eliminar factura">
@@ -1548,15 +1622,31 @@ const FacturasProveedores = () => {
                                                 </td>
                                                 <td style={{ textAlign: 'center' }}>
                                                     {abono.comprobante_url ? (
-                                                        <a 
-                                                            href={resolveFileUrl(abono.comprobante_url)} 
-                                                            target="_blank" 
-                                                            rel="noopener noreferrer"
-                                                            style={{ color: '#ef4444', fontSize: '1.2rem', display: 'inline-flex', alignItems: 'center' }}
-                                                            title="Ver Comprobante PDF"
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => openDocPreview(
+                                                                abono.comprobante_url, 
+                                                                `Comprobante Factura #${abono.numero_factura}`,
+                                                                `${abono.proveedor} • C$${parseFloat(abono.monto).toLocaleString(undefined, { minimumFractionDigits: 2 })} • ${abono.metodo_pago}`
+                                                            )}
+                                                            style={{
+                                                                background: '#eff6ff',
+                                                                color: '#2563eb',
+                                                                border: '1px solid #bfdbfe',
+                                                                padding: '0.35rem 0.6rem',
+                                                                borderRadius: '8px',
+                                                                cursor: 'pointer',
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '0.35rem',
+                                                                fontSize: '0.85rem',
+                                                                fontWeight: 600
+                                                            }}
+                                                            title="Ver Comprobante"
                                                         >
-                                                            <FaFilePdf />
-                                                        </a>
+                                                            {isPdfDoc(abono.comprobante_url) ? <FaFilePdf style={{ color: '#ef4444' }} /> : <FaImage style={{ color: '#3b82f6' }} />}
+                                                            <span>Ver</span>
+                                                        </button>
                                                     ) : (
                                                         <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>—</span>
                                                     )}
@@ -1634,7 +1724,7 @@ const FacturasProveedores = () => {
                                     ))}
                                 </select>
                             </FormGroup>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
                                 <FormGroup>
                                     <label>No. Factura</label>
                                     <input required type="text" value={formData.numero_factura} onChange={e => setFormData({ ...formData, numero_factura: e.target.value })} placeholder="Ej: F-001" />
@@ -1644,74 +1734,180 @@ const FacturasProveedores = () => {
                                     <input required type="number" step="0.01" value={formData.monto_total} onChange={e => setFormData({ ...formData, monto_total: e.target.value })} placeholder="0.00" />
                                 </FormGroup>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
                                 <FormGroup>
                                     <label>Fecha Emisión</label>
                                     <input required type="date" value={formData.fecha_emision} onChange={e => setFormData({ ...formData, fecha_emision: e.target.value })} />
                                 </FormGroup>
                                 <FormGroup>
                                     <label>Fecha Vencimiento</label>
-                                    <input required type="date" value={formData.fecha_vencimiento} onChange={e => setFormData({ ...formData, fecha_vencimiento: e.target.value })} />
+                                    <input 
+                                        required={formData.tipo_compra !== 'CONTADO'}
+                                        disabled={formData.tipo_compra === 'CONTADO'}
+                                        type="date" 
+                                        value={formData.tipo_compra === 'CONTADO' ? formData.fecha_emision : formData.fecha_vencimiento} 
+                                        onChange={e => setFormData({ ...formData, fecha_vencimiento: e.target.value })} 
+                                    />
+                                    {formData.tipo_compra === 'CONTADO' && (
+                                        <small style={{ color: '#10b981', fontWeight: 600, marginTop: '4px', display: 'block' }}>
+                                            ✓ Pagada al contado (sin vencimiento pendiente)
+                                        </small>
+                                    )}
                                 </FormGroup>
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: '#f8fafc', padding: '1rem', borderRadius: '12px', marginBottom: '1.25rem', border: '1px solid #e2e8f0' }}>
-                                <FormGroup style={{ marginBottom: 0 }}>
-                                    <label>Tipo de Compra</label>
-                                    <select required value={formData.tipo_compra} onChange={e => setFormData({ ...formData, tipo_compra: e.target.value })}>
-                                        <option value="CREDITO">A Crédito</option>
-                                        <option value="CONTADO">De Contado</option>
-                                    </select>
-                                </FormGroup>
-                                {formData.tipo_compra === 'CONTADO' && (
-                                    <FormGroup style={{ marginBottom: 0 }}>
-                                        <label>Método de Pago</label>
-                                        <select required value={formData.metodo_pago} onChange={e => setFormData({ ...formData, metodo_pago: e.target.value })}>
-                                            <option value="EFECTIVO">Efectivo</option>
-                                            <option value="TARJETA">Tarjeta</option>
-                                            <option value="TRANSFERENCIA">Transferencia</option>
-                                            <option value="CHEQUE">Cheque</option>
-                                        </select>
-                                    </FormGroup>
-                                )}
                             </div>
 
+                            {/* Selector Tipo de Compra */}
+                            <FormGroup>
+                                <label>Condición de Pago</label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, tipo_compra: 'CREDITO' })}
+                                        style={{
+                                            padding: '0.85rem 1rem',
+                                            borderRadius: '12px',
+                                            border: formData.tipo_compra === 'CREDITO' ? '2px solid #0f172a' : '1px solid #cbd5e1',
+                                            background: formData.tipo_compra === 'CREDITO' ? '#0f172a' : '#fff',
+                                            color: formData.tipo_compra === 'CREDITO' ? '#fff' : '#475569',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '0.5rem',
+                                            transition: 'all 0.15s'
+                                        }}
+                                    >
+                                        <FaClock /> A Crédito
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({
+                                            ...formData,
+                                            tipo_compra: 'CONTADO',
+                                            fecha_vencimiento: formData.fecha_emision || getTodayManaguaISO()
+                                        })}
+                                        style={{
+                                            padding: '0.85rem 1rem',
+                                            borderRadius: '12px',
+                                            border: formData.tipo_compra === 'CONTADO' ? '2px solid #10b981' : '1px solid #cbd5e1',
+                                            background: formData.tipo_compra === 'CONTADO' ? '#10b981' : '#fff',
+                                            color: formData.tipo_compra === 'CONTADO' ? '#fff' : '#475569',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '0.5rem',
+                                            transition: 'all 0.15s'
+                                        }}
+                                    >
+                                        <FaCheckCircle /> De Contado
+                                    </button>
+                                </div>
+                            </FormGroup>
+
+                            {/* Opciones cuando es CONTADO */}
                             {formData.tipo_compra === 'CONTADO' && (
-                                <>
-                                    <FormGroup>
-                                        <label>Referencia de Pago (Transferencia, Cheque, etc.)</label>
-                                        <input type="text" value={formData.referencia} onChange={e => setFormData({ ...formData, referencia: e.target.value })} placeholder="Opcional..." />
+                                <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '1.25rem' }}>
+                                    <FormGroup style={{ marginBottom: '1rem' }}>
+                                        <label style={{ color: '#0f172a', fontWeight: 700 }}>Método de Pago de Contado</label>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))', gap: '0.5rem' }}>
+                                            {[
+                                                { id: 'EFECTIVO', label: 'Efectivo', icon: <FaMoneyBillWave /> },
+                                                { id: 'TRANSFERENCIA', label: 'Transferencia', icon: <FaUniversity /> },
+                                                { id: 'TARJETA', label: 'Tarjeta', icon: <FaCreditCard /> },
+                                                { id: 'CHEQUE', label: 'Cheque', icon: <FaReceipt /> }
+                                            ].map(m => (
+                                                <button
+                                                    key={m.id}
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, metodo_pago: m.id })}
+                                                    style={{
+                                                        padding: '0.75rem 0.5rem',
+                                                        borderRadius: '10px',
+                                                        border: formData.metodo_pago === m.id ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                                                        background: formData.metodo_pago === m.id ? '#eff6ff' : '#fff',
+                                                        color: formData.metodo_pago === m.id ? '#1d4ed8' : '#475569',
+                                                        fontWeight: 700,
+                                                        fontSize: '0.85rem',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        alignItems: 'center',
+                                                        gap: '0.35rem',
+                                                        transition: 'all 0.15s'
+                                                    }}
+                                                >
+                                                    <span style={{ fontSize: '1.15rem' }}>{m.icon}</span>
+                                                    {m.label}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </FormGroup>
 
-                                    <FormGroup>
-                                        <label>Comprobante de Pago (Imagen o PDF)</label>
+                                    <FormGroup style={{ marginBottom: '1rem' }}>
+                                        <label>Referencia de Pago</label>
+                                        <input 
+                                            type="text" 
+                                            value={formData.referencia} 
+                                            onChange={e => setFormData({ ...formData, referencia: e.target.value })} 
+                                            placeholder={formData.metodo_pago === 'TRANSFERENCIA' ? 'Ej: Transferencia Lafise 14664661' : 'Ej: No. recibo, cheque o nota de pago...'} 
+                                        />
+                                    </FormGroup>
+
+                                    <FormGroup style={{ marginBottom: 0 }}>
+                                        <label>Comprobante de Pago (Foto o PDF)</label>
                                         <FileUploadContainer>
                                             <FaUpload className="upload-icon" />
                                             {attachmentFile ? (
                                                 <div className="file-details">
-                                                    {attachmentProcessing ? "Procesando archivo..." : `✓ PDF Generado: ${attachmentData.name}`}
+                                                    {attachmentProcessing ? "Comprimiendo archivo..." : `✓ Listo: ${attachmentData.name} (${attachmentData.sizeInfo || ''})`}
                                                 </div>
                                             ) : (
-                                                <div className="file-details">Haz clic o arrastra una imagen o PDF</div>
+                                                <div className="file-details">Haz clic o arrastra foto del voucher o PDF</div>
                                             )}
                                             <input type="file" accept="image/*,application/pdf" onChange={handleFileSelection} disabled={attachmentProcessing} />
                                         </FileUploadContainer>
+                                        {attachmentFile && (
+                                            <div style={{ marginTop: '0.4rem', textAlign: 'right' }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setAttachmentFile(null); setAttachmentData({ base64: null, name: null }); }}
+                                                    style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
+                                                >
+                                                    ✕ Quitar comprobante
+                                                </button>
+                                            </div>
+                                        )}
                                     </FormGroup>
-                                </>
+                                </div>
                             )}
 
                             <FormGroup>
-                                <label>Factura Escaneada (Foto o PDF de la Factura)</label>
+                                <label>Factura Escaneada (Foto o PDF de la Factura del Proveedor)</label>
                                 <FileUploadContainer>
                                     <FaFilePdf className="upload-icon" style={{ color: '#ef4444' }} />
                                     {facturaFile ? (
                                         <div className="file-details">
-                                            {facturaProcessing ? "Procesando archivo..." : `✓ Factura Cargada: ${facturaData.name}`}
+                                            {facturaProcessing ? "Comprimiendo archivo..." : `✓ Listo: ${facturaData.name} (${facturaData.sizeInfo || ''})`}
                                         </div>
                                     ) : (
                                         <div className="file-details">Haz clic para subir foto o PDF de la factura</div>
                                     )}
                                     <input type="file" accept="image/*,application/pdf" onChange={handleFacturaFileSelection} disabled={facturaProcessing} />
                                 </FileUploadContainer>
+                                {facturaFile && (
+                                    <div style={{ marginTop: '0.4rem', textAlign: 'right' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setFacturaFile(null); setFacturaData({ base64: null, name: null }); }}
+                                            style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
+                                        >
+                                            ✕ Quitar factura
+                                        </button>
+                                    </div>
+                                )}
                             </FormGroup>
 
                             <FormGroup>
@@ -1749,7 +1945,7 @@ const FacturasProveedores = () => {
                                     ))}
                                 </select>
                             </FormGroup>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
                                 <FormGroup>
                                     <label>No. Factura</label>
                                     <input required type="text" value={editInvoiceData.numero_factura} onChange={e => setEditInvoiceData({ ...editInvoiceData, numero_factura: e.target.value })} />
@@ -1759,23 +1955,110 @@ const FacturasProveedores = () => {
                                     <input required type="number" step="0.01" value={editInvoiceData.monto_total} onChange={e => setEditInvoiceData({ ...editInvoiceData, monto_total: e.target.value })} />
                                 </FormGroup>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
                                 <FormGroup>
                                     <label>Fecha Emisión</label>
                                     <input required type="date" value={editInvoiceData.fecha_emision} onChange={e => setEditInvoiceData({ ...editInvoiceData, fecha_emision: e.target.value })} />
                                 </FormGroup>
                                 <FormGroup>
                                     <label>Fecha Vencimiento</label>
-                                    <input required type="date" value={editInvoiceData.fecha_vencimiento} onChange={e => setEditInvoiceData({ ...editInvoiceData, fecha_vencimiento: e.target.value })} />
+                                    <input 
+                                        required={editInvoiceData.tipo_compra !== 'CONTADO'}
+                                        disabled={editInvoiceData.tipo_compra === 'CONTADO'}
+                                        type="date" 
+                                        value={editInvoiceData.tipo_compra === 'CONTADO' ? editInvoiceData.fecha_emision : editInvoiceData.fecha_vencimiento} 
+                                        onChange={e => setEditInvoiceData({ ...editInvoiceData, fecha_vencimiento: e.target.value })} 
+                                    />
                                 </FormGroup>
                             </div>
+
                             <FormGroup>
-                                <label>Tipo de Compra</label>
-                                <select required value={editInvoiceData.tipo_compra} onChange={e => setEditInvoiceData({ ...editInvoiceData, tipo_compra: e.target.value })}>
-                                    <option value="CREDITO">A Crédito</option>
-                                    <option value="CONTADO">De Contado</option>
-                                </select>
+                                <label>Condición de Pago</label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditInvoiceData({ ...editInvoiceData, tipo_compra: 'CREDITO' })}
+                                        style={{
+                                            padding: '0.85rem 1rem',
+                                            borderRadius: '12px',
+                                            border: editInvoiceData.tipo_compra === 'CREDITO' ? '2px solid #0f172a' : '1px solid #cbd5e1',
+                                            background: editInvoiceData.tipo_compra === 'CREDITO' ? '#0f172a' : '#fff',
+                                            color: editInvoiceData.tipo_compra === 'CREDITO' ? '#fff' : '#475569',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '0.5rem',
+                                            transition: 'all 0.15s'
+                                        }}
+                                    >
+                                        <FaClock /> A Crédito
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditInvoiceData({
+                                            ...editInvoiceData,
+                                            tipo_compra: 'CONTADO',
+                                            fecha_vencimiento: editInvoiceData.fecha_emision || getTodayManaguaISO()
+                                        })}
+                                        style={{
+                                            padding: '0.85rem 1rem',
+                                            borderRadius: '12px',
+                                            border: editInvoiceData.tipo_compra === 'CONTADO' ? '2px solid #10b981' : '1px solid #cbd5e1',
+                                            background: editInvoiceData.tipo_compra === 'CONTADO' ? '#10b981' : '#fff',
+                                            color: editInvoiceData.tipo_compra === 'CONTADO' ? '#fff' : '#475569',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '0.5rem',
+                                            transition: 'all 0.15s'
+                                        }}
+                                    >
+                                        <FaCheckCircle /> De Contado
+                                    </button>
+                                </div>
                             </FormGroup>
+
+                            {editInvoiceData.tipo_compra === 'CONTADO' && (
+                                <FormGroup style={{ background: '#f8fafc', padding: '1rem', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+                                    <label style={{ color: '#0f172a', fontWeight: 700 }}>Método de Pago</label>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '0.5rem' }}>
+                                        {[
+                                            { id: 'EFECTIVO', label: 'Efectivo', icon: <FaMoneyBillWave /> },
+                                            { id: 'TRANSFERENCIA', label: 'Transferencia', icon: <FaUniversity /> },
+                                            { id: 'TARJETA', label: 'Tarjeta', icon: <FaCreditCard /> },
+                                            { id: 'CHEQUE', label: 'Cheque', icon: <FaReceipt /> }
+                                        ].map(m => (
+                                            <button
+                                                key={m.id}
+                                                type="button"
+                                                onClick={() => setEditInvoiceData({ ...editInvoiceData, metodo_pago: m.id })}
+                                                style={{
+                                                    padding: '0.65rem 0.5rem',
+                                                    borderRadius: '10px',
+                                                    border: editInvoiceData.metodo_pago === m.id ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                                                    background: editInvoiceData.metodo_pago === m.id ? '#eff6ff' : '#fff',
+                                                    color: editInvoiceData.metodo_pago === m.id ? '#1d4ed8' : '#475569',
+                                                    fontWeight: 700,
+                                                    fontSize: '0.82rem',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    gap: '0.3rem',
+                                                    transition: 'all 0.15s'
+                                                }}
+                                            >
+                                                <span style={{ fontSize: '1.1rem' }}>{m.icon}</span>
+                                                {m.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </FormGroup>
+                            )}
 
                             <FormGroup>
                                 <label>Reemplazar Factura Escaneada (Foto o PDF)</label>
@@ -1783,7 +2066,7 @@ const FacturasProveedores = () => {
                                     <FaFilePdf className="upload-icon" style={{ color: '#ef4444' }} />
                                     {facturaFile ? (
                                         <div className="file-details">
-                                            {facturaProcessing ? "Procesando archivo..." : `✓ Nueva Factura: ${facturaData.name}`}
+                                            {facturaProcessing ? "Comprimiendo archivo..." : `✓ Nueva Factura: ${facturaData.name} (${facturaData.sizeInfo || ''})`}
                                         </div>
                                     ) : (
                                         <div className="file-details">
@@ -1794,9 +2077,13 @@ const FacturasProveedores = () => {
                                 </FileUploadContainer>
                                 {selectedInvoice?.factura_url && !facturaFile && (
                                     <div style={{ marginTop: '0.5rem', textAlign: 'right' }}>
-                                        <a href={resolveFileUrl(selectedInvoice.factura_url)} target="_blank" rel="noreferrer" style={{ fontSize: '0.85rem', color: '#2563eb', fontWeight: 600, textDecoration: 'none' }}>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => openDocPreview(selectedInvoice.factura_url, `Factura #${selectedInvoice.numero_factura}`, selectedInvoice.proveedor)}
+                                            style={{ background: 'none', border: 'none', fontSize: '0.85rem', color: '#2563eb', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                                        >
                                             📄 Ver factura actual
-                                        </a>
+                                        </button>
                                     </div>
                                 )}
                             </FormGroup>
@@ -1868,10 +2155,10 @@ const FacturasProveedores = () => {
                                     <FaUpload className="upload-icon" />
                                     {attachmentFile ? (
                                         <div className="file-details">
-                                            {attachmentProcessing ? "Procesando archivo..." : `✓ PDF Generado: ${attachmentData.name}`}
+                                            {attachmentProcessing ? "Comprimiendo archivo..." : `✓ Listo: ${attachmentData.name} (${attachmentData.sizeInfo || ''})`}
                                         </div>
                                     ) : (
-                                        <div className="file-details">Sube el comprobante de pago</div>
+                                        <div className="file-details">Sube el comprobante de pago (Foto o PDF)</div>
                                     )}
                                     <input type="file" accept="image/*,application/pdf" onChange={handleFileSelection} disabled={attachmentProcessing} />
                                 </FileUploadContainer>
@@ -1932,16 +2219,22 @@ const FacturasProveedores = () => {
                                     <FaUpload className="upload-icon" />
                                     {attachmentFile ? (
                                         <div className="file-details">
-                                            {attachmentProcessing ? "Procesando archivo..." : `✓ PDF Generado: ${attachmentData.name}`}
+                                            {attachmentProcessing ? "Comprimiendo archivo..." : `✓ Listo: ${attachmentData.name} (${attachmentData.sizeInfo || ''})`}
                                         </div>
                                     ) : (
-                                        <div className="file-details">Selecciona un archivo si deseas reemplazarlo</div>
+                                        <div className="file-details">Selecciona una foto o PDF para reemplazarlo</div>
                                     )}
                                     <input type="file" accept="image/*,application/pdf" onChange={handleFileSelection} disabled={attachmentProcessing} />
                                 </FileUploadContainer>
                                 {selectedAbono?.comprobante_url && !attachmentFile && (
                                     <div style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
-                                        Tiene comprobante: <a href={resolveFileUrl(selectedAbono.comprobante_url)} target="_blank" rel="noopener noreferrer" style={{ color: '#ef4444', fontWeight: 'bold' }}>Ver actual</a>
+                                        Tiene comprobante: <button 
+                                            type="button" 
+                                            onClick={() => openDocPreview(selectedAbono.comprobante_url, `Comprobante - Factura #${selectedInvoice?.numero_factura}`, `${selectedInvoice?.proveedor} • C$${parseFloat(selectedAbono.monto || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`)}
+                                            style={{ background: 'none', border: 'none', color: '#2563eb', fontWeight: 'bold', cursor: 'pointer' }}
+                                        >
+                                            Ver actual
+                                        </button>
                                     </div>
                                 )}
                             </FormGroup>
@@ -1972,20 +2265,20 @@ const FacturasProveedores = () => {
                 </ModalOverlay>
             )}
 
-            {/* --- MODAL HISTORIAL DE ABONOS --- */}
+            {/* --- MODAL HISTORIAL DE ABONOS (OPTIMIZADO RESPONSIVE Y MOBILE) --- */}
             {showHistoryModal && (
                 <ModalOverlay onClick={() => setShowHistoryModal(false)}>
-                    <ModalContent onClick={e => e.stopPropagation()} style={{ maxWidth: '650px' }}>
+                    <ModalContent onClick={e => e.stopPropagation()} style={{ maxWidth: '680px' }}>
                         <CloseButton onClick={() => setShowHistoryModal(false)}><FaTimes /></CloseButton>
                         <h2>Historial de Abonos</h2>
-                        <div style={{ background: '#f1f5f9', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ background: '#f1f5f9', padding: '1rem', borderRadius: '12px', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                             <div>
-                                <div style={{ fontSize: '0.9rem', color: '#64748b' }}>Factura #{selectedInvoice?.numero_factura}</div>
+                                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Factura #{selectedInvoice?.numero_factura}</div>
                                 <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0f172a' }}>{selectedInvoice?.proveedor}</div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontSize: '0.9rem', color: '#64748b' }}>Abonado Total</div>
-                                <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#10b981' }}>C${(parseFloat(selectedInvoice?.monto_abonado) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Abonado Total</div>
+                                <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#10b981' }}>C${(parseFloat(selectedInvoice?.monto_abonado) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                             </div>
                         </div>
 
@@ -1995,69 +2288,173 @@ const FacturasProveedores = () => {
                                 <p>Cargando historial...</p>
                             </div>
                         ) : historyData.length > 0 ? (
-                            <div style={{ overflowX: 'auto' }}>
-                                <BITable>
-                                    <thead>
-                                        <tr>
-                                            <th>Fecha</th>
-                                            <th>Método</th>
-                                            <th>Referencia</th>
-                                            <th style={{ textAlign: 'center' }}>Comprobante</th>
-                                            <th style={{ textAlign: 'right' }}>Monto</th>
-                                            <th style={{ textAlign: 'center' }}>Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {historyData.map((abono, idx) => (
-                                            <tr key={abono.id || idx}>
-                                                <td>{formatDateManagua(abono.fecha)}</td>
-                                                <td>
-                                                    <StatusBadge bg="#f1f5f9" text="#475569">{abono.metodo_pago}</StatusBadge>
-                                                </td>
-                                                <td>{abono.referencia || '-'}</td>
-                                                <td style={{ textAlign: 'center' }}>
-                                                    {abono.comprobante_url ? (
-                                                        <a 
-                                                            href={resolveFileUrl(abono.comprobante_url)} 
-                                                            target="_blank" 
-                                                            rel="noopener noreferrer"
-                                                            style={{ color: '#ef4444', fontSize: '1.2rem', display: 'inline-flex', alignItems: 'center' }}
-                                                            title="Ver Comprobante PDF"
-                                                        >
-                                                            <FaFilePdf />
-                                                        </a>
-                                                    ) : (
-                                                        <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>—</span>
-                                                    )}
-                                                </td>
-                                                <td className="amount" style={{ color: '#10b981' }}>
-                                                    C${parseFloat(abono.monto).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                </td>
-                                                <td style={{ textAlign: 'center' }}>
-                                                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                                                        <Button
-                                                            $secondary
-                                                            title="Editar abono"
-                                                            style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem', borderRadius: '8px' }}
-                                                            onClick={() => openEditPayModal(abono)}
-                                                        >
-                                                            <FaEdit />
-                                                        </Button>
-                                                        <Button
-                                                            $danger
-                                                            title="Eliminar abono"
-                                                            style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem', borderRadius: '8px' }}
-                                                            onClick={() => handleDeletePayment(abono.id, selectedInvoice?.id)}
-                                                        >
-                                                            <FaTrashAlt />
-                                                        </Button>
-                                                    </div>
-                                                </td>
+                            <>
+                                {/* Tabla para Desktop */}
+                                <div className="desktop-history" style={{ overflowX: 'auto' }}>
+                                    <BITable>
+                                        <thead>
+                                            <tr>
+                                                <th style={{ padding: '0.75rem 0.6rem' }}>Fecha</th>
+                                                <th style={{ padding: '0.75rem 0.6rem' }}>Método</th>
+                                                <th style={{ padding: '0.75rem 0.6rem' }}>Referencia</th>
+                                                <th style={{ padding: '0.75rem 0.6rem', textAlign: 'center' }}>Comprobante</th>
+                                                <th style={{ padding: '0.75rem 0.6rem', textAlign: 'right' }}>Monto</th>
+                                                <th style={{ padding: '0.75rem 0.6rem', textAlign: 'center' }}>Acciones</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </BITable>
-                            </div>
+                                        </thead>
+                                        <tbody>
+                                            {historyData.map((abono, idx) => (
+                                                <tr key={abono.id || idx}>
+                                                    <td style={{ padding: '0.75rem 0.6rem' }}>{formatDateManagua(abono.fecha)}</td>
+                                                    <td style={{ padding: '0.75rem 0.6rem' }}>
+                                                        <StatusBadge bg="#f1f5f9" text="#475569">{abono.metodo_pago}</StatusBadge>
+                                                    </td>
+                                                    <td style={{ padding: '0.75rem 0.6rem' }}>{abono.referencia || '-'}</td>
+                                                    <td style={{ padding: '0.75rem 0.6rem', textAlign: 'center' }}>
+                                                        {abono.comprobante_url ? (
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => openDocPreview(
+                                                                    abono.comprobante_url, 
+                                                                    `Comprobante Factura #${selectedInvoice?.numero_factura}`,
+                                                                    `${selectedInvoice?.proveedor} • C$${parseFloat(abono.monto).toLocaleString(undefined, { minimumFractionDigits: 2 })} • ${abono.metodo_pago}`
+                                                                )}
+                                                                style={{
+                                                                    background: '#eff6ff',
+                                                                    color: '#2563eb',
+                                                                    border: '1px solid #bfdbfe',
+                                                                    padding: '0.35rem 0.6rem',
+                                                                    borderRadius: '8px',
+                                                                    cursor: 'pointer',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '0.35rem',
+                                                                    fontSize: '0.82rem',
+                                                                    fontWeight: 600
+                                                                }}
+                                                                title="Ver Comprobante"
+                                                            >
+                                                                {isPdfDoc(abono.comprobante_url) ? <FaFilePdf style={{ color: '#ef4444' }} /> : <FaImage style={{ color: '#3b82f6' }} />}
+                                                                <span>Ver</span>
+                                                            </button>
+                                                        ) : (
+                                                            <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="amount" style={{ padding: '0.75rem 0.6rem', color: '#10b981' }}>
+                                                        C${parseFloat(abono.monto).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                    </td>
+                                                    <td style={{ padding: '0.75rem 0.6rem', textAlign: 'center' }}>
+                                                        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                                                            <Button
+                                                                $secondary
+                                                                title="Editar abono"
+                                                                style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem', borderRadius: '8px' }}
+                                                                onClick={() => openEditPayModal(abono)}
+                                                            >
+                                                                <FaEdit />
+                                                            </Button>
+                                                            <Button
+                                                                $danger
+                                                                title="Eliminar abono"
+                                                                style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem', borderRadius: '8px' }}
+                                                                onClick={() => handleDeletePayment(abono.id, selectedInvoice?.id)}
+                                                            >
+                                                                <FaTrashAlt />
+                                                            </Button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </BITable>
+                                </div>
+
+                                {/* Tarjetas para Mobile (Cero desbordamiento horizontal) */}
+                                <div className="mobile-history" style={{ flexDirection: 'column', gap: '0.75rem' }}>
+                                    {historyData.map((abono, idx) => (
+                                        <div 
+                                            key={abono.id || idx}
+                                            style={{
+                                                background: '#f8fafc',
+                                                border: '1px solid #e2e8f0',
+                                                borderRadius: '14px',
+                                                padding: '0.9rem',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '0.6rem'
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>{formatDateManagua(abono.fecha)}</span>
+                                                    <StatusBadge bg="#e2e8f0" text="#334155" style={{ fontSize: '0.75rem', padding: '2px 8px' }}>{abono.metodo_pago}</StatusBadge>
+                                                </div>
+                                                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#10b981' }}>
+                                                    C${parseFloat(abono.monto).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                </div>
+                                            </div>
+
+                                            {abono.referencia && (
+                                                <div style={{ fontSize: '0.85rem', color: '#475569', background: '#fff', padding: '0.4rem 0.6rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                                    <span style={{ color: '#94a3b8', fontSize: '0.72rem', textTransform: 'uppercase', display: 'block', fontWeight: 700 }}>Referencia</span>
+                                                    {abono.referencia}
+                                                </div>
+                                            )}
+
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.3rem', borderTop: '1px solid #f1f5f9' }}>
+                                                {abono.comprobante_url ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openDocPreview(
+                                                            abono.comprobante_url,
+                                                            `Comprobante Factura #${selectedInvoice?.numero_factura}`,
+                                                            `${selectedInvoice?.proveedor} • C$${parseFloat(abono.monto).toLocaleString(undefined, { minimumFractionDigits: 2 })} • ${abono.metodo_pago}`
+                                                        )}
+                                                        style={{
+                                                            background: '#eff6ff',
+                                                            color: '#2563eb',
+                                                            border: '1px solid #bfdbfe',
+                                                            padding: '0.4rem 0.75rem',
+                                                            borderRadius: '8px',
+                                                            cursor: 'pointer',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '0.4rem',
+                                                            fontSize: '0.85rem',
+                                                            fontWeight: 600
+                                                        }}
+                                                    >
+                                                        {isPdfDoc(abono.comprobante_url) ? <FaFilePdf style={{ color: '#ef4444' }} /> : <FaImage style={{ color: '#3b82f6' }} />}
+                                                        <span>Ver Comprobante</span>
+                                                    </button>
+                                                ) : (
+                                                    <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>Sin comprobante</span>
+                                                )}
+
+                                                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                                    <Button
+                                                        $secondary
+                                                        title="Editar abono"
+                                                        style={{ padding: '0.45rem 0.7rem', fontSize: '0.85rem', borderRadius: '8px' }}
+                                                        onClick={() => openEditPayModal(abono)}
+                                                    >
+                                                        <FaEdit />
+                                                    </Button>
+                                                    <Button
+                                                        $danger
+                                                        title="Eliminar abono"
+                                                        style={{ padding: '0.45rem 0.7rem', fontSize: '0.85rem', borderRadius: '8px' }}
+                                                        onClick={() => handleDeletePayment(abono.id, selectedInvoice?.id)}
+                                                    >
+                                                        <FaTrashAlt />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
                         ) : (
                             <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8', border: '1px dashed #cbd5e1', borderRadius: '16px' }}>
                                 <FaMoneyBillWave style={{ fontSize: '2rem', marginBottom: '1rem', opacity: 0.5 }} />
@@ -2067,7 +2464,148 @@ const FacturasProveedores = () => {
                     </ModalContent>
                 </ModalOverlay>
             )}
+
+            {/* --- VISOR INTERACTIVO DE COMPROBANTES Y FACTURAS --- */}
+            <PreviewDocModal 
+                doc={previewDoc} 
+                onClose={() => setPreviewDoc(prev => ({ ...prev, show: false }))} 
+            />
         </PageWrapper>
+    );
+};
+
+// --- COMPONENTE VISOR INTERACTIVO ---
+const PreviewDocModal = ({ doc, onClose }) => {
+    const [zoom, setZoom] = useState(1);
+    const [rotation, setRotation] = useState(0);
+
+    useEffect(() => {
+        setZoom(1);
+        setRotation(0);
+    }, [doc.url]);
+
+    if (!doc.show || !doc.url) return null;
+
+    const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.25, 3));
+    const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.5));
+    const handleReset = () => { setZoom(1); setRotation(0); };
+    const handleRotate = () => setRotation(prev => (prev + 90) % 360);
+
+    const viewerBtn = {
+        background: '#334155',
+        color: '#f8fafc',
+        border: 'none',
+        borderRadius: '8px',
+        padding: '0.5rem 0.75rem',
+        fontSize: '0.9rem',
+        cursor: 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'all 0.15s'
+    };
+
+    return (
+        <ModalOverlay onClick={onClose} style={{ zIndex: 1500 }}>
+            <div
+                onClick={e => e.stopPropagation()}
+                style={{
+                    background: '#0f172a',
+                    color: '#fff',
+                    borderRadius: '20px',
+                    width: '95%',
+                    maxWidth: '850px',
+                    height: '88vh',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)'
+                }}
+            >
+                {/* Cabecera del Visor */}
+                <div style={{
+                    padding: '0.9rem 1.25rem',
+                    background: '#1e293b',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    borderBottom: '1px solid #334155',
+                    flexWrap: 'wrap',
+                    gap: '0.5rem'
+                }}>
+                    <div style={{ minWidth: '160px' }}>
+                        <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#f8fafc' }}>{doc.title}</div>
+                        {doc.subtitle && <div style={{ fontSize: '0.82rem', color: '#94a3b8' }}>{doc.subtitle}</div>}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        {!doc.isPdf && (
+                            <>
+                                <button title="Acercar (+)" onClick={handleZoomIn} style={viewerBtn}><FaSearchPlus /></button>
+                                <button title="Alejar (-)" onClick={handleZoomOut} style={viewerBtn}><FaSearchMinus /></button>
+                                <button title="Restablecer" onClick={handleReset} style={viewerBtn}><FaRedo /></button>
+                                <button title="Rotar 90°" onClick={handleRotate} style={{ ...viewerBtn, fontSize: '1.1rem', fontWeight: 700 }}>↻</button>
+                            </>
+                        )}
+                        <a
+                            href={doc.url}
+                            download
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Descargar / Abrir archivo"
+                            style={{ ...viewerBtn, background: '#2563eb', color: '#fff', textDecoration: 'none' }}
+                        >
+                            <FaDownload />
+                        </a>
+                        <button title="Cerrar visor" onClick={onClose} style={{ ...viewerBtn, background: '#ef4444', color: '#fff' }}>
+                            <FaTimes />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Contenedor del documento */}
+                <div style={{
+                    flex: 1,
+                    overflow: 'auto',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1rem',
+                    background: '#090d16',
+                    position: 'relative'
+                }}>
+                    {doc.isPdf ? (
+                        <iframe
+                            src={doc.url}
+                            title={doc.title}
+                            style={{ width: '100%', height: '100%', border: 'none', borderRadius: '12px', background: '#fff' }}
+                        />
+                    ) : (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '100%',
+                            height: '100%',
+                            overflow: 'auto'
+                        }}>
+                            <img
+                                src={doc.url}
+                                alt={doc.title}
+                                style={{
+                                    maxWidth: '100%',
+                                    maxHeight: '100%',
+                                    objectFit: 'contain',
+                                    transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                                    transition: 'transform 0.2s ease',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 10px 30px rgba(0,0,0,0.6)'
+                                }}
+                            />
+                        </div>
+                    )}
+                </div>
+            </div>
+        </ModalOverlay>
     );
 };
 
