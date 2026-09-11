@@ -711,15 +711,6 @@ const LabelCard = styled.div`
   &.paper-bond {
     border: 1px dashed #94a3b8;
     border-radius: 0;
-
-    &::after {
-      content: '✂';
-      position: absolute;
-      top: -4px;
-      left: -4px;
-      font-size: 8px;
-      color: #94a3b8;
-    }
   }
 
   /* Estilos para Papel Adhesivo / Stickers */
@@ -732,19 +723,19 @@ const LabelCard = styled.div`
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    margin-bottom: 1.2mm;
+    gap: 6px;
+    margin-bottom: 1.5mm;
     width: 100%;
 
     .company-logo {
-      height: 12px;
-      max-height: 12px;
+      height: 18px;
+      max-height: 18px;
       width: auto;
       object-fit: contain;
     }
 
     .company-title {
-      font-size: 7.2pt;
+      font-size: 8pt;
       font-weight: 800;
       text-transform: uppercase;
       color: #1e293b;
@@ -793,14 +784,14 @@ const LabelCard = styled.div`
     border-top: 0.5px solid #e2e8f0;
 
     .code-text {
-      font-size: 7pt;
+      font-size: 7.5pt;
       font-family: monospace;
-      font-weight: 600;
-      color: #475569;
+      font-weight: 700;
+      color: #334155;
     }
 
     .price-tag {
-      font-size: 8.5pt;
+      font-size: 9.5pt;
       font-weight: 800;
       color: #059669;
       letter-spacing: -0.01em;
@@ -1000,7 +991,11 @@ export default function BarcodeTicketGeneratorModal({
 
       pageItems.forEach((product) => {
         const barcodeCode = product.codigo_barras || product.codigo || '000000';
-        const formattedPrice = product.precio_venta ? `C$ ${Number(product.precio_venta).toFixed(2)}` : '';
+        const rawVal = product.precio_venta ?? product.venta ?? product.precio ?? product.__fmt?.venta ?? 0;
+        const numVal = typeof rawVal === 'string' && rawVal.includes('C$')
+          ? parseFloat(rawVal.replace(/[^0-9.]/g, ''))
+          : parseFloat(rawVal);
+        const formattedPrice = (!isNaN(numVal) && numVal > 0) ? `C$ ${numVal.toFixed(2)}` : '';
         const catName = product.categoria_nombre || '';
 
         // Generador de SVG Barcode para el print
@@ -1104,18 +1099,18 @@ export default function BarcodeTicketGeneratorModal({
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 3px;
+        gap: 5px;
         margin-bottom: 1mm;
         width: 100%;
       }
       .company-logo {
-        height: 11px;
-        max-height: 11px;
+        height: 18px;
+        max-height: 18px;
         width: auto;
         object-fit: contain;
       }
       .company-title {
-        font-size: 7.2pt;
+        font-size: 8pt;
         font-weight: 800;
         text-transform: uppercase;
         color: #000;
@@ -1482,7 +1477,11 @@ export default function BarcodeTicketGeneratorModal({
                 <A4Sheet className={`layout-${layoutType}`}>
                   {currentLabelsForPage.map((prod, index) => {
                     const code = prod.codigo_barras || prod.codigo || '000000';
-                    const formattedPrice = prod.precio_venta ? `C$ ${Number(prod.precio_venta).toFixed(2)}` : '';
+                    const rawVal = prod.precio_venta ?? prod.venta ?? prod.precio ?? prod.__fmt?.venta ?? 0;
+                    const numVal = typeof rawVal === 'string' && rawVal.includes('C$')
+                      ? parseFloat(rawVal.replace(/[^0-9.]/g, ''))
+                      : parseFloat(rawVal);
+                    const formattedPrice = (!isNaN(numVal) && numVal > 0) ? `C$ ${numVal.toFixed(2)}` : '';
                     const cat = prod.categoria_nombre || '';
 
                     return (
