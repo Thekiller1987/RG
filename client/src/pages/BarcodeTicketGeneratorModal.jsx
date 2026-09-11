@@ -728,14 +728,30 @@ const LabelCard = styled.div`
     border-radius: 4px;
   }
 
-  .company-title {
-    font-size: 7.5pt;
-    font-weight: 800;
-    text-transform: uppercase;
-    color: #1e293b;
-    letter-spacing: 0.05em;
-    line-height: 1;
-    margin-bottom: 1.5mm;
+  .company-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    margin-bottom: 1.2mm;
+    width: 100%;
+
+    .company-logo {
+      height: 12px;
+      max-height: 12px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    .company-title {
+      font-size: 7.2pt;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #1e293b;
+      letter-spacing: 0.04em;
+      line-height: 1;
+      margin: 0;
+    }
   }
 
   .product-name {
@@ -821,6 +837,7 @@ export default function BarcodeTicketGeneratorModal({
   const [layoutType, setLayoutType] = useState('24'); // '24' (3x8) | '40' (4x10) | '12' (2x6)
 
   // Interruptores de visualización
+  const [showLogo, setShowLogo] = useState(true);
   const [showCompany, setShowCompany] = useState(true);
   const [showPrice, setShowPrice] = useState(true);
   const [showCategory, setShowCategory] = useState(false);
@@ -1006,7 +1023,12 @@ export default function BarcodeTicketGeneratorModal({
 
         labelsHtml += `
           <div class="label-card ${borderClass}">
-            ${showCompany ? '<div class="company-title">Multirepuestos RG</div>' : ''}
+            ${(showCompany || showLogo) ? `
+              <div class="company-header">
+                ${showLogo ? '<img src="/icons/logo.png" class="company-logo" alt="Logo" onerror="this.style.display=\'none\'" />' : ''}
+                ${showCompany ? '<span class="company-title">Multirepuestos RG</span>' : ''}
+              </div>
+            ` : ''}
             <div class="product-name">${product.nombre || 'Repuesto'}</div>
             <div class="code-area">${codeHtml}</div>
             <div class="bottom-info">
@@ -1078,14 +1100,28 @@ export default function BarcodeTicketGeneratorModal({
       .label-card.paper-adhesive {
         border: 1px solid transparent;
       }
+      .company-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        margin-bottom: 1mm;
+        width: 100%;
+      }
+      .company-logo {
+        height: 11px;
+        max-height: 11px;
+        width: auto;
+        object-fit: contain;
+      }
       .company-title {
-        font-size: 7.5pt;
+        font-size: 7.2pt;
         font-weight: 800;
         text-transform: uppercase;
         color: #000;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.04em;
         line-height: 1;
-        margin-bottom: 1mm;
+        margin: 0;
       }
       .product-name {
         font-size: 8pt;
@@ -1375,6 +1411,13 @@ export default function BarcodeTicketGeneratorModal({
                   {/* Toggles de contenido */}
                   <div className="toggles">
                     <div
+                      className={`toggle-chip ${showLogo ? 'active' : ''}`}
+                      onClick={() => setShowLogo(!showLogo)}
+                      title="Mostrar logo pequeño"
+                    >
+                      {showLogo && <FaCheck size={10} />} Logo
+                    </div>
+                    <div
                       className={`toggle-chip ${showPrice ? 'active' : ''}`}
                       onClick={() => setShowPrice(!showPrice)}
                       title="Mostrar precio de venta"
@@ -1447,7 +1490,19 @@ export default function BarcodeTicketGeneratorModal({
                         key={`${prod.id_producto}-${index}`}
                         className={`paper-${paperType}`}
                       >
-                        {showCompany && <div className="company-title">Multirepuestos RG</div>}
+                        {(showCompany || showLogo) && (
+                          <div className="company-header">
+                            {showLogo && (
+                              <img
+                                src="/icons/logo.png"
+                                alt="Logo"
+                                className="company-logo"
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                            )}
+                            {showCompany && <span className="company-title">Multirepuestos RG</span>}
+                          </div>
+                        )}
 
                         <div className="product-name" title={prod.nombre}>
                           {prod.nombre}
