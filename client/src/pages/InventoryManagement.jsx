@@ -11,6 +11,7 @@ import {
 } from 'react-icons/fa';
 import { rankItems } from '../utils/searchEngine';
 import { useAuth } from '../context/AuthContext';
+import BarcodeTicketGeneratorModal from './BarcodeTicketGeneratorModal';
 
 /* ================================
    STYLED COMPONENTS LOCALES
@@ -196,6 +197,8 @@ const ActionButton = styled.button`
     &:hover { background: #e0f2fe; border-color: #7dd3fc; color: #0369a1; } }
   &.delete { background: #fef2f2; border-color: #fecaca; color: #ef4444; 
     &:hover { background: #fee2e2; border-color: #fca5a5; color: #dc2626; } }
+  &.label { background: #f5f3ff; border-color: #ddd6fe; color: #7c3aed; 
+    &:hover { background: #ede9fe; border-color: #c4b5fd; color: #6d28d9; } }
 `;
 
 /* ESTILOS MODAL (Premium) */
@@ -999,6 +1002,8 @@ const InventoryManagement = () => {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
+  const [initialBarcodeProduct, setInitialBarcodeProduct] = useState(null);
   const [adjustmentModal, setAdjustmentModal] = useState({ isOpen: false, product: null });
   const [alert, setAlert] = useState({ isOpen: false, title: '', message: '' });
   const [archivePrompt, setArchivePrompt] = useState({ open: false, product: null, detail: null });
@@ -1328,6 +1333,9 @@ const InventoryManagement = () => {
         <Title><FaBoxOpen /> Gestión de Inventario</Title>
         <ButtonGroup>
           <Button primary onClick={openCreateModal}><FaPlus /> Crear Producto</Button>
+          <Button secondary onClick={() => { setInitialBarcodeProduct(null); setIsBarcodeModalOpen(true); }} title="Generador de Etiquetas / QR en Hoja A4">
+            <FaBarcode /> Etiquetas A4
+          </Button>
           <Button secondary onClick={() => setIsCategoryModalOpen(true)}><FaTags /> Categorías</Button>
           <Button secondary onClick={() => setIsProviderModalOpen(true)}><FaTruck /> Proveedores</Button>
           <Button tertiary onClick={() => setIsHistoryModalOpen(true)}><FaHistory /> Historial</Button>
@@ -1417,6 +1425,7 @@ const InventoryManagement = () => {
                 <InfoTag><span>Costo Total</span><strong>{p.__fmt.costoTotal}</strong></InfoTag>
               </CardBody>
               <CardFooter>
+                <ActionButton className="label" title="Generar Etiquetas A4" onClick={() => { setInitialBarcodeProduct(p); setIsBarcodeModalOpen(true); }}><FaBarcode /></ActionButton>
                 <ActionButton className="adjust" title="Ajustar Stock" onClick={() => setAdjustmentModal({ isOpen: true, product: p })}><FaPlusCircle /><FaMinusCircle style={{ marginLeft: 4 }} /></ActionButton>
                 <ActionButton className="edit" onClick={() => openEditModal(p)}><FaEdit /> Editar</ActionButton>
                 <ActionButton className="delete" onClick={() => openDeleteModal(p)}><FaTrash /> Eliminar</ActionButton>
@@ -1513,6 +1522,17 @@ const InventoryManagement = () => {
       </AnimatePresence>
       <AnimatePresence>
         {viewImage.isOpen && <ImageViewModal isOpen={viewImage.isOpen} productId={viewImage.productId} imageSrc={viewImage.imageUrl} onClose={() => setViewImage({ isOpen: false, productId: null, imageUrl: null })} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {isBarcodeModalOpen && (
+          <BarcodeTicketGeneratorModal
+            isOpen={isBarcodeModalOpen}
+            onClose={() => { setIsBarcodeModalOpen(false); setInitialBarcodeProduct(null); }}
+            products={allProducts}
+            categories={categories}
+            initialProduct={initialBarcodeProduct}
+          />
+        )}
       </AnimatePresence>
     </PageWrapper>
   );
