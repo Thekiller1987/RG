@@ -14,6 +14,7 @@ contraseña droplet*
 contrasena_droplet*
 CONEXION_DROPLET*
 conexion_droplet*
+deploy_to_droplet*
 *contraseña*
 *password*
 *.pem
