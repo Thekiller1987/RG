@@ -30,7 +30,6 @@ export async function connectBluetoothPrinter(onDisconnected = null) {
   }
 
   try {
-    // Buscar cualquier dispositivo Bluetooth cercano con los servicios térmicos permitidos
     const device = await navigator.bluetooth.requestDevice({
       acceptAllDevices: true,
       optionalServices: PHOMEMO_BLE_SERVICES
@@ -42,7 +41,6 @@ export async function connectBluetoothPrinter(onDisconnected = null) {
 
     const server = await device.gatt.connect();
 
-    // Buscar una característica con permisos de escritura
     let writeCharacteristic = null;
 
     // 1. Probar primero los servicios conocidos
@@ -58,11 +56,11 @@ export async function connectBluetoothPrinter(onDisconnected = null) {
         }
         if (writeCharacteristic) break;
       } catch (err) {
-        // Continuar intentando con el siguiente servicio
+        // Continuar buscando
       }
     }
 
-    // 2. Si no se encontró en la lista fija, consultar todos los servicios primarios expuestos
+    // 2. Si no se encontró en la lista fija, consultar todos los servicios expuestos
     if (!writeCharacteristic) {
       try {
         const services = await server.getPrimaryServices();
@@ -111,6 +109,27 @@ export function disconnectBluetoothPrinter(device) {
 }
 
 /**
+ * Envío seguro de un comando discreto a la característica GATT
+ */
+async function writeCommand(characteristic, data) {
+  try {
+    if (characteristic.properties.writeWithoutResponse && typeof characteristic.writeValueWithoutResponse === 'function') {
+      await characteristic.writeValueWithoutResponse(data);
+    } else {
+      await characteristic.writeValue(data);
+    }
+  } catch (err) {
+    // Si falla writeWithoutResponse, intentar fallback a writeValue
+    try {
+      await characteristic.writeValue(data);
+    } catch (err2) {
+      console.error('Error escribiendo en característica GATT:', err2);
+      throw err2;
+    }
+  }
+}
+
+/**
  * Dibuja un texto ajustado en múltiples líneas en un canvas 2D
  */
 function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 2) {
@@ -133,7 +152,6 @@ function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 2) {
     lines.push(line.trim());
   }
 
-  // Si hay más texto que no cupo en maxLines, colocar ellipsis al final
   if (lines.length === maxLines) {
     let last = lines[maxLines - 1];
     while (ctx.measureText(last + '...').width > maxWidth && last.length > 0) {
@@ -158,11 +176,11 @@ export function render2x1LabelCanvas(product, options = {}) {
     showCompany = true,
     showPrice = true,
     showCategory = false,
-    codeType = 'barcode', // 'barcode' | 'qr' | 'hybrid'
+    codeType = 'barcode',
     storeName = 'MULTIREPUESTOS RG'
   } = options;
 
-  const width = 384; // 48 mm * 8 puntos/mm = 384 puntos exactos
+  const width = 384; // 48 mm * 8 puntos/mm = 384 puntos exactos (ancho cabezal M110)
   const height = 200; // 25 mm * 8 puntos/mm = 200 puntos exactos (2x1 pulgada)
 
   const canvas = document.createElement('canvas');
@@ -180,7 +198,7 @@ export function render2x1LabelCanvas(product, options = {}) {
 
   let currentY = 6;
 
-  // 1. Encabezado de la Empresa (si está activo)
+  // 1. Encabezado de la Empresa
   if (showCompany) {
     ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
     ctx.letterSpacing = '1px';
@@ -200,7 +218,6 @@ export function render2x1LabelCanvas(product, options = {}) {
 
   // 3. Renderizado de Código de Barras / QR
   if (codeType === 'barcode' || codeType === 'hybrid') {
-    // Barcode usando JsBarcode sobre un canvas temporal
     try {
       const barcodeCanvas = document.createElement('canvas');
       JsBarcode(barcodeCanvas, rawCode, {
@@ -214,7 +231,6 @@ export function render2x1LabelCanvas(product, options = {}) {
       });
 
       const bcWidth = barcodeCanvas.width;
-      const bcHeight = barcodeCanvas.height;
       const drawWidth = Math.min(bcWidth, width - 24);
       const drawX = (width - drawWidth) / 2;
 
@@ -225,7 +241,6 @@ export function render2x1LabelCanvas(product, options = {}) {
       currentY += 44;
     }
   } else {
-    // Si sólo es texto o espacio reservado
     currentY += 40;
   }
 
@@ -271,10 +286,10 @@ export function render2x1LabelCanvas(product, options = {}) {
 }
 
 /**
- * Convierte un Canvas 2D en comandos ESC/POS Raster (GS v 0) compatibles con Phomemo
- * Genera un buffer de 1-bit empaquetado para el cabezal térmico.
+ * Convierte un Canvas 2D en datos bitmap puros de 1-bit empaquetados
+ * Cada byte = 8 píxeles horizontales, MSB = pixel izquierdo, bit 1 = negro.
  */
-export function canvasToPhomemoRaster(canvas) {
+export function canvasTo1BitBitmap(canvas) {
   const ctx = canvas.getContext('2d');
   const width = canvas.width; // 384 puntos
   const height = canvas.height; // 200 puntos
@@ -282,27 +297,10 @@ export function canvasToPhomemoRaster(canvas) {
   const imgData = ctx.getImageData(0, 0, width, height);
   const pixels = imgData.data;
 
-  const widthBytes = Math.ceil(width / 8); // 48 bytes
-  const totalRasterBytes = widthBytes * height;
+  const widthBytes = Math.ceil(width / 8); // 48 bytes por línea
+  const bitmap = new Uint8Array(widthBytes * height);
+  let byteIndex = 0;
 
-  const command = [];
-
-  // 1. Inicialización ESC/POS y encabezado propietario Phomemo (M110 / M120 / M220 / D30)
-  // ESC @ (1b 40) + ESC a 1 (centrado 1b 61 01) + Phomemo label setup (1f 11 02 04)
-  command.push(0x1B, 0x40);
-  command.push(0x1B, 0x61, 0x01);
-  command.push(0x1F, 0x11, 0x02, 0x04);
-
-  // 2. Comando GS v 0 (Raster bit image)
-  // 1D 76 30 00 xL xH yL yH
-  const xL = widthBytes & 0xFF;
-  const xH = (widthBytes >> 8) & 0xFF;
-  const yL = height & 0xFF;
-  const yH = (height >> 8) & 0xFF;
-
-  command.push(0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH);
-
-  // 3. Matriz de píxeles: Umbralización monocromática de 1 bit por punto (1 = punto negro, 0 = blanco)
   for (let y = 0; y < height; y++) {
     for (let xByte = 0; xByte < widthBytes; xByte++) {
       let byteVal = 0;
@@ -315,63 +313,95 @@ export function canvasToPhomemoRaster(canvas) {
           const b = pixels[idx + 2];
           const a = pixels[idx + 3];
 
-          // Fórmula de luminosidad ITU-R BT.601
           const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-          // Si el píxel es oscuro y no transparente -> punto térmico negro
           if (a > 128 && luminance < 165) {
             byteVal |= (1 << (7 - bit));
           }
         }
       }
-      command.push(byteVal);
+      bitmap[byteIndex++] = byteVal;
     }
   }
 
-  // 4. Pie de impresión y avance de etiqueta
-  // ESC d 2 (alimentación 2 líneas) + comandos Phomemo de fin de impresión y avance a hendidura/sensor
-  command.push(0x1B, 0x64, 0x02);
-  command.push(0x1B, 0x64, 0x02);
-  command.push(0x1F, 0x11, 0x08);
-  command.push(0x1F, 0x11, 0x0E);
-  command.push(0x0C); // Form Feed estándar para impresoras con sensor de etiqueta gap
-
-  return new Uint8Array(command);
+  return bitmap;
 }
 
 /**
- * Envía datos binarios a la característica BLE en fragmentos (chunks) seguros de 120 bytes
- * evitando desbordamientos de búfer en el chip Bluetooth de la impresora.
+ * Imprime una sola etiqueta en la Phomemo M110 usando la secuencia exacta
+ * y validada del protocolo oficial (pyphomemo / phomymo):
+ * 1. Speed (1b 4e 0d 05) -> delay 30ms
+ * 2. Density (1b 4e 04 0f) -> delay 30ms
+ * 3. Media con gaps (1f 11 0a) -> delay 30ms
+ * 4. Raster Header GS v 0 (1d 76 30 00 30 00 c8 00) -> delay 20ms
+ * 5. Bitmap en chunks de 128 bytes con 20ms de delay
+ * 6. Pausa de 300ms antes del footer
+ * 7. Footer de finalización (1f f0 05 00 1f f0 03 00)
+ * 8. Pausa de 500ms después del footer para completar el avance
  */
-export async function sendBluetoothData(characteristic, uint8Data, onProgress = null) {
-  const CHUNK_SIZE = 120; // 120 bytes es compatible con el MTU de cualquier dispositivo BLE
-  const total = uint8Data.length;
+export async function printSingleLabelM110(characteristic, canvas, options = {}, onChunkProgress = null) {
+  const width = canvas.width; // 384
+  const height = canvas.height; // 200
+  const widthBytes = Math.ceil(width / 8); // 48 bytes
+
+  const bitmapBytes = canvasTo1BitBitmap(canvas);
+
+  const speed = options.speed ?? 0x05; // 0x01 a 0x05
+  const density = options.density ?? 0x0F; // 0x01 a 0x0F (0x0F = máxima nitidez térmica)
+  const media = options.media ?? 0x0A; // 0x0A = etiqueta troquelada con sensor de gap (2x1)
+
+  // 1. Configurar velocidad
+  await writeCommand(characteristic, new Uint8Array([0x1B, 0x4E, 0x0D, speed]));
+  await new Promise(r => setTimeout(r, 30));
+
+  // 2. Configurar densidad / contraste
+  await writeCommand(characteristic, new Uint8Array([0x1B, 0x4E, 0x04, density]));
+  await new Promise(r => setTimeout(r, 30));
+
+  // 3. Configurar tipo de papel (Etiquetas troqueladas con separación)
+  await writeCommand(characteristic, new Uint8Array([0x1F, 0x11, media]));
+  await new Promise(r => setTimeout(r, 30));
+
+  // 4. Encabezado de imagen raster GS v 0
+  const header = new Uint8Array([
+    0x1D, 0x76, 0x30, 0x00,
+    widthBytes & 0xFF, (widthBytes >> 8) & 0xFF,
+    height & 0xFF, (height >> 8) & 0xFF
+  ]);
+  await writeCommand(characteristic, header);
+  await new Promise(r => setTimeout(r, 20));
+
+  // 5. Enviar el mapa de bits en paquetes de 128 bytes
+  const CHUNK_SIZE = 128;
+  const total = bitmapBytes.length;
   let offset = 0;
 
   while (offset < total) {
-    const chunk = uint8Data.slice(offset, offset + CHUNK_SIZE);
-
-    if (characteristic.properties.writeWithoutResponse) {
-      await characteristic.writeValueWithoutResponse(chunk);
-    } else {
-      await characteristic.writeValue(chunk);
-    }
-
+    const chunk = bitmapBytes.slice(offset, offset + CHUNK_SIZE);
+    await writeCommand(characteristic, chunk);
     offset += CHUNK_SIZE;
 
-    if (onProgress) {
-      onProgress(Math.min(100, Math.round((offset / total) * 100)));
+    if (onChunkProgress) {
+      onChunkProgress(Math.min(100, Math.round((offset / total) * 100)));
     }
-
-    // Pequeño descanso de 15ms para drenar el buffer Bluetooth
-    await new Promise((resolve) => setTimeout(resolve, 15));
+    await new Promise(r => setTimeout(r, 20));
   }
+
+  // 6. Pausa crítica antes del footer (300ms)
+  await new Promise(r => setTimeout(r, 300));
+
+  // 7. Footer oficial Phomemo de fin de impresión y alineación
+  const footer = new Uint8Array([0x1F, 0xF0, 0x05, 0x00, 0x1F, 0xF0, 0x03, 0x00]);
+  await writeCommand(characteristic, footer);
+
+  // 8. Pausa para permitir que el motor mecánico termine de imprimir y avanzar
+  await new Promise(r => setTimeout(r, 500));
 }
 
 /**
  * Imprime un lote continuo de etiquetas a la impresora Bluetooth Phomemo ("De un solo")
  * @param {BluetoothRemoteGATTCharacteristic} characteristic - Característica BLE conectada
  * @param {Array} labelsList - Lista de productos (repetidos según la cantidad solicitada)
- * @param {Object} options - Configuración visual de la etiqueta (showPrice, showCompany, etc.)
+ * @param {Object} options - Configuración visual y parámetros de impresión
  * @param {Function} onProgress - Callback ({ current, total, percentage, labelName })
  */
 export async function printBatchViaBluetooth(characteristic, labelsList, options = {}, onProgress = null) {
@@ -392,23 +422,35 @@ export async function printBatchViaBluetooth(characteristic, labelsList, options
       onProgress({
         current: i + 1,
         total,
-        percentage: Math.round(((i) / total) * 100),
+        percentage: Math.round((i / total) * 100),
         labelName: item.nombre || 'Repuesto'
       });
     }
 
-    // 1. Renderizar etiqueta en canvas de alta resolución térmica
+    // 1. Renderizar etiqueta en Canvas 2D
     const canvas = render2x1LabelCanvas(item, options);
 
-    // 2. Empaquetar a comandos de imagen Phomemo ESC/POS
-    const rasterData = canvasToPhomemoRaster(canvas);
+    // 2. Ejecutar la secuencia M110 real
+    await printSingleLabelM110(
+      characteristic,
+      canvas,
+      options,
+      (chunkPercent) => {
+        if (onProgress) {
+          const overall = Math.round(((i + (chunkPercent / 100)) / total) * 100);
+          onProgress({
+            current: i + 1,
+            total,
+            percentage: overall,
+            labelName: item.nombre || 'Repuesto'
+          });
+        }
+      }
+    );
 
-    // 3. Transmitir por Bluetooth
-    await sendBluetoothData(characteristic, rasterData);
-
-    // Pausa de 350ms entre etiquetas para que el motor mecánico avance y corte/alinee la etiqueta
+    // Pausa entre etiquetas consecutivas
     if (i < total - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 350));
+      await new Promise(r => setTimeout(r, 600));
     }
   }
 
@@ -417,7 +459,7 @@ export async function printBatchViaBluetooth(characteristic, labelsList, options
       current: total,
       total,
       percentage: 100,
-      labelName: 'Completado'
+      labelName: '¡Completado con éxito!'
     });
   }
 

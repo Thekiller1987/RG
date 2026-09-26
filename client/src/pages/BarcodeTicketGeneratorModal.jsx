@@ -1396,6 +1396,8 @@ export default function BarcodeTicketGeneratorModal({
   const [isPrintingBatch, setIsPrintingBatch] = useState(false);
   const [printProgress, setPrintProgress] = useState({ current: 0, total: 0, percentage: 0, labelName: '' });
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [labelMedia, setLabelMedia] = useState(0x0A); // 0x0A = Troquelada con separación (Gap 2x1), 0x0B = Continuo
+  const [labelDensity, setLabelDensity] = useState(0x0F); // 0x0F = Máxima nitidez térmica (darkest)
 
   // Cargar producto inicial si fue invocado con uno
   useEffect(() => {
@@ -1631,7 +1633,10 @@ export default function BarcodeTicketGeneratorModal({
           showPrice,
           showCategory,
           codeType,
-          storeName: 'MULTIREPUESTOS RG'
+          storeName: 'MULTIREPUESTOS RG',
+          density: labelDensity,
+          media: labelMedia,
+          speed: 0x05
         },
         (progress) => {
           setPrintProgress(progress);
@@ -2371,6 +2376,20 @@ export default function BarcodeTicketGeneratorModal({
                         )}
                       </select>
                     </div>
+
+                    {/* Selector de Papel para Phomemo 2x1 */}
+                    {paperFormat === 'thermal_2x1' && (
+                      <div className="control-group">
+                        <label>Tipo de Rollo</label>
+                        <select
+                          value={labelMedia}
+                          onChange={(e) => setLabelMedia(Number(e.target.value))}
+                        >
+                          <option value={0x0A}>🏷️ Con Separación (Gap 2x1)</option>
+                          <option value={0x0B}>📄 Rollo Continuo</option>
+                        </select>
+                      </div>
+                    )}
 
                     {/* Controles específicos para A4 */}
                     {paperFormat === 'a4_sheet' && (
