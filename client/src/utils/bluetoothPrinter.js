@@ -230,19 +230,86 @@ function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 2) {
 }
 
 /**
+ * Carga la imagen del logo de la empresa para ser incrustada en el Canvas
+ */
+export function loadLogoImage(url = '/icons/logo.png') {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || typeof Image === 'undefined') {
+      return resolve(null);
+    }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      console.warn('No se pudo cargar el logo desde:', url);
+      resolve(null);
+    };
+    img.src = url;
+  });
+}
+
+/**
+ * Calcula el checksum Adler-32 para el bloque ZLIB (RFC 1950)
+ */
+function adler32(data) {
+  let a = 1;
+  let b = 0;
+  const MOD_ADLER = 65521;
+  for (let i = 0; i < data.length; i++) {
+    a = (a + data[i]) % MOD_ADLER;
+    b = (b + a) % MOD_ADLER;
+  }
+  return ((b << 16) | a) >>> 0;
+}
+
+/**
+ * Empaqueta un buffer de bytes crudos en un stream ZLIB RFC 1950 válido (window_bits=10, Deflate stored block)
+ * Compatible directamente con los microcontroladores de la serie Quin / PrintMaster (Q199, M110, Q30)
+ */
+function buildZlibStoredStream(rawBytes) {
+  const len = rawBytes.length;
+  const nlen = (~len) & 0xFFFF;
+  const adler = adler32(rawBytes);
+
+  // 2 bytes ZLIB header (CMF=0x28 wbits=10, FLG=0x15)
+  // + 5 bytes Deflate block header (BFINAL=1, BTYPE=00, LEN 16-bit LE, NLEN 16-bit LE)
+  // + len bytes de datos
+  // + 4 bytes Adler-32 checksum (Big Endian)
+  const stream = new Uint8Array(2 + 5 + len + 4);
+  stream[0] = 0x28; // CMF (Deflate, 1KB window)
+  stream[1] = 0x15; // FLG ((0x28 * 256 + 0x15) % 31 === 0)
+  stream[2] = 0x01; // BFINAL=1, BTYPE=00 (stored/uncompressed)
+  stream[3] = len & 0xFF;
+  stream[4] = (len >> 8) & 0xFF;
+  stream[5] = nlen & 0xFF;
+  stream[6] = (nlen >> 8) & 0xFF;
+  stream.set(rawBytes, 7);
+
+  const adlerPos = 7 + len;
+  stream[adlerPos] = (adler >> 24) & 0xFF;
+  stream[adlerPos + 1] = (adler >> 16) & 0xFF;
+  stream[adlerPos + 2] = (adler >> 8) & 0xFF;
+  stream[adlerPos + 3] = adler & 0xFF;
+
+  return stream;
+}
+
+/**
  * Renderiza una etiqueta 2x1 pulgadas (384 x 200 px a 203 DPI) en un Canvas HTML5
- * con estética limpia, contraste térmico perfecto y disposición nítida.
+ * con estética limpia, contraste térmico perfecto, logo del negocio y disposición nítida.
  */
 export function render2x1LabelCanvas(product, options = {}) {
   const {
     showCompany = true,
+    showLogo = true,
+    logoImage = null,
     showPrice = true,
     showCategory = false,
     codeType = 'barcode',
     storeName = 'MULTIREPUESTOS RG'
   } = options;
 
-  const width = 384; // 48 mm * 8 puntos/mm = 384 puntos exactos (ancho cabezal térmico M110)
+  const width = 384; // 48 mm * 8 puntos/mm = 384 puntos exactos (ancho cabezal térmico M110/Q199)
   const height = 200; // 25 mm * 8 puntos/mm = 200 puntos exactos (2x1 pulgada)
 
   const canvas = document.createElement('canvas');
@@ -255,25 +322,48 @@ export function render2x1LabelCanvas(product, options = {}) {
   ctx.fillRect(0, 0, width, height);
 
   ctx.fillStyle = '#000000';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
 
-  let currentY = 6;
+  let currentY = 5;
 
-  // 1. Encabezado de la Empresa
-  if (showCompany) {
-    ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
-    ctx.letterSpacing = '1px';
-    ctx.fillText(storeName, width / 2, currentY);
-    currentY += 16;
+  // 1. Encabezado con Logo del Negocio y Nombre de la Empresa
+  const hasLogo = Boolean(showLogo && logoImage);
+  if (showCompany || hasLogo) {
+    const logoSize = 22; // 22x22 px cabe perfecto sin desplazar la información crítica
+    ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
+
+    if (hasLogo && showCompany) {
+      const textMetrics = ctx.measureText(storeName);
+      const gap = 6;
+      const totalHeaderWidth = logoSize + gap + textMetrics.width;
+      const startX = Math.max(8, (width - totalHeaderWidth) / 2);
+
+      // Dibujar logo del negocio
+      ctx.drawImage(logoImage, startX, currentY, logoSize, logoSize);
+
+      // Dibujar nombre de empresa centrado verticalmente respecto al logo
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(storeName, startX + logoSize + gap, currentY + (logoSize / 2));
+      currentY += logoSize + 4;
+    } else if (hasLogo) {
+      ctx.drawImage(logoImage, (width - logoSize) / 2, currentY, logoSize, logoSize);
+      currentY += logoSize + 4;
+    } else if (showCompany) {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(storeName, width / 2, currentY);
+      currentY += 16;
+    }
   } else {
     currentY += 4;
   }
 
   // 2. Nombre del Producto (1 o 2 líneas, negrita de alta visibilidad)
-  ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.font = 'bold 14px system-ui, -apple-system, sans-serif';
   const prodName = product.nombre || 'Repuesto';
-  const textHeight = drawWrappedText(ctx, prodName, width / 2, currentY, width - 20, 17, 2);
+  const textHeight = drawWrappedText(ctx, prodName, width / 2, currentY, width - 20, 16, 2);
   currentY += textHeight + 4;
 
   const rawCode = String(product.codigo_barras || product.codigo || '000000');
@@ -284,8 +374,8 @@ export function render2x1LabelCanvas(product, options = {}) {
       const barcodeCanvas = document.createElement('canvas');
       JsBarcode(barcodeCanvas, rawCode, {
         format: 'CODE128',
-        width: 1.6,
-        height: 44,
+        width: 1.5,
+        height: 40,
         displayValue: false,
         margin: 0,
         background: '#ffffff',
@@ -296,14 +386,14 @@ export function render2x1LabelCanvas(product, options = {}) {
       const drawWidth = Math.min(bcWidth, width - 24);
       const drawX = (width - drawWidth) / 2;
 
-      ctx.drawImage(barcodeCanvas, drawX, currentY, drawWidth, 44);
-      currentY += 47;
+      ctx.drawImage(barcodeCanvas, drawX, currentY, drawWidth, 40);
+      currentY += 43;
     } catch (err) {
       console.warn('Error dibujando código de barras en canvas:', err);
-      currentY += 44;
+      currentY += 40;
     }
   } else {
-    currentY += 40;
+    currentY += 38;
   }
 
   // 4. Línea separadora inferior
@@ -349,7 +439,7 @@ export function render2x1LabelCanvas(product, options = {}) {
 
 /**
  * Convierte un Canvas 2D en datos bitmap puros de 1-bit empaquetados
- * Cada byte = 8 píxeles horizontales, MSB = pixel izquierdo, bit 1 = negro.
+ * Cada byte = 8 píxeles horizontales, MSB = pixel izquierdo, bit 1 = negro (calor térmico).
  */
 export function canvasTo1BitBitmap(canvas) {
   const ctx = canvas.getContext('2d');
@@ -375,9 +465,12 @@ export function canvasTo1BitBitmap(canvas) {
           const b = pixels[idx + 2];
           const a = pixels[idx + 3];
 
-          const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-          if (a > 128 && luminance < 165) {
-            byteVal |= (1 << (7 - bit));
+          // Manejo de transparencia y contraste térmico
+          if (a > 64) {
+            const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+            if (luminance < 175) {
+              byteVal |= (1 << (7 - bit));
+            }
           }
         }
       }
@@ -392,16 +485,132 @@ export function canvasTo1BitBitmap(canvas) {
  * Detecta el protocolo predeterminado según el nombre del dispositivo Bluetooth reportado
  */
 export function detectProtocolFromName(name) {
-  if (!name) return 'm_series';
+  if (!name) return 'printmaster_0x1f';
   const n = String(name).toUpperCase();
-  if (n.startsWith('Q') || n.includes('Q199') || n.includes('D30') || n.includes('D35') || n.includes('Q30') || n.includes('D110')) {
+  // Familias Quin / PrintMaster (Q199, Q042, Q061, Q119, Q192, Q194, M110, M120, M220, PrintMaster)
+  if (
+    n.startsWith('Q') ||
+    n.includes('Q199') ||
+    n.includes('M110') ||
+    n.includes('PRINTMASTER') ||
+    n.includes('M108') ||
+    n.includes('M120') ||
+    n.includes('M220') ||
+    n.includes('M200')
+  ) {
+    return 'printmaster_0x1f';
+  }
+  if (n.includes('D30') || n.includes('D35') || n.includes('D110')) {
     return 'd_series';
   }
   if (n.includes('M02') || n.includes('T02')) {
     return 'm02_series';
   }
-  // Para M110, M120, M200, M220 o marcas genéricas Phomemo
-  return 'm_series';
+  return 'printmaster_0x1f';
+}
+
+/**
+ * Construye el payload nativo 0x1F para impresoras Quin / PrintMaster (Q199, M110, Q30)
+ * Usa compresión Deflate encapsulada en ZLIB (RFC 1950) y delimitadores 0x1F C0
+ */
+export function buildPrintMaster0x1FPayload(canvas, options = {}) {
+  const {
+    density = 0x03, // Densidad PrintMaster 1-5 (3 = medio, 5 = oscuro)
+    media = 0x20     // 0x20 = Papel con separación (Gap 2x1), 0x10 = Continuo
+  } = options;
+
+  const width = canvas.width; // 384
+  const height = canvas.height; // 200
+  const widthBytes = Math.ceil(width / 8); // 48
+  const rawBitmap = canvasTo1BitBitmap(canvas); // 9600 bytes
+  const zlibStream = buildZlibStoredStream(rawBitmap); // 9611 bytes
+  const zlibLen = zlibStream.length;
+
+  const parts = [];
+
+  // 1. Configurar tipo de papel (0x20 = Gap troquelado 2x1, 0x10 = Continuo)
+  const paperMode = (media === 0x0B || media === 0x10) ? 0x10 : 0x20;
+  parts.push(new Uint8Array([0x1F, 0x80, 0x01, paperMode]));
+
+  // 2. Configurar densidad / energía de impresión (1-5)
+  const densByte = Math.min(5, Math.max(1, Number(density) || 3));
+  parts.push(new Uint8Array([0x1F, 0x20, 0x01, densByte]));
+
+  // 3. Iniciar trabajo de impresión (Start Print Job)
+  parts.push(new Uint8Array([0x1F, 0xC0, 0x01, 0x00]));
+
+  // 4. Alinear posición de inicio (Align start)
+  parts.push(new Uint8Array([0x1F, 0x11, 0x51]));
+
+  // 5. Comando de Imagen 0x1F 0x10:
+  // Encabezado de 10 bytes: 0x1F, 0x10, widthBytes(2B BE), height(2B BE), zlibLen(4B BE)
+  const imgHeader = new Uint8Array([
+    0x1F, 0x10,
+    (widthBytes >> 8) & 0xFF, widthBytes & 0xFF,
+    (height >> 8) & 0xFF, height & 0xFF,
+    (zlibLen >> 24) & 0xFF, (zlibLen >> 16) & 0xFF, (zlibLen >> 8) & 0xFF, zlibLen & 0xFF
+  ]);
+  parts.push(imgHeader);
+  parts.push(zlibStream);
+
+  // 6. Finalizar trabajo de impresión (End Print Job)
+  parts.push(new Uint8Array([0x1F, 0xC0, 0x01, 0x01]));
+
+  // 7. Avanzar papel a la línea de corte / separación óptica (Feed paper)
+  parts.push(new Uint8Array([0x1F, 0x11, 0x50]));
+
+  // Concatenar todos los bloques
+  const totalLength = parts.reduce((acc, p) => acc + p.length, 0);
+  const payload = new Uint8Array(totalLength);
+  let pos = 0;
+  for (const p of parts) {
+    payload.set(p, pos);
+    pos += p.length;
+  }
+  return payload;
+}
+
+/**
+ * Construye el payload ESC/POS para PrintMaster / Phomemo M110 con avance seguro de 80 puntos
+ */
+export function buildPrintMasterEscPayload(canvas, options = {}) {
+  const {
+    density = 0x0F,
+    speed = 0x03
+  } = options;
+
+  const width = canvas.width; // 384
+  const height = canvas.height; // 200
+  const widthBytes = Math.ceil(width / 8); // 48 bytes
+  const bitmap = canvasTo1BitBitmap(canvas); // 9600 bytes
+
+  const parts = [];
+
+  // Comandos de control PrintMaster
+  parts.push(new Uint8Array([0x1F, 0x11, 0x02, density & 0xFF])); // Densidad
+  parts.push(new Uint8Array([0x1F, 0x11, 0x23, speed & 0xFF]));   // Velocidad
+  parts.push(new Uint8Array([0x1B, 0x40]));                       // Reset ESC @
+  parts.push(new Uint8Array([0x1F, 0x11, 0x21, 0x01]));           // Cantidad copias = 1
+
+  // Bloque raster estándar GS v 0
+  parts.push(new Uint8Array([
+    0x1D, 0x76, 0x30, 0x00,
+    widthBytes & 0xFF, (widthBytes >> 8) & 0xFF,
+    height & 0xFF, (height >> 8) & 0xFF
+  ]));
+  parts.push(bitmap);
+
+  // Avance mecánico calibrado (ESC J 80 puntos = 10mm) hacia la línea de corte
+  parts.push(new Uint8Array([0x1B, 0x4A, 0x50]));
+
+  const totalLength = parts.reduce((acc, p) => acc + p.length, 0);
+  const payload = new Uint8Array(totalLength);
+  let pos = 0;
+  for (const p of parts) {
+    payload.set(p, pos);
+    pos += p.length;
+  }
+  return payload;
 }
 
 /**
@@ -410,11 +619,21 @@ export function detectProtocolFromName(name) {
  */
 export function buildLabelPayload(canvas, options = {}) {
   const {
-    protocol = 'm_series',
+    protocol = 'printmaster_0x1f',
     speed = 0x05,
     density = 0x0F,
-    media = 0x0A // 0x0A = Troquelada con separación (Gap 2x1), 0x0B = Continuo
+    media = 0x0A
   } = options;
+
+  // Protocolo Nativo Quin / PrintMaster 0x1F (Q199, Q30, M110)
+  if (protocol === 'printmaster_0x1f') {
+    return buildPrintMaster0x1FPayload(canvas, options);
+  }
+
+  // Protocolo PrintMaster ESC/POS con feed calibrado
+  if (protocol === 'printmaster_esc') {
+    return buildPrintMasterEscPayload(canvas, options);
+  }
 
   const width = canvas.width; // 384
   const height = canvas.height; // 200
@@ -425,14 +644,14 @@ export function buildLabelPayload(canvas, options = {}) {
 
   if (protocol === 'd_series') {
     // Protocolo Phomemo Serie D (D30, Q30, etc.)
-    parts.push(new Uint8Array([0x1B, 0x40])); // ESC @
+    parts.push(new Uint8Array([0x1F, 0x11, 0x24, 0x00, 0x1B, 0x40]));
     parts.push(new Uint8Array([
       0x1D, 0x76, 0x30, 0x00,
       widthBytes & 0xFF, (widthBytes >> 8) & 0xFF,
       height & 0xFF, (height >> 8) & 0xFF
     ]));
     parts.push(bitmap);
-    parts.push(new Uint8Array([0x1B, 0x64, 0x00])); // ESC d 0
+    parts.push(new Uint8Array([0x1B, 0x64, 0x02]));
   } else if (protocol === 'm02_series') {
     // Protocolo Phomemo Serie M02 / T02
     parts.push(new Uint8Array([
@@ -448,14 +667,13 @@ export function buildLabelPayload(canvas, options = {}) {
     parts.push(bitmap);
     parts.push(new Uint8Array([
       0x1B, 0x64, 0x02,
-      0x1B, 0x64, 0x02,
       0x1F, 0x11, 0x08,
       0x1F, 0x11, 0x0E,
       0x1F, 0x11, 0x07,
       0x1F, 0x11, 0x09
     ]));
   } else if (protocol === 'm_series_esc') {
-    // Phomemo Serie M con Reset ESC @ inicial
+    // Phomemo Serie M con Reset ESC @ inicial y avance seguro
     parts.push(new Uint8Array([
       0x1B, 0x40,
       0x1B, 0x4E, 0x0D, speed,
@@ -468,10 +686,7 @@ export function buildLabelPayload(canvas, options = {}) {
       height & 0xFF, (height >> 8) & 0xFF
     ]));
     parts.push(bitmap);
-    parts.push(new Uint8Array([
-      0x1F, 0xF0, 0x05, 0x00,
-      0x1F, 0xF0, 0x03, 0x00
-    ]));
+    parts.push(new Uint8Array([0x1B, 0x4A, 0x40]));
   } else if (protocol === 'esc_pos_std') {
     // Protocolo ESC/POS estándar
     parts.push(new Uint8Array([0x1B, 0x40]));
@@ -483,11 +698,11 @@ export function buildLabelPayload(canvas, options = {}) {
     parts.push(bitmap);
     parts.push(new Uint8Array([0x1B, 0x64, 0x03]));
   } else {
-    // Protocolo Canónico Serie M (M110, M120, M200, M220) - PREDETERMINADO
+    // Protocolo Canónico Serie M (M110, M120, M200, M220) con avance de corte
     parts.push(new Uint8Array([
-      0x1B, 0x4E, 0x0D, speed,   // Velocidad (5 = rápido)
-      0x1B, 0x4E, 0x04, density, // Densidad / Contraste (0x0F = máximo)
-      0x1F, 0x11, media          // Tipo de papel (0x0A = etiquetas con separación / gap)
+      0x1B, 0x4E, 0x0D, speed,
+      0x1B, 0x4E, 0x04, density,
+      0x1F, 0x11, media
     ]));
     parts.push(new Uint8Array([
       0x1D, 0x76, 0x30, 0x00,
@@ -495,10 +710,7 @@ export function buildLabelPayload(canvas, options = {}) {
       height & 0xFF, (height >> 8) & 0xFF
     ]));
     parts.push(bitmap);
-    parts.push(new Uint8Array([
-      0x1F, 0xF0, 0x05, 0x00,
-      0x1F, 0xF0, 0x03, 0x00
-    ]));
+    parts.push(new Uint8Array([0x1B, 0x4A, 0x40]));
   }
 
   // Concatenar todos los bloques en un solo buffer binario contiguo
@@ -531,6 +743,18 @@ export async function printBatchViaBluetooth(characteristic, labelsList, options
 
   const total = labelsList.length;
 
+  // Cargar imagen del logo de forma asíncrona una sola vez para todo el lote
+  let logoImage = options.logoImage || null;
+  if (!logoImage && options.showLogo !== false) {
+    try {
+      logoImage = await loadLogoImage('/icons/logo.png');
+    } catch (e) {
+      console.warn('Error cargando logo para impresión:', e);
+    }
+  }
+
+  const batchOptions = { ...options, logoImage };
+
   for (let i = 0; i < total; i++) {
     const item = labelsList[i];
 
@@ -543,11 +767,11 @@ export async function printBatchViaBluetooth(characteristic, labelsList, options
       });
     }
 
-    // 1. Renderizar etiqueta en Canvas 2D
-    const canvas = render2x1LabelCanvas(item, options);
+    // 1. Renderizar etiqueta en Canvas 2D con el logo del negocio
+    const canvas = render2x1LabelCanvas(item, batchOptions);
 
     // 2. Construir payload binario completo según el protocolo seleccionado
-    const payload = buildLabelPayload(canvas, options);
+    const payload = buildLabelPayload(canvas, batchOptions);
 
     // 3. Enviar todo el payload continuo en paquetes seguros esperando respuesta GATT
     await sendBluetoothPayload(characteristic, payload, (chunkPercent) => {
@@ -580,3 +804,4 @@ export async function printBatchViaBluetooth(characteristic, labelsList, options
 
   return { success: true, count: total };
 }
+

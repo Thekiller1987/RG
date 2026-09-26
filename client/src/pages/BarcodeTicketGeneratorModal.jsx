@@ -927,14 +927,31 @@ const ThermalSticker = styled.div`
     gap: 4px;
   }
 
-  .company-title {
-    font-size: 8pt;
-    font-weight: 800;
-    text-transform: uppercase;
-    color: #000000;
-    letter-spacing: 0.05em;
-    line-height: 1;
-    margin: 0;
+  .company-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 2px;
+    width: 100%;
+
+    .company-logo {
+      height: 18px;
+      max-height: 18px;
+      width: auto;
+      object-fit: contain;
+      filter: contrast(160%) grayscale(100%);
+    }
+
+    .company-title {
+      font-size: 8pt;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #000000;
+      letter-spacing: 0.05em;
+      line-height: 1;
+      margin: 0;
+    }
   }
 
   .product-name {
@@ -1399,7 +1416,7 @@ export default function BarcodeTicketGeneratorModal({
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [labelMedia, setLabelMedia] = useState(0x0A); // 0x0A = Troquelada con separación (Gap 2x1), 0x0B = Continuo
   const [labelDensity, setLabelDensity] = useState(0x0F); // 0x0F = Máxima nitidez térmica (darkest)
-  const [printerProtocol, setPrinterProtocol] = useState('m_series'); // 'm_series' | 'm_series_esc' | 'd_series' | 'm02_series' | 'esc_pos_std'
+  const [printerProtocol, setPrinterProtocol] = useState('printmaster_0x1f'); // 'printmaster_0x1f' | 'printmaster_esc' | 'm_series' | 'm_series_esc' | 'd_series' | 'm02_series' | 'esc_pos_std'
 
   // Cargar producto inicial si fue invocado con uno
   useEffect(() => {
@@ -1633,6 +1650,7 @@ export default function BarcodeTicketGeneratorModal({
         char,
         flattenedLabels,
         {
+          showLogo,
           showCompany,
           showPrice,
           showCategory,
@@ -1701,9 +1719,10 @@ export default function BarcodeTicketGeneratorModal({
 
       labelsHtml += `
         <div class="label-page-2x1">
-          ${showCompany ? `
+          ${(showCompany || showLogo) ? `
             <div class="company-header">
-              <span class="company-title">Multirepuestos RG</span>
+              ${showLogo ? '<img src="/icons/logo.png" class="company-logo" alt="Logo" onerror="this.style.display=\'none\'" />' : ''}
+              ${showCompany ? '<span class="company-title">Multirepuestos RG</span>' : ''}
             </div>
           ` : ''}
           <div class="product-name">${product.nombre || 'Repuesto'}</div>
@@ -1766,6 +1785,16 @@ export default function BarcodeTicketGeneratorModal({
         width: 100%;
         line-height: 1;
         margin-bottom: 0.3mm;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+      }
+      .company-logo {
+        height: 16px;
+        max-height: 16px;
+        width: auto;
+        object-fit: contain;
       }
       .company-title {
         font-size: 6.5pt;
@@ -2391,9 +2420,11 @@ export default function BarcodeTicketGeneratorModal({
                             value={printerProtocol}
                             onChange={(e) => setPrinterProtocol(e.target.value)}
                           >
-                            <option value="m_series">🏷️ Phomemo Serie M (M110 / M120 / M220)</option>
-                            <option value="m_series_esc">🏷️ Phomemo M110 (con Reset ESC @)</option>
-                            <option value="d_series">🏷️ Phomemo Serie Q / D (Q199 / Q30 / D30)</option>
+                            <option value="printmaster_0x1f">🏷️ Phomemo Serie Q / M (Protocolo 0x1F - Q199 / Q30 / M110) [Recomendado]</option>
+                            <option value="printmaster_esc">🏷️ Phomemo Serie Q / M (Modo ESC/POS + Feed)</option>
+                            <option value="m_series">🏷️ Phomemo Serie M Clásica (M110 / M120 / M220)</option>
+                            <option value="m_series_esc">🏷️ Phomemo Serie M (con Reset ESC @)</option>
+                            <option value="d_series">🏷️ Phomemo Serie D (D30 / Q30)</option>
                             <option value="m02_series">🏷️ Phomemo Serie M02 / T02</option>
                             <option value="esc_pos_std">🏷️ ESC/POS Genérico</option>
                           </select>
@@ -2436,6 +2467,13 @@ export default function BarcodeTicketGeneratorModal({
 
                     {/* Toggles de contenido */}
                     <div className="toggles">
+                      <div
+                        className={`toggle-chip ${showLogo ? 'active' : ''}`}
+                        onClick={() => setShowLogo(!showLogo)}
+                        title="Mostrar Logo del Negocio"
+                      >
+                        {showLogo && <FaCheck size={9} />} Logo
+                      </div>
                       <div
                         className={`toggle-chip ${showPrice ? 'active' : ''}`}
                         onClick={() => setShowPrice(!showPrice)}
@@ -2560,8 +2598,18 @@ export default function BarcodeTicketGeneratorModal({
                               <FaTags size={10} /> 2x1 PULGADAS (50x25mm)
                             </div>
 
-                            {showCompany && (
-                              <div className="company-title">Multirepuestos RG</div>
+                            {(showCompany || showLogo) && (
+                              <div className="company-header-row">
+                                {showLogo && (
+                                  <img
+                                    src="/icons/logo.png"
+                                    className="company-logo"
+                                    alt="Logo"
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                  />
+                                )}
+                                {showCompany && <span className="company-title">Multirepuestos RG</span>}
+                              </div>
                             )}
 
                             <div className="product-name" title={prod.nombre}>
@@ -2617,8 +2665,18 @@ export default function BarcodeTicketGeneratorModal({
                                 #{index + 1} • 2x1''
                               </div>
 
-                              {showCompany && (
-                                <div className="company-title">Multirepuestos RG</div>
+                              {(showCompany || showLogo) && (
+                                <div className="company-header-row">
+                                  {showLogo && (
+                                    <img
+                                      src="/icons/logo.png"
+                                      className="company-logo"
+                                      alt="Logo"
+                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                    />
+                                  )}
+                                  {showCompany && <span className="company-title">Multirepuestos RG</span>}
+                                </div>
                               )}
 
                               <div className="product-name" title={prod.nombre}>
