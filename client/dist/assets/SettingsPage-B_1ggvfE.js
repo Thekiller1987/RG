@@ -1,4 +1,4 @@
-import{r as m,j as e,y as v,bb as E,bc as L,bd as P,al as z,b1 as T,C as D,be as G,D as $,s}from"./vendor-C6IkOdzt.js";import{a as I,u as R,c as A,b as H}from"./index-Bh0OH_w0.js";import"./scanner-vendor-DfxRpMWJ.js";import"./pdf-vendor-CINaEeII.js";const M=s.div`
+import{r as m,j as e,y as v,bb as E,bc as L,bd as P,al as z,b1 as T,C as D,be as G,D as $,s}from"./vendor-C6IkOdzt.js";import{a as I,u as R,c as A,b as H}from"./index-CxGubJr2.js";import"./scanner-vendor-DfxRpMWJ.js";import"./pdf-vendor-CINaEeII.js";const M=s.div`
   padding: 2rem;
   max-width: 800px;
   margin: 0 auto;

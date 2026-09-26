@@ -15,7 +15,8 @@ import {
   isBluetoothSupported,
   connectBluetoothPrinter,
   disconnectBluetoothPrinter,
-  printBatchViaBluetooth
+  printBatchViaBluetooth,
+  detectProtocolFromName
 } from '../utils/bluetoothPrinter';
 
 /* ==========================================
@@ -1398,6 +1399,7 @@ export default function BarcodeTicketGeneratorModal({
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [labelMedia, setLabelMedia] = useState(0x0A); // 0x0A = Troquelada con separación (Gap 2x1), 0x0B = Continuo
   const [labelDensity, setLabelDensity] = useState(0x0F); // 0x0F = Máxima nitidez térmica (darkest)
+  const [printerProtocol, setPrinterProtocol] = useState('m_series'); // 'm_series' | 'm_series_esc' | 'd_series' | 'm02_series' | 'esc_pos_std'
 
   // Cargar producto inicial si fue invocado con uno
   useEffect(() => {
@@ -1604,6 +1606,8 @@ export default function BarcodeTicketGeneratorModal({
         setBluetoothDevice(conn.device);
         setBluetoothCharacteristic(conn.characteristic);
         setBluetoothDeviceName(conn.name);
+        const autoProto = detectProtocolFromName(conn.name);
+        setPrinterProtocol(autoProto);
         setBluetoothStatus('connected');
         toast.success(`Conectado a ${conn.name}`);
       } catch (err) {
@@ -1636,7 +1640,8 @@ export default function BarcodeTicketGeneratorModal({
           storeName: 'MULTIREPUESTOS RG',
           density: labelDensity,
           media: labelMedia,
-          speed: 0x05
+          speed: 0x05,
+          protocol: printerProtocol
         },
         (progress) => {
           setPrintProgress(progress);
@@ -2377,18 +2382,34 @@ export default function BarcodeTicketGeneratorModal({
                       </select>
                     </div>
 
-                    {/* Selector de Papel para Phomemo 2x1 */}
+                    {/* Selector de Protocolo y Papel para Phomemo 2x1 */}
                     {paperFormat === 'thermal_2x1' && (
-                      <div className="control-group">
-                        <label>Tipo de Rollo</label>
-                        <select
-                          value={labelMedia}
-                          onChange={(e) => setLabelMedia(Number(e.target.value))}
-                        >
-                          <option value={0x0A}>🏷️ Con Separación (Gap 2x1)</option>
-                          <option value={0x0B}>📄 Rollo Continuo</option>
-                        </select>
-                      </div>
+                      <>
+                        <div className="control-group">
+                          <label>Protocolo de Impresora</label>
+                          <select
+                            value={printerProtocol}
+                            onChange={(e) => setPrinterProtocol(e.target.value)}
+                          >
+                            <option value="m_series">🏷️ Phomemo Serie M (M110 / M120 / M220)</option>
+                            <option value="m_series_esc">🏷️ Phomemo M110 (con Reset ESC @)</option>
+                            <option value="d_series">🏷️ Phomemo Serie D / Q (D30 / Q30 / D110)</option>
+                            <option value="m02_series">🏷️ Phomemo Serie M02 / T02</option>
+                            <option value="esc_pos_std">🏷️ ESC/POS Genérico</option>
+                          </select>
+                        </div>
+
+                        <div className="control-group">
+                          <label>Tipo de Rollo</label>
+                          <select
+                            value={labelMedia}
+                            onChange={(e) => setLabelMedia(Number(e.target.value))}
+                          >
+                            <option value={0x0A}>🏷️ Con Separación (Gap 2x1)</option>
+                            <option value={0x0B}>📄 Rollo Continuo</option>
+                          </select>
+                        </div>
+                      </>
                     )}
 
                     {/* Controles específicos para A4 */}

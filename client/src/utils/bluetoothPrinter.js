@@ -43,18 +43,34 @@ export async function connectBluetoothPrinter(onDisconnected = null) {
 
     let writeCharacteristic = null;
 
+    // Helper para seleccionar la mejor característica de escritura
+    const pickBestChar = (chars) => {
+      // 1. Buscar prioritariamente la característica 'ff02' o 'ffe1'
+      let found = chars.find(c =>
+        (c.uuid.includes('ff02') || c.uuid.includes('ffe1')) &&
+        (c.properties.write || c.properties.writeWithoutResponse)
+      );
+      // 2. Si no, cualquiera que soporte write con respuesta
+      if (!found) {
+        found = chars.find(c => c.properties.write);
+      }
+      // 3. Si no, cualquiera con writeWithoutResponse
+      if (!found) {
+        found = chars.find(c => c.properties.writeWithoutResponse);
+      }
+      return found;
+    };
+
     // 1. Probar primero los servicios conocidos
     for (const serviceUuid of PHOMEMO_BLE_SERVICES) {
       try {
         const service = await server.getPrimaryService(serviceUuid);
         const chars = await service.getCharacteristics();
-        for (const char of chars) {
-          if (char.properties.write || char.properties.writeWithoutResponse) {
-            writeCharacteristic = char;
-            break;
-          }
+        const target = pickBestChar(chars);
+        if (target) {
+          writeCharacteristic = target;
+          break;
         }
-        if (writeCharacteristic) break;
       } catch (err) {
         // Continuar buscando
       }
@@ -66,13 +82,11 @@ export async function connectBluetoothPrinter(onDisconnected = null) {
         const services = await server.getPrimaryServices();
         for (const service of services) {
           const chars = await service.getCharacteristics();
-          for (const char of chars) {
-            if (char.properties.write || char.properties.writeWithoutResponse) {
-              writeCharacteristic = char;
-              break;
-            }
+          const target = pickBestChar(chars);
+          if (target) {
+            writeCharacteristic = target;
+            break;
           }
-          if (writeCharacteristic) break;
         }
       } catch (e) {
         console.warn('Error al explorar servicios adicionales:', e);
@@ -109,23 +123,71 @@ export function disconnectBluetoothPrinter(device) {
 }
 
 /**
- * Envío seguro de un comando discreto a la característica GATT
+ * Envío seguro de un chunk a la característica GATT
+ * Prioriza writeValueWithResponse / writeValue para esperar la confirmación de hardware
  */
-async function writeCommand(characteristic, data) {
-  try {
-    if (characteristic.properties.writeWithoutResponse && typeof characteristic.writeValueWithoutResponse === 'function') {
+async function writeGattChunk(characteristic, data) {
+  // 1. Intentar primero con confirmación (espera ACK del microcontrolador)
+  if (characteristic.properties.write) {
+    if (typeof characteristic.writeValueWithResponse === 'function') {
+      try {
+        await characteristic.writeValueWithResponse(data);
+        return;
+      } catch (e1) {
+        // Fallback al siguiente método
+      }
+    }
+    if (typeof characteristic.writeValue === 'function') {
+      try {
+        await characteristic.writeValue(data);
+        return;
+      } catch (e2) {
+        // Fallback
+      }
+    }
+  }
+
+  // 2. Modo sin respuesta si no hay soporte con confirmación
+  if (characteristic.properties.writeWithoutResponse) {
+    if (typeof characteristic.writeValueWithoutResponse === 'function') {
       await characteristic.writeValueWithoutResponse(data);
-    } else {
-      await characteristic.writeValue(data);
+      return;
     }
-  } catch (err) {
-    // Si falla writeWithoutResponse, intentar fallback a writeValue
-    try {
-      await characteristic.writeValue(data);
-    } catch (err2) {
-      console.error('Error escribiendo en característica GATT:', err2);
-      throw err2;
+  }
+
+  // 3. Fallback genérico
+  if (typeof characteristic.writeValue === 'function') {
+    await characteristic.writeValue(data);
+  } else if (typeof characteristic.writeValueWithoutResponse === 'function') {
+    await characteristic.writeValueWithoutResponse(data);
+  } else {
+    throw new Error('La característica Bluetooth no tiene permisos de escritura.');
+  }
+}
+
+/**
+ * Envía un payload binario completo a la impresora en chunks seguros de 128 bytes
+ * controlando la cadencia para no desbordar el búfer de recepción
+ */
+export async function sendBluetoothPayload(characteristic, uint8Data, onProgress = null) {
+  const CHUNK_SIZE = 128; // Paquetes de 128 bytes óptimos para BLE
+  const total = uint8Data.length;
+  let offset = 0;
+
+  // Si la característica no usa confirmación GATT, damos más tiempo entre paquetes (30ms vs 18ms)
+  const isReliable = characteristic.properties.write;
+  const chunkDelay = isReliable ? 18 : 32;
+
+  while (offset < total) {
+    const chunk = uint8Data.slice(offset, offset + CHUNK_SIZE);
+    await writeGattChunk(characteristic, chunk);
+    offset += CHUNK_SIZE;
+
+    if (onProgress) {
+      onProgress(Math.min(100, Math.round((offset / total) * 100)));
     }
+
+    await new Promise((resolve) => setTimeout(resolve, chunkDelay));
   }
 }
 
@@ -180,7 +242,7 @@ export function render2x1LabelCanvas(product, options = {}) {
     storeName = 'MULTIREPUESTOS RG'
   } = options;
 
-  const width = 384; // 48 mm * 8 puntos/mm = 384 puntos exactos (ancho cabezal M110)
+  const width = 384; // 48 mm * 8 puntos/mm = 384 puntos exactos (ancho cabezal térmico M110)
   const height = 200; // 25 mm * 8 puntos/mm = 200 puntos exactos (2x1 pulgada)
 
   const canvas = document.createElement('canvas');
@@ -327,74 +389,128 @@ export function canvasTo1BitBitmap(canvas) {
 }
 
 /**
- * Imprime una sola etiqueta en la Phomemo M110 usando la secuencia exacta
- * y validada del protocolo oficial (pyphomemo / phomymo):
- * 1. Speed (1b 4e 0d 05) -> delay 30ms
- * 2. Density (1b 4e 04 0f) -> delay 30ms
- * 3. Media con gaps (1f 11 0a) -> delay 30ms
- * 4. Raster Header GS v 0 (1d 76 30 00 30 00 c8 00) -> delay 20ms
- * 5. Bitmap en chunks de 128 bytes con 20ms de delay
- * 6. Pausa de 300ms antes del footer
- * 7. Footer de finalización (1f f0 05 00 1f f0 03 00)
- * 8. Pausa de 500ms después del footer para completar el avance
+ * Detecta el protocolo predeterminado según el nombre del dispositivo Bluetooth reportado
  */
-export async function printSingleLabelM110(characteristic, canvas, options = {}, onChunkProgress = null) {
+export function detectProtocolFromName(name) {
+  if (!name) return 'm_series';
+  const n = String(name).toUpperCase();
+  if (n.includes('D30') || n.includes('D35') || n.includes('Q30') || n.includes('D110')) {
+    return 'd_series';
+  }
+  if (n.includes('M02') || n.includes('T02')) {
+    return 'm02_series';
+  }
+  // Para M110, M120, M200, M220 o marcas genéricas Phomemo
+  return 'm_series';
+}
+
+/**
+ * Construye el payload binario completo y contiguo para una etiqueta
+ * en un solo flujo continuo según el modelo/protocolo seleccionado
+ */
+export function buildLabelPayload(canvas, options = {}) {
+  const {
+    protocol = 'm_series',
+    speed = 0x05,
+    density = 0x0F,
+    media = 0x0A // 0x0A = Troquelada con separación (Gap 2x1), 0x0B = Continuo
+  } = options;
+
   const width = canvas.width; // 384
   const height = canvas.height; // 200
   const widthBytes = Math.ceil(width / 8); // 48 bytes
+  const bitmap = canvasTo1BitBitmap(canvas); // 9600 bytes
 
-  const bitmapBytes = canvasTo1BitBitmap(canvas);
+  const parts = [];
 
-  const speed = options.speed ?? 0x05; // 0x01 a 0x05
-  const density = options.density ?? 0x0F; // 0x01 a 0x0F (0x0F = máxima nitidez térmica)
-  const media = options.media ?? 0x0A; // 0x0A = etiqueta troquelada con sensor de gap (2x1)
-
-  // 1. Configurar velocidad
-  await writeCommand(characteristic, new Uint8Array([0x1B, 0x4E, 0x0D, speed]));
-  await new Promise(r => setTimeout(r, 30));
-
-  // 2. Configurar densidad / contraste
-  await writeCommand(characteristic, new Uint8Array([0x1B, 0x4E, 0x04, density]));
-  await new Promise(r => setTimeout(r, 30));
-
-  // 3. Configurar tipo de papel (Etiquetas troqueladas con separación)
-  await writeCommand(characteristic, new Uint8Array([0x1F, 0x11, media]));
-  await new Promise(r => setTimeout(r, 30));
-
-  // 4. Encabezado de imagen raster GS v 0
-  const header = new Uint8Array([
-    0x1D, 0x76, 0x30, 0x00,
-    widthBytes & 0xFF, (widthBytes >> 8) & 0xFF,
-    height & 0xFF, (height >> 8) & 0xFF
-  ]);
-  await writeCommand(characteristic, header);
-  await new Promise(r => setTimeout(r, 20));
-
-  // 5. Enviar el mapa de bits en paquetes de 128 bytes
-  const CHUNK_SIZE = 128;
-  const total = bitmapBytes.length;
-  let offset = 0;
-
-  while (offset < total) {
-    const chunk = bitmapBytes.slice(offset, offset + CHUNK_SIZE);
-    await writeCommand(characteristic, chunk);
-    offset += CHUNK_SIZE;
-
-    if (onChunkProgress) {
-      onChunkProgress(Math.min(100, Math.round((offset / total) * 100)));
-    }
-    await new Promise(r => setTimeout(r, 20));
+  if (protocol === 'd_series') {
+    // Protocolo Phomemo Serie D (D30, Q30, etc.)
+    parts.push(new Uint8Array([0x1B, 0x40])); // ESC @
+    parts.push(new Uint8Array([
+      0x1D, 0x76, 0x30, 0x00,
+      widthBytes & 0xFF, (widthBytes >> 8) & 0xFF,
+      height & 0xFF, (height >> 8) & 0xFF
+    ]));
+    parts.push(bitmap);
+    parts.push(new Uint8Array([0x1B, 0x64, 0x00])); // ESC d 0
+  } else if (protocol === 'm02_series') {
+    // Protocolo Phomemo Serie M02 / T02
+    parts.push(new Uint8Array([
+      0x1B, 0x40,
+      0x1B, 0x61, 0x01,
+      0x1F, 0x11, 0x02, 0x04
+    ]));
+    parts.push(new Uint8Array([
+      0x1D, 0x76, 0x30, 0x00,
+      widthBytes & 0xFF, (widthBytes >> 8) & 0xFF,
+      height & 0xFF, (height >> 8) & 0xFF
+    ]));
+    parts.push(bitmap);
+    parts.push(new Uint8Array([
+      0x1B, 0x64, 0x02,
+      0x1B, 0x64, 0x02,
+      0x1F, 0x11, 0x08,
+      0x1F, 0x11, 0x0E,
+      0x1F, 0x11, 0x07,
+      0x1F, 0x11, 0x09
+    ]));
+  } else if (protocol === 'm_series_esc') {
+    // Phomemo Serie M con Reset ESC @ inicial
+    parts.push(new Uint8Array([
+      0x1B, 0x40,
+      0x1B, 0x4E, 0x0D, speed,
+      0x1B, 0x4E, 0x04, density,
+      0x1F, 0x11, media
+    ]));
+    parts.push(new Uint8Array([
+      0x1D, 0x76, 0x30, 0x00,
+      widthBytes & 0xFF, (widthBytes >> 8) & 0xFF,
+      height & 0xFF, (height >> 8) & 0xFF
+    ]));
+    parts.push(bitmap);
+    parts.push(new Uint8Array([
+      0x1F, 0xF0, 0x05, 0x00,
+      0x1F, 0xF0, 0x03, 0x00
+    ]));
+  } else if (protocol === 'esc_pos_std') {
+    // Protocolo ESC/POS estándar
+    parts.push(new Uint8Array([0x1B, 0x40]));
+    parts.push(new Uint8Array([
+      0x1D, 0x76, 0x30, 0x00,
+      widthBytes & 0xFF, (widthBytes >> 8) & 0xFF,
+      height & 0xFF, (height >> 8) & 0xFF
+    ]));
+    parts.push(bitmap);
+    parts.push(new Uint8Array([0x1B, 0x64, 0x03]));
+  } else {
+    // Protocolo Canónico Serie M (M110, M120, M200, M220) - PREDETERMINADO
+    parts.push(new Uint8Array([
+      0x1B, 0x4E, 0x0D, speed,   // Velocidad (5 = rápido)
+      0x1B, 0x4E, 0x04, density, // Densidad / Contraste (0x0F = máximo)
+      0x1F, 0x11, media          // Tipo de papel (0x0A = etiquetas con separación / gap)
+    ]));
+    parts.push(new Uint8Array([
+      0x1D, 0x76, 0x30, 0x00,
+      widthBytes & 0xFF, (widthBytes >> 8) & 0xFF,
+      height & 0xFF, (height >> 8) & 0xFF
+    ]));
+    parts.push(bitmap);
+    parts.push(new Uint8Array([
+      0x1F, 0xF0, 0x05, 0x00,
+      0x1F, 0xF0, 0x03, 0x00
+    ]));
   }
 
-  // 6. Pausa crítica antes del footer (300ms)
-  await new Promise(r => setTimeout(r, 300));
+  // Concatenar todos los bloques en un solo buffer binario contiguo
+  const totalLength = parts.reduce((acc, p) => acc + p.length, 0);
+  const payload = new Uint8Array(totalLength);
+  let pos = 0;
+  for (const p of parts) {
+    payload.set(p, pos);
+    pos += p.length;
+  }
 
-  // 7. Footer oficial Phomemo de fin de impresión y alineación
-  const footer = new Uint8Array([0x1F, 0xF0, 0x05, 0x00, 0x1F, 0xF0, 0x03, 0x00]);
-  await writeCommand(characteristic, footer);
-
-  // 8. Pausa para permitir que el motor mecánico termine de imprimir y avanzar
-  await new Promise(r => setTimeout(r, 500));
+  return payload;
 }
 
 /**
@@ -430,27 +546,26 @@ export async function printBatchViaBluetooth(characteristic, labelsList, options
     // 1. Renderizar etiqueta en Canvas 2D
     const canvas = render2x1LabelCanvas(item, options);
 
-    // 2. Ejecutar la secuencia M110 real
-    await printSingleLabelM110(
-      characteristic,
-      canvas,
-      options,
-      (chunkPercent) => {
-        if (onProgress) {
-          const overall = Math.round(((i + (chunkPercent / 100)) / total) * 100);
-          onProgress({
-            current: i + 1,
-            total,
-            percentage: overall,
-            labelName: item.nombre || 'Repuesto'
-          });
-        }
-      }
-    );
+    // 2. Construir payload binario completo según el protocolo seleccionado
+    const payload = buildLabelPayload(canvas, options);
 
-    // Pausa entre etiquetas consecutivas
+    // 3. Enviar todo el payload continuo en paquetes seguros esperando respuesta GATT
+    await sendBluetoothPayload(characteristic, payload, (chunkPercent) => {
+      if (onProgress) {
+        const overall = Math.round(((i + (chunkPercent / 100)) / total) * 100);
+        onProgress({
+          current: i + 1,
+          total,
+          percentage: overall,
+          labelName: item.nombre || 'Repuesto'
+        });
+      }
+    });
+
+    // 4. Pausa mecánica entre etiquetas consecutivas (800ms) para que el motor
+    // avance la etiqueta y el sensor óptico gap se estabilice
     if (i < total - 1) {
-      await new Promise(r => setTimeout(r, 600));
+      await new Promise(r => setTimeout(r, 800));
     }
   }
 
