@@ -394,7 +394,7 @@ export function canvasTo1BitBitmap(canvas) {
 export function detectProtocolFromName(name) {
   if (!name) return 'm_series';
   const n = String(name).toUpperCase();
-  if (n.includes('D30') || n.includes('D35') || n.includes('Q30') || n.includes('D110')) {
+  if (n.startsWith('Q') || n.includes('Q199') || n.includes('D30') || n.includes('D35') || n.includes('Q30') || n.includes('D110')) {
     return 'd_series';
   }
   if (n.includes('M02') || n.includes('T02')) {

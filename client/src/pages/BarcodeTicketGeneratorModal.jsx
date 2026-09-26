@@ -2393,7 +2393,7 @@ export default function BarcodeTicketGeneratorModal({
                           >
                             <option value="m_series">🏷️ Phomemo Serie M (M110 / M120 / M220)</option>
                             <option value="m_series_esc">🏷️ Phomemo M110 (con Reset ESC @)</option>
-                            <option value="d_series">🏷️ Phomemo Serie D / Q (D30 / Q30 / D110)</option>
+                            <option value="d_series">🏷️ Phomemo Serie Q / D (Q199 / Q30 / D30)</option>
                             <option value="m02_series">🏷️ Phomemo Serie M02 / T02</option>
                             <option value="esc_pos_std">🏷️ ESC/POS Genérico</option>
                           </select>
