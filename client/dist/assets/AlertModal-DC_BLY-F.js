@@ -1,4 +1,4 @@
-import{j as r,ae as t,s as n,bi as u,aa as f,W as h}from"./vendor-Cig3sC1l.js";import{M as j,a as g,B as i}from"./POS.styles-aMw4GNpO.js";const C=n.div`
+import{j as r,aq as t,s as n,bp as u,Y as f,ae as h}from"./vendor-C6IkOdzt.js";import{M as j,a as g,B as i}from"./POS.styles-BwT8xZZ-.js";const C=n.div`
     margin-bottom: 1rem;
     color: #007bff; /* Color por defecto: Info */
 
