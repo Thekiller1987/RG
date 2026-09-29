@@ -8,7 +8,7 @@ import {
   FaBarcode, FaQrcode, FaPrint, FaTrash, FaTimes, FaPlus, FaMinus,
   FaSearch, FaCheck, FaFileAlt, FaTags,
   FaArrowLeft, FaArrowRight, FaBolt,
-  FaSlidersH, FaUndo, FaUpload, FaCog,
+  FaSlidersH, FaUndo, FaUpload, FaCog, FaSave,
   FaRulerCombined, FaFont, FaImage, FaEye
 } from 'react-icons/fa';
 import { useSettings } from '../context/SettingsContext';
@@ -115,13 +115,13 @@ const BarcodeSvg = ({
 };
 
 /* Generador síncrono offline de SVG para la impresión (0 dependencias externas) */
-const generateBarcodeSvgMarkup = (code, width = 1.4, height = 32) => {
+const generateBarcodeSvgMarkup = (code, width = 1.4, height = 28) => {
   try {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     JsBarcode(svg, String(code || '000000'), {
       format: 'CODE128',
       width: width || 1.4,
-      height: height || 32,
+      height: height || 28,
       displayValue: false,
       margin: 0,
       background: 'transparent',
@@ -129,7 +129,7 @@ const generateBarcodeSvgMarkup = (code, width = 1.4, height = 32) => {
     });
     svg.removeAttribute('width');
     svg.removeAttribute('height');
-    svg.setAttribute('style', 'max-width: 96%; height: 100%; display: block; margin: 0 auto;');
+    svg.setAttribute('style', 'max-width: 95%; max-height: 100%; height: 100%; width: auto; display: block; margin: 0 auto;');
     return svg.outerHTML;
   } catch (e) {
     return `<div style="font-family:monospace;font-size:8.5pt;font-weight:bold;letter-spacing:1px;">${code}</div>`;
@@ -139,28 +139,28 @@ const generateBarcodeSvgMarkup = (code, width = 1.4, height = 32) => {
 /* ==========================================================================
    CONFIGURACIONES PREESTABLECIDAS (PRESETS) Y VALORES POR DEFECTO
 ========================================================================== */
-const STORAGE_KEY = 'rg_thermal_label_config_v4';
+const STORAGE_KEY = 'rg_thermal_label_config_v5';
 
 const PRESET_CONFIGS = {
   '2x1': {
     name: '2" x 1" (50.8 × 25.4 mm) - Estándar 3nStar / Universal',
     widthMm: 50.8,
     heightMm: 25.4,
-    paddingMm: 1.0,
-    barcodeHeightMm: 8.5,
+    paddingMm: 0.8,
+    barcodeHeightMm: 8.0,
     productNameFontSizePt: 7.2,
     productNameMaxLines: 2,
-    priceFontSizePt: 9.0,
+    priceFontSizePt: 8.5,
     codeFontSizePt: 6.5,
-    storeNameFontSizePt: 6.5,
-    logoHeightPx: 14
+    storeNameFontSizePt: 7.0,
+    logoHeightPx: 18
   },
   '50x30': {
     name: '50 × 30 mm (2" x 1.2")',
     widthMm: 50.0,
     heightMm: 30.0,
-    paddingMm: 1.5,
-    barcodeHeightMm: 11.0,
+    paddingMm: 1.2,
+    barcodeHeightMm: 10.0,
     productNameFontSizePt: 8.0,
     productNameMaxLines: 2,
     priceFontSizePt: 10.0,
@@ -172,8 +172,8 @@ const PRESET_CONFIGS = {
     name: '40 × 30 mm',
     widthMm: 40.0,
     heightMm: 30.0,
-    paddingMm: 1.2,
-    barcodeHeightMm: 10.0,
+    paddingMm: 1.0,
+    barcodeHeightMm: 9.5,
     productNameFontSizePt: 7.2,
     productNameMaxLines: 2,
     priceFontSizePt: 8.5,
@@ -185,8 +185,8 @@ const PRESET_CONFIGS = {
     name: '40 × 25 mm',
     widthMm: 40.0,
     heightMm: 25.0,
-    paddingMm: 1.0,
-    barcodeHeightMm: 8.5,
+    paddingMm: 0.8,
+    barcodeHeightMm: 8.0,
     productNameFontSizePt: 6.8,
     productNameMaxLines: 2,
     priceFontSizePt: 8.0,
@@ -198,7 +198,7 @@ const PRESET_CONFIGS = {
     name: '30 × 20 mm (Mini / Tornillería)',
     widthMm: 30.0,
     heightMm: 20.0,
-    paddingMm: 0.8,
+    paddingMm: 0.6,
     barcodeHeightMm: 6.5,
     productNameFontSizePt: 6.0,
     productNameMaxLines: 1,
@@ -211,8 +211,8 @@ const PRESET_CONFIGS = {
     name: '60 × 40 mm (Grande / Embalaje)',
     widthMm: 60.0,
     heightMm: 40.0,
-    paddingMm: 2.0,
-    barcodeHeightMm: 14.0,
+    paddingMm: 1.8,
+    barcodeHeightMm: 13.0,
     productNameFontSizePt: 9.5,
     productNameMaxLines: 2,
     priceFontSizePt: 12.0,
@@ -229,7 +229,7 @@ const DEFAULT_LABEL_CONFIG = {
   preset: '2x1',
   widthMm: 50.8,
   heightMm: 25.4,
-  paddingMm: 1.0,
+  paddingMm: 0.8,
   showLogo: true,
   showStoreName: true,
   showProductName: true,
@@ -240,16 +240,16 @@ const DEFAULT_LABEL_CONFIG = {
   showDivider: true,
   logoSource: 'store', // 'store' por defecto con el logo oficial del negocio
   customLogoData: '',
-  logoHeightPx: 14,
+  logoHeightPx: 18,
   storeName: 'MULTIREPUESTOS RG',
-  storeNameFontSizePt: 6.5,
+  storeNameFontSizePt: 7.0,
   productNameFontSizePt: 7.2,
   productNameMaxLines: 2,
   codeFontSizePt: 6.5,
-  priceFontSizePt: 9.0,
+  priceFontSizePt: 8.5,
   categoryFontSizePt: 5.5,
   codeType: 'barcode', // 'barcode' | 'qr'
-  barcodeHeightMm: 8.5,
+  barcodeHeightMm: 8.0,
   barcodeLineWidth: 1.4
 };
 
@@ -1005,6 +1005,28 @@ const CustomizationPanel = styled(motion.div)`
     padding-top: 8px;
     border-top: 1px dashed #e2e8f0;
 
+    .save-btn {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+      transition: all 0.15s;
+
+      &:hover {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(16, 185, 129, 0.4);
+      }
+    }
+
     .reset-btn {
       background: transparent;
       border: 1px solid #cbd5e1;
@@ -1502,6 +1524,20 @@ export default function BarcodeTicketGeneratorModal({
     toast.success('Configuración restablecida a 2x1" estándar.');
   };
 
+  // Guardar configuración permanentemente como predeterminada
+  const handleSaveSettings = () => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(labelConfig));
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(labelConfig));
+      toast.success('¡Ajustes guardados permanentemente para tu impresora ETIQUETAS!', {
+        icon: '💾',
+        duration: 3500
+      });
+    } catch (e) {
+      toast.error('Error al guardar ajustes en el navegador');
+    }
+  };
+
   // Cargar imagen personalizada para el logo
   const handleCustomLogoUpload = (e) => {
     const file = e.target.files?.[0];
@@ -1821,7 +1857,7 @@ export default function BarcodeTicketGeneratorModal({
         height: ${heightMm}mm;
         max-width: ${widthMm}mm;
         max-height: ${heightMm}mm;
-        padding: ${paddingMm}mm 1.5mm;
+        padding: ${paddingMm || 0.7}mm 1.5mm 0.5mm 1.5mm;
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
@@ -1846,52 +1882,47 @@ export default function BarcodeTicketGeneratorModal({
         gap: 4px;
         line-height: 1;
         white-space: nowrap !important;
-        overflow: hidden;
         flex-shrink: 0 !important;
-        margin: 0 0 0.2mm 0;
+        margin: 0 0 0.15mm 0;
       }
       .company-logo {
-        height: ${logoHeightPx}px;
-        max-height: ${logoHeightPx}px;
+        height: ${Math.min(Number(logoHeightPx) || 16, 20)}px;
+        max-height: ${Math.min(Number(logoHeightPx) || 16, 20)}px;
         width: auto;
-        max-width: 28px;
+        max-width: 24px;
         object-fit: contain;
         flex-shrink: 0 !important;
         filter: contrast(160%) grayscale(100%);
       }
       .company-title {
-        font-size: ${storeNameFontSizePt}pt;
+        font-size: ${Math.min(Number(storeNameFontSizePt) || 7.0, 7.5)}pt;
         font-weight: 800;
         text-transform: uppercase;
         color: #000000;
-        letter-spacing: 0.03em;
+        letter-spacing: 0.02em;
         white-space: nowrap !important;
-        overflow: hidden;
-        text-overflow: ellipsis;
         line-height: 1;
       }
       .product-name {
         width: 100%;
-        font-size: ${productNameFontSizePt}pt;
+        font-size: ${Math.min(Number(productNameFontSizePt) || 7.2, 7.5)}pt;
         font-weight: 800;
         color: #000000;
-        line-height: 1.15;
+        line-height: 1.1;
         text-align: center;
         word-break: break-word;
         overflow: hidden;
         flex-shrink: 0 !important;
-        margin: 0.2mm 0;
-        max-height: ${productNameMaxLines === 1 ? '1.3em' : '2.4em'};
-        ${productNameMaxLines === 1
-          ? 'white-space: nowrap; text-overflow: ellipsis;'
-          : 'display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;'}
+        margin: 0.1mm 0;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
       }
       .code-area {
         width: 100%;
-        height: ${barcodeHeightMm}mm;
-        max-height: ${barcodeHeightMm}mm;
-        flex: 1 1 auto;
-        min-height: 5mm;
+        flex: 1 1 0;
+        min-height: 4.5mm;
+        max-height: ${Math.min(Number(barcodeHeightMm) || 7.5, 8.0)}mm;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1899,7 +1930,7 @@ export default function BarcodeTicketGeneratorModal({
         overflow: hidden;
       }
       .code-area svg {
-        max-width: 96%;
+        max-width: 95% !important;
         max-height: 100% !important;
         height: 100% !important;
         width: auto !important;
@@ -1913,16 +1944,16 @@ export default function BarcodeTicketGeneratorModal({
         justify-content: space-between;
         line-height: 1;
         flex-shrink: 0 !important;
-        ${showDivider ? 'border-top: 0.8px solid #000000; padding-top: 0.4mm;' : ''}
+        ${showDivider ? 'border-top: 0.8px solid #000000; padding-top: 0.3mm; margin-top: 0.1mm;' : ''}
       }
       .code-text {
-        font-size: ${codeFontSizePt}pt;
+        font-size: ${Math.min(Number(codeFontSizePt) || 6.5, 6.8)}pt;
         font-family: monospace;
         font-weight: 800;
         color: #000000;
       }
       .price-tag {
-        font-size: ${priceFontSizePt}pt;
+        font-size: ${Math.min(Number(priceFontSizePt) || 8.5, 9.0)}pt;
         font-weight: 900;
         color: #000000;
         letter-spacing: -0.01em;
@@ -2426,6 +2457,28 @@ export default function BarcodeTicketGeneratorModal({
                         </button>
 
                         <button
+                          className="btn-save-top"
+                          onClick={handleSaveSettings}
+                          title="Guardar esta configuración como predeterminada"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: '#10b981',
+                            color: '#ffffff',
+                            border: 'none',
+                            padding: '7px 12px',
+                            borderRadius: '8px',
+                            fontSize: '0.82rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 5px rgba(16, 185, 129, 0.3)'
+                          }}
+                        >
+                          <FaSave /> Guardar Ajustes
+                        </button>
+
+                        <button
                           className="btn-test-print"
                           disabled={flattenedLabels.length === 0}
                           onClick={() => handlePrintThermal(true)}
@@ -2789,11 +2842,16 @@ export default function BarcodeTicketGeneratorModal({
 
                     {/* Pie del panel de ajustes */}
                     <div className="panel-footer">
-                      <button className="reset-btn" onClick={handleResetDefaults}>
-                        <FaUndo /> Restablecer a 2x1" Predeterminado
-                      </button>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button className="save-btn" onClick={handleSaveSettings}>
+                          <FaSave /> Guardar Ajustes como Predeterminados
+                        </button>
+                        <button className="reset-btn" onClick={handleResetDefaults}>
+                          <FaUndo /> Restablecer a 2x1" Predeterminado
+                        </button>
+                      </div>
                       <div className="notice">
-                        💾 Tus ajustes se guardan automáticamente en este equipo.
+                        🖨️ Calibrado para tu impresora térmica USB: <b>ETIQUETAS (3nStar / 4BARCODE)</b>
                       </div>
                     </div>
                   </CustomizationPanel>
