@@ -6,27 +6,75 @@ import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
 import {
   FaBarcode, FaQrcode, FaPrint, FaTrash, FaTimes, FaPlus, FaMinus,
-  FaSearch, FaLayerGroup, FaCheck, FaInfoCircle, FaFileAlt, FaTags,
-  FaArrowLeft, FaArrowRight, FaCompressAlt, FaExpandAlt, FaBolt,
-  FaBluetooth, FaBluetoothB, FaCheckCircle, FaExclamationCircle,
-  FaQuestionCircle, FaDesktop, FaSyncAlt, FaSlidersH
+  FaSearch, FaCheck, FaFileAlt, FaTags,
+  FaArrowLeft, FaArrowRight, FaBolt,
+  FaSlidersH, FaUndo, FaUpload, FaCog,
+  FaRulerCombined, FaFont, FaImage, FaEye
 } from 'react-icons/fa';
-import {
-  isBluetoothSupported,
-  connectBluetoothPrinter,
-  disconnectBluetoothPrinter,
-  printBatchViaBluetooth,
-  detectProtocolFromName
-} from '../utils/bluetoothPrinter';
+import { useSettings } from '../context/SettingsContext';
 
-/* ==========================================
-   SUBCOMPONENTE: GENERADOR DE CÓDIGO DE BARRAS SVG
-========================================== */
+/* ==========================================================================
+   INSIGNIA VECTORIAL DE ALTA DEFINICIÓN (MULTIREPUESTOS RG)
+   Diseñada en vectores 100% nítidos para impresión térmica ultra-definida (203/300 DPI)
+   sin difuminado, compresión ni pérdida de contraste.
+========================================================================== */
+export const RgVectorEmblem = ({ height = 18, color = '#000000', className = '' }) => (
+  <svg
+    height={height}
+    viewBox="0 0 100 100"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    style={{ display: 'inline-block', verticalAlign: 'middle', height: `${height}px`, width: 'auto' }}
+  >
+    {/* Engranaje y escudo automotriz estilizado */}
+    <path
+      d="M50 4 L57 12 L68 10 L72 20 L83 23 L83 34 L92 41 L88 51 L93 61 L85 68 L85 79 L74 82 L70 92 L59 90 L51 98 L49 98 L41 90 L30 92 L26 82 L15 79 L15 68 L7 61 L12 51 L8 41 L17 34 L17 23 L28 20 L32 10 L43 12 Z"
+      fill={color}
+    />
+    <circle cx="50" cy="51" r="33" fill="#ffffff" />
+    <circle cx="50" cy="51" r="28" fill={color} />
+    <circle cx="50" cy="51" r="23" fill="#ffffff" />
+    {/* Pistones / llaves mecánicas cruzadas */}
+    <path
+      d="M34 37 L42 45 L38 49 L30 41 Z M66 37 L70 41 L62 49 L58 45 Z M30 61 L38 53 L42 57 L34 65 Z M70 61 L66 65 L58 57 L62 53 Z"
+      fill={color}
+    />
+    {/* Monograma RG en alto contraste */}
+    <text
+      x="50"
+      y="58"
+      textAnchor="middle"
+      fontSize="22"
+      fontFamily="Impact, Arial Black, sans-serif"
+      fontWeight="900"
+      fill={color}
+      letterSpacing="-0.5"
+    >
+      RG
+    </text>
+  </svg>
+);
+
+const getRgVectorEmblemSvgMarkup = (height = 18, color = '#000000') => `
+<svg height="${height}" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;vertical-align:middle;height:${height}px;width:auto;">
+  <path d="M50 4 L57 12 L68 10 L72 20 L83 23 L83 34 L92 41 L88 51 L93 61 L85 68 L85 79 L74 82 L70 92 L59 90 L51 98 L49 98 L41 90 L30 92 L26 82 L15 79 L15 68 L7 61 L12 51 L8 41 L17 34 L17 23 L28 20 L32 10 L43 12 Z" fill="${color}" />
+  <circle cx="50" cy="51" r="33" fill="#ffffff" />
+  <circle cx="50" cy="51" r="28" fill="${color}" />
+  <circle cx="50" cy="51" r="23" fill="#ffffff" />
+  <path d="M34 37 L42 45 L38 49 L30 41 Z M66 37 L70 41 L62 49 L58 45 Z M30 61 L38 53 L42 57 L34 65 Z M70 61 L66 65 L58 57 L62 53 Z" fill="${color}" />
+  <text x="50" y="58" text-anchor="middle" font-size="22" font-family="Impact, Arial Black, sans-serif" font-weight="900" fill="${color}" letter-spacing="-0.5">RG</text>
+</svg>
+`;
+
+/* ==========================================================================
+   SUBCOMPONENTE: GENERADOR DE CÓDIGO DE BARRAS SVG (PANTALLA)
+========================================================================== */
 const BarcodeSvg = ({
   value,
-  width = 1.3,
-  height = 32,
-  displayValue = true,
+  width = 1.4,
+  height = 34,
+  displayValue = false,
   fontSize = 10
 }) => {
   const svgRef = useRef(null);
@@ -44,7 +92,7 @@ const BarcodeSvg = ({
           background: 'transparent',
           lineColor: '#000000',
           fontOptions: 'bold',
-          textMargin: 1
+          textMargin: 0
         });
       } catch (err) {
         try {
@@ -53,8 +101,7 @@ const BarcodeSvg = ({
             format: 'CODE128',
             width,
             height,
-            displayValue,
-            fontSize,
+            displayValue: false,
             margin: 0
           });
         } catch (e) {
@@ -67,13 +114,149 @@ const BarcodeSvg = ({
   return <svg ref={svgRef} style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }} />;
 };
 
-/* ==========================================
-   STYLED COMPONENTS: MODAL & INTERFAZ
-========================================== */
+/* Generador síncrono offline de SVG para la impresión (0 dependencias externas) */
+const generateBarcodeSvgMarkup = (code, width = 1.4, height = 34) => {
+  try {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    JsBarcode(svg, String(code || '000000'), {
+      format: 'CODE128',
+      width: width || 1.4,
+      height: height || 34,
+      displayValue: false,
+      margin: 0,
+      background: 'transparent',
+      lineColor: '#000000'
+    });
+    return svg.outerHTML;
+  } catch (e) {
+    return `<div style="font-family:monospace;font-size:8.5pt;font-weight:bold;letter-spacing:1px;">${code}</div>`;
+  }
+};
+
+/* ==========================================================================
+   CONFIGURACIONES PREESTABLECIDAS (PRESETS) Y VALORES POR DEFECTO
+========================================================================== */
+const STORAGE_KEY = 'rg_thermal_label_config_v3';
+
+const PRESET_CONFIGS = {
+  '2x1': {
+    name: '2" x 1" (50.8 × 25.4 mm) - Estándar 3nStar / Universal',
+    widthMm: 50.8,
+    heightMm: 25.4,
+    paddingMm: 1.2,
+    barcodeHeightMm: 9.5,
+    productNameFontSizePt: 7.6,
+    productNameMaxLines: 2,
+    priceFontSizePt: 9.5,
+    codeFontSizePt: 6.8,
+    storeNameFontSizePt: 6.8,
+    logoHeightPx: 16
+  },
+  '50x30': {
+    name: '50 × 30 mm (2" x 1.2")',
+    widthMm: 50.0,
+    heightMm: 30.0,
+    paddingMm: 1.5,
+    barcodeHeightMm: 11.0,
+    productNameFontSizePt: 8.0,
+    productNameMaxLines: 2,
+    priceFontSizePt: 10.0,
+    codeFontSizePt: 7.0,
+    storeNameFontSizePt: 7.2,
+    logoHeightPx: 18
+  },
+  '40x30': {
+    name: '40 × 30 mm',
+    widthMm: 40.0,
+    heightMm: 30.0,
+    paddingMm: 1.2,
+    barcodeHeightMm: 10.0,
+    productNameFontSizePt: 7.2,
+    productNameMaxLines: 2,
+    priceFontSizePt: 8.5,
+    codeFontSizePt: 6.5,
+    storeNameFontSizePt: 6.5,
+    logoHeightPx: 16
+  },
+  '40x25': {
+    name: '40 × 25 mm',
+    widthMm: 40.0,
+    heightMm: 25.0,
+    paddingMm: 1.0,
+    barcodeHeightMm: 8.5,
+    productNameFontSizePt: 6.8,
+    productNameMaxLines: 2,
+    priceFontSizePt: 8.0,
+    codeFontSizePt: 6.2,
+    storeNameFontSizePt: 6.2,
+    logoHeightPx: 14
+  },
+  '30x20': {
+    name: '30 × 20 mm (Mini / Tornillería)',
+    widthMm: 30.0,
+    heightMm: 20.0,
+    paddingMm: 0.8,
+    barcodeHeightMm: 6.5,
+    productNameFontSizePt: 6.0,
+    productNameMaxLines: 1,
+    priceFontSizePt: 7.2,
+    codeFontSizePt: 5.5,
+    storeNameFontSizePt: 5.5,
+    logoHeightPx: 12
+  },
+  '60x40': {
+    name: '60 × 40 mm (Grande / Embalaje)',
+    widthMm: 60.0,
+    heightMm: 40.0,
+    paddingMm: 2.0,
+    barcodeHeightMm: 14.0,
+    productNameFontSizePt: 9.5,
+    productNameMaxLines: 2,
+    priceFontSizePt: 12.0,
+    codeFontSizePt: 8.0,
+    storeNameFontSizePt: 8.5,
+    logoHeightPx: 22
+  },
+  'custom': {
+    name: '🛠️ Medida Personalizada (mm)'
+  }
+};
+
+const DEFAULT_LABEL_CONFIG = {
+  preset: '2x1',
+  widthMm: 50.8,
+  heightMm: 25.4,
+  paddingMm: 1.2,
+  showLogo: true,
+  showStoreName: true,
+  showProductName: true,
+  showBarcode: true,
+  showCodeText: true,
+  showPrice: true,
+  showCategory: false,
+  showDivider: true,
+  logoSource: 'vector', // 'vector' | 'store' | 'custom'
+  customLogoData: '',
+  logoHeightPx: 16,
+  storeName: 'MULTIREPUESTOS RG',
+  storeNameFontSizePt: 6.8,
+  productNameFontSizePt: 7.6,
+  productNameMaxLines: 2,
+  codeFontSizePt: 6.8,
+  priceFontSizePt: 9.5,
+  categoryFontSizePt: 5.5,
+  codeType: 'barcode', // 'barcode' | 'qr'
+  barcodeHeightMm: 9.5,
+  barcodeLineWidth: 1.4
+};
+
+/* ==========================================================================
+   STYLED COMPONENTS: MODAL & LAYOUT
+========================================================================== */
 const ModalOverlay = styled(motion.div)`
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.75);
+  background: rgba(15, 23, 42, 0.8);
   backdrop-filter: blur(8px);
   z-index: 9999;
   display: flex;
@@ -85,14 +268,14 @@ const ModalOverlay = styled(motion.div)`
 const ModalContainer = styled(motion.div)`
   background: #ffffff;
   width: 98vw;
-  max-width: 1460px;
+  max-width: 1480px;
   height: 95vh;
   border-radius: 20px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
   overflow: hidden;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #cbd5e1;
 `;
 
 const Header = styled.div`
@@ -110,21 +293,21 @@ const Header = styled.div`
     gap: 12px;
 
     .icon-badge {
-      width: 42px;
-      height: 42px;
+      width: 44px;
+      height: 44px;
       border-radius: 12px;
-      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.25rem;
+      font-size: 1.35rem;
       color: #ffffff;
-      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
     }
 
     h2 {
       font-size: 1.15rem;
-      font-weight: 700;
+      font-weight: 800;
       margin: 0;
       letter-spacing: -0.01em;
       display: flex;
@@ -133,7 +316,7 @@ const Header = styled.div`
     }
 
     p {
-      margin: 0;
+      margin: 2px 0 0 0;
       font-size: 0.78rem;
       color: #94a3b8;
     }
@@ -167,82 +350,9 @@ const CloseButton = styled.button`
   }
 `;
 
-const BluetoothBadge = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  transition: all 0.2s;
-  user-select: none;
-
-  &.disconnected {
-    background: rgba(59, 130, 246, 0.15);
-    color: #93c5fd;
-    border: 1px solid rgba(59, 130, 246, 0.3);
-    cursor: pointer;
-
-    &:hover {
-      background: rgba(59, 130, 246, 0.25);
-      color: #ffffff;
-    }
-  }
-
-  &.connecting {
-    background: rgba(234, 179, 8, 0.15);
-    color: #fde047;
-    border: 1px solid rgba(234, 179, 8, 0.3);
-  }
-
-  &.connected {
-    background: rgba(34, 197, 94, 0.15);
-    color: #86efac;
-    border: 1px solid rgba(34, 197, 94, 0.3);
-  }
-
-  .disconnect-x {
-    background: rgba(239, 68, 68, 0.25);
-    border: none;
-    color: #fca5a5;
-    border-radius: 4px;
-    padding: 2px 5px;
-    font-size: 0.7rem;
-    cursor: pointer;
-    margin-left: 4px;
-    transition: all 0.15s;
-
-    &:hover {
-      background: #ef4444;
-      color: #ffffff;
-    }
-  }
-`;
-
-const HelpBtn = styled.button`
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #cbd5e1;
-  padding: 6px 12px;
-  border-radius: 10px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.2);
-    color: #ffffff;
-  }
-`;
-
 const ContentLayout = styled.div`
   display: grid;
-  grid-template-columns: 440px 1fr;
+  grid-template-columns: 430px 1fr;
   flex: 1;
   overflow: hidden;
 
@@ -252,9 +362,9 @@ const ContentLayout = styled.div`
   }
 `;
 
-/* ==========================================
-   PANEL IZQUIERDO: CARRITO / BANDEJA DE ETIQUETAS
-========================================== */
+/* ==========================================================================
+   PANEL IZQUIERDO: SELECCIÓN Y CARRITO
+========================================================================== */
 const LeftPanel = styled.div`
   background: #f8fafc;
   border-right: 1px solid #e2e8f0;
@@ -291,9 +401,9 @@ const SearchBox = styled.div`
       background: #f8fafc;
 
       &:focus {
-        border-color: #3b82f6;
+        border-color: #0284c7;
         background: #ffffff;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
       }
     }
   }
@@ -317,7 +427,7 @@ const SearchBox = styled.div`
       transition: background 0.15s;
 
       &:hover {
-        background: #eff6ff;
+        background: #f0f9ff;
       }
 
       &:last-child {
@@ -328,7 +438,7 @@ const SearchBox = styled.div`
         display: flex;
         flex-direction: column;
         gap: 2px;
-        max-width: 300px;
+        max-width: 290px;
 
         .name {
           font-size: 0.82rem;
@@ -348,13 +458,23 @@ const SearchBox = styled.div`
       }
 
       .add-btn {
-        background: #dbeafe;
-        color: #1d4ed8;
+        background: #e0f2fe;
+        color: #0369a1;
         border: none;
         border-radius: 6px;
         padding: 4px 8px;
         font-size: 0.75rem;
-        font-weight: 600;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        transition: all 0.15s;
+
+        &:hover {
+          background: #0284c7;
+          color: #ffffff;
+        }
       }
     }
   }
@@ -377,7 +497,7 @@ const QueueHeader = styled.div`
     gap: 6px;
 
     .badge {
-      background: #3b82f6;
+      background: #0284c7;
       color: #ffffff;
       padding: 2px 7px;
       border-radius: 12px;
@@ -471,7 +591,7 @@ const QueueItem = styled.div`
       }
 
       .price {
-        font-weight: 600;
+        font-weight: 700;
         color: #059669;
       }
     }
@@ -578,9 +698,9 @@ const EmptyQueueMessage = styled.div`
   }
 `;
 
-/* ==========================================
+/* ==========================================================================
    PANEL DERECHO: VISTA PREVIA Y CONTROLES
-========================================== */
+========================================================================== */
 const RightPanel = styled.div`
   display: flex;
   flex-direction: column;
@@ -626,7 +746,7 @@ const ControlBar = styled.div`
 
       &.active {
         background: #ffffff;
-        color: #2563eb;
+        color: #0284c7;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
       }
 
@@ -641,79 +761,6 @@ const ControlBar = styled.div`
     }
   }
 
-  .options-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .config-section {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    align-items: center;
-  }
-
-  .control-group {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-
-    label {
-      font-size: 0.7rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: #64748b;
-    }
-
-    select {
-      padding: 5px 8px;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: #1e293b;
-      background: #f8fafc;
-      outline: none;
-
-      &:focus {
-        border-color: #3b82f6;
-      }
-    }
-  }
-
-  .toggles {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
-
-    .toggle-chip {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      background: #f8fafc;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 4px 9px;
-      font-size: 0.76rem;
-      font-weight: 600;
-      color: #475569;
-      cursor: pointer;
-      user-select: none;
-      transition: all 0.15s;
-
-      &.active {
-        background: #eff6ff;
-        border-color: #3b82f6;
-        color: #1d4ed8;
-      }
-    }
-  }
-
   .action-buttons {
     display: flex;
     align-items: center;
@@ -721,24 +768,24 @@ const ControlBar = styled.div`
     flex-wrap: wrap;
   }
 
-  .btn-bluetooth-print {
-    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  .btn-print-primary {
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
     color: #ffffff;
     border: none;
     border-radius: 10px;
-    padding: 8px 16px;
-    font-size: 0.86rem;
+    padding: 9px 18px;
+    font-size: 0.88rem;
     font-weight: 700;
     display: flex;
     align-items: center;
     gap: 8px;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
     transition: all 0.2s;
 
     &:hover:not(:disabled) {
       transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+      box-shadow: 0 6px 16px rgba(2, 132, 199, 0.45);
     }
 
     &:disabled {
@@ -747,29 +794,54 @@ const ControlBar = styled.div`
     }
   }
 
-  .btn-pc-print {
+  .btn-test-print {
     background: #ffffff;
     color: #334155;
     border: 1px solid #cbd5e1;
     border-radius: 10px;
-    padding: 8px 14px;
-    font-size: 0.84rem;
+    padding: 9px 14px;
+    font-size: 0.82rem;
     font-weight: 700;
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 6px;
     cursor: pointer;
     transition: all 0.2s;
 
     &:hover:not(:disabled) {
-      background: #f1f5f9;
-      color: #0f172a;
+      background: #f8fafc;
       border-color: #94a3b8;
+      color: #0f172a;
     }
 
     &:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+  }
+
+  .btn-toggle-settings {
+    background: #f8fafc;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+    border-radius: 10px;
+    padding: 9px 14px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &.active {
+      background: #0284c7;
+      color: #ffffff;
+      border-color: #0284c7;
+    }
+
+    &:hover:not(.active) {
+      background: #e0f2fe;
     }
   }
 
@@ -778,8 +850,8 @@ const ControlBar = styled.div`
     color: #ffffff;
     border: none;
     border-radius: 10px;
-    padding: 8px 16px;
-    font-size: 0.86rem;
+    padding: 9px 18px;
+    font-size: 0.88rem;
     font-weight: 700;
     display: flex;
     align-items: center;
@@ -796,6 +868,163 @@ const ControlBar = styled.div`
     &:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+  }
+`;
+
+/* ==========================================================================
+   PANEL EXPANDIBLE DE AJUSTES Y MEDIDAS PERSONALIZADAS
+========================================================================== */
+const CustomizationPanel = styled(motion.div)`
+  background: #ffffff;
+  border-bottom: 2px solid #e2e8f0;
+  padding: 1rem 1.25rem;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.03);
+
+  .settings-tabs {
+    display: flex;
+    gap: 6px;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    overflow-x: auto;
+
+    button {
+      background: transparent;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #64748b;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: all 0.15s;
+
+      &.active {
+        background: #e0f2fe;
+        color: #0369a1;
+      }
+
+      &:hover:not(.active) {
+        background: #f1f5f9;
+        color: #1e293b;
+      }
+    }
+  }
+
+  .tab-content {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    align-items: flex-start;
+  }
+
+  .setting-block {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 140px;
+
+    label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #475569;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      span.val {
+        color: #0284c7;
+        font-weight: 800;
+      }
+    }
+
+    select, input[type="text"], input[type="number"] {
+      padding: 6px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #1e293b;
+      background: #f8fafc;
+      outline: none;
+
+      &:focus {
+        border-color: #0284c7;
+        background: #ffffff;
+      }
+    }
+
+    input[type="range"] {
+      accent-color: #0284c7;
+      cursor: pointer;
+    }
+  }
+
+  .toggles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+    gap: 8px;
+    width: 100%;
+
+    .toggle-card {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #334155;
+      user-select: none;
+      transition: all 0.15s;
+
+      &.active {
+        background: #eff6ff;
+        border-color: #0284c7;
+        color: #0369a1;
+      }
+    }
+  }
+
+  .panel-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px dashed #e2e8f0;
+
+    .reset-btn {
+      background: transparent;
+      border: 1px solid #cbd5e1;
+      color: #64748b;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+
+      &:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+      }
+    }
+
+    .notice {
+      font-size: 0.72rem;
+      color: #64748b;
     }
   }
 `;
@@ -865,11 +1094,12 @@ const PaginationBar = styled.div`
     display: flex;
     align-items: center;
     gap: 6px;
-    font-weight: 600;
-    color: #0284c7;
+    font-weight: 700;
+    color: #0369a1;
     background: #e0f2fe;
     padding: 3px 10px;
     border-radius: 12px;
+    font-size: 0.75rem;
   }
 `;
 
@@ -880,13 +1110,13 @@ const PreviewArea = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  background: #64748b;
+  background: #475569;
   position: relative;
 `;
 
-/* ==========================================
-   VISTA PREVIA DE ETIQUETA TÉRMICA 2x1 (50x25mm)
-========================================== */
+/* ==========================================================================
+   VISTA PREVIA INTERACTIVA DE ETIQUETA TÉRMICA (ESCALADA PROPORCIONALMENTE)
+========================================================================== */
 const ThermalCardWrapper = styled.div`
   display: flex;
   flex-direction: column;
@@ -895,21 +1125,19 @@ const ThermalCardWrapper = styled.div`
 `;
 
 const ThermalSticker = styled.div`
-  width: 384px;
-  height: 196px;
   background: #ffffff;
   border-radius: 8px;
-  padding: 10px 14px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   align-items: center;
   text-align: center;
-  box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.4);
-  border: 1px solid #e2e8f0;
+  box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.45);
+  border: 1px solid #cbd5e1;
   position: relative;
   box-sizing: border-box;
   user-select: none;
+  transition: width 0.2s, height 0.2s, padding 0.2s;
 
   .dim-pill {
     position: absolute;
@@ -925,6 +1153,7 @@ const ThermalSticker = styled.div`
     display: flex;
     align-items: center;
     gap: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.25);
   }
 
   .company-header-row {
@@ -932,40 +1161,33 @@ const ThermalSticker = styled.div`
     align-items: center;
     justify-content: center;
     gap: 6px;
-    margin-bottom: 2px;
     width: 100%;
 
     .company-logo {
-      height: 18px;
-      max-height: 18px;
-      width: auto;
       object-fit: contain;
       filter: contrast(160%) grayscale(100%);
     }
 
     .company-title {
-      font-size: 8pt;
       font-weight: 800;
       text-transform: uppercase;
       color: #000000;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.04em;
       line-height: 1;
       margin: 0;
     }
   }
 
   .product-name {
-    font-size: 9.5pt;
     font-weight: 800;
     color: #000000;
     line-height: 1.15;
-    max-height: 2.3em;
     overflow: hidden;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     width: 100%;
-    margin-top: 2px;
+    margin-top: 1px;
+    word-break: break-word;
   }
 
   .code-area {
@@ -973,7 +1195,7 @@ const ThermalSticker = styled.div`
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 2px 0;
+    margin: 1px 0;
   }
 
   .bottom-info {
@@ -981,26 +1203,24 @@ const ThermalSticker = styled.div`
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-top: 1px solid #000000;
-    padding-top: 3px;
+    line-height: 1;
 
     .code-text {
-      font-size: 7.5pt;
       font-family: monospace;
       font-weight: 800;
       color: #000000;
     }
 
     .price-tag {
-      font-size: 11pt;
       font-weight: 900;
       color: #000000;
+      letter-spacing: -0.01em;
     }
 
     .category-text {
-      font-size: 6.5pt;
       color: #334155;
       text-transform: uppercase;
+      font-weight: 700;
     }
   }
 `;
@@ -1009,13 +1229,13 @@ const ReelRollStrip = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: #cbd5e1;
-  padding: 16px 20px;
+  background: #334155;
+  padding: 18px 24px;
   border-radius: 16px;
   gap: 14px;
   max-height: 68vh;
   overflow-y: auto;
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
 
   .reel-sticker-wrap {
     position: relative;
@@ -1027,7 +1247,7 @@ const ReelRollStrip = styled.div`
       left: 0;
       right: 0;
       text-align: center;
-      color: #64748b;
+      color: #94a3b8;
       font-size: 0.65rem;
       letter-spacing: 2px;
       overflow: hidden;
@@ -1039,9 +1259,9 @@ const ReelRollStrip = styled.div`
   }
 `;
 
-/* ==========================================
+/* ==========================================================================
    ESTILOS DE HOJA A4 (210mm x 297mm)
-========================================== */
+========================================================================== */
 const A4Sheet = styled.div`
   width: 210mm;
   min-height: 297mm;
@@ -1139,13 +1359,6 @@ const LabelCard = styled.div`
     align-items: center;
     justify-content: center;
     margin: 1mm 0;
-
-    &.hybrid {
-      display: flex;
-      align-items: center;
-      justify-content: space-around;
-      gap: 4px;
-    }
   }
 
   .bottom-info {
@@ -1179,198 +1392,9 @@ const LabelCard = styled.div`
   }
 `;
 
-/* ==========================================
-   MODAL DE AYUDA Y OVERLAY DE PROGRESO BLE
-========================================== */
-const PrintingOverlay = styled.div`
-  position: absolute;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(4px);
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  .progress-card {
-    background: #ffffff;
-    border-radius: 16px;
-    padding: 24px 30px;
-    width: 360px;
-    text-align: center;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-
-    .icon-anim {
-      font-size: 2.4rem;
-      color: #2563eb;
-      margin-bottom: 12px;
-      animation: pulse 1.5s infinite;
-    }
-
-    h3 {
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: #0f172a;
-      margin: 0 0 8px 0;
-    }
-
-    .label-desc {
-      font-size: 0.82rem;
-      color: #64748b;
-      margin-bottom: 16px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .progress-bar-bg {
-      width: 100%;
-      height: 10px;
-      background: #e2e8f0;
-      border-radius: 5px;
-      overflow: hidden;
-      margin-bottom: 8px;
-
-      .progress-bar-fill {
-        height: 100%;
-        background: linear-gradient(90deg, #3b82f6, #10b981);
-        transition: width 0.3s ease;
-      }
-    }
-
-    .percentage-text {
-      font-size: 0.82rem;
-      font-weight: 700;
-      color: #1e293b;
-    }
-
-    .footer-note {
-      font-size: 0.72rem;
-      color: #94a3b8;
-      margin-top: 10px;
-    }
-  }
-
-  @keyframes pulse {
-    0% { transform: scale(1); opacity: 0.8; }
-    50% { transform: scale(1.15); opacity: 1; }
-    100% { transform: scale(1); opacity: 0.8; }
-  }
-`;
-
-const HelpModalOverlay = styled.div`
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.7);
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-`;
-
-const HelpModalContainer = styled.div`
-  background: #ffffff;
-  border-radius: 16px;
-  width: 100%;
-  max-width: 600px;
-  overflow: hidden;
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
-
-  .header {
-    background: #0f172a;
-    color: #ffffff;
-    padding: 14px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-
-    h3 {
-      font-size: 1.05rem;
-      margin: 0;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    button {
-      background: transparent;
-      border: none;
-      color: #94a3b8;
-      font-size: 1.1rem;
-      cursor: pointer;
-      &:hover { color: #ffffff; }
-    }
-  }
-
-  .body {
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    max-height: 75vh;
-    overflow-y: auto;
-
-    .step-box {
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 14px;
-      background: #f8fafc;
-
-      .step-title {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        font-weight: 700;
-        font-size: 0.92rem;
-        color: #1e293b;
-        margin-bottom: 6px;
-
-        .badge-number {
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          background: #2563eb;
-          color: #ffffff;
-          font-size: 0.75rem;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-      }
-
-      p {
-        font-size: 0.82rem;
-        color: #475569;
-        line-height: 1.5;
-        margin: 0 0 6px 0;
-      }
-    }
-  }
-
-  .footer {
-    padding: 12px 20px;
-    background: #f1f5f9;
-    border-top: 1px solid #e2e8f0;
-    text-align: right;
-
-    button {
-      background: #2563eb;
-      color: #ffffff;
-      border: none;
-      padding: 8px 18px;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 0.84rem;
-      cursor: pointer;
-      &:hover { background: #1d4ed8; }
-    }
-  }
-`;
-
-/* ==========================================
+/* ==========================================================================
    COMPONENTE PRINCIPAL
-========================================== */
+========================================================================== */
 export default function BarcodeTicketGeneratorModal({
   isOpen,
   onClose,
@@ -1378,6 +1402,8 @@ export default function BarcodeTicketGeneratorModal({
   categories = [],
   initialProduct = null
 }) {
+  const { settings } = useSettings();
+
   // Estado de la cola de impresión: [{ product, quantity }]
   const [queue, setQueue] = useState([]);
 
@@ -1385,38 +1411,123 @@ export default function BarcodeTicketGeneratorModal({
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
 
-  // Formato principal: 'thermal_2x1' (Phomemo 50x25mm) o 'a4_sheet' (hojas A4)
-  const [paperFormat, setPaperFormat] = useState('thermal_2x1');
+  // Formato principal: 'thermal_roll' (3nStar / Térmica USB) o 'a4_sheet' (hojas A4)
+  const [paperFormat, setPaperFormat] = useState('thermal_roll');
 
-  // Modo de visualización en 2x1: 'single' (una sola) o 'reel' (tira continua)
+  // Modo de visualización en rollo: 'single' (individual) o 'reel' (tira continua)
   const [labelViewMode, setLabelViewMode] = useState('single');
-  const [preview2x1Index, setPreview2x1Index] = useState(0);
+  const [previewIndex, setPreviewIndex] = useState(0);
 
   // Opciones de configuración A4
   const [paperType, setPaperType] = useState('bond'); // 'bond' | 'adhesive'
-  const [codeType, setCodeType] = useState('barcode'); // 'barcode' | 'qr' | 'hybrid'
   const [layoutType, setLayoutType] = useState('24'); // '24' (3x8) | '40' (4x10) | '12' (2x6)
-
-  // Interruptores de visualización
-  const [showLogo, setShowLogo] = useState(true);
-  const [showCompany, setShowCompany] = useState(true);
-  const [showPrice, setShowPrice] = useState(true);
-  const [showCategory, setShowCategory] = useState(false);
-
-  // Navegación de páginas A4 en el preview
   const [currentPage, setCurrentPage] = useState(0);
 
-  // Estado de conexión Bluetooth
-  const [bluetoothDevice, setBluetoothDevice] = useState(null);
-  const [bluetoothCharacteristic, setBluetoothCharacteristic] = useState(null);
-  const [bluetoothStatus, setBluetoothStatus] = useState('disconnected'); // 'disconnected' | 'connecting' | 'connected' | 'printing'
-  const [bluetoothDeviceName, setBluetoothDeviceName] = useState('');
-  const [isPrintingBatch, setIsPrintingBatch] = useState(false);
-  const [printProgress, setPrintProgress] = useState({ current: 0, total: 0, percentage: 0, labelName: '' });
-  const [showHelpModal, setShowHelpModal] = useState(false);
-  const [labelMedia, setLabelMedia] = useState(0x0A); // 0x0A = Troquelada con separación (Gap 2x1), 0x0B = Continuo
-  const [labelDensity, setLabelDensity] = useState(0x0F); // 0x0F = Máxima nitidez térmica (darkest)
-  const [printerProtocol, setPrinterProtocol] = useState('printmaster_0x1f'); // 'printmaster_0x1f' | 'printmaster_esc' | 'm_series' | 'm_series_esc' | 'd_series' | 'm02_series' | 'esc_pos_std'
+  // Panel de personalización
+  const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
+  const [settingsActiveTab, setSettingsActiveTab] = useState('measures'); // 'measures' | 'brand' | 'fonts' | 'barcode' | 'visibility'
+
+  // Configuración completa de la etiqueta
+  const [labelConfig, setLabelConfig] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        return { ...DEFAULT_LABEL_CONFIG, ...JSON.parse(saved) };
+      }
+    } catch (e) {
+      console.warn('Error leyendo configuración guardada de etiquetas:', e);
+    }
+    return {
+      ...DEFAULT_LABEL_CONFIG,
+      storeName: settings?.empresa_nombre || 'MULTIREPUESTOS RG'
+    };
+  });
+
+  // Guardar configuración en localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(labelConfig));
+    } catch (e) {
+      console.warn('Error guardando configuración de etiquetas:', e);
+    }
+  }, [labelConfig]);
+
+  // Actualizar storeName si no está personalizado
+  useEffect(() => {
+    if (settings?.empresa_nombre && labelConfig.storeName === 'MULTIREPUESTOS RG') {
+      setLabelConfig(prev => ({ ...prev, storeName: settings.empresa_nombre }));
+    }
+  }, [settings?.empresa_nombre]);
+
+  // Modificar campo de configuración
+  const updateConfig = (patch) => {
+    setLabelConfig(prev => ({ ...prev, ...patch }));
+  };
+
+  // Cambiar preset de tamaño
+  const handlePresetChange = (presetKey) => {
+    if (presetKey === 'custom') {
+      updateConfig({ preset: 'custom' });
+      return;
+    }
+    const presetData = PRESET_CONFIGS[presetKey];
+    if (!presetData) return;
+    updateConfig({
+      preset: presetKey,
+      widthMm: presetData.widthMm,
+      heightMm: presetData.heightMm,
+      paddingMm: presetData.paddingMm,
+      barcodeHeightMm: presetData.barcodeHeightMm,
+      productNameFontSizePt: presetData.productNameFontSizePt,
+      productNameMaxLines: presetData.productNameMaxLines,
+      priceFontSizePt: presetData.priceFontSizePt,
+      codeFontSizePt: presetData.codeFontSizePt,
+      storeNameFontSizePt: presetData.storeNameFontSizePt,
+      logoHeightPx: presetData.logoHeightPx
+    });
+    toast.success(`Plantilla cambiada a ${presetData.name}`, { duration: 2500 });
+  };
+
+  // Restablecer valores a 2x1 original
+  const handleResetDefaults = () => {
+    const base = {
+      ...DEFAULT_LABEL_CONFIG,
+      storeName: settings?.empresa_nombre || 'MULTIREPUESTOS RG'
+    };
+    setLabelConfig(base);
+    localStorage.removeItem(STORAGE_KEY);
+    toast.success('Configuración restablecida a 2x1" estándar.');
+  };
+
+  // Cargar imagen personalizada para el logo
+  const handleCustomLogoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('La imagen no debe superar los 2MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      updateConfig({
+        logoSource: 'custom',
+        customLogoData: event.target.result
+      });
+      toast.success('Logo personalizado cargado para las etiquetas.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Resolver URL del logo oficial del sistema
+  const officialLogoUrl = useMemo(() => {
+    if (!settings?.empresa_logo_url) return '/icons/logo.png';
+    if (settings.empresa_logo_url.startsWith('http') || settings.empresa_logo_url.startsWith('data:')) {
+      return settings.empresa_logo_url;
+    }
+    const apiEndpoint = import.meta.env.VITE_API_URL || 'https://sistema.multirepuestosrg.com';
+    const base = apiEndpoint.replace(/\/api\/?$/, '');
+    return `${base}${settings.empresa_logo_url.startsWith('/') ? '' : '/'}${settings.empresa_logo_url}`;
+  }, [settings?.empresa_logo_url]);
 
   // Cargar producto inicial si fue invocado con uno
   useEffect(() => {
@@ -1471,12 +1582,12 @@ export default function BarcodeTicketGeneratorModal({
     }
   }, [totalPages, currentPage]);
 
-  // Ajustar índice de etiqueta 2x1 si excede el nuevo total
+  // Ajustar índice de etiqueta térmica si excede el nuevo total
   useEffect(() => {
-    if (preview2x1Index >= flattenedLabels.length) {
-      setPreview2x1Index(Math.max(0, flattenedLabels.length - 1));
+    if (previewIndex >= flattenedLabels.length) {
+      setPreviewIndex(Math.max(0, flattenedLabels.length - 1));
     }
-  }, [flattenedLabels.length, preview2x1Index]);
+  }, [flattenedLabels.length, previewIndex]);
 
   // Etiquetas para la página A4 actualmente visible en pantalla
   const currentLabelsForPage = useMemo(() => {
@@ -1484,8 +1595,8 @@ export default function BarcodeTicketGeneratorModal({
     return flattenedLabels.slice(start, start + labelsPerPage);
   }, [flattenedLabels, currentPage, labelsPerPage]);
 
-  // Producto actual para la vista individual 2x1
-  const current2x1Product = flattenedLabels[preview2x1Index] || null;
+  // Producto actual para la vista individual
+  const currentStickerProduct = flattenedLabels[previewIndex] || null;
 
   // Acciones en la cola
   const handleAddProduct = (prod) => {
@@ -1550,136 +1661,45 @@ export default function BarcodeTicketGeneratorModal({
   const handleClearQueue = () => {
     setQueue([]);
     setCurrentPage(0);
-    setPreview2x1Index(0);
+    setPreviewIndex(0);
   };
 
-  /* ==========================================
-     CONEXIÓN BLUETOOTH CON PHOMEMO DESDE LA PC
-  ========================================== */
-  const handleConnectBluetooth = async () => {
-    if (!isBluetoothSupported()) {
-      toast.error('Tu navegador no soporta Bluetooth Web. Usa Google Chrome o Microsoft Edge en tu PC.');
+  /* ==========================================================================
+     MOTOR UNIVERSAL DE IMPRESIÓN TÉRMICA USB (3nStar / Zebra / Xprinter)
+  ========================================================================== */
+  const handlePrintThermal = (testOnly = false) => {
+    const itemsToPrint = testOnly ? (flattenedLabels.slice(0, 1)) : flattenedLabels;
+    if (itemsToPrint.length === 0) {
+      toast.error('No hay etiquetas en la bandeja para imprimir.');
       return;
     }
 
-    try {
-      setBluetoothStatus('connecting');
-      const conn = await connectBluetoothPrinter(() => {
-        setBluetoothDevice(null);
-        setBluetoothCharacteristic(null);
-        setBluetoothStatus('disconnected');
-        setBluetoothDeviceName('');
-        toast('Impresora Bluetooth desconectada.');
-      });
-
-      setBluetoothDevice(conn.device);
-      setBluetoothCharacteristic(conn.characteristic);
-      setBluetoothDeviceName(conn.name);
-      setBluetoothStatus('connected');
-      toast.success(`Conectado a ${conn.name}`);
-    } catch (err) {
-      setBluetoothStatus('disconnected');
-      if (err.message && !err.message.includes('cancelada')) {
-        toast.error(err.message || 'No se pudo conectar a la impresora Bluetooth.');
-      }
-    }
-  };
-
-  const handleDisconnectBluetooth = () => {
-    if (bluetoothDevice) {
-      disconnectBluetoothPrinter(bluetoothDevice);
-    }
-    setBluetoothDevice(null);
-    setBluetoothCharacteristic(null);
-    setBluetoothStatus('disconnected');
-    setBluetoothDeviceName('');
-    toast('Impresora desconectada');
-  };
-
-  /* ==========================================
-     IMPRESIÓN POR BLUETOOTH ("DE UN SOLO")
-  ========================================== */
-  const handlePrintBluetoothBatch = async () => {
-    if (flattenedLabels.length === 0) {
-      toast.error('No hay etiquetas en la bandeja.');
-      return;
-    }
-
-    let char = bluetoothCharacteristic;
-
-    // Si aún no está conectado, solicitar conexión primero
-    if (!char || bluetoothStatus !== 'connected') {
-      try {
-        setBluetoothStatus('connecting');
-        const conn = await connectBluetoothPrinter(() => {
-          setBluetoothDevice(null);
-          setBluetoothCharacteristic(null);
-          setBluetoothStatus('disconnected');
-          setBluetoothDeviceName('');
-          toast('Impresora Bluetooth desconectada.');
-        });
-
-        char = conn.characteristic;
-        setBluetoothDevice(conn.device);
-        setBluetoothCharacteristic(conn.characteristic);
-        setBluetoothDeviceName(conn.name);
-        const autoProto = detectProtocolFromName(conn.name);
-        setPrinterProtocol(autoProto);
-        setBluetoothStatus('connected');
-        toast.success(`Conectado a ${conn.name}`);
-      } catch (err) {
-        setBluetoothStatus('disconnected');
-        if (err.message && !err.message.includes('cancelada')) {
-          toast.error(err.message || 'Error al conectar por Bluetooth');
-        }
-        return;
-      }
-    }
-
-    // Iniciar impresión continua
-    try {
-      setIsPrintingBatch(true);
-      setPrintProgress({
-        current: 1,
-        total: flattenedLabels.length,
-        percentage: 0,
-        labelName: flattenedLabels[0]?.nombre || 'Repuesto'
-      });
-
-      await printBatchViaBluetooth(
-        char,
-        flattenedLabels,
-        {
-          showLogo,
-          showCompany,
-          showPrice,
-          showCategory,
-          codeType,
-          storeName: 'MULTIREPUESTOS RG',
-          density: labelDensity,
-          media: labelMedia,
-          speed: 0x05,
-          protocol: printerProtocol
-        },
-        (progress) => {
-          setPrintProgress(progress);
-        }
-      );
-
-      toast.success(`¡${flattenedLabels.length} etiquetas impresas en Phomemo con éxito!`);
-    } catch (err) {
-      console.error('Error al imprimir por Bluetooth:', err);
-      toast.error(`Error en la impresión: ${err.message}`);
-    } finally {
-      setIsPrintingBatch(false);
-    }
-  };
-
-  /* ==========================================
-     IMPRESIÓN 2x1 CON DIÁLOGO DE WINDOWS / PC
-  ========================================== */
-  const handlePrint2x1Window = () => {
-    if (flattenedLabels.length === 0) return;
+    const {
+      widthMm,
+      heightMm,
+      paddingMm,
+      showLogo,
+      showStoreName,
+      showProductName,
+      showBarcode,
+      showCodeText,
+      showPrice,
+      showCategory,
+      showDivider,
+      logoSource,
+      customLogoData,
+      logoHeightPx,
+      storeName,
+      storeNameFontSizePt,
+      productNameFontSizePt,
+      productNameMaxLines,
+      codeFontSizePt,
+      priceFontSizePt,
+      categoryFontSizePt,
+      codeType,
+      barcodeHeightMm,
+      barcodeLineWidth
+    } = labelConfig;
 
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
@@ -1692,9 +1712,21 @@ export default function BarcodeTicketGeneratorModal({
 
     const doc = iframe.contentWindow.document;
 
+    // Generar bloque de logo para inyectar en HTML
+    let logoMarkup = '';
+    if (showLogo) {
+      if (logoSource === 'vector') {
+        logoMarkup = getRgVectorEmblemSvgMarkup(logoHeightPx, '#000000');
+      } else if (logoSource === 'custom' && customLogoData) {
+        logoMarkup = `<img src="${customLogoData}" class="company-logo" style="height:${logoHeightPx}px;max-height:${logoHeightPx}px;" alt="Logo" />`;
+      } else {
+        logoMarkup = `<img src="${officialLogoUrl}" class="company-logo" style="height:${logoHeightPx}px;max-height:${logoHeightPx}px;" alt="Logo" onerror="this.style.display='none'" />`;
+      }
+    }
+
     let labelsHtml = '';
 
-    flattenedLabels.forEach((product) => {
+    itemsToPrint.forEach((product) => {
       const barcodeCode = product.codigo_barras || product.codigo || '000000';
       const rawVal = product.precio_venta ?? product.venta ?? product.precio ?? product.__fmt?.venta ?? 0;
       const numVal = typeof rawVal === 'string' && rawVal.includes('C$')
@@ -1703,56 +1735,60 @@ export default function BarcodeTicketGeneratorModal({
       const formattedPrice = (!isNaN(numVal) && numVal > 0) ? `C$ ${numVal.toFixed(2)}` : '';
       const catName = product.categoria_nombre || '';
 
-      let codeHtml = '';
-      if (codeType === 'barcode') {
-        codeHtml = `<svg class="barcode-item" data-code="${barcodeCode}"></svg>`;
-      } else if (codeType === 'qr') {
-        codeHtml = `<div class="qr-item" data-code="${barcodeCode}"></div>`;
-      } else {
-        codeHtml = `
-          <div style="display:flex;align-items:center;justify-content:space-around;width:100%;">
-            <svg class="barcode-item" data-code="${barcodeCode}" style="max-width:70%;height:10mm;"></svg>
-            <div class="qr-item" data-code="${barcodeCode}" style="width:11mm;height:11mm;"></div>
-          </div>
-        `;
+      // Generar código de barras o QR
+      let codeMarkup = '';
+      if (showBarcode) {
+        if (codeType === 'barcode') {
+          codeMarkup = generateBarcodeSvgMarkup(barcodeCode, barcodeLineWidth, barcodeHeightMm * 3.4);
+        } else {
+          codeMarkup = `<div class="qr-item" data-code="${barcodeCode}"></div>`;
+        }
       }
 
       labelsHtml += `
-        <div class="label-page-2x1">
-          ${(showCompany || showLogo) ? `
+        <div class="label-page">
+          ${(showLogo || showStoreName) ? `
             <div class="company-header">
-              ${showLogo ? '<img src="/icons/logo.png" class="company-logo" alt="Logo" onerror="this.style.display=\'none\'" />' : ''}
-              ${showCompany ? '<span class="company-title">Multirepuestos RG</span>' : ''}
+              ${showLogo ? logoMarkup : ''}
+              ${showStoreName ? `<span class="company-title">${storeName}</span>` : ''}
             </div>
           ` : ''}
-          <div class="product-name">${product.nombre || 'Repuesto'}</div>
-          <div class="code-area">${codeHtml}</div>
-          <div class="bottom-info">
-            <span class="code-text">${barcodeCode}</span>
-            ${showPrice && formattedPrice ? `<span class="price-tag">${formattedPrice}</span>` : ''}
-            ${showCategory && catName ? `<span class="category-text">${catName}</span>` : ''}
-          </div>
+          ${showProductName ? `<div class="product-name">${product.nombre || 'Repuesto'}</div>` : ''}
+          ${showBarcode ? `<div class="code-area">${codeMarkup}</div>` : ''}
+          ${(showCodeText || showPrice || showCategory) ? `
+            <div class="bottom-info">
+              ${showCodeText ? `<span class="code-text">${barcodeCode}</span>` : '<span></span>'}
+              ${showPrice && formattedPrice ? `<span class="price-tag">${formattedPrice}</span>` : ''}
+              ${showCategory && catName ? `<span class="category-text">${catName}</span>` : ''}
+            </div>
+          ` : ''}
         </div>
       `;
     });
 
     const printCss = `
       @page {
-        size: 50.8mm 25.4mm; /* Exactamente 2x1 pulgadas */
+        size: ${widthMm}mm ${heightMm}mm;
         margin: 0;
       }
       @media print {
         html, body {
-          width: 50.8mm;
+          width: ${widthMm}mm;
           margin: 0;
           padding: 0;
           background: #ffffff;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
         }
-        .label-page-2x1 {
+        .label-page {
+          width: ${widthMm}mm;
+          height: ${heightMm}mm;
+          max-width: ${widthMm}mm;
+          max-height: ${heightMm}mm;
           page-break-after: always;
           break-after: page;
+          page-break-inside: avoid;
+          break-inside: avoid;
         }
       }
       * {
@@ -1761,16 +1797,16 @@ export default function BarcodeTicketGeneratorModal({
         padding: 0;
       }
       body {
-        font-family: system-ui, -apple-system, sans-serif;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         background: #ffffff;
         color: #000000;
       }
-      .label-page-2x1 {
-        width: 50.8mm;
-        height: 25.4mm;
-        max-width: 50.8mm;
-        max-height: 25.4mm;
-        padding: 1.2mm 2.2mm;
+      .label-page {
+        width: ${widthMm}mm;
+        height: ${heightMm}mm;
+        max-width: ${widthMm}mm;
+        max-height: ${heightMm}mm;
+        padding: ${paddingMm}mm;
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
@@ -1780,6 +1816,7 @@ export default function BarcodeTicketGeneratorModal({
         overflow: hidden;
         page-break-after: always;
         break-after: page;
+        margin: 0 auto;
       }
       .company-header {
         width: 100%;
@@ -1791,25 +1828,27 @@ export default function BarcodeTicketGeneratorModal({
         gap: 5px;
       }
       .company-logo {
-        height: 16px;
-        max-height: 16px;
+        height: ${logoHeightPx}px;
+        max-height: ${logoHeightPx}px;
         width: auto;
         object-fit: contain;
+        filter: contrast(170%) grayscale(100%);
       }
       .company-title {
-        font-size: 6.5pt;
+        font-size: ${storeNameFontSizePt}pt;
         font-weight: 800;
         text-transform: uppercase;
         letter-spacing: 0.04em;
+        line-height: 1;
       }
       .product-name {
-        font-size: 7.2pt;
+        font-size: ${productNameFontSizePt}pt;
         font-weight: 700;
-        line-height: 1.1;
-        max-height: 2.2em;
+        line-height: 1.15;
+        max-height: ${productNameMaxLines * 1.25}em;
         overflow: hidden;
         display: -webkit-box;
-        -webkit-line-clamp: 2;
+        -webkit-line-clamp: ${productNameMaxLines};
         -webkit-box-orient: vertical;
         word-break: break-word;
         width: 100%;
@@ -1819,32 +1858,33 @@ export default function BarcodeTicketGeneratorModal({
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 0.4mm 0;
+        margin: 0.2mm 0;
       }
       .code-area svg {
-        max-width: 95%;
-        height: 10mm;
+        max-width: 98%;
+        height: ${barcodeHeightMm}mm;
+        display: block;
       }
       .bottom-info {
         width: 100%;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        border-top: 0.5px solid #000;
-        padding-top: 0.5mm;
+        ${showDivider ? 'border-top: 0.5px solid #000000; padding-top: 0.4mm;' : ''}
         line-height: 1;
       }
       .code-text {
-        font-size: 6.5pt;
+        font-size: ${codeFontSizePt}pt;
         font-family: monospace;
         font-weight: 700;
       }
       .price-tag {
-        font-size: 8pt;
-        font-weight: 800;
+        font-size: ${priceFontSizePt}pt;
+        font-weight: 900;
+        letter-spacing: -0.01em;
       }
       .category-text {
-        font-size: 5.5pt;
+        font-size: ${categoryFontSizePt}pt;
         text-transform: uppercase;
       }
     `;
@@ -1854,58 +1894,55 @@ export default function BarcodeTicketGeneratorModal({
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Etiquetas_2x1_Phomemo_Multirepuestos_RG</title>
+          <title>Etiquetas_Termicas_3nStar_${storeName.replace(/\s+/g, '_')}</title>
           <style>${printCss}</style>
-          <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-          <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+          ${codeType === 'qr' ? '<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>' : ''}
         </head>
         <body>
           ${labelsHtml}
           <script>
             window.onload = function() {
-              document.querySelectorAll('.barcode-item').forEach(function(el) {
-                var code = el.getAttribute('data-code');
-                try {
-                  JsBarcode(el, code, {
-                    format: 'CODE128',
-                    width: 1.5,
-                    height: 38,
-                    displayValue: false,
-                    margin: 0
-                  });
-                } catch(e) {}
-              });
-
-              document.querySelectorAll('.qr-item').forEach(function(el) {
-                var code = el.getAttribute('data-code');
-                try {
-                  new QRCode(el, {
-                    text: code,
-                    width: 40,
-                    height: 40,
-                    correctLevel: QRCode.CorrectLevel.M
-                  });
-                } catch(e) {}
-              });
+              ${codeType === 'qr' ? `
+                document.querySelectorAll('.qr-item').forEach(function(el) {
+                  var code = el.getAttribute('data-code');
+                  try {
+                    new QRCode(el, {
+                      text: code,
+                      width: 44,
+                      height: 44,
+                      correctLevel: QRCode.CorrectLevel.M
+                    });
+                  } catch(e) {}
+                });
+              ` : ''}
 
               setTimeout(function() {
                 window.focus();
                 window.print();
                 setTimeout(function() {
-                  window.frameElement.parentNode.removeChild(window.frameElement);
-                }, 1000);
-              }, 350);
+                  if (window.frameElement && window.frameElement.parentNode) {
+                    window.frameElement.parentNode.removeChild(window.frameElement);
+                  }
+                }, 1500);
+              }, 250);
             };
           </script>
         </body>
       </html>
     `);
     doc.close();
+
+    toast.success(
+      testOnly
+        ? 'Imprimiendo 1 etiqueta de prueba en tu 3nStar / USB...'
+        : `Enviando ${itemsToPrint.length} etiquetas a la impresora 3nStar / USB`,
+      { duration: 4000, icon: '🖨️' }
+    );
   };
 
-  /* ==========================================
+  /* ==========================================================================
      MOTOR DE IMPRESIÓN A4
-  ========================================== */
+  ========================================================================== */
   const handlePrintA4 = () => {
     if (flattenedLabels.length === 0) return;
 
@@ -1939,36 +1976,23 @@ export default function BarcodeTicketGeneratorModal({
         const formattedPrice = (!isNaN(numVal) && numVal > 0) ? `C$ ${numVal.toFixed(2)}` : '';
         const catName = product.categoria_nombre || '';
 
-        let codeHtml = '';
-        if (codeType === 'barcode') {
-          codeHtml = `<svg class="barcode-item" data-code="${barcodeCode}"></svg>`;
-        } else if (codeType === 'qr') {
-          codeHtml = `<div class="qr-item" data-code="${barcodeCode}"></div>`;
-        } else {
-          codeHtml = `
-            <div style="display:flex;align-items:center;justify-content:space-around;width:100%;">
-              <svg class="barcode-item" data-code="${barcodeCode}" style="max-width:70%;"></svg>
-              <div class="qr-item" data-code="${barcodeCode}" style="width:24mm;height:24mm;"></div>
-            </div>
-          `;
-        }
-
+        const codeSvg = generateBarcodeSvgMarkup(barcodeCode, 1.4, 28);
         const borderClass = paperType === 'bond' ? 'paper-bond' : 'paper-adhesive';
 
         labelsHtml += `
           <div class="label-card ${borderClass}">
-            ${(showCompany || showLogo) ? `
+            ${labelConfig.showLogo || labelConfig.showStoreName ? `
               <div class="company-header">
-                ${showLogo ? '<img src="/icons/logo.png" class="company-logo" alt="Logo" onerror="this.style.display=\'none\'" />' : ''}
-                ${showCompany ? '<span class="company-title">Multirepuestos RG</span>' : ''}
+                ${labelConfig.showLogo ? getRgVectorEmblemSvgMarkup(18, '#000000') : ''}
+                ${labelConfig.showStoreName ? `<span class="company-title">${labelConfig.storeName}</span>` : ''}
               </div>
             ` : ''}
             <div class="product-name">${product.nombre || 'Repuesto'}</div>
-            <div class="code-area">${codeHtml}</div>
+            <div class="code-area">${codeSvg}</div>
             <div class="bottom-info">
               <span class="code-text">${barcodeCode}</span>
-              ${showPrice && formattedPrice ? `<span class="price-tag">${formattedPrice}</span>` : ''}
-              ${showCategory && catName ? `<span class="category-text">${catName}</span>` : ''}
+              ${labelConfig.showPrice && formattedPrice ? `<span class="price-tag">${formattedPrice}</span>` : ''}
+              ${labelConfig.showCategory && catName ? `<span class="category-text">${catName}</span>` : ''}
             </div>
           </div>
         `;
@@ -2042,12 +2066,6 @@ export default function BarcodeTicketGeneratorModal({
         margin-bottom: 1mm;
         width: 100%;
       }
-      .company-logo {
-        height: 18px;
-        max-height: 18px;
-        width: auto;
-        object-fit: contain;
-      }
       .company-title {
         font-size: 8pt;
         font-weight: 800;
@@ -2103,47 +2121,22 @@ export default function BarcodeTicketGeneratorModal({
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Etiquetas_A4_Multirepuestos_RG</title>
+          <title>Etiquetas_A4_${labelConfig.storeName.replace(/\s+/g, '_')}</title>
           <style>${printCss}</style>
-          <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-          <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
         </head>
         <body>
           ${pagesHtml}
           <script>
             window.onload = function() {
-              document.querySelectorAll('.barcode-item').forEach(function(el) {
-                var code = el.getAttribute('data-code');
-                try {
-                  JsBarcode(el, code, {
-                    format: 'CODE128',
-                    width: 1.4,
-                    height: 30,
-                    displayValue: false,
-                    margin: 0
-                  });
-                } catch(e) {}
-              });
-
-              document.querySelectorAll('.qr-item').forEach(function(el) {
-                var code = el.getAttribute('data-code');
-                try {
-                  new QRCode(el, {
-                    text: code,
-                    width: 48,
-                    height: 48,
-                    correctLevel: QRCode.CorrectLevel.M
-                  });
-                } catch(e) {}
-              });
-
               setTimeout(function() {
                 window.focus();
                 window.print();
                 setTimeout(function() {
-                  window.frameElement.parentNode.removeChild(window.frameElement);
+                  if (window.frameElement && window.frameElement.parentNode) {
+                    window.frameElement.parentNode.removeChild(window.frameElement);
+                  }
                 }, 1000);
-              }, 400);
+              }, 250);
             };
           </script>
         </body>
@@ -2153,6 +2146,10 @@ export default function BarcodeTicketGeneratorModal({
   };
 
   if (!isOpen) return null;
+
+  // Cálculo de dimensiones en píxeles para la vista previa proporcional
+  const previewStickerWidthPx = Math.min(430, Math.max(270, labelConfig.widthMm * 7.2));
+  const previewStickerHeightPx = Math.round((previewStickerWidthPx / labelConfig.widthMm) * labelConfig.heightMm);
 
   return (
     <AnimatePresence>
@@ -2174,44 +2171,14 @@ export default function BarcodeTicketGeneratorModal({
               </div>
               <div>
                 <h2>
-                  Generador de Etiquetas y Códigos de Barra
+                  Generador de Etiquetas Térmicas (3nStar / USB Universal)
                 </h2>
-                <p>Imprime en Rollo Térmico 2x1'' (Phomemo Bluetooth) o en Hojas A4</p>
+                <p>Impresión de alta resolución en Rollo Térmico 2x1'' (50×25mm) y Hojas A4</p>
               </div>
             </div>
 
             <div className="actions-group">
-              {/* Badge indicador de Bluetooth */}
-              {bluetoothStatus === 'connected' ? (
-                <BluetoothBadge className="connected" title="Conectado vía Bluetooth a la impresora">
-                  <FaCheckCircle /> {bluetoothDeviceName || 'Phomemo Conectada'}
-                  <button
-                    className="disconnect-x"
-                    onClick={handleDisconnectBluetooth}
-                    title="Desconectar"
-                  >
-                    Desconectar
-                  </button>
-                </BluetoothBadge>
-              ) : bluetoothStatus === 'connecting' ? (
-                <BluetoothBadge className="connecting">
-                  <FaSyncAlt className="animate-spin" /> Conectando Bluetooth...
-                </BluetoothBadge>
-              ) : (
-                <BluetoothBadge
-                  className="disconnected"
-                  onClick={handleConnectBluetooth}
-                  title="Haz clic para conectar tu Phomemo por Bluetooth desde la PC"
-                >
-                  <FaBluetooth /> Conectar Phomemo
-                </BluetoothBadge>
-              )}
-
-              <HelpBtn onClick={() => setShowHelpModal(true)} title="Instrucciones para Phomemo en PC">
-                <FaQuestionCircle /> ¿Cómo usar Phomemo?
-              </HelpBtn>
-
-              <CloseButton onClick={onClose} title="Cerrar">
+              <CloseButton onClick={onClose} title="Cerrar ventana">
                 <FaTimes />
               </CloseButton>
             </div>
@@ -2258,7 +2225,7 @@ export default function BarcodeTicketGeneratorModal({
                 )}
               </SearchBox>
 
-              {/* Encabezado del carrito de etiquetas */}
+              {/* Encabezado del carrito */}
               <QueueHeader>
                 <div className="stats">
                   <span>Bandeja:</span>
@@ -2302,7 +2269,7 @@ export default function BarcodeTicketGeneratorModal({
                         </div>
                       </div>
 
-                      {/* Contador de etiquetas para este producto */}
+                      {/* Contador de etiquetas */}
                       <div className="stepper">
                         <button onClick={() => handleUpdateQuantity(item.product.id_producto, -1)}>
                           <FaMinus />
@@ -2329,7 +2296,7 @@ export default function BarcodeTicketGeneratorModal({
                       <button
                         className="remove-btn"
                         onClick={() => handleRemove(item.product.id_producto)}
-                        title="Quitar"
+                        title="Quitar de la bandeja"
                       >
                         <FaTimes />
                       </button>
@@ -2344,13 +2311,13 @@ export default function BarcodeTicketGeneratorModal({
               {/* Barra de opciones y selector de formato */}
               <ControlBar>
                 <div className="top-row">
-                  {/* Selector de Modo: Rollo 2x1 vs A4 */}
+                  {/* Selector de Modo: Rollo Térmico vs A4 */}
                   <div className="format-selector">
                     <button
-                      className={paperFormat === 'thermal_2x1' ? 'active' : ''}
-                      onClick={() => setPaperFormat('thermal_2x1')}
+                      className={paperFormat === 'thermal_roll' ? 'active' : ''}
+                      onClick={() => setPaperFormat('thermal_roll')}
                     >
-                      <FaTags /> 🏷️ Rollo Térmico 2x1'' (Phomemo)
+                      <FaTags /> 🏷️ Rollo Térmico (3nStar / USB)
                     </button>
                     <button
                       className={paperFormat === 'a4_sheet' ? 'active' : ''}
@@ -2360,163 +2327,410 @@ export default function BarcodeTicketGeneratorModal({
                     </button>
                   </div>
 
-                  {/* Botones de acción según el formato */}
+                  {/* Botones de acción */}
                   <div className="action-buttons">
-                    {paperFormat === 'thermal_2x1' ? (
+                    {paperFormat === 'thermal_roll' ? (
                       <>
                         <button
-                          className="btn-bluetooth-print"
-                          disabled={flattenedLabels.length === 0 || isPrintingBatch}
-                          onClick={handlePrintBluetoothBatch}
-                          title="Imprime de un solo tirón por Bluetooth directamente desde la PC"
+                          className={`btn-toggle-settings ${showSettingsDrawer ? 'active' : ''}`}
+                          onClick={() => setShowSettingsDrawer(!showSettingsDrawer)}
+                          title="Personalizar medidas, tamaños, logo y diseño"
                         >
-                          <FaBluetooth />
-                          {bluetoothStatus === 'connected'
-                            ? `Imprimir ${flattenedLabels.length} por Bluetooth`
-                            : `Conectar e Imprimir ${flattenedLabels.length} (Bluetooth)`}
+                          <FaSlidersH /> {showSettingsDrawer ? 'Ocultar Ajustes' : '⚙️ Personalizar Diseño & Medidas'}
                         </button>
 
                         <button
-                          className="btn-pc-print"
-                          disabled={flattenedLabels.length === 0 || isPrintingBatch}
-                          onClick={handlePrint2x1Window}
-                          title="Imprime usando la impresora de Windows o cable USB configurada en 2x1''"
+                          className="btn-test-print"
+                          disabled={flattenedLabels.length === 0}
+                          onClick={() => handlePrintThermal(true)}
+                          title="Imprime solo 1 etiqueta para calibrar alineación en la 3nStar"
                         >
-                          <FaDesktop /> Diálogo PC (2x1'')
+                          📄 Probar 1 Etiqueta
+                        </button>
+
+                        <button
+                          className="btn-print-primary"
+                          disabled={flattenedLabels.length === 0}
+                          onClick={() => handlePrintThermal(false)}
+                          title="Imprime todas las etiquetas en la impresora 3nStar o térmica USB de Windows"
+                        >
+                          <FaPrint /> Imprimir {flattenedLabels.length} Etiquetas
                         </button>
                       </>
                     ) : (
-                      <button
-                        className="btn-a4-print"
-                        disabled={flattenedLabels.length === 0}
-                        onClick={handlePrintA4}
-                      >
-                        <FaPrint /> Imprimir {flattenedLabels.length} Etiquetas A4
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="options-row">
-                  <div className="config-section">
-                    {/* Tipo de Código */}
-                    <div className="control-group">
-                      <label>Tipo de Código</label>
-                      <select value={codeType} onChange={(e) => setCodeType(e.target.value)}>
-                        <option value="barcode">📊 Código de Barras (1D)</option>
-                        <option value="qr">📱 Código QR (2D)</option>
-                        {paperFormat === 'a4_sheet' && (
-                          <option value="hybrid">🔄 Híbrido (Barras + QR)</option>
-                        )}
-                      </select>
-                    </div>
-
-                    {/* Selector de Protocolo y Papel para Phomemo 2x1 */}
-                    {paperFormat === 'thermal_2x1' && (
                       <>
-                        <div className="control-group">
-                          <label>Protocolo de Impresora</label>
-                          <select
-                            value={printerProtocol}
-                            onChange={(e) => setPrinterProtocol(e.target.value)}
-                          >
-                            <option value="printmaster_0x1f">🏷️ Phomemo Serie Q / M (Protocolo 0x1F - Q199 / Q30 / M110) [Recomendado]</option>
-                            <option value="printmaster_esc">🏷️ Phomemo Serie Q / M (Modo ESC/POS + Feed)</option>
-                            <option value="m_series">🏷️ Phomemo Serie M Clásica (M110 / M120 / M220)</option>
-                            <option value="m_series_esc">🏷️ Phomemo Serie M (con Reset ESC @)</option>
-                            <option value="d_series">🏷️ Phomemo Serie D (D30 / Q30)</option>
-                            <option value="m02_series">🏷️ Phomemo Serie M02 / T02</option>
-                            <option value="esc_pos_std">🏷️ ESC/POS Genérico</option>
-                          </select>
-                        </div>
-
-                        <div className="control-group">
-                          <label>Tipo de Rollo</label>
-                          <select
-                            value={labelMedia}
-                            onChange={(e) => setLabelMedia(Number(e.target.value))}
-                          >
-                            <option value={0x0A}>🏷️ Con Separación (Gap 2x1)</option>
-                            <option value={0x0B}>📄 Rollo Continuo</option>
-                          </select>
-                        </div>
-                      </>
-                    )}
-
-                    {/* Controles específicos para A4 */}
-                    {paperFormat === 'a4_sheet' && (
-                      <>
-                        <div className="control-group">
-                          <label>Tipo de Papel</label>
-                          <select value={paperType} onChange={(e) => setPaperType(e.target.value)}>
-                            <option value="bond">📄 Papel Bond A4 (Líneas de Corte)</option>
-                            <option value="adhesive">🏷️ Papel Adhesivo (Stickers A4)</option>
-                          </select>
-                        </div>
-
-                        <div className="control-group">
-                          <label>Distribución A4</label>
+                        <div className="setting-block" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <label style={{ margin: 0 }}>Distribución:</label>
                           <select value={layoutType} onChange={(e) => setLayoutType(e.target.value)}>
-                            <option value="24">24 por Hoja (3x8 - Estándar Góndola)</option>
-                            <option value="40">40 por Hoja (4x10 - Repuesto Pequeño)</option>
-                            <option value="12">12 por Hoja (2x6 - Grande / Baterías)</option>
+                            <option value="24">24 por Hoja (3x8)</option>
+                            <option value="40">40 por Hoja (4x10)</option>
+                            <option value="12">12 por Hoja (2x6)</option>
                           </select>
                         </div>
+                        <button
+                          className="btn-a4-print"
+                          disabled={flattenedLabels.length === 0}
+                          onClick={handlePrintA4}
+                        >
+                          <FaPrint /> Imprimir {flattenedLabels.length} Etiquetas A4
+                        </button>
                       </>
                     )}
-
-                    {/* Toggles de contenido */}
-                    <div className="toggles">
-                      <div
-                        className={`toggle-chip ${showLogo ? 'active' : ''}`}
-                        onClick={() => setShowLogo(!showLogo)}
-                        title="Mostrar Logo del Negocio"
-                      >
-                        {showLogo && <FaCheck size={9} />} Logo
-                      </div>
-                      <div
-                        className={`toggle-chip ${showPrice ? 'active' : ''}`}
-                        onClick={() => setShowPrice(!showPrice)}
-                        title="Mostrar precio de venta C$"
-                      >
-                        {showPrice && <FaCheck size={9} />} Precio C$
-                      </div>
-                      <div
-                        className={`toggle-chip ${showCompany ? 'active' : ''}`}
-                        onClick={() => setShowCompany(!showCompany)}
-                        title="Mostrar Multirepuestos RG"
-                      >
-                        {showCompany && <FaCheck size={9} />} Empresa
-                      </div>
-                      <div
-                        className={`toggle-chip ${showCategory ? 'active' : ''}`}
-                        onClick={() => setShowCategory(!showCategory)}
-                        title="Mostrar Categoría"
-                      >
-                        {showCategory && <FaCheck size={9} />} Categoría
-                      </div>
-                    </div>
                   </div>
                 </div>
               </ControlBar>
 
+              {/* PANEL DESPLEGABLE DE PERSONALIZACIÓN Y MEDIDAS */}
+              <AnimatePresence>
+                {showSettingsDrawer && paperFormat === 'thermal_roll' && (
+                  <CustomizationPanel
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {/* Pestañas de Ajustes */}
+                    <div className="settings-tabs">
+                      <button
+                        className={settingsActiveTab === 'measures' ? 'active' : ''}
+                        onClick={() => setSettingsActiveTab('measures')}
+                      >
+                        <FaRulerCombined /> 1. Medidas & Rollo
+                      </button>
+                      <button
+                        className={settingsActiveTab === 'brand' ? 'active' : ''}
+                        onClick={() => setSettingsActiveTab('brand')}
+                      >
+                        <FaImage /> 2. Logo & Tienda
+                      </button>
+                      <button
+                        className={settingsActiveTab === 'fonts' ? 'active' : ''}
+                        onClick={() => setSettingsActiveTab('fonts')}
+                      >
+                        <FaFont /> 3. Textos & Tamaños
+                      </button>
+                      <button
+                        className={settingsActiveTab === 'barcode' ? 'active' : ''}
+                        onClick={() => setSettingsActiveTab('barcode')}
+                      >
+                        <FaBarcode /> 4. Código de Barras
+                      </button>
+                      <button
+                        className={settingsActiveTab === 'visibility' ? 'active' : ''}
+                        onClick={() => setSettingsActiveTab('visibility')}
+                      >
+                        <FaEye /> 5. Elementos Visibles
+                      </button>
+                    </div>
+
+                    {/* Contenido según pestaña */}
+                    <div className="tab-content">
+                      {/* PESTAÑA 1: MEDIDAS Y ROLLO */}
+                      {settingsActiveTab === 'measures' && (
+                        <>
+                          <div className="setting-block">
+                            <label>Plantilla de Tamaño</label>
+                            <select
+                              value={labelConfig.preset}
+                              onChange={(e) => handlePresetChange(e.target.value)}
+                            >
+                              <option value="2x1">🏷️ 2x1 Pulgadas (50.8 × 25.4 mm) - Estándar 3nStar</option>
+                              <option value="50x30">🏷️ 50 × 30 mm</option>
+                              <option value="40x30">🏷️ 40 × 30 mm</option>
+                              <option value="40x25">🏷️ 40 × 25 mm</option>
+                              <option value="30x20">🏷️ 30 × 20 mm (Mini / Tornillos)</option>
+                              <option value="60x40">🏷️ 60 × 40 mm (Grande)</option>
+                              <option value="custom">🛠️ Medida Personalizada (mm)</option>
+                            </select>
+                          </div>
+
+                          <div className="setting-block">
+                            <label>Ancho (mm): <span className="val">{labelConfig.widthMm} mm</span></label>
+                            <input
+                              type="number"
+                              min="20"
+                              max="120"
+                              step="0.1"
+                              value={labelConfig.widthMm}
+                              onChange={(e) => updateConfig({ widthMm: parseFloat(e.target.value) || 50, preset: 'custom' })}
+                            />
+                          </div>
+
+                          <div className="setting-block">
+                            <label>Alto (mm): <span className="val">{labelConfig.heightMm} mm</span></label>
+                            <input
+                              type="number"
+                              min="15"
+                              max="120"
+                              step="0.1"
+                              value={labelConfig.heightMm}
+                              onChange={(e) => updateConfig({ heightMm: parseFloat(e.target.value) || 25, preset: 'custom' })}
+                            />
+                          </div>
+
+                          <div className="setting-block">
+                            <label>Margen Interior: <span className="val">{labelConfig.paddingMm} mm</span></label>
+                            <input
+                              type="range"
+                              min="0.5"
+                              max="3.5"
+                              step="0.1"
+                              value={labelConfig.paddingMm}
+                              onChange={(e) => updateConfig({ paddingMm: parseFloat(e.target.value) })}
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {/* PESTAÑA 2: LOGO Y TIENDA */}
+                      {settingsActiveTab === 'brand' && (
+                        <>
+                          <div className="setting-block" style={{ minWidth: 220 }}>
+                            <label>Origen del Logo</label>
+                            <select
+                              value={labelConfig.logoSource}
+                              onChange={(e) => updateConfig({ logoSource: e.target.value })}
+                            >
+                              <option value="vector">⚡ Insignia Vectorial RG (Ultra-Nítida para Térmica)</option>
+                              <option value="store">🏢 Logo Oficial del Negocio</option>
+                              <option value="custom">🖼️ Subir Imagen Personalizada</option>
+                            </select>
+                          </div>
+
+                          {labelConfig.logoSource === 'custom' && (
+                            <div className="setting-block">
+                              <label>Cargar Archivo</label>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleCustomLogoUpload}
+                                style={{ fontSize: '0.75rem' }}
+                              />
+                            </div>
+                          )}
+
+                          <div className="setting-block">
+                            <label>Altura del Logo: <span className="val">{labelConfig.logoHeightPx} px</span></label>
+                            <input
+                              type="range"
+                              min="10"
+                              max="34"
+                              step="1"
+                              value={labelConfig.logoHeightPx}
+                              onChange={(e) => updateConfig({ logoHeightPx: parseInt(e.target.value) })}
+                            />
+                          </div>
+
+                          <div className="setting-block" style={{ minWidth: 200 }}>
+                            <label>Nombre del Negocio en Etiqueta</label>
+                            <input
+                              type="text"
+                              value={labelConfig.storeName}
+                              onChange={(e) => updateConfig({ storeName: e.target.value })}
+                              placeholder="MULTIREPUESTOS RG"
+                            />
+                          </div>
+
+                          <div className="setting-block">
+                            <label>Tamaño Texto Negocio: <span className="val">{labelConfig.storeNameFontSizePt} pt</span></label>
+                            <input
+                              type="range"
+                              min="5"
+                              max="10"
+                              step="0.2"
+                              value={labelConfig.storeNameFontSizePt}
+                              onChange={(e) => updateConfig({ storeNameFontSizePt: parseFloat(e.target.value) })}
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {/* PESTAÑA 3: TIPOGRAFÍAS Y TAMAÑOS */}
+                      {settingsActiveTab === 'fonts' && (
+                        <>
+                          <div className="setting-block">
+                            <label>Nombre Repuesto: <span className="val">{labelConfig.productNameFontSizePt} pt</span></label>
+                            <input
+                              type="range"
+                              min="6.0"
+                              max="12.0"
+                              step="0.2"
+                              value={labelConfig.productNameFontSizePt}
+                              onChange={(e) => updateConfig({ productNameFontSizePt: parseFloat(e.target.value) })}
+                            />
+                          </div>
+
+                          <div className="setting-block">
+                            <label>Líneas de Nombre</label>
+                            <select
+                              value={labelConfig.productNameMaxLines}
+                              onChange={(e) => updateConfig({ productNameMaxLines: parseInt(e.target.value) })}
+                            >
+                              <option value="1">1 sola línea</option>
+                              <option value="2">2 líneas (Recomendado)</option>
+                            </select>
+                          </div>
+
+                          <div className="setting-block">
+                            <label>Precio C$: <span className="val">{labelConfig.priceFontSizePt} pt</span></label>
+                            <input
+                              type="range"
+                              min="7.0"
+                              max="15.0"
+                              step="0.5"
+                              value={labelConfig.priceFontSizePt}
+                              onChange={(e) => updateConfig({ priceFontSizePt: parseFloat(e.target.value) })}
+                            />
+                          </div>
+
+                          <div className="setting-block">
+                            <label>Código Repuesto: <span className="val">{labelConfig.codeFontSizePt} pt</span></label>
+                            <input
+                              type="range"
+                              min="5.0"
+                              max="9.5"
+                              step="0.2"
+                              value={labelConfig.codeFontSizePt}
+                              onChange={(e) => updateConfig({ codeFontSizePt: parseFloat(e.target.value) })}
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {/* PESTAÑA 4: CÓDIGO DE BARRAS */}
+                      {settingsActiveTab === 'barcode' && (
+                        <>
+                          <div className="setting-block">
+                            <label>Tipo de Código</label>
+                            <select
+                              value={labelConfig.codeType}
+                              onChange={(e) => updateConfig({ codeType: e.target.value })}
+                            >
+                              <option value="barcode">📊 Código de Barras 1D (Estándar)</option>
+                              <option value="qr">📱 Código QR 2D</option>
+                            </select>
+                          </div>
+
+                          <div className="setting-block">
+                            <label>Altura del Código: <span className="val">{labelConfig.barcodeHeightMm} mm</span></label>
+                            <input
+                              type="range"
+                              min="6.0"
+                              max="16.0"
+                              step="0.5"
+                              value={labelConfig.barcodeHeightMm}
+                              onChange={(e) => updateConfig({ barcodeHeightMm: parseFloat(e.target.value) })}
+                            />
+                          </div>
+
+                          {labelConfig.codeType === 'barcode' && (
+                            <div className="setting-block">
+                              <label>Grosor de Barras: <span className="val">{labelConfig.barcodeLineWidth}</span></label>
+                              <select
+                                value={labelConfig.barcodeLineWidth}
+                                onChange={(e) => updateConfig({ barcodeLineWidth: parseFloat(e.target.value) })}
+                              >
+                                <option value="1.2">Fino (1.2) - Para códigos muy largos</option>
+                                <option value="1.4">Estándar (1.4) - Óptimo para 3nStar</option>
+                                <option value="1.6">Grueso (1.6) - Máxima legibilidad</option>
+                              </select>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* PESTAÑA 5: ELEMENTOS VISIBLES */}
+                      {settingsActiveTab === 'visibility' && (
+                        <div className="toggles-grid">
+                          <div
+                            className={`toggle-card ${labelConfig.showLogo ? 'active' : ''}`}
+                            onClick={() => updateConfig({ showLogo: !labelConfig.showLogo })}
+                          >
+                            <FaCheck size={11} style={{ opacity: labelConfig.showLogo ? 1 : 0.2 }} /> Logo del Negocio
+                          </div>
+
+                          <div
+                            className={`toggle-card ${labelConfig.showStoreName ? 'active' : ''}`}
+                            onClick={() => updateConfig({ showStoreName: !labelConfig.showStoreName })}
+                          >
+                            <FaCheck size={11} style={{ opacity: labelConfig.showStoreName ? 1 : 0.2 }} /> Nombre Empresa
+                          </div>
+
+                          <div
+                            className={`toggle-card ${labelConfig.showProductName ? 'active' : ''}`}
+                            onClick={() => updateConfig({ showProductName: !labelConfig.showProductName })}
+                          >
+                            <FaCheck size={11} style={{ opacity: labelConfig.showProductName ? 1 : 0.2 }} /> Nombre Repuesto
+                          </div>
+
+                          <div
+                            className={`toggle-card ${labelConfig.showBarcode ? 'active' : ''}`}
+                            onClick={() => updateConfig({ showBarcode: !labelConfig.showBarcode })}
+                          >
+                            <FaCheck size={11} style={{ opacity: labelConfig.showBarcode ? 1 : 0.2 }} /> Código Barras / QR
+                          </div>
+
+                          <div
+                            className={`toggle-card ${labelConfig.showCodeText ? 'active' : ''}`}
+                            onClick={() => updateConfig({ showCodeText: !labelConfig.showCodeText })}
+                          >
+                            <FaCheck size={11} style={{ opacity: labelConfig.showCodeText ? 1 : 0.2 }} /> Código Alfanumérico
+                          </div>
+
+                          <div
+                            className={`toggle-card ${labelConfig.showPrice ? 'active' : ''}`}
+                            onClick={() => updateConfig({ showPrice: !labelConfig.showPrice })}
+                          >
+                            <FaCheck size={11} style={{ opacity: labelConfig.showPrice ? 1 : 0.2 }} /> Precio de Venta C$
+                          </div>
+
+                          <div
+                            className={`toggle-card ${labelConfig.showCategory ? 'active' : ''}`}
+                            onClick={() => updateConfig({ showCategory: !labelConfig.showCategory })}
+                          >
+                            <FaCheck size={11} style={{ opacity: labelConfig.showCategory ? 1 : 0.2 }} /> Categoría
+                          </div>
+
+                          <div
+                            className={`toggle-card ${labelConfig.showDivider ? 'active' : ''}`}
+                            onClick={() => updateConfig({ showDivider: !labelConfig.showDivider })}
+                          >
+                            <FaCheck size={11} style={{ opacity: labelConfig.showDivider ? 1 : 0.2 }} /> Línea Divisoria
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Pie del panel de ajustes */}
+                    <div className="panel-footer">
+                      <button className="reset-btn" onClick={handleResetDefaults}>
+                        <FaUndo /> Restablecer a 2x1" Predeterminado
+                      </button>
+                      <div className="notice">
+                        💾 Tus ajustes se guardan automáticamente en este equipo.
+                      </div>
+                    </div>
+                  </CustomizationPanel>
+                )}
+              </AnimatePresence>
+
               {/* Barra de paginación / navegación */}
               <PaginationBar>
-                {paperFormat === 'thermal_2x1' ? (
+                {paperFormat === 'thermal_roll' ? (
                   <>
                     <div className="nav-group">
                       <button
-                        disabled={preview2x1Index === 0}
-                        onClick={() => setPreview2x1Index(p => Math.max(0, p - 1))}
+                        disabled={previewIndex === 0}
+                        onClick={() => setPreviewIndex(p => Math.max(0, p - 1))}
                       >
                         <FaArrowLeft /> Anterior
                       </button>
                       <span>
-                        Etiqueta <strong>{flattenedLabels.length > 0 ? preview2x1Index + 1 : 0}</strong> de <strong>{flattenedLabels.length}</strong>
+                        Etiqueta <strong>{flattenedLabels.length > 0 ? previewIndex + 1 : 0}</strong> de <strong>{flattenedLabels.length}</strong>
                       </span>
                       <button
-                        disabled={preview2x1Index >= flattenedLabels.length - 1}
-                        onClick={() => setPreview2x1Index(p => Math.min(flattenedLabels.length - 1, p + 1))}
+                        disabled={previewIndex >= flattenedLabels.length - 1}
+                        onClick={() => setPreviewIndex(p => Math.min(flattenedLabels.length - 1, p + 1))}
                       >
                         Siguiente <FaArrowRight />
                       </button>
@@ -2540,7 +2754,7 @@ export default function BarcodeTicketGeneratorModal({
                     </div>
 
                     <div className="paper-indicator">
-                      <FaTags /> Rollo Térmico 2x1'' (50mm x 25mm) - Phomemo / Térmica
+                      <FaTags /> {labelConfig.widthMm} × {labelConfig.heightMm} mm ({labelConfig.preset === '2x1' ? '2×1 pulg' : 'Personalizada'}) • 3nStar / USB
                     </div>
                   </>
                 ) : (
@@ -2573,17 +2787,17 @@ export default function BarcodeTicketGeneratorModal({
 
               {/* VISTA PREVIA EN PANTALLA */}
               <PreviewArea>
-                {/* 1. MODO ROLLO TÉRMICO 2x1 */}
-                {paperFormat === 'thermal_2x1' ? (
+                {/* 1. MODO ROLLO TÉRMICO */}
+                {paperFormat === 'thermal_roll' ? (
                   flattenedLabels.length === 0 ? (
                     <div style={{ color: '#e2e8f0', textAlign: 'center' }}>
                       <FaBarcode size={48} style={{ opacity: 0.5, marginBottom: 12 }} />
-                      <p>Agrega repuestos a la bandeja para previsualizar tu etiqueta 2x1''.</p>
+                      <p>Agrega repuestos a la bandeja para previsualizar tu etiqueta térmica.</p>
                     </div>
-                  ) : labelViewMode === 'single' && current2x1Product ? (
+                  ) : labelViewMode === 'single' && currentStickerProduct ? (
                     <ThermalCardWrapper>
                       {(() => {
-                        const prod = current2x1Product;
+                        const prod = currentStickerProduct;
                         const code = prod.codigo_barras || prod.codigo || '000000';
                         const rawVal = prod.precio_venta ?? prod.venta ?? prod.precio ?? prod.__fmt?.venta ?? 0;
                         const numVal = typeof rawVal === 'string' && rawVal.includes('C$')
@@ -2593,55 +2807,119 @@ export default function BarcodeTicketGeneratorModal({
                         const cat = prod.categoria_nombre || '';
 
                         return (
-                          <ThermalSticker>
+                          <ThermalSticker
+                            style={{
+                              width: `${previewStickerWidthPx}px`,
+                              height: `${previewStickerHeightPx}px`,
+                              padding: `${labelConfig.paddingMm * 8}px`
+                            }}
+                          >
                             <div className="dim-pill">
-                              <FaTags size={10} /> 2x1 PULGADAS (50x25mm)
+                              <FaTags size={9} /> {labelConfig.widthMm} × {labelConfig.heightMm} mm (3nStar)
                             </div>
 
-                            {(showCompany || showLogo) && (
+                            {(labelConfig.showLogo || labelConfig.showStoreName) && (
                               <div className="company-header-row">
-                                {showLogo && (
-                                  <img
-                                    src="/icons/logo.png"
-                                    className="company-logo"
-                                    alt="Logo"
-                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                  />
+                                {labelConfig.showLogo && (
+                                  labelConfig.logoSource === 'vector' ? (
+                                    <RgVectorEmblem height={labelConfig.logoHeightPx} />
+                                  ) : labelConfig.logoSource === 'custom' && labelConfig.customLogoData ? (
+                                    <img
+                                      src={labelConfig.customLogoData}
+                                      className="company-logo"
+                                      style={{ height: `${labelConfig.logoHeightPx}px` }}
+                                      alt="Logo"
+                                    />
+                                  ) : (
+                                    <img
+                                      src={officialLogoUrl}
+                                      className="company-logo"
+                                      style={{ height: `${labelConfig.logoHeightPx}px` }}
+                                      alt="Logo"
+                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                    />
+                                  )
                                 )}
-                                {showCompany && <span className="company-title">Multirepuestos RG</span>}
+                                {labelConfig.showStoreName && (
+                                  <span
+                                    className="company-title"
+                                    style={{ fontSize: `${labelConfig.storeNameFontSizePt * 1.3}px` }}
+                                  >
+                                    {labelConfig.storeName}
+                                  </span>
+                                )}
                               </div>
                             )}
 
-                            <div className="product-name" title={prod.nombre}>
-                              {prod.nombre}
-                            </div>
+                            {labelConfig.showProductName && (
+                              <div
+                                className="product-name"
+                                style={{
+                                  fontSize: `${labelConfig.productNameFontSizePt * 1.3}px`,
+                                  WebkitLineClamp: labelConfig.productNameMaxLines,
+                                  maxHeight: `${labelConfig.productNameMaxLines * 1.3 * labelConfig.productNameFontSizePt * 1.3}px`
+                                }}
+                                title={prod.nombre}
+                              >
+                                {prod.nombre}
+                              </div>
+                            )}
 
-                            <div className="code-area">
-                              {codeType === 'barcode' ? (
-                                <BarcodeSvg
-                                  value={code}
-                                  width={1.6}
-                                  height={36}
-                                  displayValue={false}
-                                />
-                              ) : (
-                                <QRCodeSVG
-                                  value={code}
-                                  size={44}
-                                  level="M"
-                                />
-                              )}
-                            </div>
+                            {labelConfig.showBarcode && (
+                              <div className="code-area">
+                                {labelConfig.codeType === 'barcode' ? (
+                                  <BarcodeSvg
+                                    value={code}
+                                    width={labelConfig.barcodeLineWidth}
+                                    height={labelConfig.barcodeHeightMm * 3.4}
+                                    displayValue={false}
+                                  />
+                                ) : (
+                                  <QRCodeSVG
+                                    value={code}
+                                    size={labelConfig.barcodeHeightMm * 4}
+                                    level="M"
+                                  />
+                                )}
+                              </div>
+                            )}
 
-                            <div className="bottom-info">
-                              <span className="code-text">{code}</span>
-                              {showPrice && formattedPrice && (
-                                <span className="price-tag">{formattedPrice}</span>
-                              )}
-                              {showCategory && cat && (
-                                <span className="category-text">{cat}</span>
-                              )}
-                            </div>
+                            {(labelConfig.showCodeText || labelConfig.showPrice || labelConfig.showCategory) && (
+                              <div
+                                className="bottom-info"
+                                style={{
+                                  borderTop: labelConfig.showDivider ? '1px solid #000000' : 'none',
+                                  paddingTop: labelConfig.showDivider ? '3px' : '0'
+                                }}
+                              >
+                                {labelConfig.showCodeText ? (
+                                  <span
+                                    className="code-text"
+                                    style={{ fontSize: `${labelConfig.codeFontSizePt * 1.3}px` }}
+                                  >
+                                    {code}
+                                  </span>
+                                ) : <span />}
+
+                                {labelConfig.showPrice && formattedPrice && (
+                                  <span
+                                    className="price-tag"
+                                    style={{ fontSize: `${labelConfig.priceFontSizePt * 1.3}px` }}
+                                  >
+                                    {formattedPrice}
+                                  </span>
+                                )}
+
+                                {labelConfig.showCategory && cat && (
+                                  <span
+                                    className="category-text"
+                                    style={{ fontSize: `${labelConfig.categoryFontSizePt * 1.3}px` }}
+                                  >
+                                    {cat}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </ThermalSticker>
                         );
                       })()}
@@ -2660,55 +2938,119 @@ export default function BarcodeTicketGeneratorModal({
 
                         return (
                           <div key={`${prod.id_producto}-${index}`} className="reel-sticker-wrap">
-                            <ThermalSticker>
+                            <ThermalSticker
+                              style={{
+                                width: `${previewStickerWidthPx}px`,
+                                height: `${previewStickerHeightPx}px`,
+                                padding: `${labelConfig.paddingMm * 8}px`
+                              }}
+                            >
                               <div className="dim-pill">
-                                #{index + 1} • 2x1''
+                                #{index + 1} • {labelConfig.widthMm}×{labelConfig.heightMm}mm
                               </div>
 
-                              {(showCompany || showLogo) && (
+                              {(labelConfig.showLogo || labelConfig.showStoreName) && (
                                 <div className="company-header-row">
-                                  {showLogo && (
-                                    <img
-                                      src="/icons/logo.png"
-                                      className="company-logo"
-                                      alt="Logo"
-                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                    />
+                                  {labelConfig.showLogo && (
+                                    labelConfig.logoSource === 'vector' ? (
+                                      <RgVectorEmblem height={labelConfig.logoHeightPx} />
+                                    ) : labelConfig.logoSource === 'custom' && labelConfig.customLogoData ? (
+                                      <img
+                                        src={labelConfig.customLogoData}
+                                        className="company-logo"
+                                        style={{ height: `${labelConfig.logoHeightPx}px` }}
+                                        alt="Logo"
+                                      />
+                                    ) : (
+                                      <img
+                                        src={officialLogoUrl}
+                                        className="company-logo"
+                                        style={{ height: `${labelConfig.logoHeightPx}px` }}
+                                        alt="Logo"
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                      />
+                                    )
                                   )}
-                                  {showCompany && <span className="company-title">Multirepuestos RG</span>}
+                                  {labelConfig.showStoreName && (
+                                    <span
+                                      className="company-title"
+                                      style={{ fontSize: `${labelConfig.storeNameFontSizePt * 1.3}px` }}
+                                    >
+                                      {labelConfig.storeName}
+                                    </span>
+                                  )}
                                 </div>
                               )}
 
-                              <div className="product-name" title={prod.nombre}>
-                                {prod.nombre}
-                              </div>
+                              {labelConfig.showProductName && (
+                                <div
+                                  className="product-name"
+                                  style={{
+                                    fontSize: `${labelConfig.productNameFontSizePt * 1.3}px`,
+                                    WebkitLineClamp: labelConfig.productNameMaxLines,
+                                    maxHeight: `${labelConfig.productNameMaxLines * 1.3 * labelConfig.productNameFontSizePt * 1.3}px`
+                                  }}
+                                  title={prod.nombre}
+                                >
+                                  {prod.nombre}
+                                </div>
+                              )}
 
-                              <div className="code-area">
-                                {codeType === 'barcode' ? (
-                                  <BarcodeSvg
-                                    value={code}
-                                    width={1.6}
-                                    height={36}
-                                    displayValue={false}
-                                  />
-                                ) : (
-                                  <QRCodeSVG
-                                    value={code}
-                                    size={44}
-                                    level="M"
-                                  />
-                                )}
-                              </div>
+                              {labelConfig.showBarcode && (
+                                <div className="code-area">
+                                  {labelConfig.codeType === 'barcode' ? (
+                                    <BarcodeSvg
+                                      value={code}
+                                      width={labelConfig.barcodeLineWidth}
+                                      height={labelConfig.barcodeHeightMm * 3.4}
+                                      displayValue={false}
+                                    />
+                                  ) : (
+                                    <QRCodeSVG
+                                      value={code}
+                                      size={labelConfig.barcodeHeightMm * 4}
+                                      level="M"
+                                    />
+                                  )}
+                                </div>
+                              )}
 
-                              <div className="bottom-info">
-                                <span className="code-text">{code}</span>
-                                {showPrice && formattedPrice && (
-                                  <span className="price-tag">{formattedPrice}</span>
-                                )}
-                                {showCategory && cat && (
-                                  <span className="category-text">{cat}</span>
-                                )}
-                              </div>
+                              {(labelConfig.showCodeText || labelConfig.showPrice || labelConfig.showCategory) && (
+                                <div
+                                  className="bottom-info"
+                                  style={{
+                                    borderTop: labelConfig.showDivider ? '1px solid #000000' : 'none',
+                                    paddingTop: labelConfig.showDivider ? '3px' : '0'
+                                  }}
+                                >
+                                  {labelConfig.showCodeText ? (
+                                    <span
+                                      className="code-text"
+                                      style={{ fontSize: `${labelConfig.codeFontSizePt * 1.3}px` }}
+                                    >
+                                      {code}
+                                    </span>
+                                  ) : <span />}
+
+                                  {labelConfig.showPrice && formattedPrice && (
+                                    <span
+                                      className="price-tag"
+                                      style={{ fontSize: `${labelConfig.priceFontSizePt * 1.3}px` }}
+                                    >
+                                      {formattedPrice}
+                                    </span>
+                                  )}
+
+                                  {labelConfig.showCategory && cat && (
+                                    <span
+                                      className="category-text"
+                                      style={{ fontSize: `${labelConfig.categoryFontSizePt * 1.3}px` }}
+                                    >
+                                      {cat}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </ThermalSticker>
                           </div>
                         );
@@ -2732,17 +3074,14 @@ export default function BarcodeTicketGeneratorModal({
                           key={`${prod.id_producto}-${index}`}
                           className={`paper-${paperType}`}
                         >
-                          {(showCompany || showLogo) && (
+                          {(labelConfig.showStoreName || labelConfig.showLogo) && (
                             <div className="company-header">
-                              {showLogo && (
-                                <img
-                                  src="/icons/logo.png"
-                                  alt="Logo"
-                                  className="company-logo"
-                                  onError={(e) => { e.target.style.display = 'none'; }}
-                                />
+                              {labelConfig.showLogo && (
+                                <RgVectorEmblem height={18} />
                               )}
-                              {showCompany && <span className="company-title">Multirepuestos RG</span>}
+                              {labelConfig.showStoreName && (
+                                <span className="company-title">{labelConfig.storeName}</span>
+                              )}
                             </div>
                           )}
 
@@ -2750,49 +3089,21 @@ export default function BarcodeTicketGeneratorModal({
                             {prod.nombre}
                           </div>
 
-                          <div className={`code-area ${codeType === 'hybrid' ? 'hybrid' : ''}`}>
-                            {codeType === 'barcode' && (
-                              <BarcodeSvg
-                                value={code}
-                                width={layoutType === '40' ? 1.0 : 1.3}
-                                height={layoutType === '40' ? 22 : 28}
-                                displayValue={false}
-                              />
-                            )}
-
-                            {codeType === 'qr' && (
-                              <QRCodeSVG
-                                value={code}
-                                size={layoutType === '40' ? 38 : 46}
-                                level="M"
-                              />
-                            )}
-
-                            {codeType === 'hybrid' && (
-                              <>
-                                <div style={{ flex: 1, maxWidth: '72%' }}>
-                                  <BarcodeSvg
-                                    value={code}
-                                    width={1.0}
-                                    height={22}
-                                    displayValue={false}
-                                  />
-                                </div>
-                                <QRCodeSVG
-                                  value={code}
-                                  size={32}
-                                  level="M"
-                                />
-                              </>
-                            )}
+                          <div className="code-area">
+                            <BarcodeSvg
+                              value={code}
+                              width={layoutType === '40' ? 1.0 : 1.3}
+                              height={layoutType === '40' ? 22 : 28}
+                              displayValue={false}
+                            />
                           </div>
 
                           <div className="bottom-info">
                             <span className="code-text">{code}</span>
-                            {showPrice && formattedPrice && (
+                            {labelConfig.showPrice && formattedPrice && (
                               <span className="price-tag">{formattedPrice}</span>
                             )}
-                            {showCategory && cat && (
+                            {labelConfig.showCategory && cat && (
                               <span className="category-text">{cat}</span>
                             )}
                           </div>
@@ -2804,90 +3115,6 @@ export default function BarcodeTicketGeneratorModal({
               </PreviewArea>
             </RightPanel>
           </ContentLayout>
-
-          {/* OVERLAY DE PROGRESO DE IMPRESIÓN POR BLUETOOTH */}
-          {isPrintingBatch && (
-            <PrintingOverlay>
-              <div className="progress-card">
-                <div className="icon-anim">
-                  <FaBluetooth />
-                </div>
-                <h3>Imprimiendo en Phomemo...</h3>
-                <div className="label-desc">
-                  Etiqueta {printProgress.current} de {printProgress.total}:
-                  <strong> {printProgress.labelName}</strong>
-                </div>
-                <div className="progress-bar-bg">
-                  <div
-                    className="progress-bar-fill"
-                    style={{ width: `${Math.max(5, printProgress.percentage)}%` }}
-                  />
-                </div>
-                <div className="percentage-text">{printProgress.percentage}% completado</div>
-                <div className="footer-note">No apagues la etiquetadora durante la impresión.</div>
-              </div>
-            </PrintingOverlay>
-          )}
-
-          {/* MODAL DE AYUDA Y GUÍA DE CONEXIÓN PHOMEMO EN PC */}
-          {showHelpModal && (
-            <HelpModalOverlay onClick={() => setShowHelpModal(false)}>
-              <HelpModalContainer onClick={(e) => e.stopPropagation()}>
-                <div className="header">
-                  <h3>
-                    <FaBluetooth /> Guía: ¿Cómo imprimir en Phomemo desde la PC?
-                  </h3>
-                  <button onClick={() => setShowHelpModal(false)}>
-                    <FaTimes />
-                  </button>
-                </div>
-                <div className="body">
-                  <div className="step-box">
-                    <div className="step-title">
-                      <div className="badge-number">1</div>
-                      <span>Opción A: Bluetooth Web Directo (¡Recomendado!)</span>
-                    </div>
-                    <p>
-                      <strong>1.</strong> Enciende tu etiquetadora Phomemo (M110, M120, M220, D30, etc.) y colócale el rollo de etiquetas 2x1 pulgadas (50x25mm).
-                    </p>
-                    <p>
-                      <strong>2.</strong> En tu computadora con Google Chrome o Microsoft Edge, haz clic en el botón azul <strong>"Conectar e Imprimir (Bluetooth)"</strong>.
-                    </p>
-                    <p>
-                      <strong>3.</strong> El navegador mostrará una ventana con los dispositivos Bluetooth. Elige tu Phomemo y haz clic en <strong>"Vincular"</strong>.
-                    </p>
-                    <p>
-                      <strong>4.</strong> ¡Listo! Se imprimirán todas las etiquetas de tu lista <strong>de un solo tirón</strong> sin necesidad de tocar el celular ni de conectar la impresora a cada rato.
-                    </p>
-                  </div>
-
-                  <div className="step-box">
-                    <div className="step-title">
-                      <div className="badge-number">2</div>
-                      <span>Opción B: Usar como Impresora de Windows o Cable USB</span>
-                    </div>
-                    <p>
-                      <strong>1.</strong> Si tienes instalados los drivers de Phomemo o el software <em>Labelife</em> en tu computadora con Windows:
-                    </p>
-                    <p>
-                      <strong>2.</strong> Haz clic en el botón <strong>"Diálogo PC (2x1'')"</strong>.
-                    </p>
-                    <p>
-                      <strong>3.</strong> En la ventana de impresión de Windows, selecciona tu impresora Phomemo y asegúrate de elegir el tamaño de papel <strong>2x1 pulgadas o 50x25mm</strong> con márgenes en 0.
-                    </p>
-                    <p>
-                      <strong>4.</strong> Presiona Imprimir y el rollo saldrá continuo de un solo tiro.
-                    </p>
-                  </div>
-                </div>
-                <div className="footer">
-                  <button onClick={() => setShowHelpModal(false)}>
-                    ¡Entendido, volver al generador!
-                  </button>
-                </div>
-              </HelpModalContainer>
-            </HelpModalOverlay>
-          )}
         </ModalContainer>
       </ModalOverlay>
     </AnimatePresence>
