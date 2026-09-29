@@ -1945,14 +1945,10 @@ export default function BarcodeTicketGeneratorModal({
           margin: 0 !important;
         }
         html, body {
-          width: ${widthMm}mm !important;
-          height: ${heightMm}mm !important;
-          max-width: ${widthMm}mm !important;
-          max-height: ${heightMm}mm !important;
+          width: 100% !important;
           margin: 0 !important;
           padding: 0 !important;
           background: #ffffff !important;
-          overflow: hidden !important;
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
         }
@@ -1981,12 +1977,9 @@ export default function BarcodeTicketGeneratorModal({
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         background: #ffffff;
         color: #000000;
-        width: ${widthMm}mm;
-        height: ${heightMm}mm;
         margin: 0;
         padding: 0;
         -webkit-font-smoothing: antialiased;
-        overflow: hidden;
       }
       .label-page {
         width: ${widthMm}mm;
