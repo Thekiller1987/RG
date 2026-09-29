@@ -115,18 +115,21 @@ const BarcodeSvg = ({
 };
 
 /* Generador síncrono offline de SVG para la impresión (0 dependencias externas) */
-const generateBarcodeSvgMarkup = (code, width = 1.4, height = 34) => {
+const generateBarcodeSvgMarkup = (code, width = 1.4, height = 32) => {
   try {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     JsBarcode(svg, String(code || '000000'), {
       format: 'CODE128',
       width: width || 1.4,
-      height: height || 34,
+      height: height || 32,
       displayValue: false,
       margin: 0,
       background: 'transparent',
       lineColor: '#000000'
     });
+    svg.removeAttribute('width');
+    svg.removeAttribute('height');
+    svg.setAttribute('style', 'max-width: 96%; height: 100%; display: block; margin: 0 auto;');
     return svg.outerHTML;
   } catch (e) {
     return `<div style="font-family:monospace;font-size:8.5pt;font-weight:bold;letter-spacing:1px;">${code}</div>`;
@@ -136,21 +139,21 @@ const generateBarcodeSvgMarkup = (code, width = 1.4, height = 34) => {
 /* ==========================================================================
    CONFIGURACIONES PREESTABLECIDAS (PRESETS) Y VALORES POR DEFECTO
 ========================================================================== */
-const STORAGE_KEY = 'rg_thermal_label_config_v3';
+const STORAGE_KEY = 'rg_thermal_label_config_v4';
 
 const PRESET_CONFIGS = {
   '2x1': {
     name: '2" x 1" (50.8 × 25.4 mm) - Estándar 3nStar / Universal',
     widthMm: 50.8,
     heightMm: 25.4,
-    paddingMm: 1.2,
-    barcodeHeightMm: 9.5,
-    productNameFontSizePt: 7.6,
+    paddingMm: 1.0,
+    barcodeHeightMm: 8.5,
+    productNameFontSizePt: 7.2,
     productNameMaxLines: 2,
-    priceFontSizePt: 9.5,
-    codeFontSizePt: 6.8,
-    storeNameFontSizePt: 6.8,
-    logoHeightPx: 16
+    priceFontSizePt: 9.0,
+    codeFontSizePt: 6.5,
+    storeNameFontSizePt: 6.5,
+    logoHeightPx: 14
   },
   '50x30': {
     name: '50 × 30 mm (2" x 1.2")',
@@ -226,7 +229,7 @@ const DEFAULT_LABEL_CONFIG = {
   preset: '2x1',
   widthMm: 50.8,
   heightMm: 25.4,
-  paddingMm: 1.2,
+  paddingMm: 1.0,
   showLogo: true,
   showStoreName: true,
   showProductName: true,
@@ -235,18 +238,18 @@ const DEFAULT_LABEL_CONFIG = {
   showPrice: true,
   showCategory: false,
   showDivider: true,
-  logoSource: 'vector', // 'vector' | 'store' | 'custom'
+  logoSource: 'store', // 'store' por defecto con el logo oficial del negocio
   customLogoData: '',
-  logoHeightPx: 16,
+  logoHeightPx: 14,
   storeName: 'MULTIREPUESTOS RG',
-  storeNameFontSizePt: 6.8,
-  productNameFontSizePt: 7.6,
+  storeNameFontSizePt: 6.5,
+  productNameFontSizePt: 7.2,
   productNameMaxLines: 2,
-  codeFontSizePt: 6.8,
-  priceFontSizePt: 9.5,
+  codeFontSizePt: 6.5,
+  priceFontSizePt: 9.0,
   categoryFontSizePt: 5.5,
   codeType: 'barcode', // 'barcode' | 'qr'
-  barcodeHeightMm: 9.5,
+  barcodeHeightMm: 8.5,
   barcodeLineWidth: 1.4
 };
 
@@ -1732,14 +1735,14 @@ export default function BarcodeTicketGeneratorModal({
       const numVal = typeof rawVal === 'string' && rawVal.includes('C$')
         ? parseFloat(rawVal.replace(/[^0-9.]/g, ''))
         : parseFloat(rawVal);
-      const formattedPrice = (!isNaN(numVal) && numVal > 0) ? `C$ ${numVal.toFixed(2)}` : '';
+      const formattedPrice = (!isNaN(numVal) && numVal >= 0) ? `C$ ${numVal.toFixed(2)}` : '';
       const catName = product.categoria_nombre || '';
 
       // Generar código de barras o QR
       let codeMarkup = '';
       if (showBarcode) {
         if (codeType === 'barcode') {
-          codeMarkup = generateBarcodeSvgMarkup(barcodeCode, barcodeLineWidth, barcodeHeightMm * 3.4);
+          codeMarkup = generateBarcodeSvgMarkup(barcodeCode, barcodeLineWidth, Math.round(barcodeHeightMm * 3.5));
         } else {
           codeMarkup = `<div class="qr-item" data-code="${barcodeCode}"></div>`;
         }
@@ -1772,23 +1775,31 @@ export default function BarcodeTicketGeneratorModal({
         margin: 0;
       }
       @media print {
-        html, body {
-          width: ${widthMm}mm;
+        @page {
+          size: ${widthMm}mm ${heightMm}mm;
           margin: 0;
-          padding: 0;
-          background: #ffffff;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
+        }
+        html, body {
+          width: ${widthMm}mm !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background: #ffffff !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
         }
         .label-page {
-          width: ${widthMm}mm;
-          height: ${heightMm}mm;
-          max-width: ${widthMm}mm;
-          max-height: ${heightMm}mm;
-          page-break-after: always;
-          break-after: page;
-          page-break-inside: avoid;
-          break-inside: avoid;
+          width: ${widthMm}mm !important;
+          height: ${heightMm}mm !important;
+          max-width: ${widthMm}mm !important;
+          max-height: ${heightMm}mm !important;
+          page-break-after: always !important;
+          break-after: page !important;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+        .label-page:last-child {
+          page-break-after: auto !important;
+          break-after: auto !important;
         }
       }
       * {
@@ -1797,16 +1808,20 @@ export default function BarcodeTicketGeneratorModal({
         padding: 0;
       }
       body {
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         background: #ffffff;
         color: #000000;
+        width: ${widthMm}mm;
+        margin: 0;
+        padding: 0;
+        -webkit-font-smoothing: antialiased;
       }
       .label-page {
         width: ${widthMm}mm;
         height: ${heightMm}mm;
         max-width: ${widthMm}mm;
         max-height: ${heightMm}mm;
-        padding: ${paddingMm}mm;
+        padding: ${paddingMm}mm 1.5mm;
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
@@ -1817,75 +1832,106 @@ export default function BarcodeTicketGeneratorModal({
         page-break-after: always;
         break-after: page;
         margin: 0 auto;
+        background: #ffffff;
+      }
+      .label-page:last-child {
+        page-break-after: auto;
+        break-after: auto;
       }
       .company-header {
         width: 100%;
-        line-height: 1;
-        margin-bottom: 0.3mm;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 5px;
+        gap: 4px;
+        line-height: 1;
+        white-space: nowrap !important;
+        overflow: hidden;
+        flex-shrink: 0 !important;
+        margin: 0 0 0.2mm 0;
       }
       .company-logo {
         height: ${logoHeightPx}px;
         max-height: ${logoHeightPx}px;
         width: auto;
+        max-width: 28px;
         object-fit: contain;
-        filter: contrast(170%) grayscale(100%);
+        flex-shrink: 0 !important;
+        filter: contrast(160%) grayscale(100%);
       }
       .company-title {
         font-size: ${storeNameFontSizePt}pt;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
+        color: #000000;
+        letter-spacing: 0.03em;
+        white-space: nowrap !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
         line-height: 1;
       }
       .product-name {
-        font-size: ${productNameFontSizePt}pt;
-        font-weight: 700;
-        line-height: 1.15;
-        max-height: ${productNameMaxLines * 1.25}em;
-        overflow: hidden;
-        display: -webkit-box;
-        -webkit-line-clamp: ${productNameMaxLines};
-        -webkit-box-orient: vertical;
-        word-break: break-word;
         width: 100%;
+        font-size: ${productNameFontSizePt}pt;
+        font-weight: 800;
+        color: #000000;
+        line-height: 1.15;
+        text-align: center;
+        word-break: break-word;
+        overflow: hidden;
+        flex-shrink: 0 !important;
+        margin: 0.2mm 0;
+        max-height: ${productNameMaxLines === 1 ? '1.3em' : '2.4em'};
+        ${productNameMaxLines === 1
+          ? 'white-space: nowrap; text-overflow: ellipsis;'
+          : 'display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;'}
       }
       .code-area {
         width: 100%;
+        height: ${barcodeHeightMm}mm;
+        max-height: ${barcodeHeightMm}mm;
+        flex: 1 1 auto;
+        min-height: 5mm;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 0.2mm 0;
+        margin: 0.1mm 0;
+        overflow: hidden;
       }
       .code-area svg {
-        max-width: 98%;
-        height: ${barcodeHeightMm}mm;
+        max-width: 96%;
+        max-height: 100% !important;
+        height: 100% !important;
+        width: auto !important;
         display: block;
+        margin: 0 auto;
       }
       .bottom-info {
         width: 100%;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        ${showDivider ? 'border-top: 0.5px solid #000000; padding-top: 0.4mm;' : ''}
         line-height: 1;
+        flex-shrink: 0 !important;
+        ${showDivider ? 'border-top: 0.8px solid #000000; padding-top: 0.4mm;' : ''}
       }
       .code-text {
         font-size: ${codeFontSizePt}pt;
         font-family: monospace;
-        font-weight: 700;
+        font-weight: 800;
+        color: #000000;
       }
       .price-tag {
         font-size: ${priceFontSizePt}pt;
         font-weight: 900;
+        color: #000000;
         letter-spacing: -0.01em;
       }
       .category-text {
         font-size: ${categoryFontSizePt}pt;
+        color: #334155;
         text-transform: uppercase;
+        font-weight: 700;
       }
     `;
 
@@ -1896,41 +1942,81 @@ export default function BarcodeTicketGeneratorModal({
         <head>
           <title>Etiquetas_Termicas_3nStar_${storeName.replace(/\s+/g, '_')}</title>
           <style>${printCss}</style>
-          ${codeType === 'qr' ? '<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>' : ''}
         </head>
         <body>
           ${labelsHtml}
-          <script>
-            window.onload = function() {
-              ${codeType === 'qr' ? `
-                document.querySelectorAll('.qr-item').forEach(function(el) {
-                  var code = el.getAttribute('data-code');
-                  try {
-                    new QRCode(el, {
-                      text: code,
-                      width: 44,
-                      height: 44,
-                      correctLevel: QRCode.CorrectLevel.M
-                    });
-                  } catch(e) {}
-                });
-              ` : ''}
-
-              setTimeout(function() {
-                window.focus();
-                window.print();
-                setTimeout(function() {
-                  if (window.frameElement && window.frameElement.parentNode) {
-                    window.frameElement.parentNode.removeChild(window.frameElement);
-                  }
-                }, 1500);
-              }, 250);
-            };
-          </script>
         </body>
       </html>
     `);
     doc.close();
+
+    // Si es código QR, cargar qrcodejs y renderizarlo
+    if (codeType === 'qr') {
+      const qrScript = doc.createElement('script');
+      qrScript.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+      qrScript.onload = () => {
+        doc.querySelectorAll('.qr-item').forEach((el) => {
+          const code = el.getAttribute('data-code');
+          try {
+            new iframe.contentWindow.QRCode(el, {
+              text: code,
+              width: Math.round(Number(barcodeHeightMm) * 3.78) || 40,
+              height: Math.round(Number(barcodeHeightMm) * 3.78) || 40,
+              correctLevel: 1
+            });
+          } catch (e) {}
+        });
+      };
+      doc.head.appendChild(qrScript);
+    }
+
+    // Esperar que las imágenes carguen antes de lanzar el diálogo de impresión
+    const images = doc.querySelectorAll('img');
+    let loadedCount = 0;
+    const totalImages = images.length;
+
+    const triggerPrint = () => {
+      setTimeout(() => {
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        } catch (e) {
+          console.error('Error al invocar impresión:', e);
+        }
+        setTimeout(() => {
+          if (iframe.parentNode) {
+            iframe.parentNode.removeChild(iframe);
+          }
+        }, 3000);
+      }, 150);
+    };
+
+    if (totalImages === 0) {
+      triggerPrint();
+    } else {
+      let fired = false;
+      const onImgDone = () => {
+        loadedCount++;
+        if (loadedCount >= totalImages && !fired) {
+          fired = true;
+          triggerPrint();
+        }
+      };
+      images.forEach(img => {
+        if (img.complete) {
+          onImgDone();
+        } else {
+          img.onload = onImgDone;
+          img.onerror = onImgDone;
+        }
+      });
+      setTimeout(() => {
+        if (!fired) {
+          fired = true;
+          triggerPrint();
+        }
+      }, 500);
+    }
 
     toast.success(
       testOnly
