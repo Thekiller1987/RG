@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
 import JsBarcode from 'jsbarcode';
 import { QRCodeSVG } from 'qrcode.react';
+import QRCode from 'qrcode';
 import toast from 'react-hot-toast';
 import {
   FaBarcode, FaQrcode, FaPrint, FaTrash, FaTimes, FaPlus, FaMinus,
@@ -139,86 +140,155 @@ const generateBarcodeSvgMarkup = (code, width = 1.4, height = 28) => {
 /* ==========================================================================
    CONFIGURACIONES PREESTABLECIDAS (PRESETS) Y VALORES POR DEFECTO
 ========================================================================== */
-const STORAGE_KEY = 'rg_thermal_label_config_v5';
+const STORAGE_KEY = 'rg_thermal_label_config_v7';
 
 const PRESET_CONFIGS = {
+  'rg_aragon': {
+    name: '⭐ Multirepuestos RG Aragón (53 × 25 mm - Probado)',
+    widthMm: 53.0,
+    heightMm: 25.0,
+    paddingMm: 0.8,
+    paddingHorizontalMm: 1.5,
+    barcodeHeightMm: 8.5,
+    productNameFontSizePt: 6.8,
+    productNameMaxLines: 1,
+    priceFontSizePt: 8.5,
+    codeFontSizePt: 6.5,
+    storeNameFontSizePt: 6.5,
+    logoHeightPx: 16,
+    barcodeLineWidth: 1.4,
+    barcodeWidthPercent: 95,
+    codePosition: 'below_barcode',
+    headerAlign: 'center',
+    productNameAlign: 'center',
+    priceAlign: 'right',
+    showDivider: true
+  },
   '2x1': {
     name: '2" x 1" (50.8 × 25.4 mm) - Estándar 3nStar / Universal',
     widthMm: 50.8,
     heightMm: 25.4,
     paddingMm: 0.8,
+    paddingHorizontalMm: 1.5,
     barcodeHeightMm: 8.0,
     productNameFontSizePt: 7.2,
     productNameMaxLines: 2,
     priceFontSizePt: 8.5,
     codeFontSizePt: 6.5,
     storeNameFontSizePt: 7.0,
-    logoHeightPx: 18
+    logoHeightPx: 18,
+    barcodeLineWidth: 1.4,
+    barcodeWidthPercent: 95,
+    codePosition: 'below_barcode',
+    headerAlign: 'center',
+    productNameAlign: 'center',
+    priceAlign: 'right',
+    showDivider: true
   },
   '50x30': {
     name: '50 × 30 mm (2" x 1.2")',
     widthMm: 50.0,
     heightMm: 30.0,
     paddingMm: 1.2,
+    paddingHorizontalMm: 1.5,
     barcodeHeightMm: 10.0,
     productNameFontSizePt: 8.0,
     productNameMaxLines: 2,
     priceFontSizePt: 10.0,
     codeFontSizePt: 7.0,
     storeNameFontSizePt: 7.2,
-    logoHeightPx: 18
+    logoHeightPx: 18,
+    barcodeLineWidth: 1.4,
+    barcodeWidthPercent: 95,
+    codePosition: 'below_barcode',
+    headerAlign: 'center',
+    productNameAlign: 'center',
+    priceAlign: 'right',
+    showDivider: true
   },
   '40x30': {
     name: '40 × 30 mm',
     widthMm: 40.0,
     heightMm: 30.0,
     paddingMm: 1.0,
+    paddingHorizontalMm: 1.2,
     barcodeHeightMm: 9.5,
     productNameFontSizePt: 7.2,
     productNameMaxLines: 2,
     priceFontSizePt: 8.5,
     codeFontSizePt: 6.5,
     storeNameFontSizePt: 6.5,
-    logoHeightPx: 16
+    logoHeightPx: 16,
+    barcodeLineWidth: 1.4,
+    barcodeWidthPercent: 95,
+    codePosition: 'below_barcode',
+    headerAlign: 'center',
+    productNameAlign: 'center',
+    priceAlign: 'right',
+    showDivider: true
   },
   '40x25': {
     name: '40 × 25 mm',
     widthMm: 40.0,
     heightMm: 25.0,
     paddingMm: 0.8,
+    paddingHorizontalMm: 1.2,
     barcodeHeightMm: 8.0,
     productNameFontSizePt: 6.8,
     productNameMaxLines: 2,
     priceFontSizePt: 8.0,
     codeFontSizePt: 6.2,
     storeNameFontSizePt: 6.2,
-    logoHeightPx: 14
+    logoHeightPx: 14,
+    barcodeLineWidth: 1.4,
+    barcodeWidthPercent: 95,
+    codePosition: 'below_barcode',
+    headerAlign: 'center',
+    productNameAlign: 'center',
+    priceAlign: 'right',
+    showDivider: true
   },
   '30x20': {
     name: '30 × 20 mm (Mini / Tornillería)',
     widthMm: 30.0,
     heightMm: 20.0,
     paddingMm: 0.6,
+    paddingHorizontalMm: 1.0,
     barcodeHeightMm: 6.5,
     productNameFontSizePt: 6.0,
     productNameMaxLines: 1,
     priceFontSizePt: 7.2,
     codeFontSizePt: 5.5,
     storeNameFontSizePt: 5.5,
-    logoHeightPx: 12
+    logoHeightPx: 12,
+    barcodeLineWidth: 1.2,
+    barcodeWidthPercent: 90,
+    codePosition: 'below_barcode',
+    headerAlign: 'center',
+    productNameAlign: 'center',
+    priceAlign: 'right',
+    showDivider: false
   },
   '60x40': {
     name: '60 × 40 mm (Grande / Embalaje)',
     widthMm: 60.0,
     heightMm: 40.0,
     paddingMm: 1.8,
+    paddingHorizontalMm: 2.0,
     barcodeHeightMm: 13.0,
     productNameFontSizePt: 9.5,
     productNameMaxLines: 2,
     priceFontSizePt: 12.0,
     codeFontSizePt: 8.0,
     storeNameFontSizePt: 8.5,
-    logoHeightPx: 22
+    logoHeightPx: 22,
+    barcodeLineWidth: 1.5,
+    barcodeWidthPercent: 95,
+    codePosition: 'below_barcode',
+    headerAlign: 'center',
+    productNameAlign: 'center',
+    priceAlign: 'right',
+    showDivider: true
   },
   'custom': {
     name: '🛠️ Medida Personalizada (mm)'
@@ -226,10 +296,11 @@ const PRESET_CONFIGS = {
 };
 
 const DEFAULT_LABEL_CONFIG = {
-  preset: '2x1',
-  widthMm: 50.8,
-  heightMm: 25.4,
+  preset: 'rg_aragon',
+  widthMm: 53.0,
+  heightMm: 25.0,
   paddingMm: 0.8,
+  paddingHorizontalMm: 1.5,
   showLogo: true,
   showStoreName: true,
   showProductName: true,
@@ -240,17 +311,22 @@ const DEFAULT_LABEL_CONFIG = {
   showDivider: true,
   logoSource: 'store', // 'store' por defecto con el logo oficial del negocio
   customLogoData: '',
-  logoHeightPx: 18,
+  logoHeightPx: 16,
   storeName: 'MULTIREPUESTOS RG',
-  storeNameFontSizePt: 7.0,
-  productNameFontSizePt: 7.2,
+  storeNameFontSizePt: 6.8,
+  productNameFontSizePt: 7.0,
   productNameMaxLines: 2,
   codeFontSizePt: 6.5,
   priceFontSizePt: 8.5,
   categoryFontSizePt: 5.5,
   codeType: 'barcode', // 'barcode' | 'qr'
-  barcodeHeightMm: 8.0,
-  barcodeLineWidth: 1.4
+  barcodeHeightMm: 8.5,
+  barcodeLineWidth: 1.4,
+  barcodeWidthPercent: 95,
+  codePosition: 'below_barcode', // 'below_barcode' | 'split' | 'bottom_center'
+  headerAlign: 'center', // 'center' | 'left' | 'space-between'
+  productNameAlign: 'center', // 'center' | 'left' | 'right'
+  priceAlign: 'right' // 'right' | 'center' | 'left'
 };
 
 /* ==========================================================================
@@ -1223,6 +1299,17 @@ const ThermalSticker = styled.div`
     margin: 1px 0;
   }
 
+  .code-centered-text {
+    font-family: monospace;
+    font-weight: 800;
+    color: #000000;
+    text-align: center;
+    letter-spacing: 0.5px;
+    line-height: 1;
+    width: 100%;
+    margin: 1px 0;
+  }
+
   .bottom-info {
     width: 100%;
     display: flex;
@@ -1502,13 +1589,21 @@ export default function BarcodeTicketGeneratorModal({
       widthMm: presetData.widthMm,
       heightMm: presetData.heightMm,
       paddingMm: presetData.paddingMm,
+      paddingHorizontalMm: presetData.paddingHorizontalMm ?? 1.5,
       barcodeHeightMm: presetData.barcodeHeightMm,
       productNameFontSizePt: presetData.productNameFontSizePt,
       productNameMaxLines: presetData.productNameMaxLines,
       priceFontSizePt: presetData.priceFontSizePt,
       codeFontSizePt: presetData.codeFontSizePt,
       storeNameFontSizePt: presetData.storeNameFontSizePt,
-      logoHeightPx: presetData.logoHeightPx
+      logoHeightPx: presetData.logoHeightPx,
+      barcodeLineWidth: presetData.barcodeLineWidth ?? 1.4,
+      barcodeWidthPercent: presetData.barcodeWidthPercent ?? 95,
+      codePosition: presetData.codePosition ?? 'split',
+      headerAlign: presetData.headerAlign ?? 'center',
+      productNameAlign: presetData.productNameAlign ?? 'center',
+      priceAlign: presetData.priceAlign ?? 'right',
+      showDivider: presetData.showDivider ?? true
     });
     toast.success(`Plantilla cambiada a ${presetData.name}`, { duration: 2500 });
   };
@@ -1706,7 +1801,10 @@ export default function BarcodeTicketGeneratorModal({
   /* ==========================================================================
      MOTOR UNIVERSAL DE IMPRESIÓN TÉRMICA USB (3nStar / Zebra / Xprinter)
   ========================================================================== */
-  const handlePrintThermal = (testOnly = false) => {
+  /* ==========================================================================
+     MOTOR UNIVERSAL DE IMPRESIÓN TÉRMICA USB (3nStar / Zebra / Xprinter)
+  ========================================================================== */
+  const handlePrintThermal = async (testOnly = false) => {
     const itemsToPrint = testOnly ? (flattenedLabels.slice(0, 1)) : flattenedLabels;
     if (itemsToPrint.length === 0) {
       toast.error('No hay etiquetas en la bandeja para imprimir.');
@@ -1717,6 +1815,7 @@ export default function BarcodeTicketGeneratorModal({
       widthMm,
       heightMm,
       paddingMm,
+      paddingHorizontalMm,
       showLogo,
       showStoreName,
       showProductName,
@@ -1737,7 +1836,12 @@ export default function BarcodeTicketGeneratorModal({
       categoryFontSizePt,
       codeType,
       barcodeHeightMm,
-      barcodeLineWidth
+      barcodeLineWidth,
+      barcodeWidthPercent,
+      codePosition,
+      headerAlign,
+      productNameAlign,
+      priceAlign
     } = labelConfig;
 
     const iframe = document.createElement('iframe');
@@ -1763,9 +1867,10 @@ export default function BarcodeTicketGeneratorModal({
       }
     }
 
+    const isCodeBelow = (codePosition === 'below_barcode' || codePosition === 'center');
     let labelsHtml = '';
 
-    itemsToPrint.forEach((product) => {
+    for (const product of itemsToPrint) {
       const barcodeCode = product.codigo_barras || product.codigo || '000000';
       const rawVal = product.precio_venta ?? product.venta ?? product.precio ?? product.__fmt?.venta ?? 0;
       const numVal = typeof rawVal === 'string' && rawVal.includes('C$')
@@ -1780,46 +1885,71 @@ export default function BarcodeTicketGeneratorModal({
         if (codeType === 'barcode') {
           codeMarkup = generateBarcodeSvgMarkup(barcodeCode, barcodeLineWidth, Math.round(barcodeHeightMm * 3.5));
         } else {
-          codeMarkup = `<div class="qr-item" data-code="${barcodeCode}"></div>`;
+          try {
+            codeMarkup = await QRCode.toString(barcodeCode, {
+              type: 'svg',
+              margin: 0,
+              errorCorrectionLevel: 'M'
+            });
+          } catch (err) {
+            codeMarkup = `<div class="qr-item" data-code="${barcodeCode}"></div>`;
+          }
         }
       }
 
       labelsHtml += `
         <div class="label-page">
           ${(showLogo || showStoreName) ? `
-            <div class="company-header">
+            <div class="company-header" style="justify-content: ${headerAlign === 'left' ? 'flex-start' : headerAlign === 'space-between' ? 'space-between' : 'center'};">
               ${showLogo ? logoMarkup : ''}
               ${showStoreName ? `<span class="company-title">${storeName}</span>` : ''}
             </div>
           ` : ''}
-          ${showProductName ? `<div class="product-name">${product.nombre || 'Repuesto'}</div>` : ''}
+          ${showProductName ? `<div class="product-name" style="text-align: ${productNameAlign || 'center'};">${product.nombre || 'Repuesto'}</div>` : ''}
           ${showBarcode ? `<div class="code-area">${codeMarkup}</div>` : ''}
-          ${(showCodeText || showPrice || showCategory) ? `
-            <div class="bottom-info">
-              ${showCodeText ? `<span class="code-text">${barcodeCode}</span>` : '<span></span>'}
-              ${showPrice && formattedPrice ? `<span class="price-tag">${formattedPrice}</span>` : ''}
-              ${showCategory && catName ? `<span class="category-text">${catName}</span>` : ''}
-            </div>
+          ${(showCodeText && isCodeBelow) ? `
+            <div class="code-centered-text">${barcodeCode}</div>
           ` : ''}
+          ${isCodeBelow ? `
+            ${(showPrice || showCategory) ? `
+              <div class="bottom-info" style="justify-content: ${priceAlign === 'left' ? 'flex-start' : priceAlign === 'center' ? 'center' : 'flex-end'};">
+                ${showPrice && formattedPrice ? `<span class="price-tag">${formattedPrice}</span>` : ''}
+                ${showCategory && catName ? `<span class="category-text">${catName}</span>` : ''}
+              </div>
+            ` : ''}
+          ` : `
+            ${(showCodeText || showPrice || showCategory) ? `
+              <div class="bottom-info" style="justify-content: ${codePosition === 'bottom_center' ? 'center' : 'space-between'};">
+                ${showCodeText ? `<span class="code-text">${barcodeCode}</span>` : '<span></span>'}
+                ${showPrice && formattedPrice ? `<span class="price-tag">${formattedPrice}</span>` : ''}
+                ${showCategory && catName ? `<span class="category-text">${catName}</span>` : ''}
+              </div>
+            ` : ''}
+          `}
         </div>
       `;
-    });
+    }
 
     const printCss = `
+      @charset "UTF-8";
       @page {
-        size: ${widthMm}mm ${heightMm}mm;
-        margin: 0;
+        size: ${widthMm}mm ${heightMm}mm ${widthMm > heightMm ? 'landscape' : 'portrait'};
+        margin: 0 !important;
       }
       @media print {
         @page {
-          size: ${widthMm}mm ${heightMm}mm;
-          margin: 0;
+          size: ${widthMm}mm ${heightMm}mm ${widthMm > heightMm ? 'landscape' : 'portrait'};
+          margin: 0 !important;
         }
         html, body {
           width: ${widthMm}mm !important;
+          height: ${heightMm}mm !important;
+          max-width: ${widthMm}mm !important;
+          max-height: ${heightMm}mm !important;
           margin: 0 !important;
           padding: 0 !important;
           background: #ffffff !important;
+          overflow: hidden !important;
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
         }
@@ -1832,6 +1962,7 @@ export default function BarcodeTicketGeneratorModal({
           break-after: page !important;
           page-break-inside: avoid !important;
           break-inside: avoid !important;
+          overflow: hidden !important;
         }
         .label-page:last-child {
           page-break-after: auto !important;
@@ -1848,16 +1979,18 @@ export default function BarcodeTicketGeneratorModal({
         background: #ffffff;
         color: #000000;
         width: ${widthMm}mm;
+        height: ${heightMm}mm;
         margin: 0;
         padding: 0;
         -webkit-font-smoothing: antialiased;
+        overflow: hidden;
       }
       .label-page {
         width: ${widthMm}mm;
         height: ${heightMm}mm;
         max-width: ${widthMm}mm;
         max-height: ${heightMm}mm;
-        padding: ${paddingMm || 0.7}mm 1.5mm 0.5mm 1.5mm;
+        padding: ${paddingMm || 0.8}mm ${paddingHorizontalMm || 1.5}mm 0.4mm ${paddingHorizontalMm || 1.5}mm;
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
@@ -1865,6 +1998,7 @@ export default function BarcodeTicketGeneratorModal({
         align-items: center;
         text-align: center;
         overflow: hidden;
+        page-break-inside: avoid;
         page-break-after: always;
         break-after: page;
         margin: 0 auto;
@@ -1878,24 +2012,23 @@ export default function BarcodeTicketGeneratorModal({
         width: 100%;
         display: flex;
         align-items: center;
-        justify-content: center;
         gap: 4px;
         line-height: 1;
         white-space: nowrap !important;
         flex-shrink: 0 !important;
-        margin: 0 0 0.15mm 0;
+        margin: 0 0 0.1mm 0;
       }
       .company-logo {
-        height: ${Math.min(Number(logoHeightPx) || 16, 20)}px;
-        max-height: ${Math.min(Number(logoHeightPx) || 16, 20)}px;
+        height: ${Math.min(Number(logoHeightPx) || 16, 26)}px;
+        max-height: ${Math.min(Number(logoHeightPx) || 16, 26)}px;
         width: auto;
-        max-width: 24px;
+        max-width: 28px;
         object-fit: contain;
         flex-shrink: 0 !important;
         filter: contrast(160%) grayscale(100%);
       }
       .company-title {
-        font-size: ${Math.min(Number(storeNameFontSizePt) || 7.0, 7.5)}pt;
+        font-size: ${Math.min(Number(storeNameFontSizePt) || 6.8, 8.5)}pt;
         font-weight: 800;
         text-transform: uppercase;
         color: #000000;
@@ -1905,61 +2038,71 @@ export default function BarcodeTicketGeneratorModal({
       }
       .product-name {
         width: 100%;
-        font-size: ${Math.min(Number(productNameFontSizePt) || 7.2, 7.5)}pt;
+        font-size: ${Math.min(Number(productNameFontSizePt) || 7.0, 9.0)}pt;
         font-weight: 800;
         color: #000000;
         line-height: 1.1;
-        text-align: center;
         word-break: break-word;
         overflow: hidden;
         flex-shrink: 0 !important;
         margin: 0.1mm 0;
         display: -webkit-box;
-        -webkit-line-clamp: 2;
+        -webkit-line-clamp: ${productNameMaxLines || 2};
         -webkit-box-orient: vertical;
       }
       .code-area {
         width: 100%;
         flex: 1 1 0;
-        min-height: 4.5mm;
-        max-height: ${Math.min(Number(barcodeHeightMm) || 7.5, 8.0)}mm;
+        min-height: 4.0mm;
+        max-height: ${Number(barcodeHeightMm) || 8.5}mm;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 0.1mm 0;
+        margin: 0.1mm auto;
         overflow: hidden;
       }
       .code-area svg {
-        max-width: 95% !important;
-        max-height: 100% !important;
+        max-width: ${barcodeWidthPercent || 95}% !important;
+        max-height: ${Number(barcodeHeightMm) || 8.5}mm !important;
         height: 100% !important;
         width: auto !important;
         display: block;
         margin: 0 auto;
       }
+      .code-centered-text {
+        width: 100%;
+        font-family: monospace;
+        font-size: ${Math.min(Number(codeFontSizePt) || 6.5, 8.5)}pt;
+        font-weight: 800;
+        color: #000000;
+        text-align: center;
+        letter-spacing: 0.5px;
+        line-height: 1;
+        margin: 0.2mm 0;
+        flex-shrink: 0 !important;
+      }
       .bottom-info {
         width: 100%;
         display: flex;
         align-items: center;
-        justify-content: space-between;
         line-height: 1;
         flex-shrink: 0 !important;
-        ${showDivider ? 'border-top: 0.8px solid #000000; padding-top: 0.3mm; margin-top: 0.1mm;' : ''}
+        ${showDivider ? 'border-top: 0.8px solid #000000; padding-top: 0.3mm; margin-top: 0.15mm;' : ''}
       }
       .code-text {
-        font-size: ${Math.min(Number(codeFontSizePt) || 6.5, 6.8)}pt;
+        font-size: ${Math.min(Number(codeFontSizePt) || 6.5, 7.5)}pt;
         font-family: monospace;
         font-weight: 800;
         color: #000000;
       }
       .price-tag {
-        font-size: ${Math.min(Number(priceFontSizePt) || 8.5, 9.0)}pt;
+        font-size: ${Math.min(Number(priceFontSizePt) || 8.5, 11.0)}pt;
         font-weight: 900;
         color: #000000;
         letter-spacing: -0.01em;
       }
       .category-text {
-        font-size: ${categoryFontSizePt}pt;
+        font-size: ${categoryFontSizePt || 5.5}pt;
         color: #334155;
         text-transform: uppercase;
         font-weight: 700;
@@ -1971,7 +2114,7 @@ export default function BarcodeTicketGeneratorModal({
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Etiquetas_Termicas_3nStar_${storeName.replace(/\s+/g, '_')}</title>
+          <title>Etiquetas_Termicas_${storeName.replace(/\s+/g, '_')}</title>
           <style>${printCss}</style>
         </head>
         <body>
@@ -1980,26 +2123,6 @@ export default function BarcodeTicketGeneratorModal({
       </html>
     `);
     doc.close();
-
-    // Si es código QR, cargar qrcodejs y renderizarlo
-    if (codeType === 'qr') {
-      const qrScript = doc.createElement('script');
-      qrScript.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
-      qrScript.onload = () => {
-        doc.querySelectorAll('.qr-item').forEach((el) => {
-          const code = el.getAttribute('data-code');
-          try {
-            new iframe.contentWindow.QRCode(el, {
-              text: code,
-              width: Math.round(Number(barcodeHeightMm) * 3.78) || 40,
-              height: Math.round(Number(barcodeHeightMm) * 3.78) || 40,
-              correctLevel: 1
-            });
-          } catch (e) {}
-        });
-      };
-      doc.head.appendChild(qrScript);
-    }
 
     // Esperar que las imágenes carguen antes de lanzar el diálogo de impresión
     const images = doc.querySelectorAll('img');
@@ -2051,8 +2174,8 @@ export default function BarcodeTicketGeneratorModal({
 
     toast.success(
       testOnly
-        ? 'Imprimiendo 1 etiqueta de prueba en tu 3nStar / USB...'
-        : `Enviando ${itemsToPrint.length} etiquetas a la impresora 3nStar / USB`,
+        ? 'Imprimiendo 1 etiqueta de prueba en tu impresora ETIQUETAS...'
+        : `Enviando ${itemsToPrint.length} etiquetas a la impresora ETIQUETAS`,
       { duration: 4000, icon: '🖨️' }
     );
   };
@@ -2546,13 +2669,13 @@ export default function BarcodeTicketGeneratorModal({
                         className={settingsActiveTab === 'fonts' ? 'active' : ''}
                         onClick={() => setSettingsActiveTab('fonts')}
                       >
-                        <FaFont /> 3. Textos & Tamaños
+                        <FaFont /> 3. Textos & Posición
                       </button>
                       <button
                         className={settingsActiveTab === 'barcode' ? 'active' : ''}
                         onClick={() => setSettingsActiveTab('barcode')}
                       >
-                        <FaBarcode /> 4. Código de Barras
+                        <FaBarcode /> 4. Código / QR
                       </button>
                       <button
                         className={settingsActiveTab === 'visibility' ? 'active' : ''}
@@ -2567,12 +2690,13 @@ export default function BarcodeTicketGeneratorModal({
                       {/* PESTAÑA 1: MEDIDAS Y ROLLO */}
                       {settingsActiveTab === 'measures' && (
                         <>
-                          <div className="setting-block">
+                          <div className="setting-block" style={{ minWidth: 260 }}>
                             <label>Plantilla de Tamaño</label>
                             <select
                               value={labelConfig.preset}
                               onChange={(e) => handlePresetChange(e.target.value)}
                             >
+                              <option value="rg_aragon">⭐ Multirepuestos RG Aragón (53 × 25 mm - Probado)</option>
                               <option value="2x1">🏷️ 2x1 Pulgadas (50.8 × 25.4 mm) - Estándar 3nStar</option>
                               <option value="50x30">🏷️ 50 × 30 mm</option>
                               <option value="40x30">🏷️ 40 × 30 mm</option>
@@ -2608,14 +2732,26 @@ export default function BarcodeTicketGeneratorModal({
                           </div>
 
                           <div className="setting-block">
-                            <label>Margen Interior: <span className="val">{labelConfig.paddingMm} mm</span></label>
+                            <label>Margen Vertical: <span className="val">{labelConfig.paddingMm} mm</span></label>
                             <input
                               type="range"
-                              min="0.5"
-                              max="3.5"
+                              min="0.2"
+                              max="3.0"
                               step="0.1"
                               value={labelConfig.paddingMm}
                               onChange={(e) => updateConfig({ paddingMm: parseFloat(e.target.value) })}
+                            />
+                          </div>
+
+                          <div className="setting-block">
+                            <label>Margen Horiz.: <span className="val">{labelConfig.paddingHorizontalMm || 1.5} mm</span></label>
+                            <input
+                              type="range"
+                              min="0.5"
+                              max="4.0"
+                              step="0.1"
+                              value={labelConfig.paddingHorizontalMm || 1.5}
+                              onChange={(e) => updateConfig({ paddingHorizontalMm: parseFloat(e.target.value) })}
                             />
                           </div>
                         </>
@@ -2649,7 +2785,7 @@ export default function BarcodeTicketGeneratorModal({
                           )}
 
                           <div className="setting-block">
-                            <label>Altura del Logo: <span className="val">{labelConfig.logoHeightPx} px</span></label>
+                            <label>Altura Logo: <span className="val">{labelConfig.logoHeightPx} px</span></label>
                             <input
                               type="range"
                               min="10"
@@ -2658,6 +2794,18 @@ export default function BarcodeTicketGeneratorModal({
                               value={labelConfig.logoHeightPx}
                               onChange={(e) => updateConfig({ logoHeightPx: parseInt(e.target.value) })}
                             />
+                          </div>
+
+                          <div className="setting-block">
+                            <label>Alineación Encabezado</label>
+                            <select
+                              value={labelConfig.headerAlign || 'center'}
+                              onChange={(e) => updateConfig({ headerAlign: e.target.value })}
+                            >
+                              <option value="center">Centrado</option>
+                              <option value="left">A la Izquierda</option>
+                              <option value="space-between">Separado a los Extremos</option>
+                            </select>
                           </div>
 
                           <div className="setting-block" style={{ minWidth: 200 }}>
@@ -2684,14 +2832,26 @@ export default function BarcodeTicketGeneratorModal({
                         </>
                       )}
 
-                      {/* PESTAÑA 3: TIPOGRAFÍAS Y TAMAÑOS */}
+                      {/* PESTAÑA 3: TIPOGRAFÍAS Y POSICIÓN */}
                       {settingsActiveTab === 'fonts' && (
                         <>
+                          <div className="setting-block">
+                            <label>Alineación Nombre</label>
+                            <select
+                              value={labelConfig.productNameAlign || 'center'}
+                              onChange={(e) => updateConfig({ productNameAlign: e.target.value })}
+                            >
+                              <option value="center">Centrado</option>
+                              <option value="left">A la Izquierda</option>
+                              <option value="right">A la Derecha</option>
+                            </select>
+                          </div>
+
                           <div className="setting-block">
                             <label>Nombre Repuesto: <span className="val">{labelConfig.productNameFontSizePt} pt</span></label>
                             <input
                               type="range"
-                              min="6.0"
+                              min="5.5"
                               max="12.0"
                               step="0.2"
                               value={labelConfig.productNameFontSizePt}
@@ -2705,8 +2865,44 @@ export default function BarcodeTicketGeneratorModal({
                               value={labelConfig.productNameMaxLines}
                               onChange={(e) => updateConfig({ productNameMaxLines: parseInt(e.target.value) })}
                             >
-                              <option value="1">1 sola línea</option>
-                              <option value="2">2 líneas (Recomendado)</option>
+                              <option value="1">1 sola línea (Compacto)</option>
+                              <option value="2">2 líneas (Estándar)</option>
+                            </select>
+                          </div>
+
+                          <div className="setting-block" style={{ minWidth: 230 }}>
+                            <label>Posición del Código</label>
+                            <select
+                              value={labelConfig.codePosition || 'below_barcode'}
+                              onChange={(e) => updateConfig({ codePosition: e.target.value })}
+                            >
+                              <option value="below_barcode">⭐ Centrado debajo del Código / QR</option>
+                              <option value="split">Fila inferior (Código izq, Precio der)</option>
+                              <option value="bottom_center">Fila inferior centrado</option>
+                            </select>
+                          </div>
+
+                          <div className="setting-block">
+                            <label>Tamaño Código: <span className="val">{labelConfig.codeFontSizePt} pt</span></label>
+                            <input
+                              type="range"
+                              min="5.0"
+                              max="9.5"
+                              step="0.2"
+                              value={labelConfig.codeFontSizePt}
+                              onChange={(e) => updateConfig({ codeFontSizePt: parseFloat(e.target.value) })}
+                            />
+                          </div>
+
+                          <div className="setting-block">
+                            <label>Alineación Precio</label>
+                            <select
+                              value={labelConfig.priceAlign || 'right'}
+                              onChange={(e) => updateConfig({ priceAlign: e.target.value })}
+                            >
+                              <option value="right">A la Derecha</option>
+                              <option value="center">Centrado</option>
+                              <option value="left">A la Izquierda</option>
                             </select>
                           </div>
 
@@ -2721,22 +2917,10 @@ export default function BarcodeTicketGeneratorModal({
                               onChange={(e) => updateConfig({ priceFontSizePt: parseFloat(e.target.value) })}
                             />
                           </div>
-
-                          <div className="setting-block">
-                            <label>Código Repuesto: <span className="val">{labelConfig.codeFontSizePt} pt</span></label>
-                            <input
-                              type="range"
-                              min="5.0"
-                              max="9.5"
-                              step="0.2"
-                              value={labelConfig.codeFontSizePt}
-                              onChange={(e) => updateConfig({ codeFontSizePt: parseFloat(e.target.value) })}
-                            />
-                          </div>
                         </>
                       )}
 
-                      {/* PESTAÑA 4: CÓDIGO DE BARRAS */}
+                      {/* PESTAÑA 4: CÓDIGO DE BARRAS / QR */}
                       {settingsActiveTab === 'barcode' && (
                         <>
                           <div className="setting-block">
@@ -2746,16 +2930,19 @@ export default function BarcodeTicketGeneratorModal({
                               onChange={(e) => updateConfig({ codeType: e.target.value })}
                             >
                               <option value="barcode">📊 Código de Barras 1D (Estándar)</option>
-                              <option value="qr">📱 Código QR 2D</option>
+                              <option value="qr">📱 Código QR 2D (Vectorial)</option>
                             </select>
                           </div>
 
                           <div className="setting-block">
-                            <label>Altura del Código: <span className="val">{labelConfig.barcodeHeightMm} mm</span></label>
+                            <label>
+                              {labelConfig.codeType === 'qr' ? 'Tamaño del QR:' : 'Altura del Código:'}
+                              <span className="val">{labelConfig.barcodeHeightMm} mm</span>
+                            </label>
                             <input
                               type="range"
-                              min="6.0"
-                              max="16.0"
+                              min={labelConfig.codeType === 'qr' ? '6.0' : '4.0'}
+                              max={labelConfig.codeType === 'qr' ? '22.0' : '20.0'}
                               step="0.5"
                               value={labelConfig.barcodeHeightMm}
                               onChange={(e) => updateConfig({ barcodeHeightMm: parseFloat(e.target.value) })}
@@ -2763,16 +2950,39 @@ export default function BarcodeTicketGeneratorModal({
                           </div>
 
                           {labelConfig.codeType === 'barcode' && (
-                            <div className="setting-block">
-                              <label>Grosor de Barras: <span className="val">{labelConfig.barcodeLineWidth}</span></label>
-                              <select
-                                value={labelConfig.barcodeLineWidth}
-                                onChange={(e) => updateConfig({ barcodeLineWidth: parseFloat(e.target.value) })}
-                              >
-                                <option value="1.2">Fino (1.2) - Para códigos muy largos</option>
-                                <option value="1.4">Estándar (1.4) - Óptimo para 3nStar</option>
-                                <option value="1.6">Grueso (1.6) - Máxima legibilidad</option>
-                              </select>
+                            <>
+                              <div className="setting-block">
+                                <label>Ancho del Código: <span className="val">{labelConfig.barcodeWidthPercent || 95}%</span></label>
+                                <input
+                                  type="range"
+                                  min="50"
+                                  max="100"
+                                  step="5"
+                                  value={labelConfig.barcodeWidthPercent || 95}
+                                  onChange={(e) => updateConfig({ barcodeWidthPercent: parseInt(e.target.value) })}
+                                />
+                              </div>
+
+                              <div className="setting-block">
+                                <label>Grosor de Barras: <span className="val">{labelConfig.barcodeLineWidth}</span></label>
+                                <select
+                                  value={labelConfig.barcodeLineWidth}
+                                  onChange={(e) => updateConfig({ barcodeLineWidth: parseFloat(e.target.value) })}
+                                >
+                                  <option value="1.2">Fino (1.2) - Para códigos muy largos</option>
+                                  <option value="1.4">Estándar (1.4) - Óptimo para 3nStar</option>
+                                  <option value="1.6">Grueso (1.6) - Máxima legibilidad</option>
+                                  <option value="1.8">Extra Grueso (1.8)</option>
+                                </select>
+                              </div>
+                            </>
+                          )}
+
+                          {labelConfig.codeType === 'qr' && (
+                            <div className="setting-block" style={{ justifyContent: 'center' }}>
+                              <span style={{ fontSize: '0.73rem', color: '#0369a1', fontWeight: 600 }}>
+                                📱 Código QR vectorial de alta definición calibrado para rollos térmicos.
+                              </span>
                             </div>
                           )}
                         </>
@@ -2955,15 +3165,20 @@ export default function BarcodeTicketGeneratorModal({
                             style={{
                               width: `${previewStickerWidthPx}px`,
                               height: `${previewStickerHeightPx}px`,
-                              padding: `${labelConfig.paddingMm * 8}px`
+                              padding: `${(labelConfig.paddingMm || 0.8) * 8}px ${(labelConfig.paddingHorizontalMm || 1.5) * 8}px`
                             }}
                           >
                             <div className="dim-pill">
-                              <FaTags size={9} /> {labelConfig.widthMm} × {labelConfig.heightMm} mm (3nStar)
+                              <FaTags size={9} /> {labelConfig.widthMm} × {labelConfig.heightMm} mm (ETIQUETAS)
                             </div>
 
                             {(labelConfig.showLogo || labelConfig.showStoreName) && (
-                              <div className="company-header-row">
+                              <div
+                                className="company-header-row"
+                                style={{
+                                  justifyContent: labelConfig.headerAlign === 'left' ? 'flex-start' : labelConfig.headerAlign === 'space-between' ? 'space-between' : 'center'
+                                }}
+                              >
                                 {labelConfig.showLogo && (
                                   labelConfig.logoSource === 'vector' ? (
                                     <RgVectorEmblem height={labelConfig.logoHeightPx} />
@@ -3000,6 +3215,7 @@ export default function BarcodeTicketGeneratorModal({
                                 className="product-name"
                                 style={{
                                   fontSize: `${labelConfig.productNameFontSizePt * 1.3}px`,
+                                  textAlign: labelConfig.productNameAlign || 'center',
                                   WebkitLineClamp: labelConfig.productNameMaxLines,
                                   maxHeight: `${labelConfig.productNameMaxLines * 1.3 * labelConfig.productNameFontSizePt * 1.3}px`
                                 }}
@@ -3010,7 +3226,13 @@ export default function BarcodeTicketGeneratorModal({
                             )}
 
                             {labelConfig.showBarcode && (
-                              <div className="code-area">
+                              <div
+                                className="code-area"
+                                style={{
+                                  width: `${labelConfig.barcodeWidthPercent || 95}%`,
+                                  margin: '1px auto'
+                                }}
+                              >
                                 {labelConfig.codeType === 'barcode' ? (
                                   <BarcodeSvg
                                     value={code}
@@ -3021,48 +3243,91 @@ export default function BarcodeTicketGeneratorModal({
                                 ) : (
                                   <QRCodeSVG
                                     value={code}
-                                    size={labelConfig.barcodeHeightMm * 4}
+                                    size={labelConfig.barcodeHeightMm * 3.8}
                                     level="M"
                                   />
                                 )}
                               </div>
                             )}
 
-                            {(labelConfig.showCodeText || labelConfig.showPrice || labelConfig.showCategory) && (
+                            {labelConfig.showCodeText && (labelConfig.codePosition === 'below_barcode' || labelConfig.codePosition === 'center') && (
                               <div
-                                className="bottom-info"
+                                className="code-centered-text"
                                 style={{
-                                  borderTop: labelConfig.showDivider ? '1px solid #000000' : 'none',
-                                  paddingTop: labelConfig.showDivider ? '3px' : '0'
+                                  fontSize: `${labelConfig.codeFontSizePt * 1.3}px`
                                 }}
                               >
-                                {labelConfig.showCodeText ? (
-                                  <span
-                                    className="code-text"
-                                    style={{ fontSize: `${labelConfig.codeFontSizePt * 1.3}px` }}
-                                  >
-                                    {code}
-                                  </span>
-                                ) : <span />}
-
-                                {labelConfig.showPrice && formattedPrice && (
-                                  <span
-                                    className="price-tag"
-                                    style={{ fontSize: `${labelConfig.priceFontSizePt * 1.3}px` }}
-                                  >
-                                    {formattedPrice}
-                                  </span>
-                                )}
-
-                                {labelConfig.showCategory && cat && (
-                                  <span
-                                    className="category-text"
-                                    style={{ fontSize: `${labelConfig.categoryFontSizePt * 1.3}px` }}
-                                  >
-                                    {cat}
-                                  </span>
-                                )}
+                                {code}
                               </div>
+                            )}
+
+                            {(labelConfig.codePosition === 'below_barcode' || labelConfig.codePosition === 'center') ? (
+                              (labelConfig.showPrice || labelConfig.showCategory) && (
+                                <div
+                                  className="bottom-info"
+                                  style={{
+                                    justifyContent: labelConfig.priceAlign === 'left' ? 'flex-start' : labelConfig.priceAlign === 'center' ? 'center' : 'flex-end',
+                                    borderTop: labelConfig.showDivider ? '1px solid #000000' : 'none',
+                                    paddingTop: labelConfig.showDivider ? '3px' : '0'
+                                  }}
+                                >
+                                  {labelConfig.showPrice && formattedPrice && (
+                                    <span
+                                      className="price-tag"
+                                      style={{ fontSize: `${labelConfig.priceFontSizePt * 1.3}px` }}
+                                    >
+                                      {formattedPrice}
+                                    </span>
+                                  )}
+
+                                  {labelConfig.showCategory && cat && (
+                                    <span
+                                      className="category-text"
+                                      style={{ fontSize: `${labelConfig.categoryFontSizePt * 1.3}px` }}
+                                    >
+                                      {cat}
+                                    </span>
+                                  )}
+                                </div>
+                              )
+                            ) : (
+                              (labelConfig.showCodeText || labelConfig.showPrice || labelConfig.showCategory) && (
+                                <div
+                                  className="bottom-info"
+                                  style={{
+                                    justifyContent: labelConfig.codePosition === 'bottom_center' ? 'center' : 'space-between',
+                                    borderTop: labelConfig.showDivider ? '1px solid #000000' : 'none',
+                                    paddingTop: labelConfig.showDivider ? '3px' : '0'
+                                  }}
+                                >
+                                  {labelConfig.showCodeText ? (
+                                    <span
+                                      className="code-text"
+                                      style={{ fontSize: `${labelConfig.codeFontSizePt * 1.3}px` }}
+                                    >
+                                      {code}
+                                    </span>
+                                  ) : <span />}
+
+                                  {labelConfig.showPrice && formattedPrice && (
+                                    <span
+                                      className="price-tag"
+                                      style={{ fontSize: `${labelConfig.priceFontSizePt * 1.3}px` }}
+                                    >
+                                      {formattedPrice}
+                                    </span>
+                                  )}
+
+                                  {labelConfig.showCategory && cat && (
+                                    <span
+                                      className="category-text"
+                                      style={{ fontSize: `${labelConfig.categoryFontSizePt * 1.3}px` }}
+                                    >
+                                      {cat}
+                                    </span>
+                                  )}
+                                </div>
+                              )
                             )}
                           </ThermalSticker>
                         );
@@ -3086,7 +3351,7 @@ export default function BarcodeTicketGeneratorModal({
                               style={{
                                 width: `${previewStickerWidthPx}px`,
                                 height: `${previewStickerHeightPx}px`,
-                                padding: `${labelConfig.paddingMm * 8}px`
+                                padding: `${(labelConfig.paddingMm || 0.8) * 8}px ${(labelConfig.paddingHorizontalMm || 1.5) * 8}px`
                               }}
                             >
                               <div className="dim-pill">
@@ -3094,7 +3359,12 @@ export default function BarcodeTicketGeneratorModal({
                               </div>
 
                               {(labelConfig.showLogo || labelConfig.showStoreName) && (
-                                <div className="company-header-row">
+                                <div
+                                  className="company-header-row"
+                                  style={{
+                                    justifyContent: labelConfig.headerAlign === 'left' ? 'flex-start' : labelConfig.headerAlign === 'space-between' ? 'space-between' : 'center'
+                                  }}
+                                >
                                   {labelConfig.showLogo && (
                                     labelConfig.logoSource === 'vector' ? (
                                       <RgVectorEmblem height={labelConfig.logoHeightPx} />
@@ -3131,6 +3401,7 @@ export default function BarcodeTicketGeneratorModal({
                                   className="product-name"
                                   style={{
                                     fontSize: `${labelConfig.productNameFontSizePt * 1.3}px`,
+                                    textAlign: labelConfig.productNameAlign || 'center',
                                     WebkitLineClamp: labelConfig.productNameMaxLines,
                                     maxHeight: `${labelConfig.productNameMaxLines * 1.3 * labelConfig.productNameFontSizePt * 1.3}px`
                                   }}
@@ -3141,7 +3412,13 @@ export default function BarcodeTicketGeneratorModal({
                               )}
 
                               {labelConfig.showBarcode && (
-                                <div className="code-area">
+                                <div
+                                  className="code-area"
+                                  style={{
+                                    width: `${labelConfig.barcodeWidthPercent || 95}%`,
+                                    margin: '1px auto'
+                                  }}
+                                >
                                   {labelConfig.codeType === 'barcode' ? (
                                     <BarcodeSvg
                                       value={code}
@@ -3152,48 +3429,91 @@ export default function BarcodeTicketGeneratorModal({
                                   ) : (
                                     <QRCodeSVG
                                       value={code}
-                                      size={labelConfig.barcodeHeightMm * 4}
+                                      size={labelConfig.barcodeHeightMm * 3.8}
                                       level="M"
                                     />
                                   )}
                                 </div>
                               )}
 
-                              {(labelConfig.showCodeText || labelConfig.showPrice || labelConfig.showCategory) && (
+                              {labelConfig.showCodeText && (labelConfig.codePosition === 'below_barcode' || labelConfig.codePosition === 'center') && (
                                 <div
-                                  className="bottom-info"
+                                  className="code-centered-text"
                                   style={{
-                                    borderTop: labelConfig.showDivider ? '1px solid #000000' : 'none',
-                                    paddingTop: labelConfig.showDivider ? '3px' : '0'
+                                    fontSize: `${labelConfig.codeFontSizePt * 1.3}px`
                                   }}
                                 >
-                                  {labelConfig.showCodeText ? (
-                                    <span
-                                      className="code-text"
-                                      style={{ fontSize: `${labelConfig.codeFontSizePt * 1.3}px` }}
-                                    >
-                                      {code}
-                                    </span>
-                                  ) : <span />}
-
-                                  {labelConfig.showPrice && formattedPrice && (
-                                    <span
-                                      className="price-tag"
-                                      style={{ fontSize: `${labelConfig.priceFontSizePt * 1.3}px` }}
-                                    >
-                                      {formattedPrice}
-                                    </span>
-                                  )}
-
-                                  {labelConfig.showCategory && cat && (
-                                    <span
-                                      className="category-text"
-                                      style={{ fontSize: `${labelConfig.categoryFontSizePt * 1.3}px` }}
-                                    >
-                                      {cat}
-                                    </span>
-                                  )}
+                                  {code}
                                 </div>
+                              )}
+
+                              {(labelConfig.codePosition === 'below_barcode' || labelConfig.codePosition === 'center') ? (
+                                (labelConfig.showPrice || labelConfig.showCategory) && (
+                                  <div
+                                    className="bottom-info"
+                                    style={{
+                                      justifyContent: labelConfig.priceAlign === 'left' ? 'flex-start' : labelConfig.priceAlign === 'center' ? 'center' : 'flex-end',
+                                      borderTop: labelConfig.showDivider ? '1px solid #000000' : 'none',
+                                      paddingTop: labelConfig.showDivider ? '3px' : '0'
+                                    }}
+                                  >
+                                    {labelConfig.showPrice && formattedPrice && (
+                                      <span
+                                        className="price-tag"
+                                        style={{ fontSize: `${labelConfig.priceFontSizePt * 1.3}px` }}
+                                      >
+                                        {formattedPrice}
+                                      </span>
+                                    )}
+
+                                    {labelConfig.showCategory && cat && (
+                                      <span
+                                        className="category-text"
+                                        style={{ fontSize: `${labelConfig.categoryFontSizePt * 1.3}px` }}
+                                      >
+                                        {cat}
+                                      </span>
+                                    )}
+                                  </div>
+                                )
+                              ) : (
+                                (labelConfig.showCodeText || labelConfig.showPrice || labelConfig.showCategory) && (
+                                  <div
+                                    className="bottom-info"
+                                    style={{
+                                      justifyContent: labelConfig.codePosition === 'bottom_center' ? 'center' : 'space-between',
+                                      borderTop: labelConfig.showDivider ? '1px solid #000000' : 'none',
+                                      paddingTop: labelConfig.showDivider ? '3px' : '0'
+                                    }}
+                                  >
+                                    {labelConfig.showCodeText ? (
+                                      <span
+                                        className="code-text"
+                                        style={{ fontSize: `${labelConfig.codeFontSizePt * 1.3}px` }}
+                                      >
+                                        {code}
+                                      </span>
+                                    ) : <span />}
+
+                                    {labelConfig.showPrice && formattedPrice && (
+                                      <span
+                                        className="price-tag"
+                                        style={{ fontSize: `${labelConfig.priceFontSizePt * 1.3}px` }}
+                                      >
+                                        {formattedPrice}
+                                      </span>
+                                    )}
+
+                                    {labelConfig.showCategory && cat && (
+                                      <span
+                                        className="category-text"
+                                        style={{ fontSize: `${labelConfig.categoryFontSizePt * 1.3}px` }}
+                                      >
+                                        {cat}
+                                      </span>
+                                    )}
+                                  </div>
+                                )
                               )}
                             </ThermalSticker>
                           </div>
