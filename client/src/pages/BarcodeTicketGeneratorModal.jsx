@@ -124,7 +124,7 @@ const generateBarcodeSvgMarkup = (code, width = 1.4, height = 28) => {
       width: width || 1.4,
       height: height || 28,
       displayValue: false,
-      margin: 0,
+      margin: 3,
       background: 'transparent',
       lineColor: '#000000'
     });
@@ -133,7 +133,7 @@ const generateBarcodeSvgMarkup = (code, width = 1.4, height = 28) => {
     svg.setAttribute('style', 'max-width: 95%; max-height: 100%; height: 100%; width: auto; display: block; margin: 0 auto;');
     return svg.outerHTML;
   } catch (e) {
-    return `<div style="font-family:monospace;font-size:8.5pt;font-weight:bold;letter-spacing:1px;">${code}</div>`;
+    return `<div style="font-family:'Arial Black',Impact,sans-serif;font-size:8.5pt;font-weight:900;letter-spacing:1px;">${code}</div>`;
   }
 };
 
@@ -148,7 +148,7 @@ const PRESET_CONFIGS = {
     widthMm: 53.0,
     heightMm: 25.0,
     paddingMm: 0.8,
-    paddingHorizontalMm: 1.5,
+    paddingHorizontalMm: 2.0,
     barcodeHeightMm: 8.5,
     productNameFontSizePt: 6.8,
     productNameMaxLines: 1,
@@ -300,7 +300,7 @@ const DEFAULT_LABEL_CONFIG = {
   widthMm: 53.0,
   heightMm: 25.0,
   paddingMm: 0.8,
-  paddingHorizontalMm: 1.5,
+  paddingHorizontalMm: 2.0,
   showLogo: true,
   showStoreName: true,
   showProductName: true,
@@ -1300,14 +1300,15 @@ const ThermalSticker = styled.div`
   }
 
   .code-centered-text {
-    font-family: monospace;
-    font-weight: 800;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Arial Black", Arial, sans-serif;
+    font-weight: 900;
     color: #000000;
     text-align: center;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.8px;
     line-height: 1;
     width: 100%;
     margin: 1px 0;
+    padding: 0 4px;
   }
 
   .bottom-info {
@@ -1318,9 +1319,11 @@ const ThermalSticker = styled.div`
     line-height: 1;
 
     .code-text {
-      font-family: monospace;
-      font-weight: 800;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Arial Black", Arial, sans-serif;
+      font-weight: 900;
       color: #000000;
+      letter-spacing: 0.8px;
+      padding-left: 2mm;
     }
 
     .price-tag {
@@ -2071,14 +2074,15 @@ export default function BarcodeTicketGeneratorModal({
       }
       .code-centered-text {
         width: 100%;
-        font-family: monospace;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Arial Black", Arial, sans-serif !important;
         font-size: ${Math.min(Number(codeFontSizePt) || 6.5, 8.5)}pt;
-        font-weight: 800;
-        color: #000000;
+        font-weight: 900 !important;
+        color: #000000 !important;
         text-align: center;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.8px;
         line-height: 1;
         margin: 0.2mm 0;
+        padding: 0 4px;
         flex-shrink: 0 !important;
       }
       .bottom-info {
@@ -2091,9 +2095,12 @@ export default function BarcodeTicketGeneratorModal({
       }
       .code-text {
         font-size: ${Math.min(Number(codeFontSizePt) || 6.5, 7.5)}pt;
-        font-family: monospace;
-        font-weight: 800;
-        color: #000000;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Arial Black", Arial, sans-serif !important;
+        font-weight: 900 !important;
+        color: #000000 !important;
+        letter-spacing: 0.8px;
+        padding-left: 2.0mm !important;
+        padding-right: 1mm;
       }
       .price-tag {
         font-size: ${Math.min(Number(priceFontSizePt) || 8.5, 11.0)}pt;
