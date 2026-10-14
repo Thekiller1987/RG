@@ -137,10 +137,16 @@ const CajaModal = ({
     lists: { ventasContado, devoluciones, cancelaciones, entradas, salidas, abonos }
   } = stats;
 
-  const ingresosTotalesNetos = (
+  const baseIngresos = (
     (vEfectivoC || 0) + ((vEfectivoD || 0) * tasaRef) + (vTarjeta || 0) + (vTransf || 0) + (vCredito || 0) +
     (aEfectivoC || 0) + ((aEfectivoD || 0) * tasaRef) + (aTarjeta || 0) + (aTransf || 0)
-  ) - (sumDevolucionesCancelaciones || 0); const diferencia = (Number(montoContado || 0) - efectivoEsperado);
+  ) - (sumDevolucionesCancelaciones || 0);
+
+  const ingresosTotalesNetos = (stats?.totalVentasDia !== undefined && stats?.totalVentasDia !== null && stats.totalVentasDia > 0)
+    ? stats.totalVentasDia
+    : baseIngresos;
+
+  const diferencia = (Number(montoContado || 0) - efectivoEsperado);
   const openedAt = session?.openedAt ? new Date(session.openedAt) : null;
 
   // --------- HANDLERS ----------

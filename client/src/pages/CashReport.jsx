@@ -828,7 +828,7 @@ const CashReport = () => {
             ${stats.sumDevolucionesCancelaciones > 0 ? `<div class="row" style="color: #dc2626; font-weight: bold;"><span>(-) Devoluciones / Cancelaciones:</span><span>-${fmtMoney(stats.sumDevolucionesCancelaciones)}</span></div>` : ''}
             <div class="row bold" style="border-top: 1px dashed #cbd5e1; margin-top: 5px; padding-top: 8px;">
               <span>(=) INGRESOS TOTALES NETOS GENERADOS:</span>
-              <span>${fmtMoney((stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef) + stats.vTarjeta + stats.vTransf + stats.vCredito) + (stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef) + stats.aTarjeta + stats.aTransf) - stats.sumDevolucionesCancelaciones)}</span>
+              <span>${fmtMoney(stats.totalVentasDia !== undefined && stats.totalVentasDia > 0 ? stats.totalVentasDia : ((stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef) + stats.vTarjeta + stats.vTransf + stats.vCredito) + (stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef) + stats.aTarjeta + stats.aTransf) - stats.sumDevolucionesCancelaciones))}</span>
             </div>
           </div>
         </div>
@@ -1064,7 +1064,7 @@ const CashReport = () => {
                     <span style={{ fontSize: '0.7rem', color: theme.textLight }}>(Ventas + Abonos - Devoluciones/Cancelaciones)</span>
                   </div>
                   <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: theme.primary, fontFamily: 'Roboto Mono' }}>
-                    {fmtMoney((stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef) + stats.vTarjeta + stats.vTransf + stats.vCredito) + (stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef) + stats.aTarjeta + stats.aTransf) - stats.sumDevolucionesCancelaciones)}
+                    {fmtMoney(stats.totalVentasDia !== undefined && stats.totalVentasDia > 0 ? stats.totalVentasDia : ((stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef) + stats.vTarjeta + stats.vTransf + stats.vCredito) + (stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef) + stats.aTarjeta + stats.aTransf) - stats.sumDevolucionesCancelaciones))}
                   </span>
                 </div>
 
@@ -1100,7 +1100,7 @@ const CashReport = () => {
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 'bold', borderTop: '1px dashed #ccc', marginTop: 4, paddingTop: 4 }}>
                       <span>(=) Ingresos Totales Netos:</span>
-                      <span>{fmtMoney((stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef) + stats.vTarjeta + stats.vTransf + stats.vCredito) + (stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef) + stats.aTarjeta + stats.aTransf) - stats.sumDevolucionesCancelaciones)}</span>
+                      <span>{fmtMoney(stats.totalVentasDia !== undefined && stats.totalVentasDia > 0 ? stats.totalVentasDia : ((stats.vEfectivoC + (stats.vEfectivoD * stats.tasaRef) + stats.vTarjeta + stats.vTransf + stats.vCredito) + (stats.aEfectivoC + (stats.aEfectivoD * stats.tasaRef) + stats.aTarjeta + stats.aTransf) - stats.sumDevolucionesCancelaciones))}</span>
                     </div>
                   </div>
 
