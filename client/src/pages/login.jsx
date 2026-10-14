@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import styled, { keyframes, createGlobalStyle, css } from 'styled-components';
 import { FaUser, FaLock, FaSignInAlt, FaApple, FaAndroid, FaTimes, FaSpinner } from 'react-icons/fa';
+import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../context/AuthContext.jsx';
 import * as api from '../service/api.js'; // 💡 tu api.js real
 
@@ -308,7 +309,12 @@ const Login = () => {
   const [typing, setTyping] = useState(false);
 
   useEffect(() => {
-    // 💡 INICIO CÓDIGO MODIFICADO: Lógica de PWA Prompt
+    // Si ya estamos ejecutándonos dentro de la app móvil nativa de Capacitor, no mostrar prompt PWA
+    if (Capacitor.isNativePlatform() || window.Capacitor?.isNativePlatform?.()) {
+      setShowPwaPrompt(false);
+      return;
+    }
+
     const ua = window.navigator.userAgent.toLowerCase();
     const isIOS = /iphone|ipad|ipod/.test(ua);
     const isAndroid = /android/.test(ua);
@@ -316,15 +322,13 @@ const Login = () => {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
                          window.navigator.standalone; // Soporte para iOS viejo
 
-    // Solo mostramos el prompt si es Android/iOS Y NO está en modo standalone (es decir, está en el navegador)
+    // Solo mostramos el prompt si es Android/iOS Y NO está en modo standalone (es decir, está en el navegador web)
     if ((isIOS || isAndroid) && !isStandalone) {
       setPwaPlatform(isIOS ? 'ios' : 'android');
       setShowPwaPrompt(true);
     } else {
-        // Ocultar si ya está instalada o no es un móvil compatible con el prompt nativo
-        setShowPwaPrompt(false);
+      setShowPwaPrompt(false);
     }
-    // 💡 FIN CÓDIGO MODIFICADO
   }, []);
 
   // ✅ Lógica corregida

@@ -105,9 +105,16 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
             tTransf += txTransf;
             tCredito += txCredito;
         } else if (t === 'ajuste') {
-            if (pd.target === 'tarjeta') tTarjeta += txAmount;
-            if (pd.target === 'credito') tCredito += txAmount;
-            if (pd.target === 'transferencia') tTransf += txAmount;
+            if (pd.target === 'tarjeta') {
+                tTarjeta += txAmount;
+                vTarjeta += txAmount;
+            } else if (pd.target === 'credito') {
+                tCredito += txAmount;
+                vCredito += txAmount;
+            } else if (pd.target === 'transferencia') {
+                tTransf += txAmount;
+                vTransf += txAmount;
+            }
         }
 
         // ══════════════════════════════════════════════════════
@@ -185,9 +192,14 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
         } else if (t === 'ajuste') {
             if (pd.target === 'efectivo') {
                 netCordobas += txAmount;
+                vEfectivoC += txAmount;
                 if (pd.hidden) totalHidden += txAmount;
             } else if (pd.target === 'dolares') {
                 netDolares += txAmount;
+                vEfectivoD += txAmount;
+            } else if (pd.target === 'ventas_totales') {
+                vEfectivoC += txAmount;
+                netCordobas += txAmount;
             }
 
         } else {
@@ -206,11 +218,14 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
             tVentasDia += Math.abs(totalRevenue);
         } else if (t.includes('devolucion') || t.includes('cancelacion') || t.includes('anulacion')) {
             tVentasDia -= Math.abs(totalRevenue);
-        } else if (t === 'ajuste' && pd.target === 'ventas_totales') {
-            tVentasDia += txAmount; // God Mode: ajustar ventas totales
-        } else if (t === 'ajuste' && pd.target === 'efectivo' && txAmount < 0) {
-            // USER REQUEST: Si el ajuste al efectivo es negativo, debe sumar (ya que txAmount es negativo, le sumamos a tVentasDia para restar)
-            tVentasDia += txAmount;
+        } else if (t === 'ajuste') {
+            if (pd.target === 'efectivo' || pd.target === 'ventas_totales') {
+                tVentasDia += txAmount;
+            } else if (pd.target === 'dolares') {
+                tVentasDia += (txAmount * tasaRef);
+            } else if (pd.target === 'tarjeta' || pd.target === 'credito' || pd.target === 'transferencia') {
+                tVentasDia += txAmount;
+            }
         }
 
         // ══════════════════════════════════════════════════════
@@ -234,6 +249,11 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
     tVentasDia = safe(tVentasDia);
     totalHidden = safe(totalHidden);
     sumDevsCancels = safe(sumDevsCancels);
+    vEfectivoC = safe(vEfectivoC);
+    vEfectivoD = safe(vEfectivoD);
+    vTarjeta = safe(vTarjeta);
+    vTransf = safe(vTransf);
+    vCredito = safe(vCredito);
 
     const efectivoEsperadoCordobas = cajaInicialN + netCordobas;
     const efectivoEsperado = efectivoEsperadoCordobas + (netDolares * tasaRef);

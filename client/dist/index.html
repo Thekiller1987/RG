@@ -5,13 +5,13 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/png" href="/icons/192x192.png" />
   <link rel="manifest" href="/manifest.webmanifest" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#007bff" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
 
   <!-- Mobile Web App Meta Tags -->
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="RG POS" />
   <link rel="apple-touch-icon" href="/icons/icon-512x512.png" />
 
@@ -35,6 +35,8 @@
     (function() {
       let lastChecked = 0;
       async function checkVersion() {
+        // En ambiente móvil/Capacitor nativo o si corre localmente, no ejecutar auto-reload por fetch
+        if (window.Capacitor || window.location.protocol === 'capacitor:' || window.location.protocol === 'file:') return;
         const now = Date.now();
         if (now - lastChecked < 45000) return; // Máximo una verificación cada 45 segundos
         lastChecked = now;
@@ -77,11 +79,11 @@
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"
     integrity="sha384-2huaZvOR9iDzHqslqwpR87isEmrfxqyWOF7hr7BY6KG0+hVKLoEXMPUJw3ynWuhO"
     crossorigin="anonymous"></script>
-  <script type="module" crossorigin src="/assets/index-BvPaic78.js"></script>
+  <script type="module" crossorigin src="/assets/index-CbgDD4XQ.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/pdf-vendor-Bcr1-3qX.js">
   <link rel="modulepreload" crossorigin href="/assets/scanner-vendor-DfxRpMWJ.js">
-  <link rel="modulepreload" crossorigin href="/assets/vendor-j_dNh8a8.js">
-  <link rel="modulepreload" crossorigin href="/assets/pdf-vendor-De63AySQ.js">
-  <link rel="stylesheet" crossorigin href="/assets/index-CJIrVlr0.css">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-B7YP9FBM.js">
+  <link rel="stylesheet" crossorigin href="/assets/index-JvLTtPTN.css">
 </head>
 
 <body>

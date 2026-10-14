@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "build": "cd client && npm install && npm run build"
+    "build": "cd client && npm install && npm run build",
+    "build:apk": "powershell -ExecutionPolicy Bypass -File .\\build_apk.ps1"
   },
   "dependencies": {
     "react-to-print": "^3.1.1"

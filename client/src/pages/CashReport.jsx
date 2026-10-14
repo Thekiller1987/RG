@@ -134,6 +134,7 @@ function calculateReportStats(session) {
   }
 
   const cajaInicialN = Number(session?.initialAmount || session?.monto_inicial || 0);
+  const tasaRef = Number(session?.tasaDolar || 36.60);
 
   // DEDUP: Eliminado para permitir ventas idénticas (especialmente menores a C$70)
   // transactions = _dedup(transactions);
@@ -242,16 +243,30 @@ function calculateReportStats(session) {
       netCordobas += rawAmount; // already negative
     }
     else if (t === 'ajuste') {
+      const monto = rawAmount;
       if (pd.target === 'efectivo') {
-        netCordobas += rawAmount;
-        if (pd.hidden) totalHidden += rawAmount;
+        netCordobas += monto;
+        vEfectivoC += monto;
+        tVentasDia += monto;
+        if (pd.hidden) totalHidden += monto;
+      } else if (pd.target === 'dolares') {
+        netDolares += monto;
+        vEfectivoD += monto;
+        tVentasDia += (monto * tasaRef);
+      } else if (pd.target === 'tarjeta') {
+        vTarjeta += monto;
+        tVentasDia += monto;
+      } else if (pd.target === 'credito') {
+        vCredito += monto;
+        tVentasDia += monto;
+      } else if (pd.target === 'transferencia') {
+        vTransf += monto;
+        tVentasDia += monto;
+      } else if (pd.target === 'ventas_totales') {
+        vEfectivoC += monto;
+        netCordobas += monto;
+        tVentasDia += monto;
       }
-      if (pd.target === 'dolares') {
-        netDolares += rawAmount;
-      }
-      if (pd.target === 'tarjeta') vTarjeta += rawAmount;
-      if (pd.target === 'credito') vCredito += rawAmount;
-      if (pd.target === 'transferencia') vTransf += rawAmount;
     }
     else {
       netCordobas += rawAmount;
@@ -260,8 +275,6 @@ function calculateReportStats(session) {
     // 3. TOTAL INGRESOS GRUESOS
     if (t.startsWith('venta') || t.includes('abono') || t === 'entrada') {
       tVentasDia += Math.abs(totalAmount);
-    } else if (t === 'ajuste') {
-      // AJUSTES NO DEBEN INFLAR LAS VENTAS. Es solo movimiento de caja física.
     }
 
     // Listas
@@ -289,9 +302,6 @@ function calculateReportStats(session) {
       cls.abonos.push(normalizedTx);
     }
   }
-
-  // Tasa de cambio de la sesión (o actual de referencia)
-  const tasaRef = Number(session?.tasaDolar || 36.60);
 
   return {
     cajaInicial: cajaInicialN,
@@ -669,7 +679,7 @@ const CashReport = () => {
   // Función para imprimir (A4 Profesional + Configuración Dinámica)
   const handlePrintDetail = (session) => {
     // Al final del mapeo de sesiones
-    const stats = session.stats || calculateReportStats(session); // Fallback solo si el server no mandó nada
+    const stats = calculateReportStats(session);
 
     // Configurar ventana de impresión
     const win = window.open('', '_blank');

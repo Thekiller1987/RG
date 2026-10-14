@@ -1,8 +1,10 @@
-import React from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import { Toaster } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { App as CapApp } from '@capacitor/app';
+import { StatusBar, Style } from '@capacitor/status-bar';
 
 // Páginas
 import ProtectedRoute from './components/ProtectedRoute.jsx';
@@ -52,6 +54,37 @@ const ROLES = {
 function App() {
   const { user, isLoading } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Configurar StatusBar nativa en Android/iOS
+    try {
+      StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
+      StatusBar.setBackgroundColor({ color: '#0f172a' }).catch(() => {});
+    } catch (_) {}
+
+    // Manejar botón atrás nativo de Android
+    let backListener = null;
+    try {
+      CapApp.addListener('backButton', ({ canGoBack }) => {
+        if (location.pathname === '/login' || location.pathname === '/dashboard') {
+          CapApp.exitApp();
+        } else if (canGoBack) {
+          navigate(-1);
+        } else {
+          navigate('/dashboard');
+        }
+      }).then(listener => {
+        backListener = listener;
+      }).catch(() => {});
+    } catch (_) {}
+
+    return () => {
+      if (backListener?.remove) {
+        backListener.remove();
+      }
+    };
+  }, [location.pathname, navigate]);
 
   // Evitar parpadeo mientras auth carga
   if (isLoading) return <Loading />;

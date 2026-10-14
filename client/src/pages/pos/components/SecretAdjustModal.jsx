@@ -54,12 +54,16 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
             const targetC = parseFloat(override.cordobas);
             const targetD = parseFloat(override.dolares);
             const targetVT = parseFloat(override.ventas_totales);
+            const tasaRef = Number(currentStats?.tasaRef || 36.60);
+
+            let cashAdjustmentSalesImpact = 0;
 
             if (!isNaN(targetC)) {
                 const currentC = Number(currentStats?.netCordobas || 0);
                 const diffC = targetC - currentC;
                 if (Math.abs(diffC) > 0.01) {
                     activeAdjustments.push({ target: 'efectivo', amount: diffC });
+                    cashAdjustmentSalesImpact += diffC;
                 }
             }
 
@@ -68,14 +72,16 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
                 const diffD = targetD - currentD;
                 if (Math.abs(diffD) > 0.01) {
                     activeAdjustments.push({ target: 'dolares', amount: diffD });
+                    cashAdjustmentSalesImpact += (diffD * tasaRef);
                 }
             }
 
             if (!isNaN(targetVT)) {
                 const currentVT = Number(currentStats?.totalVentasDia || 0);
                 const diffVT = targetVT - currentVT;
-                if (Math.abs(diffVT) > 0.01) {
-                    activeAdjustments.push({ target: 'ventas_totales', amount: diffVT });
+                const remainingVT = diffVT - cashAdjustmentSalesImpact;
+                if (Math.abs(remainingVT) > 0.01) {
+                    activeAdjustments.push({ target: 'ventas_totales', amount: remainingVT });
                 }
             }
         }

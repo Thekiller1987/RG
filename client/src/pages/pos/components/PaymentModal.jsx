@@ -6,9 +6,66 @@ import {
   FaCashRegister, FaHandshake, FaCreditCard as FaCreditCardIcon, FaPrint, FaUserTie
 } from 'react-icons/fa';
 
+import styled from 'styled-components';
 import {
   ModalOverlay, ModalContent, Button, SearchInput, TotalsRow, InfoBox
 } from '../POS.styles.jsx';
+
+const ResponsivePaymentGrid = styled.div`
+  display: grid;
+  grid-template-columns: 5fr 4fr;
+  gap: 1.5rem;
+  max-height: calc(90vh - 120px);
+  max-height: calc(90dvh - 120px);
+
+  @media (max-width: 860px) {
+    grid-template-columns: 1fr;
+    max-height: none;
+    height: auto;
+    gap: 1.25rem;
+  }
+`;
+
+const PaymentColumn = styled.div`
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 10px;
+
+  &.left-column {
+    padding-right: 12px;
+    border-right: 1px solid #e2e8f0;
+
+    @media (max-width: 860px) {
+      padding-right: 0;
+      border-right: none;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 16px;
+    }
+  }
+
+  &.right-column {
+    padding-left: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+
+    @media (max-width: 860px) {
+      padding-left: 0;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    }
+  }
+`;
+
+const BreakdownGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+
+  @media (max-width: 460px) {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+`;
 
 /* ========== Helpers ========== */
 const cleanFloat = (v) => {
@@ -300,12 +357,14 @@ const PaymentModal = ({
     <ModalOverlay>
       <ModalContent
         style={{
-          maxWidth: '950px',
+          maxWidth: '920px',
           width: '96%',
-          maxHeight: '90vh',
-          overflow: 'hidden',
+          maxHeight: '92dvh',
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
           borderRadius: 16,
           backgroundColor: '#f8f9fa',
+          padding: 'clamp(12px, 2.5vw, 24px)',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
         }}
       >
@@ -313,24 +372,24 @@ const PaymentModal = ({
         <div
           style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            borderBottom: '2px solid #e9ecef', paddingBottom: 15, marginBottom: 20
+            borderBottom: '2px solid #e9ecef', paddingBottom: 12, marginBottom: 16
           }}
         >
-          <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.5rem', fontWeight: 800 }}>
+          <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.35rem', fontWeight: 800 }}>
             <FaCreditCardIcon style={{ marginRight: '0.5rem', color: '#007bff' }} /> PROCESAR PAGO
           </h2>
           <Button
             $cancel onClick={onClose}
-            style={{ borderRadius: '50%', width: 40, height: 40, padding: 0, fontSize: '1.2rem', backgroundColor: '#fee2e2', color: '#ef4444', borderColor: 'transparent' }}
+            style={{ borderRadius: '50%', width: 36, height: 36, padding: 0, fontSize: '1.1rem', backgroundColor: '#fee2e2', color: '#ef4444', borderColor: 'transparent' }}
           >
             <FaWindowClose />
           </Button>
         </div>
 
-        {/* Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '5fr 4fr', gap: '2rem', height: 'calc(90vh - 140px)' }}>
-          {/* Left */}
-          <div style={{ paddingRight: 10, borderRight: '1px solid #e2e8f0', overflowY: 'auto', paddingBottom: 10 }}>
+        {/* Grid Responsivo */}
+        <ResponsivePaymentGrid>
+          {/* Left Column */}
+          <PaymentColumn className="left-column">
             {/* Opciones */}
             <div style={{ padding: 20, border: '1px solid #e2e8f0', borderRadius: 12, backgroundColor: '#fff', marginBottom: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
               <h4 style={{ marginTop: 0, color: '#334155', fontSize: '1rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: 15 }}>
@@ -428,7 +487,7 @@ const PaymentModal = ({
                 Desglose de Pago (C$)
               </h4>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+              <BreakdownGrid>
                 <div>
                   <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: 6, color: '#64748b' }}>
                     <FaMoneyBillWave /> Efectivo
@@ -456,7 +515,7 @@ const PaymentModal = ({
                   </label>
                   <SearchInput type="number" step="0.01" value={transferencia} onChange={e => setTransferencia(e.target.value)} style={{ width: '100%', height: 38, fontSize: '1rem', borderRadius: 8, border: '1px solid #cbd5e1' }} disabled={disableInputs} />
                 </div>
-              </div>
+              </BreakdownGrid>
 
               {tipoPagoPrincipal === 'credito' && (
                 <div style={{ marginTop: 15, padding: 12, backgroundColor: '#fff7ed', borderRadius: 8, border: '1px dashed #f97316' }}>
@@ -491,10 +550,10 @@ const PaymentModal = ({
                 </Button>
               )}
             </div>
-          </div>
+          </PaymentColumn>
 
-          {/* Right */}
-          <div style={{ paddingLeft: 10, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', paddingBottom: 10 }}>
+          {/* Right Column */}
+          <PaymentColumn className="right-column">
             <div>
               <InfoBox style={{ marginBottom: 15, padding: 20, backgroundColor: '#f0f9ff', border: 'none', borderRadius: 12, boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)' }}>
                 <TotalsRow $bold style={{ fontSize: '1.8rem', color: '#0f172a', marginBottom: 5 }}>
@@ -579,8 +638,8 @@ const PaymentModal = ({
               </Button>
 
             </div>
-          </div>
-        </div>
+          </PaymentColumn>
+        </ResponsivePaymentGrid>
       </ModalContent>
     </ModalOverlay>
   );

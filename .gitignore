@@ -19,6 +19,8 @@ deploy_to_droplet*
 *password*
 *.pem
 *.key
+*.keystore
+*.jks
 
 # Builds y temporales
 client/dist/
@@ -33,3 +35,10 @@ yarn-error.log*
 # Archivos de depuración y temporales
 Nuevo Documento de texto.txt
 scratch/
+
+# Android build outputs
+client/android/.gradle/
+client/android/build/
+client/android/app/build/
+*.apk
+

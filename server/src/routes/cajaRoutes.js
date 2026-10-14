@@ -253,17 +253,16 @@ function calcularTotalesSesion(transactions, details) {
       const monto = txAmount;
       if (d.target === 'efectivo') {
         movimientoNetoEfectivo += monto;
-        // USER REQUEST: Si el ajuste al efectivo es negativo (un faltante o reintegro), 
-        // debe restar de las Ventas Totales para que la contabilidad del dia baje junto con el cash.
-        if (monto < 0) {
-          ventasAjuste += monto;
-        }
+        totalEfectivo += monto;
       }
       else if (d.target === 'credito') totalCredito += monto;
       else if (d.target === 'tarjeta') totalTarjeta += monto;
       else if (d.target === 'transferencia') totalTransferencia += monto;
       else if (d.target === 'dolares') totalDolares += monto;
-      else if (d.target === 'ventas_totales') ventasAjuste += monto;
+      else if (d.target === 'ventas_totales') {
+        totalEfectivo += monto;
+        movimientoNetoEfectivo += monto;
+      }
     }
   });
 
@@ -279,7 +278,7 @@ function calcularTotalesSesion(transactions, details) {
     efectivoEsperado: safe(efectivoEsperado),
     efectivoEsperadoCordobas: safe(efectivoEsperadoCordobas),
     efectivoEsperadoDolares: safe(totalDolares),
-    totalVentasDia: safe(totalEfectivo + totalTarjeta + totalTransferencia + totalCredito + ventasAjuste), // Incluye ajuste God Mode
+    totalVentasDia: safe(totalEfectivo + totalTarjeta + totalTransferencia + totalCredito + (totalDolares * tasaDefault) + ventasAjuste), // Incluye ajuste God Mode
     totalTarjeta: safe(totalTarjeta),
     totalTransferencia: safe(totalTransferencia),
     totalCredito: safe(totalCredito),
@@ -287,6 +286,11 @@ function calcularTotalesSesion(transactions, details) {
     sumDevolucionesCancelaciones: 0,
     totalHidden: 0,
     tasaRef: tasaDefault,
+    vEfectivoC: safe(totalEfectivo),
+    vEfectivoD: safe(totalDolares),
+    vTarjeta: safe(totalTarjeta),
+    vTransf: safe(totalTransferencia),
+    vCredito: safe(totalCredito),
     // Métricas originales del servidor para debug
     totalEfectivo: safe(totalEfectivo),
     totalIngresos: safe(totalIngresos),

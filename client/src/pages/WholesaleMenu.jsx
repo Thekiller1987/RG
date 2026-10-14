@@ -6,25 +6,33 @@ import {
 } from 'react-icons/fa';
 
 const PageWrapper = styled.div`
-    padding: 2rem;
+    padding: clamp(1rem, 4vw, 2rem);
     background-color: #f0f2f5;
     min-height: 100vh;
+    min-height: 100dvh;
     display: flex;
     flex-direction: column;
     align-items: center;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
 `;
 
 const Content = styled.div`
     width: 100%;
     max-width: 1000px;
+    touch-action: pan-y;
 `;
 
 const Header = styled.div`
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 3rem;
+    margin-bottom: 2rem;
     width: 100%;
+
+    @media (max-width: 768px) {
+        margin-bottom: 1.5rem;
+    }
 `;
 
 const Title = styled.h1`
@@ -33,13 +41,16 @@ const Title = styled.h1`
     display: flex;
     align-items: center;
     gap: 15px;
-    font-size: 2.5rem;
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
 `;
 
 const Grid = styled.div`
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.5rem;
+    width: 100%;
+    touch-action: pan-y;
+    padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
 `;
 
 const MenuCard = styled(Link)`
@@ -49,17 +60,26 @@ const MenuCard = styled(Link)`
     text-decoration: none;
     color: inherit;
     box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-    transition: all 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
     border: 2px solid transparent;
+    touch-action: pan-y;
+    -webkit-tap-highlight-color: transparent;
 
-    &:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 15px 35px rgba(139, 92, 246, 0.15);
-        border-color: #8b5cf6;
+    @media (hover: hover) {
+        &:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(139, 92, 246, 0.15);
+            border-color: #8b5cf6;
+        }
+    }
+
+    &:active {
+        transform: scale(0.98);
+        background-color: #f8fafc;
     }
 
     h2 { margin: 1rem 0 0.5rem; color: #1e293b; }

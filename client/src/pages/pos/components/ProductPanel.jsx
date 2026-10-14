@@ -308,12 +308,13 @@ export default function ProductPanel({
   }, [products, searchTerm]);
 
   return (
-    <S.MainPanel>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden' }}>
       {/* Barra de Búsqueda */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '0.75rem', alignItems: 'center', width: '100%', flexShrink: 0 }}>
         <S.SearchInput
           ref={inputRef}
-          placeholder={searchType === 'code' ? "Escribe código..." : "Buscar producto por nombre o código..."}
+          style={{ flex: 1, minWidth: 0 }}
+          placeholder={searchType === 'code' ? "Escribe código..." : "Buscar por nombre o código..."}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyDown={(e) => {
@@ -430,13 +431,14 @@ export default function ProductPanel({
                     className="product-name"
                     style={{
                       fontWeight: 600,
-                      fontSize: '0.88rem',
+                      fontSize: '0.85rem',
                       color: '#1e293b',
                       lineHeight: '1.25',
-                      height: '3.8rem',
+                      minHeight: '2.4rem',
+                      maxHeight: '2.5rem',
                       overflow: 'hidden',
                       display: '-webkit-box',
-                      WebkitLineClamp: 3,
+                      WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical'
                     }}
                   >
@@ -491,6 +493,6 @@ export default function ProductPanel({
           />
         )}
       </AnimatePresence>
-    </S.MainPanel>
+    </div>
   );
 }

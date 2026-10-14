@@ -1,0 +1,28 @@
+{
+  "appId": "com.multirepuestosrg.app",
+  "appName": "Multirepuestos RG",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true,
+    "allowNavigation": [
+      "sistema.multirepuestosrg.com",
+      "*.multirepuestosrg.com"
+    ]
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0b1220"
+    },
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "backgroundColor": "#0b1220"
+    },
+    "Keyboard": {
+      "resize": "body",
+      "style": "DARK"
+    }
+  }
+}

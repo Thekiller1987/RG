@@ -57,6 +57,20 @@ export const HeaderActions = styled.header`
   .right-actions {
     display: flex; gap: 8px; align-items: center;
   }
+
+  @media (max-width: 768px) {
+    height: 52px;
+    padding: 0 8px;
+    gap: 4px;
+
+    .pos-brand-title {
+      display: none !important;
+    }
+
+    .right-actions {
+      gap: 4px;
+    }
+  }
 `;
 
 export const Header = HeaderActions;
@@ -69,12 +83,19 @@ export const ActionButton = styled.button`
   transition: all 0.2s;
 
   &:hover { background: #f8fafc; border-color: #cbd5e1; }
+
+  @media (max-width: 768px) {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+  }
 `;
 
 export const CloseCartBtn = styled.button`
   display: flex; align-items: center; justify-content: center;
   background: none; border: none; font-size: 1.25rem;
-  color: #64748b; cursor: pointer; padding: 4px;
+  color: #64748b; cursor: pointer; padding: 6px;
+  border-radius: 8px;
+  &:hover { background: #f1f5f9; color: #0f172a; }
 `;
 
 export const PageContentWrapper = styled.div`
@@ -82,12 +103,14 @@ export const PageContentWrapper = styled.div`
   flex: 1;
   overflow: hidden;
   height: calc(100vh - 64px);
+  height: calc(100dvh - 64px);
 
   @media (max-width: 960px) {
     flex-direction: column;
-    overflow-y: auto;
-    height: auto;
-    min-height: calc(100dvh - 64px);
+    height: calc(100vh - 52px);
+    height: calc(100dvh - 52px);
+    overflow: hidden;
+    position: relative;
   }
 `;
 
@@ -98,12 +121,14 @@ export const MainPanel = styled.div`
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
 
   @media (max-width: 960px) {
     width: 100%;
-    padding: 12px;
-    overflow: visible;
-    padding-bottom: 80px; /* Space for mobile cart toggle */
+    padding: 8px 8px 0 8px;
+    overflow: hidden;
+    height: 100%;
+    min-height: 0;
   }
 `;
 
@@ -121,15 +146,21 @@ export const CartPanel = styled.div`
   
   @media (max-width: 960px) {
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     width: 100%;
+    height: 100vh;
     height: 100dvh;
     border-left: none;
-    border-top: ${CARD_BORDER};
+    border-top: none;
     flex: none;
     transform: translateY(${props => props.isOpen ? '0' : '100%'});
-    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    z-index: 2000;
+    transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 3000;
+    background: #ffffff;
+    padding-top: env(safe-area-inset-top, 0px);
   }
 `;
 
@@ -137,14 +168,22 @@ export const MobileCartToggle = styled.button`
   display: none;
   @media (max-width: 960px) {
     display: flex; align-items: center; justify-content: space-between;
-    position: fixed; bottom: 20px; left: 20px; right: 20px;
+    position: fixed;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    left: 12px;
+    right: 12px;
     background: linear-gradient(135deg, ${C_ACCENT} 0%, ${C_ACCENT_HOVER} 100%);
     color: white;
-    padding: 16px 24px; border-radius: 16px; border: none;
-    box-shadow: 0 10px 25px rgba(14, 165, 233, 0.4);
-    z-index: 1000; font-weight: 700; font-size: 1.1rem; cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-    &:active { transform: scale(0.96); }
+    padding: 14px 20px;
+    border-radius: 14px;
+    border: none;
+    box-shadow: 0 8px 24px rgba(14, 165, 233, 0.45);
+    z-index: 1000;
+    font-weight: 700;
+    font-size: 1.05rem;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    &:active { transform: scale(0.97); }
   }
 `;
 
@@ -153,12 +192,14 @@ export const MobileCartToggle = styled.button`
    =========================== */
 export const ProductGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1.1rem;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 4px;
   padding-bottom: 2rem;
   flex: 1;
+  min-height: 0;
   align-content: start;
 
   &::-webkit-scrollbar { width: 6px; }
@@ -166,8 +207,15 @@ export const ProductGrid = styled.div`
   &::-webkit-scrollbar-track { background: transparent; }
 
   @media (max-width: 768px) {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 2px 2px 95px 2px;
+  }
+
+  @media (max-width: 360px) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding-bottom: 95px;
   }
 `;
 
@@ -198,7 +246,7 @@ export const ProductCard = styled.div`
 
   .image-placeholder {
     width: 100%; height: 150px;
-    background: #f1f5f9; /* Un tono gris/celeste muy claro para separar la imagen del texto blanco */
+    background: #f1f5f9;
     display: flex; align-items: center; justify-content: center;
     position: relative;
     border-bottom: 1px solid #e2e8f0;
@@ -221,7 +269,7 @@ export const ProductCard = styled.div`
   }
 
   .info {
-    padding: 14px;
+    padding: 12px;
     flex-grow: 1;
     display: flex; flex-direction: column; gap: 4px;
     justify-content: space-between;
@@ -230,7 +278,8 @@ export const ProductCard = styled.div`
   .product-name {
     font-weight: 600; font-size: 0.88rem; color: ${C_TEXT_DARK}; line-height: 1.3;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-    height: 2.6em;
+    height: auto;
+    max-height: 2.6em;
   }
 
   .price {
@@ -239,10 +288,14 @@ export const ProductCard = styled.div`
   }
 
   @media (max-width: 768px) {
-    height: 250px;
-    border-radius: 14px;
-    .image-placeholder { height: 120px; }
-    .eye-icon { opacity: 1; transform: scale(1); background: rgba(255,255,255,0.9); }
+    height: auto;
+    min-height: 200px;
+    border-radius: 12px;
+    .image-placeholder { height: 110px; }
+    .eye-icon { opacity: 1; transform: scale(1); width: 28px; height: 28px; background: rgba(255,255,255,0.9); }
+    .info { padding: 8px; gap: 2px; }
+    .product-name { font-size: 0.8rem; line-height: 1.2; max-height: 2.4em; }
+    .price { font-size: 1.05rem; }
   }
 `;
 
@@ -437,7 +490,9 @@ export const ModalContent = styled.div`
   padding: 2.2rem;
   border-radius: 20px;
   width: 100%; max-width: 650px;
-  max-height: 90vh; overflow-y: auto;
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-y: auto;
   box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15);
   color: ${C_TEXT_DARK};
 
@@ -450,8 +505,9 @@ export const ModalContent = styled.div`
   &::-webkit-scrollbar-track { background: transparent; }
 
   @media (max-width: 768px) {
-    padding: 1.5rem;
+    padding: 1.25rem 1rem;
     border-radius: 16px;
+    max-height: 94dvh;
     h2 { font-size: 1.25rem; }
   }
 `;

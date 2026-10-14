@@ -17,34 +17,43 @@ import ProtectedRoute from '../components/ProtectedRoute.jsx'; // Assuming Prote
 
 // --- ESTILOS MEJORADOS Y RESPONSIVOS ---
 const PageWrapper = styled.div`
-    padding: clamp(1rem, 5vw, 2.5rem); 
+    padding: clamp(1rem, 4vw, 2.5rem); 
     background-color: #f0f2f5; 
     min-height: 100vh;
+    min-height: 100dvh;
     box-sizing: border-box;
+    width: 100%;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
 `;
 const Content = styled.div`
     width: 100%;
     max-width: 1300px;
     margin: 0 auto;
+    touch-action: pan-y;
 `;
 const TopBar = styled.div`
     display: flex;
     justify-content: space-between;
     align-items: center; 
-    margin-bottom: 3rem; 
-    gap: 1.5rem;
+    margin-bottom: 2rem; 
+    gap: 1.2rem;
     flex-wrap: wrap;
+
+    @media (max-width: 768px) {
+        margin-bottom: 1.5rem;
+    }
 `;
 const Header = styled.div`min-width: 0;`;
 const WelcomeTitle = styled.h1`
-    font-size: clamp(1.8rem, 4vw, 2.4rem); 
+    font-size: clamp(1.6rem, 4vw, 2.4rem); 
     color: #1e293b; 
     font-weight: 800;
     margin: 0;
     line-height: 1.2;
 `;
 const WelcomeSubtitle = styled.p`
-    font-size: clamp(0.9rem, 2vw, 1.1rem);
+    font-size: clamp(0.85rem, 2vw, 1.1rem);
     color: #64748b;
     margin: 0.4rem 0 0;
 `;
@@ -62,12 +71,12 @@ const LogoutButton = styled.button`
     gap: 0.6rem;
     align-items: center;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); 
+    touch-action: manipulation;
     
     &:hover, &:focus { 
         background: #dc2626; 
         color: #fff; 
         box-shadow: 0 6px 10px rgba(220, 38, 38, 0.3); 
-        transform: translateY(-2px);
         outline: none; 
     }
 `;
@@ -75,13 +84,16 @@ const GridContainer = styled.main`
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
     gap: clamp(1rem, 2vw, 1.5rem);
+    width: 100%;
+    touch-action: pan-y;
+    padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
 `;
 const Card = styled(Link)`
     background-color: #ffffff;
     border-radius: 16px; 
     padding: 1.5rem;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); 
-    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.25s ease; 
+    transition: transform 0.2s ease, box-shadow 0.2s ease; 
     display: flex;
     flex-direction: column;
     text-decoration: none;
@@ -89,6 +101,8 @@ const Card = styled(Link)`
     min-height: 130px;
     position: relative;
     overflow: hidden;
+    touch-action: pan-y;
+    -webkit-tap-highlight-color: transparent;
 
     &::before {
         content: '';
@@ -100,10 +114,17 @@ const Card = styled(Link)`
         background-color: ${props => props.color || '#007bff'};
     }
 
-    &:hover, &:focus { 
-        transform: translateY(-4px); 
-        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15); 
-        outline: none; 
+    @media (hover: hover) {
+        &:hover, &:focus { 
+            transform: translateY(-4px); 
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15); 
+            outline: none; 
+        }
+    }
+
+    &:active {
+        transform: scale(0.98);
+        background-color: #f8fafc;
     }
     
     h2 { 

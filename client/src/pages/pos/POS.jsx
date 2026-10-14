@@ -79,7 +79,18 @@ const POS = () => {
 
   const searchRef = useRef(null);
 
-  // ... (Calculations)
+  // Cerrar carrito móvil suavemente si el usuario presiona atrás nativo en Android
+  useEffect(() => {
+    if (!isMobileCartOpen) return;
+    window.history.pushState({ posMobileCart: true }, '');
+    const handlePopState = () => {
+      setIsMobileCartOpen(false);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isMobileCartOpen]);
 
   // Calculate Current Stats for Secret Modal
   const currentStats = useMemo(() => {
@@ -741,19 +752,21 @@ const POS = () => {
   return (
     <S.PageWrapper>
       <S.HeaderActions>
-        <S.BackButton to="/dashboard"><FaArrowLeft /> Regresar</S.BackButton>
-        <div style={{ fontWeight: '800', letterSpacing: '1px', userSelect: 'none' }} onDoubleClick={handleSecretTrigger}>SISTEMA POS</div>
+        <S.BackButton to="/dashboard" style={{ padding: '6px 10px', fontSize: '0.88rem' }}>
+          <FaArrowLeft /> <span className="pos-brand-title" style={{ marginLeft: 4 }}>Regresar</span>
+        </S.BackButton>
+        <div className="pos-brand-title" style={{ fontWeight: '800', letterSpacing: '1px', userSelect: 'none' }} onDoubleClick={handleSecretTrigger}>SISTEMA POS</div>
         <div className="right-actions">
-          <S.Button secondary onClick={refreshData} title="Sincronizar">
+          <S.Button secondary onClick={refreshData} title="Sincronizar" style={{ padding: '6px 8px', fontSize: '0.85rem' }}>
             <FaSync />
           </S.Button>
-          <S.Button secondary onClick={() => openModal('salesHistory')} title="Historial de Ventas">
+          <S.Button secondary onClick={() => openModal('salesHistory')} title="Historial de Ventas" style={{ padding: '6px 8px', fontSize: '0.85rem' }}>
             <FaHistory />
           </S.Button>
-          <S.Button secondary onClick={() => openModal('cashEntry')} title="Entrada de Dinero">
+          <S.Button secondary onClick={() => openModal('cashEntry')} title="Entrada de Dinero" style={{ padding: '6px 8px', fontSize: '0.85rem' }}>
             <FaArrowDown color="#10b981" />
           </S.Button>
-          <S.Button secondary onClick={() => openModal('cashExit')} title="Salida de Dinero">
+          <S.Button secondary onClick={() => openModal('cashExit')} title="Salida de Dinero" style={{ padding: '6px 8px', fontSize: '0.85rem' }}>
             <FaArrowUp color="#ef4444" />
           </S.Button>
           <S.Button secondary onClick={async () => {
@@ -765,8 +778,8 @@ const POS = () => {
               } catch (e) { console.error('dedup error:', e); }
             }
             openModal('caja');
-          }}>
-            <FaLock /> {currentUser?.nombre_usuario || 'Caja'}
+          }} style={{ padding: '6px 9px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <FaLock /> <span className="pos-brand-title">{currentUser?.nombre_usuario || 'Caja'}</span>
           </S.Button>
         </div>
       </S.HeaderActions>
@@ -789,12 +802,14 @@ const POS = () => {
 
         {/* PANEL DERECHO: CARRITO / TICKETS */}
         <S.CartPanel isOpen={isMobileCartOpen}>
-          <div style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexShrink: 0 }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem' }}>
                 <FaShoppingCart color="#2563eb" /> Carrito
               </h3>
-              {window.innerWidth <= 960 && <S.Button onClick={() => setIsMobileCartOpen(false)}><FaTimes /></S.Button>}
+              <S.Button secondary onClick={() => setIsMobileCartOpen(false)} style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}>
+                <FaTimes /> Cerrar
+              </S.Button>
             </div>
 
             {/* Gestión de Multi-Tickets */}
@@ -843,7 +858,7 @@ const POS = () => {
             </div>
 
             {/* Lista de Items en Carrito */}
-            <div style={{ flex: 1, overflowY: 'auto', margin: '1rem 0', paddingRight: '5px' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', margin: '0.5rem 0', paddingRight: '4px', WebkitOverflowScrolling: 'touch' }}>
               <AnimatePresence>
                 {cart.length === 0 ? (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center', color: '#94a3b8', marginTop: '2rem' }}>
@@ -858,35 +873,36 @@ const POS = () => {
                       exit={{ opacity: 0, scale: 0.9 }}
                       transition={{ duration: 0.15 }}
                       key={item.id_producto || item.id}
+                      style={{ margin: '0 0 8px 0', padding: '10px' }}
                     >
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a' }}>{item.nombre}</div>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155', fontStyle: 'normal' }}>{item.codigo}</div>
-                        <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: '4px' }}>
+                      <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
+                        <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.nombre}</div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#334155' }}>{item.codigo}</div>
+                        <div style={{ fontSize: '0.82rem', color: '#475569', marginTop: '2px' }}>
                           Unit: C$ {fmt(item.precio_venta)}
                         </div>
-                        <div style={{ fontSize: '0.95rem', fontWeight: '900', color: '#15803d', marginTop: '2px' }}>
+                        <div style={{ fontSize: '0.92rem', fontWeight: '900', color: '#15803d', marginTop: '1px' }}>
                           Total: C$ {fmt(Number(item.quantity || 1) * Number(item.precio_venta || 0))}
                         </div>
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
                           <S.RoundBtn title="Editar Precio" onClick={() => openModal('editPrice', { item })}>
-                            <FaPencilAlt size={11} />
+                            <FaPencilAlt size={10} />
                           </S.RoundBtn>
                           <S.RoundBtn title="Precio Mayorista" onClick={() => handleItemWholesale(item)}>
-                            <FaTag size={11} />
+                            <FaTag size={10} />
                           </S.RoundBtn>
                           <S.RoundBtn title="Descuento Item" onClick={() => openModal('itemDiscount', { item })}>
-                            <FaPercentage size={11} />
+                            <FaPercentage size={10} />
                           </S.RoundBtn>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <S.QtyControl>
-                          <S.RoundBtn onClick={() => handleUpdateCartQuantity(item.id_producto || item.id, item.quantity - 1)}><FaMinus size={10} /></S.RoundBtn>
-                          <span style={{ fontWeight: 800, minWidth: 26, textAlign: 'center', fontSize: '1rem', color: '#0f172a' }}>{item.quantity}</span>
-                          <S.RoundBtn onClick={() => handleUpdateCartQuantity(item.id_producto || item.id, item.quantity + 1)}><FaPlus size={10} /></S.RoundBtn>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                        <S.QtyControl style={{ padding: '2px' }}>
+                          <S.RoundBtn onClick={() => handleUpdateCartQuantity(item.id_producto || item.id, item.quantity - 1)}><FaMinus size={9} /></S.RoundBtn>
+                          <span style={{ fontWeight: 800, minWidth: 22, textAlign: 'center', fontSize: '0.95rem', color: '#0f172a' }}>{item.quantity}</span>
+                          <S.RoundBtn onClick={() => handleUpdateCartQuantity(item.id_producto || item.id, item.quantity + 1)}><FaPlus size={9} /></S.RoundBtn>
                         </S.QtyControl>
-                        <S.RoundBtn onClick={() => { playDeleteSound(); updateActiveCart(cart.filter(x => (x.id_producto || x.id) !== (item.id_producto || item.id))); }} style={{ background: '#fef2f2', color: '#ef4444' }}><FaTrashAlt size={14} /></S.RoundBtn>
+                        <S.RoundBtn onClick={() => { playDeleteSound(); updateActiveCart(cart.filter(x => (x.id_producto || x.id) !== (item.id_producto || item.id))); }} style={{ background: '#fef2f2', color: '#ef4444' }}><FaTrashAlt size={12} /></S.RoundBtn>
                       </div>
                     </S.CartItemWrapper>
                   ))
@@ -894,31 +910,32 @@ const POS = () => {
               </AnimatePresence>
             </div>
 
-            {/* Totales y Botón Cobrar */}
-            <div style={{ borderTop: '2px solid #f1f5f9', paddingTop: '1rem' }}>
-              <S.TotalsRow><span>Subtotal</span><span>C$ {fmt(subtotal)}</span></S.TotalsRow>
-              <S.TotalsRow style={{ color: '#ef4444' }}><span>Descuento</span><span>- C$ {fmt(discountAmount)}</span></S.TotalsRow>
-              <S.TotalsRow className="grand-total" style={{ fontSize: '1.4rem', marginTop: '5px' }}>
+            {/* Totales y Botón Cobrar (Sticky footer) */}
+            <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '0.6rem', marginTop: 'auto', flexShrink: 0, background: '#ffffff', paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))' }}>
+              <S.TotalsRow style={{ padding: '3px 8px' }}><span>Subtotal</span><span>C$ {fmt(subtotal)}</span></S.TotalsRow>
+              <S.TotalsRow style={{ color: '#ef4444', padding: '3px 8px' }}><span>Descuento</span><span>- C$ {fmt(discountAmount)}</span></S.TotalsRow>
+              <S.TotalsRow className="grand-total" style={{ fontSize: '1.35rem', marginTop: '2px', padding: '6px 8px 4px 8px' }}>
                 <span>TOTAL</span><span>C$ {fmt(total)}</span>
               </S.TotalsRow>
 
-              {/* Botón de Proforma */}
-              <S.Button
-                secondary
-                style={{ width: '100%', marginTop: '1rem', padding: '10px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}
-                onClick={() => openModal('proformaName')}
-              >
-                <FaFileInvoice /> Crear Proforma
-              </S.Button>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                <S.Button
+                  secondary
+                  style={{ flex: 1, padding: '12px 6px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}
+                  onClick={() => openModal('proformaName')}
+                >
+                  <FaFileInvoice /> Proforma
+                </S.Button>
 
-              <S.Button
-                primary
-                style={{ width: '100%', marginTop: '12px', padding: '16px', fontSize: '1.2rem', fontWeight: 'bold' }}
-                onClick={() => openModal('payment', { total })}
-                disabled={cart.length === 0}
-              >
-                $ COBRAR (F2)
-              </S.Button>
+                <S.Button
+                  primary
+                  style={{ flex: 2, padding: '14px 10px', fontSize: '1.15rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}
+                  onClick={() => openModal('payment', { total })}
+                  disabled={cart.length === 0}
+                >
+                  $ COBRAR (F2)
+                </S.Button>
+              </div>
             </div>
           </div>
         </S.CartPanel>

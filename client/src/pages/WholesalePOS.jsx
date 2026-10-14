@@ -117,6 +117,20 @@ const WholesalePOS = () => {
 
     useEffect(() => loadOrdersFromDB(), []);
 
+    // Sincronizar el estado del carrito móvil con el historial de navegación para el botón 'Atrás'
+    useEffect(() => {
+        if (isMobileCartOpen) {
+            window.history.pushState({ cartOpen: true }, '');
+            const handlePopState = () => {
+                setIsMobileCartOpen(false);
+            };
+            window.addEventListener('popstate', handlePopState);
+            return () => {
+                window.removeEventListener('popstate', handlePopState);
+            };
+        }
+    }, [isMobileCartOpen]);
+
     // Helpers
     const showAlert = (opts) => setAlert({ isOpen: true, title: opts.title || 'Alerta', message: opts.message || '' });
     const closeAlert = () => setAlert({ ...alert, isOpen: false });
@@ -552,7 +566,7 @@ const WholesalePOS = () => {
                     <S.BackButton to="/dashboard" style={{ background: '#8b5cf6' }}>
                         <FaArrowLeft /> Dashboard
                     </S.BackButton>
-                    <div className="info">
+                    <div className="info pos-brand-title">
                         <h1 style={{ color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <FaTag /> POS Mayorista
                         </h1>
@@ -676,7 +690,7 @@ const WholesalePOS = () => {
                     </div>
 
                     {/* LISTA DE ITEMS */}
-                    <div style={{ flex: 1, overflowY: 'auto', margin: '1rem 0', paddingRight: '5px' }}>
+                    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', margin: '0.5rem 0', paddingRight: '5px' }}>
                         {cart.length === 0 ? (
                             <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: '2rem' }}>
                                 <FaTag size={40} color="#e2e8f0" />
@@ -735,29 +749,37 @@ const WholesalePOS = () => {
                     </div>
 
                     {/* TOTALES */}
-                    <div style={{ borderTop: '2px solid #f1f5f9', paddingTop: '1rem' }}>
+                    <div style={{
+                        borderTop: '2px solid #f1f5f9',
+                        paddingTop: '0.75rem',
+                        marginTop: 'auto',
+                        paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))',
+                        background: '#ffffff'
+                    }}>
                         <S.TotalsRow><span>Subtotal</span><span>C$ {fmt(subtotal)}</span></S.TotalsRow>
                         <S.TotalsRow style={{ color: '#ef4444' }}><span>Descuento</span><span>- C$ {fmt(discountAmount)}</span></S.TotalsRow>
-                        <S.TotalsRow className="grand-total" style={{ fontSize: '1.4rem', marginTop: '5px', color: '#8b5cf6' }}>
+                        <S.TotalsRow className="grand-total" style={{ fontSize: '1.35rem', margin: '4px 0', color: '#8b5cf6' }}>
                             <span>TOTAL</span><span>C$ {fmt(total)}</span>
                         </S.TotalsRow>
 
-                        <S.Button
-                            secondary
-                            style={{ width: '100%', marginTop: '1rem', padding: '10px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}
-                            onClick={() => openModal('proformaName')}
-                        >
-                            <FaFileInvoice /> Hacer Cotización / Proforma
-                        </S.Button>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                            <S.Button
+                                secondary
+                                style={{ flex: 1, padding: '10px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}
+                                onClick={() => openModal('proformaName')}
+                            >
+                                <FaFileInvoice /> Proforma
+                            </S.Button>
 
-                        <S.Button
-                            primary
-                            style={{ width: '100%', marginTop: '12px', padding: '16px', fontSize: '1.2rem', fontWeight: 'bold', background: '#8b5cf6' }}
-                            onClick={() => openModal('payment', { total })}
-                            disabled={cart.length === 0}
-                        >
-                            COBRAR MAYORISTA
-                        </S.Button>
+                            <S.Button
+                                primary
+                                style={{ flex: 2, padding: '12px', fontSize: '1.05rem', fontWeight: 'bold', background: '#8b5cf6' }}
+                                onClick={() => openModal('payment', { total })}
+                                disabled={cart.length === 0}
+                            >
+                                $ COBRAR
+                            </S.Button>
+                        </div>
                     </div>
                 </S.CartPanel>
 

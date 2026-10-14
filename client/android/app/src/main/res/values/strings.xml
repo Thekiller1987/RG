@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Multirepuestos RG</string>
+    <string name="title_activity_main">Multirepuestos RG</string>
+    <string name="package_name">com.multirepuestosrg.app</string>
+    <string name="custom_url_scheme">com.multirepuestosrg.app</string>
+</resources>

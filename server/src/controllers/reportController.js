@@ -1522,6 +1522,11 @@ const getBiMetrics = async (req, res) => {
                                     efectivo += txAmount;
                                 }
                                 dolares += txDolares;
+                            } else if (tipo === 'ajuste') {
+                                if (d.target === 'efectivo' || d.target === 'ventas_totales') efectivo += txAmount;
+                                else if (d.target === 'dolares') dolares += txAmount;
+                                else if (d.target === 'tarjeta') tarjeta += txAmount;
+                                else if (d.target === 'transferencia') transferencia += txAmount;
                             }
                         });
                     } catch (err) {
