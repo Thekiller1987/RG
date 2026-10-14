@@ -243,6 +243,18 @@ function calculateReportStats(session) {
       netCordobas += rawAmount; // already negative
     }
     else if (t === 'ajuste') {
+      const isPaired = (curTx, allTxs) => {
+        if (curTx.pagoDetalles?.target !== 'ventas_totales') return false;
+        const txTime = new Date(curTx.at || 0).getTime();
+        return (allTxs || []).some(other => 
+          other !== curTx &&
+          (other.type || '').toLowerCase() === 'ajuste' &&
+          other.pagoDetalles?.target === 'efectivo' &&
+          Math.abs(Number(other.amount) - Number(curTx.amount)) < 0.01 &&
+          Math.abs(new Date(other.at || 0).getTime() - txTime) < 5000
+        );
+      };
+
       const monto = rawAmount;
       if (pd.target === 'efectivo') {
         netCordobas += monto;
@@ -263,9 +275,10 @@ function calculateReportStats(session) {
         vTransf += monto;
         tVentasDia += monto;
       } else if (pd.target === 'ventas_totales') {
-        vEfectivoC += monto;
-        netCordobas += monto;
-        tVentasDia += monto;
+        // ventas_totales es contable: NUNCA toca dinero físico (netCordobas ni vEfectivoC)
+        if (!isPaired(tx, transactions)) {
+          tVentasDia += monto;
+        }
       }
     }
     else {

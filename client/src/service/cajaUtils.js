@@ -190,6 +190,18 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
             }
 
         } else if (t === 'ajuste') {
+            const isPairedWithEfectivo = (curTx, allTxs) => {
+                if (curTx.pagoDetalles?.target !== 'ventas_totales') return false;
+                const txTime = new Date(curTx.at || 0).getTime();
+                return (allTxs || []).some(other => 
+                    other !== curTx &&
+                    (other.type || '').toLowerCase() === 'ajuste' &&
+                    other.pagoDetalles?.target === 'efectivo' &&
+                    Math.abs(Number(other.amount) - Number(curTx.amount)) < 0.01 &&
+                    Math.abs(new Date(other.at || 0).getTime() - txTime) < 5000
+                );
+            };
+
             if (pd.target === 'efectivo') {
                 netCordobas += txAmount;
                 vEfectivoC += txAmount;
@@ -197,9 +209,17 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
             } else if (pd.target === 'dolares') {
                 netDolares += txAmount;
                 vEfectivoD += txAmount;
+            } else if (pd.target === 'tarjeta') {
+                vTarjeta += txAmount;
+                tTarjeta += txAmount;
+            } else if (pd.target === 'credito') {
+                vCredito += txAmount;
+                tCredito += txAmount;
+            } else if (pd.target === 'transferencia') {
+                vTransf += txAmount;
+                tTransf += txAmount;
             } else if (pd.target === 'ventas_totales') {
-                vEfectivoC += txAmount;
-                netCordobas += txAmount;
+                // ventas_totales es contable: NUNCA modifica el dinero en mano (netCordobas)
             }
 
         } else {
@@ -219,12 +239,29 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
         } else if (t.includes('devolucion') || t.includes('cancelacion') || t.includes('anulacion')) {
             tVentasDia -= Math.abs(totalRevenue);
         } else if (t === 'ajuste') {
-            if (pd.target === 'efectivo' || pd.target === 'ventas_totales') {
+            const isPaired = (curTx, allTxs) => {
+                if (curTx.pagoDetalles?.target !== 'ventas_totales') return false;
+                const txTime = new Date(curTx.at || 0).getTime();
+                return (allTxs || []).some(other => 
+                    other !== curTx &&
+                    (other.type || '').toLowerCase() === 'ajuste' &&
+                    other.pagoDetalles?.target === 'efectivo' &&
+                    Math.abs(Number(other.amount) - Number(curTx.amount)) < 0.01 &&
+                    Math.abs(new Date(other.at || 0).getTime() - txTime) < 5000
+                );
+            };
+
+            if (pd.target === 'efectivo') {
                 tVentasDia += txAmount;
             } else if (pd.target === 'dolares') {
                 tVentasDia += (txAmount * tasaRef);
             } else if (pd.target === 'tarjeta' || pd.target === 'credito' || pd.target === 'transferencia') {
                 tVentasDia += txAmount;
+            } else if (pd.target === 'ventas_totales') {
+                // Si viene de un par con efectivo, efectivo ya lo sumó a tVentasDia
+                if (!isPaired(tx, validTransactions)) {
+                    tVentasDia += txAmount;
+                }
             }
         }
 

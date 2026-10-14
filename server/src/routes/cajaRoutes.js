@@ -250,6 +250,20 @@ function calcularTotalesSesion(transactions, details) {
     }
     // AJUSTES SECRETOS
     else if (tipo === 'ajuste') {
+      const isPaired = (curTx, allTxs) => {
+        if (d.target !== 'ventas_totales') return false;
+        const txTime = new Date(curTx.at || 0).getTime();
+        return (allTxs || []).some(other => {
+          let od = other.pagoDetalles || {};
+          if (typeof od === 'string') { try { od = JSON.parse(od); } catch { od = {}; } }
+          return other !== curTx &&
+            (other.type || '').toLowerCase() === 'ajuste' &&
+            od.target === 'efectivo' &&
+            Math.abs(Number(other.amount) - Number(curTx.amount)) < 0.01 &&
+            Math.abs(new Date(other.at || 0).getTime() - txTime) < 5000;
+        });
+      };
+
       const monto = txAmount;
       if (d.target === 'efectivo') {
         movimientoNetoEfectivo += monto;
@@ -260,8 +274,10 @@ function calcularTotalesSesion(transactions, details) {
       else if (d.target === 'transferencia') totalTransferencia += monto;
       else if (d.target === 'dolares') totalDolares += monto;
       else if (d.target === 'ventas_totales') {
-        totalEfectivo += monto;
-        movimientoNetoEfectivo += monto;
+        // NUNCA sumar a movimientoNetoEfectivo ni a totalEfectivo!
+        if (!isPaired(tx, transactions)) {
+          ventasAjuste += monto;
+        }
       }
     }
   });

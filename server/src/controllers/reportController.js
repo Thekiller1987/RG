@@ -34,6 +34,89 @@ const getDateRange = (start, end) => {
     return { from: fromDate, to: toDate };
 };
 
+/**
+ * Helper para obtener ajustes secretos de cajas en un rango de fechas.
+ * Retorna { totalAjustesVentas, totalAjustesEfectivo, dailyAdjustments, userAdjustments }
+ */
+const getCajaAdjustmentsInRange = async (from, to) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT id, usuario_id, usuario_nombre, fecha_apertura, fecha_cierre, detalles_json
+            FROM cierres_caja
+            WHERE (fecha_apertura <= ? AND (fecha_cierre >= ? OR fecha_cierre IS NULL))
+               OR (fecha_apertura BETWEEN ? AND ?)
+        `, [to, from, from, to]);
+
+        let totalAjustesVentas = 0;
+        let totalAjustesEfectivo = 0;
+        const dailyAdjustments = {};
+        const userAdjustments = {};
+
+        const fromDate = new Date(from);
+        const toDate = new Date(to);
+
+        for (const row of rows) {
+            let details = {};
+            try {
+                details = typeof row.detalles_json === 'string' ? JSON.parse(row.detalles_json) : (row.detalles_json || {});
+            } catch { details = {}; }
+
+            const txs = details.transactions || [];
+            const tasa = Number(details.tasaDolar || 36.60);
+
+            // Deduplicar pares (efectivo + ventas_totales generados al mismo tiempo)
+            const seenPairTimes = new Set();
+
+            for (const tx of txs) {
+                if ((tx.type || '').toLowerCase() !== 'ajuste') continue;
+
+                const txTime = tx.at ? new Date(tx.at) : new Date(row.fecha_apertura);
+                if (txTime < fromDate || txTime > toDate) continue;
+
+                let pd = tx.pagoDetalles || {};
+                if (typeof pd === 'string') { try { pd = JSON.parse(pd); } catch { pd = {}; } }
+                const target = pd.target || 'efectivo';
+                const amount = Number(tx.amount || 0);
+
+                const timeKey = `${Math.floor(txTime.getTime() / 3000)}_${amount}`;
+                if (target === 'ventas_totales') {
+                    if (seenPairTimes.has(timeKey)) {
+                        continue;
+                    }
+                } else if (target === 'efectivo') {
+                    seenPairTimes.add(timeKey);
+                }
+
+                let salesImpact = 0;
+                let cashImpact = 0;
+
+                if (target === 'efectivo') {
+                    salesImpact = amount;
+                    cashImpact = amount;
+                } else if (target === 'dolares') {
+                    salesImpact = amount * tasa;
+                } else if (target === 'ventas_totales' || target === 'tarjeta' || target === 'transferencia' || target === 'credito') {
+                    salesImpact = amount;
+                }
+
+                totalAjustesVentas += salesImpact;
+                totalAjustesEfectivo += cashImpact;
+
+                const dayStr = txTime.toLocaleDateString('sv-SE', { timeZone: 'America/Managua' });
+                dailyAdjustments[dayStr] = (dailyAdjustments[dayStr] || 0) + salesImpact;
+
+                const uKey = String(row.usuario_id || row.usuario_nombre);
+                userAdjustments[uKey] = (userAdjustments[uKey] || 0) + salesImpact;
+            }
+        }
+
+        return { totalAjustesVentas, totalAjustesEfectivo, dailyAdjustments, userAdjustments };
+    } catch (err) {
+        console.error('Error calculando ajustes de caja en reporte:', err);
+        return { totalAjustesVentas: 0, totalAjustesEfectivo: 0, dailyAdjustments: {}, userAdjustments: {} };
+    }
+};
+
 // --- OBTENER RESUMEN DE VENTAS Y GANANCIAS ---
 const getSalesSummaryReport = async (req, res) => {
     const { startDate, endDate } = req.query;
@@ -54,7 +137,20 @@ v.estado = 'COMPLETADA'
                 AND v.fecha >= ? AND v.fecha <= ?;
 `;
         const [results] = await db.query(sql, [from, to]);
-        res.json(results[0]);
+        let ventasBrutas = Number(results[0]?.ventas_brutas || 0);
+        let gananciaTotal = Number(results[0]?.ganancia_total || 0);
+
+        const { totalAjustesVentas } = await getCajaAdjustmentsInRange(from, to);
+        if (totalAjustesVentas !== 0) {
+            const marginRatio = ventasBrutas > 0 ? (gananciaTotal / ventasBrutas) : 0.3;
+            ventasBrutas = Math.max(0, ventasBrutas + totalAjustesVentas);
+            gananciaTotal = Math.max(0, gananciaTotal + (totalAjustesVentas * marginRatio));
+        }
+
+        res.json({
+            ventas_brutas: Number(ventasBrutas.toFixed(2)),
+            ganancia_total: Number(gananciaTotal.toFixed(2))
+        });
     } catch (error) {
         console.error('Error en reporte de resumen de ventas:', error);
         res.status(500).json({ msg: 'Error en el servidor.' });
@@ -88,6 +184,7 @@ SELECT
         WHEN v.id_empleado IS NOT NULL THEN CONCAT('Vendedor: ', COALESCE(e.nombre, 'Desconocido'))
         ELSE CONCAT('Caja: ', u.nombre_usuario)
     END AS nombre_usuario,
+    v.id_usuario,
     COUNT(v.id_venta) AS cantidad_ventas,
     SUM(v.total_venta) AS total_vendido
 FROM ventas AS v
@@ -96,10 +193,26 @@ LEFT JOIN empleados AS e ON v.id_empleado = e.id_empleado
 WHERE
     v.estado = 'COMPLETADA' 
     AND v.fecha >= ? AND v.fecha <= ?
-GROUP BY 1
+GROUP BY 1, v.id_usuario
 ORDER BY total_vendido DESC;
 `;
         const [results] = await db.query(sql, [from, to]);
+        const { userAdjustments, totalAjustesVentas } = await getCajaAdjustmentsInRange(from, to);
+
+        if (totalAjustesVentas !== 0 && results.length > 0) {
+            let applied = false;
+            for (const r of results) {
+                const adj = userAdjustments[String(r.id_usuario)];
+                if (adj) {
+                    r.total_vendido = Math.max(0, Number(r.total_vendido) + adj);
+                    applied = true;
+                }
+            }
+            if (!applied) {
+                results[0].total_vendido = Math.max(0, Number(results[0].total_vendido) + totalAjustesVentas);
+            }
+        }
+
         res.json(results);
     } catch (error) {
         console.error('Error en reporte de ventas por usuario:', error);
@@ -179,7 +292,18 @@ estado = 'COMPLETADA'
             ORDER BY dia ASC;
 `;
         const [results] = await db.query(sql, [from, to]);
-        res.json(results);
+        const { dailyAdjustments } = await getCajaAdjustmentsInRange(from, to);
+
+        const adjustedResults = results.map(row => {
+            const diaKey = typeof row.dia === 'string' ? row.dia.substring(0, 10) : new Date(row.dia).toLocaleDateString('sv-SE', { timeZone: 'America/Managua' });
+            const adj = dailyAdjustments[diaKey] || 0;
+            return {
+                ...row,
+                total_diario: Math.max(0, Number(row.total_diario) + adj)
+            };
+        });
+
+        res.json(adjustedResults);
     } catch (error) {
         console.error('Error en reporte para gráfica:', error);
         res.status(500).json({ msg: 'Error en el servidor.' });
@@ -1312,7 +1436,13 @@ const getBiMetrics = async (req, res) => {
             `);
         }
 
-        const efectivoTotal = Number(paymentDistResult[0]?.total_efectivo || 0);
+        let biAdjustments = { totalAjustesVentas: 0, totalAjustesEfectivo: 0 };
+        if (startDate && endDate) {
+            const { from, to } = getDateRange(startDate, endDate);
+            biAdjustments = await getCajaAdjustmentsInRange(from, to);
+        }
+
+        const efectivoTotal = Math.max(0, Number(paymentDistResult[0]?.total_efectivo || 0) + biAdjustments.totalAjustesEfectivo);
         const transferenciaTotal = Number(paymentDistResult[0]?.total_transferencia || 0);
         const tarjetaTotal = Number(paymentDistResult[0]?.total_tarjeta || 0);
 
@@ -1330,7 +1460,8 @@ const getBiMetrics = async (req, res) => {
             FROM ventas v
             WHERE v.estado = 'COMPLETADA' ${dateFilter}
         `, params);
-        const total_ventas_bi = Number(ticketDataResult[0]?.total_ventas || 0);
+        const raw_total_ventas_bi = Number(ticketDataResult[0]?.total_ventas || 0);
+        const total_ventas_bi = Math.max(0, raw_total_ventas_bi + biAdjustments.totalAjustesVentas);
         const total_tickets_bi = Number(ticketDataResult[0]?.total_tickets || 0);
         const ticket_promedio = total_tickets_bi > 0 
             ? Number((total_ventas_bi / total_tickets_bi).toFixed(2))

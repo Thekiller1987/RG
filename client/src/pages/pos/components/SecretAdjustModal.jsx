@@ -45,10 +45,24 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
         const activeAdjustments = [];
 
         if (mode === 'manual') {
-            if (parseFloat(adjustments.efectivo)) activeAdjustments.push({ target: 'efectivo', amount: parseFloat(adjustments.efectivo) });
-            if (parseFloat(adjustments.credito)) activeAdjustments.push({ target: 'credito', amount: parseFloat(adjustments.credito) });
-            if (parseFloat(adjustments.tarjeta)) activeAdjustments.push({ target: 'tarjeta', amount: parseFloat(adjustments.tarjeta) });
-            if (parseFloat(adjustments.ventas_totales)) activeAdjustments.push({ target: 'ventas_totales', amount: parseFloat(adjustments.ventas_totales) });
+            const efec = parseFloat(adjustments.efectivo) || 0;
+            const cred = parseFloat(adjustments.credito) || 0;
+            const tarj = parseFloat(adjustments.tarjeta) || 0;
+            const vt = parseFloat(adjustments.ventas_totales);
+
+            if (efec) activeAdjustments.push({ target: 'efectivo', amount: efec });
+            if (cred) activeAdjustments.push({ target: 'credito', amount: cred });
+            if (tarj) activeAdjustments.push({ target: 'tarjeta', amount: tarj });
+
+            // Solo enviar ventas_totales si representa un ajuste adicional al de métodos de pago
+            // Si el usuario puso ej: -1000 en Efectivo y -1000 en Ventas Totales, el efectivo ya cubre las ventas
+            if (!isNaN(vt) && vt !== 0) {
+                const methodSum = efec + cred + tarj;
+                const extraVT = vt - methodSum;
+                if (Math.abs(extraVT) > 0.01) {
+                    activeAdjustments.push({ target: 'ventas_totales', amount: extraVT });
+                }
+            }
         } else {
             // OVERRIDE MODE (Magic Fix)
             const targetC = parseFloat(override.cordobas);
