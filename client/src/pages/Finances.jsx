@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { Bar, Line } from 'react-chartjs-2'; // Importamos Line también por si se quiere variar
 import {
@@ -21,6 +21,9 @@ import { createGlobalStyle } from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import AlertModal from './pos/components/AlertModal.jsx';
 import { API_URL } from '../service/api';
+import { useSettings } from '../context/SettingsContext';
+import { updateSettings } from '../service/settingsApi';
+import FinancesSecretModal from './FinancesSecretModal.jsx';
 
 // --- REGISTRO DE CHART.JS ---
 ChartJS.register(
@@ -331,6 +334,159 @@ const Finances = () => {
   const formatCurrency = (value) =>
     new Intl.NumberFormat('es-NI', { style: 'currency', currency: 'NIO', minimumFractionDigits: 2 }).format(value || 0);
 
+  const { settings, refreshSettings } = useSettings();
+
+  // --- ESTADO MENÚ SECRETO (GOD MODE) ---
+  const [secretModalOpen, setSecretModalOpen] = useState(false);
+  const [overrideConfig, setOverrideConfig] = useState(() => {
+    try {
+      const local = localStorage.getItem('rg_finances_override');
+      if (local) return JSON.parse(local);
+    } catch (e) {}
+    return null;
+  });
+
+  // Sincronizar desde la base de datos (business_config)
+  useEffect(() => {
+    if (settings?.finances_override_json) {
+      try {
+        const parsed = JSON.parse(settings.finances_override_json);
+        if (parsed && typeof parsed === 'object') {
+          setOverrideConfig(parsed);
+          localStorage.setItem('rg_finances_override', JSON.stringify(parsed));
+        }
+      } catch (e) {}
+    }
+  }, [settings?.finances_override_json]);
+
+  // Atajo de teclado: Ctrl + Alt + F o Ctrl + Shift + S
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey && e.altKey && (e.key === 'f' || e.key === 'F')) ||
+          (e.ctrlKey && e.shiftKey && (e.key === 's' || e.key === 'S'))) {
+        e.preventDefault();
+        setSecretModalOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleSaveOverride = async (newConfig) => {
+    setOverrideConfig(newConfig);
+    try {
+      localStorage.setItem('rg_finances_override', JSON.stringify(newConfig));
+    } catch (e) {}
+
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        await updateSettings(token, { finances_override_json: JSON.stringify(newConfig) });
+        if (refreshSettings) refreshSettings();
+      } catch (err) {
+        console.warn('Error syncing override to server:', err);
+      }
+    }
+  };
+
+  const handleResetOverride = async () => {
+    setOverrideConfig(null);
+    try {
+      localStorage.removeItem('rg_finances_override');
+    } catch (e) {}
+
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        await updateSettings(token, { finances_override_json: '' });
+        if (refreshSettings) refreshSettings();
+      } catch (err) {
+        console.warn('Error resetting override on server:', err);
+      }
+    }
+  };
+
+  // --- RECALCULOS VISUALES CON OVERRIDE ACTIVO ---
+  const displayedSummary = useMemo(() => {
+    if (!overrideConfig || !overrideConfig.active) {
+      return salesSummary;
+    }
+    let v = Number(salesSummary?.ventas_brutas || 0);
+    let g = Number(salesSummary?.ganancia_total || 0);
+
+    if (overrideConfig.mode === 'override') {
+      if (overrideConfig.targetVentas !== null && overrideConfig.targetVentas !== undefined && !isNaN(overrideConfig.targetVentas)) {
+        v = Number(overrideConfig.targetVentas);
+      }
+      if (overrideConfig.targetGanancia !== null && overrideConfig.targetGanancia !== undefined && !isNaN(overrideConfig.targetGanancia)) {
+        g = Number(overrideConfig.targetGanancia);
+      }
+    } else if (overrideConfig.mode === 'relative') {
+      v += Number(overrideConfig.relVentas || 0);
+      g += Number(overrideConfig.relGanancia || 0);
+    }
+
+    return {
+      ...salesSummary,
+      ventas_brutas: Math.max(0, v),
+      ganancia_total: Math.max(0, g)
+    };
+  }, [salesSummary, overrideConfig]);
+
+  const displayedInventoryValue = useMemo(() => {
+    if (overrideConfig?.active && overrideConfig.targetInventory !== null && overrideConfig.targetInventory !== undefined && !isNaN(overrideConfig.targetInventory)) {
+      return Number(overrideConfig.targetInventory);
+    }
+    return inventoryValue;
+  }, [inventoryValue, overrideConfig]);
+
+  const displayedChartData = useMemo(() => {
+    if (!overrideConfig?.active || !overrideConfig?.syncChart || !chartData?.datasets?.[0]?.data?.length) {
+      return chartData;
+    }
+    const realV = Number(salesSummary?.ventas_brutas || 0);
+    const targetV = Number(displayedSummary.ventas_brutas);
+    const diff = targetV - realV;
+
+    if (Math.abs(diff) < 0.01) return chartData;
+
+    const originalArr = chartData.datasets[0].data;
+    const newArr = [...originalArr];
+    const lastIdx = newArr.length - 1;
+    newArr[lastIdx] = Math.max(0, Number(((Number(newArr[lastIdx]) || 0) + diff).toFixed(2)));
+
+    return {
+      ...chartData,
+      datasets: [
+        {
+          ...chartData.datasets[0],
+          data: newArr
+        }
+      ]
+    };
+  }, [chartData, overrideConfig, salesSummary, displayedSummary]);
+
+  const displayedSalesByUser = useMemo(() => {
+    if (!overrideConfig?.active || !overrideConfig?.syncUser || !salesByUser?.length) {
+      return salesByUser;
+    }
+    const realV = Number(salesSummary?.ventas_brutas || 0);
+    const targetV = Number(displayedSummary.ventas_brutas);
+    const diff = targetV - realV;
+
+    if (Math.abs(diff) < 0.01) return salesByUser;
+
+    return salesByUser.map((u, idx) => {
+      if (idx === 0) {
+        return {
+          ...u,
+          total_vendido: Math.max(0, Number(((Number(u.total_vendido) || 0) + diff).toFixed(2)))
+        };
+      }
+      return u;
+    });
+  }, [salesByUser, overrideConfig, salesSummary, displayedSummary]);
+
   // MANEJO DE PERIODOS RÁPIDOS
   const handleQuickFilter = (type) => {
     setActiveFilter(type);
@@ -477,7 +633,13 @@ const Finances = () => {
             <FaArrowLeft size={18} />
           </BackButton>
           <div>
-            <TitleHeader>Dashboard Financiero</TitleHeader>
+            <TitleHeader
+              onDoubleClick={() => setSecretModalOpen(true)}
+              title="Dashboard Financiero"
+              style={{ cursor: 'pointer', userSelect: 'none' }}
+            >
+              Dashboard Financiero
+            </TitleHeader>
             <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '0.95rem' }}>Resumen de operaciones y auditoría</p>
           </div>
         </TitleSection>
@@ -504,21 +666,27 @@ const Finances = () => {
 
       {/* 4 GRANDES KPIs */}
       <DashboardGrid>
-        <KPICard gradient="linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)" dark>
+        <KPICard
+          gradient="linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)"
+          dark
+          onDoubleClick={() => setSecretModalOpen(true)}
+          style={{ cursor: 'pointer' }}
+          title="Ventas Totales"
+        >
           <KPIHeader><FaChartBar /> Ventas Totales</KPIHeader>
-          <KPIValue>{formatCurrency(salesSummary.ventas_brutas)}</KPIValue>
+          <KPIValue>{formatCurrency(displayedSummary.ventas_brutas)}</KPIValue>
           <KPISub>En el periodo seleccionado</KPISub>
         </KPICard>
 
         <KPICard>
           <KPIHeader style={{ color: '#16a34a' }}><FaMoneyBillWave /> Ganancia Estimada</KPIHeader>
-          <KPIValue style={{ color: '#16a34a' }}>{formatCurrency(salesSummary.ganancia_total)}</KPIValue>
+          <KPIValue style={{ color: '#16a34a' }}>{formatCurrency(displayedSummary.ganancia_total)}</KPIValue>
           <KPISub>Margen bruto calculado</KPISub>
         </KPICard>
 
         <KPICard>
           <KPIHeader style={{ color: '#0f172a' }}><FaWarehouse /> Valor Inventario</KPIHeader>
-          <KPIValue>{formatCurrency(inventoryValue)}</KPIValue>
+          <KPIValue>{formatCurrency(displayedInventoryValue)}</KPIValue>
           <KPISub>Capital en mercadería (Actual)</KPISub>
         </KPICard>
 
@@ -546,7 +714,7 @@ const Finances = () => {
           </div>
           <div style={{ flex: 1, position: 'relative' }}>
             <Bar
-              data={chartData}
+              data={displayedChartData}
               options={{
                 responsive: true,
                 maintainAspectRatio: false,
@@ -575,7 +743,7 @@ const Finances = () => {
           <ListCard>
             <ListHeader><FaUserFriends style={{ color: '#3b82f6' }} /> Top Vendedores</ListHeader>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {salesByUser.length > 0 ? salesByUser.map((user, i) => (
+              {displayedSalesByUser.length > 0 ? displayedSalesByUser.map((user, i) => (
                 <ListItem key={i}>
                   <div className="left">
                     <span className="rank">{i + 1}</span>
@@ -605,6 +773,17 @@ const Finances = () => {
           </ListCard>
         </ListsContainer>
       </ContentSection>
+
+      {/* MODAL SECRETO FINANZAS */}
+      <FinancesSecretModal
+        isOpen={secretModalOpen}
+        onClose={() => setSecretModalOpen(false)}
+        realSummary={salesSummary}
+        realInventory={inventoryValue}
+        currentOverride={overrideConfig}
+        onSaveOverride={handleSaveOverride}
+        onResetOverride={handleResetOverride}
+      />
     </PageWrapper>
   );
 };
