@@ -64,6 +64,9 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
     let aEfectivoC = 0; let aEfectivoD = 0;
     let aTarjeta = 0; let aTransf = 0;
 
+    let totalEntradasDia = 0;
+    let totalSalidasDia = 0;
+
     for (const tx of validTransactions) {
         let t = (tx?.type || '').toLowerCase().trim();
         t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -171,9 +174,11 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
 
         } else if (t === 'entrada') {
             netCordobas += Math.abs(txAmount);
+            totalEntradasDia += Math.abs(txAmount);
 
         } else if (t === 'salida') {
             netCordobas -= Math.abs(txAmount);
+            totalSalidasDia += Math.abs(txAmount);
 
         } else if (t.includes('devolucion') || t.includes('cancelacion') || t.includes('anulacion')) {
             // Reversiones: sacar cash de la caja
@@ -232,9 +237,9 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
         }
 
         // ══════════════════════════════════════════════════════
-        // 3. GLOBAL SALES TOTAL
+        // 3. GLOBAL SALES TOTAL (ONLY VENTAS FACTURADAS NETAS - NO ABONOS)
         // ══════════════════════════════════════════════════════
-        if (t.startsWith('venta') || t.includes('abono') || t.includes('liquid') || t.includes('pedido')) {
+        if (t.startsWith('venta')) {
             tVentasDia += Math.abs(totalRevenue);
         } else if (t.includes('devolucion') || t.includes('cancelacion') || t.includes('anulacion')) {
             tVentasDia -= Math.abs(totalRevenue);
@@ -295,6 +300,8 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
     const efectivoEsperadoCordobas = cajaInicialN + netCordobas;
     const efectivoEsperado = efectivoEsperadoCordobas + (netDolares * tasaRef);
 
+    const totalAbonosDia = safe(aEfectivoC + (aEfectivoD * tasaRef) + aTarjeta + aTransf);
+
     return {
         cajaInicial: cajaInicialN,
         netCordobas,
@@ -303,6 +310,9 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
         efectivoEsperadoCordobas: safe(efectivoEsperadoCordobas),
         efectivoEsperadoDolares: netDolares,
         totalVentasDia: safe(tVentasDia),
+        totalAbonosDia,
+        totalEntradasDia: safe(totalEntradasDia),
+        totalSalidasDia: safe(totalSalidasDia),
         totalTarjeta: tTarjeta,
         totalTransferencia: tTransf,
         totalCredito: tCredito,

@@ -141,10 +141,15 @@ function calcularTotalesSesion(transactions, details) {
   // Helper anti-NaN
   const safe = (v) => { const n = Number(v); return (isNaN(n) || !isFinite(n)) ? 0 : n; };
 
-  let totalEfectivo = 0, totalTarjeta = 0, totalTransferencia = 0, totalCredito = 0;
-  let totalDolares = 0, totalIngresos = 0, totalGastos = 0;
-  let movimientoNetoEfectivo = 0;
-  let ventasAjuste = 0; // God Mode: ajuste de ventas totales
+  let totalVentasContado = 0;
+  let totalVentasCredito = 0;
+  let totalDevoluciones = 0;
+
+  let vEfectivoC = 0, vEfectivoD = 0, vTarjeta = 0, vTransf = 0, vCredito = 0;
+  let aEfectivoC = 0, aEfectivoD = 0, aTarjeta = 0, aTransf = 0;
+  let totalEntradas = 0, totalSalidas = 0;
+  let totalAjustesVentas = 0;
+  let totalAjustesEfectivo = 0;
 
   const tasaDefault = safe(details?.tasaDolar) || 36.60;
 
@@ -155,100 +160,82 @@ function calcularTotalesSesion(transactions, details) {
     if (typeof d === 'string') { try { d = JSON.parse(d); } catch { d = {}; } }
     if (!d || typeof d !== 'object') d = {};
 
+    const txAmount = safe(tx.amount);
+    const txTotalVenta = safe(d.totalVenta) || txAmount;
     const txEfectivo = safe(d.efectivo);
-    const txTarjeta = safe(d.tarjeta);
-    const txTransf = safe(d.transferencia);
-    const txCredito = safe(d.credito);
     const txDolares = safe(d.dolares);
     const txCambio = safe(d.cambio);
     const txIngresoCaja = safe(d.ingresoCaja);
-    const txAmount = safe(tx.amount);
-    const txTotalVenta = safe(d.totalVenta) || txAmount;
+    const txTarjeta = safe(d.tarjeta);
+    const txTransf = safe(d.transferencia);
+    const txCredito = safe(d.credito);
     const txTasa = safe(d.tasaDolarAlMomento) || tasaDefault;
 
-    // VENTAS
+    // 1. VENTAS FACTURADAS
     if (tipo.startsWith('venta')) {
-      totalEfectivo += txEfectivo;
-      totalTarjeta += txTarjeta;
-      totalTransferencia += txTransf;
-      totalCredito += txCredito;
-      totalDolares += txDolares;
+      totalVentasContado += (txTotalVenta - txCredito);
+      totalVentasCredito += txCredito;
 
-      // Movimiento neto efectivo (3 tiers de fallback)
-      const cashIn = txEfectivo + (txDolares * txTasa);
-      const cashOut = txCambio;
-      const calculatedNet = cashIn - cashOut;
-
-      if (Math.abs(calculatedNet) > 0.001) {
-        // TIER 1: Campos desglosados (efectivo/dólares/cambio)
-        movimientoNetoEfectivo += calculatedNet;
+      // Desglose de pagos físicos y electrónicos
+      if (txEfectivo > 0.001 || txDolares > 0.001 || txCambio > 0.001) {
+        vEfectivoC += (txEfectivo - txCambio);
+        vEfectivoD += txDolares;
       } else if (Math.abs(txIngresoCaja) > 0.001) {
-        // TIER 2: ingresoCaja ya calculado
-        movimientoNetoEfectivo += txIngresoCaja;
+        vEfectivoC += txIngresoCaja;
       } else {
-        // TIER 3: Residual (totalVenta - no-efectivo)
-        const noEfectivo = txTarjeta + txTransf + txCredito;
-        const residual = txTotalVenta - noEfectivo;
-        // Solo sumamos el residual si es mayor a 0 para evitar ruidos
-        if (residual > 0.001) {
-          movimientoNetoEfectivo += residual;
-        }
+        const noEf = txTarjeta + txTransf + txCredito;
+        const res = txTotalVenta - noEf;
+        if (res > 0.001) vEfectivoC += res;
       }
+
+      vTarjeta += txTarjeta;
+      vTransf += txTransf;
+      vCredito += txCredito;
     }
-    // ABONOS Y LIQUIDACIONES
+    // 2. ABONOS Y LIQUIDACIONES (COBRANZA CxC - NO SUMA A VENTAS NUEVAS)
     else if (tipo.includes('abono') || tipo.includes('liquid') || tipo.includes('pedido') || tipo.includes('apartado')) {
-      const netAbonoCash = (txEfectivo + (txDolares * txTasa)) - txCambio;
-
-      if (Math.abs(netAbonoCash) > 0.001) {
-        totalEfectivo += netAbonoCash;
-        movimientoNetoEfectivo += netAbonoCash;
-      } else if (Math.abs(txIngresoCaja) > 0.001) {
-        totalEfectivo += txIngresoCaja;
-        movimientoNetoEfectivo += txIngresoCaja;
-      } else {
-        const noEfectivo = txTarjeta + txTransf;
-        const residual = Math.max(0, txAmount - noEfectivo);
-        totalEfectivo += residual;
-        movimientoNetoEfectivo += residual;
-      }
-
-      if (txTarjeta > 0.001) totalTarjeta += txTarjeta;
-      if (txTransf > 0.001) totalTransferencia += txTransf;
-      if (txDolares > 0.001) totalDolares += txDolares;
-    }
-    // ENTRADAS
-    else if (tipo === 'entrada') {
-      const m = Math.abs(txAmount);
-      totalIngresos += m;
-      movimientoNetoEfectivo += m;
-    }
-    // SALIDAS
-    else if (tipo === 'salida') {
-      const m = Math.abs(txAmount);
-      totalGastos += m;
-      movimientoNetoEfectivo -= m;
-    }
-    // DEVOLUCIONES / CANCELACIONES
-    else if (tipo.includes('devolucion') || tipo.includes('cancelacion') || tipo.includes('anulacion')) {
-      totalEfectivo -= txEfectivo;
-      totalTarjeta -= txTarjeta;
-      totalTransferencia -= txTransf;
-      totalCredito -= txCredito;
-      totalDolares -= txDolares;
-
-      if (d.ingresoCaja !== undefined && d.ingresoCaja !== null) {
-        movimientoNetoEfectivo += safe(d.ingresoCaja); // Será negativo
+      if (txDolares > 0.001) {
+        aEfectivoD += txDolares;
+        aEfectivoC += (txEfectivo - txCambio);
       } else if (txEfectivo > 0.001) {
-        movimientoNetoEfectivo -= txEfectivo;
+        aEfectivoC += (txEfectivo - txCambio);
+      } else if (Math.abs(txIngresoCaja) > 0.001) {
+        aEfectivoC += txIngresoCaja;
       } else {
-        const noEfectivo = txTarjeta + txTransf + txCredito;
-        const cashPart = Math.abs(txAmount) - noEfectivo;
-        if (cashPart > 0.001) {
-          movimientoNetoEfectivo -= cashPart;
-        }
+        const noEf = txTarjeta + txTransf;
+        const res = Math.max(0, txAmount - noEf);
+        aEfectivoC += res;
+      }
+
+      aTarjeta += txTarjeta;
+      aTransf += txTransf;
+    }
+    // 3. ENTRADAS MANUALES DE EFECTIVO
+    else if (tipo === 'entrada') {
+      totalEntradas += Math.abs(txAmount);
+    }
+    // 4. SALIDAS / GASTOS DE CAJA
+    else if (tipo === 'salida') {
+      totalSalidas += Math.abs(txAmount);
+    }
+    // 5. DEVOLUCIONES / CANCELACIONES (RESTA A VENTAS Y RESTA A EFECTIVO)
+    else if (tipo.includes('devolucion') || tipo.includes('cancelacion') || tipo.includes('anulacion')) {
+      totalDevoluciones += Math.abs(txAmount);
+
+      if (txTarjeta > 0.001) vTarjeta -= txTarjeta;
+      if (txTransf > 0.001) vTransf -= txTransf;
+      if (txCredito > 0.001) vCredito -= txCredito;
+      if (txDolares > 0.001) vEfectivoD -= txDolares;
+
+      const noEf = txTarjeta + txTransf + txCredito;
+      const cashPart = Math.abs(txAmount) - noEf;
+      if (cashPart > 0.001) {
+        vEfectivoC -= cashPart;
+      } else if (txEfectivo > 0.001) {
+        vEfectivoC -= txEfectivo;
       }
     }
-    // AJUSTES SECRETOS
+    // 6. AJUSTES INTERNOS (God Mode)
     else if (tipo === 'ajuste') {
       const isPaired = (curTx, allTxs) => {
         if (d.target !== 'ventas_totales') return false;
@@ -266,52 +253,85 @@ function calcularTotalesSesion(transactions, details) {
 
       const monto = txAmount;
       if (d.target === 'efectivo') {
-        movimientoNetoEfectivo += monto;
-        totalEfectivo += monto;
-      }
-      else if (d.target === 'credito') totalCredito += monto;
-      else if (d.target === 'tarjeta') totalTarjeta += monto;
-      else if (d.target === 'transferencia') totalTransferencia += monto;
-      else if (d.target === 'dolares') totalDolares += monto;
-      else if (d.target === 'ventas_totales') {
-        // NUNCA sumar a movimientoNetoEfectivo ni a totalEfectivo!
+        vEfectivoC += monto;
+        totalAjustesEfectivo += monto;
+      } else if (d.target === 'dolares') {
+        vEfectivoD += monto;
+      } else if (d.target === 'tarjeta') {
+        vTarjeta += monto;
+      } else if (d.target === 'transferencia') {
+        vTransf += monto;
+      } else if (d.target === 'credito') {
+        vCredito += monto;
+      } else if (d.target === 'ventas_totales') {
         if (!isPaired(tx, transactions)) {
-          ventasAjuste += monto;
+          totalAjustesVentas += monto;
         }
       }
     }
   });
 
-  // ★ BLINDAJE FINAL: Mapeo exacto para el Frontend
+  // Calculos Consolidados
   const cajaInicial = safe(details?.initialAmount || 0);
-  const efectivoEsperadoCordobas = cajaInicial + movimientoNetoEfectivo;
-  const efectivoEsperado = efectivoEsperadoCordobas + (totalDolares * tasaDefault);
+
+  // Ventas Totales Netas = (Ventas Contado + Ventas Credito) - Devoluciones + Ajustes
+  const totalVentasDia = Math.max(0, safe(totalVentasContado + totalVentasCredito - totalDevoluciones + totalAjustesVentas));
+
+  // Total Abonos Cobrados
+  const totalAbonosDia = safe(aEfectivoC + (aEfectivoD * tasaDefault) + aTarjeta + aTransf);
+
+  // Movimiento Físico Neto de Efectivo
+  const movimientoNetoEfectivoC = (vEfectivoC + aEfectivoC + totalEntradas - totalSalidas);
+  const movimientoNetoDolares = (vEfectivoD + aEfectivoD);
+
+  // Efectivo Esperado en Caja (C$ y USD)
+  const efectivoEsperadoCordobas = safe(cajaInicial + movimientoNetoEfectivoC);
+  const efectivoEsperadoDolares = safe(movimientoNetoDolares);
+  const efectivoEsperadoTotal = safe(efectivoEsperadoCordobas + (efectivoEsperadoDolares * tasaDefault));
 
   return {
     cajaInicial,
-    netCordobas: safe(movimientoNetoEfectivo),
-    netDolares: safe(totalDolares),
-    efectivoEsperado: safe(efectivoEsperado),
+    totalVentasDia: safe(totalVentasDia),
+    totalVentasContado: safe(totalVentasContado),
+    totalVentasCredito: safe(totalVentasCredito),
+    totalAbonosDia: safe(totalAbonosDia),
+    totalDevoluciones: safe(totalDevoluciones),
+
+    // Efectivo en mano
+    netCordobas: safe(movimientoNetoEfectivoC),
+    netDolares: safe(movimientoNetoDolares),
+    efectivoEsperado: safe(efectivoEsperadoTotal),
     efectivoEsperadoCordobas: safe(efectivoEsperadoCordobas),
-    efectivoEsperadoDolares: safe(totalDolares),
-    totalVentasDia: safe(totalEfectivo + totalTarjeta + totalTransferencia + totalCredito + (totalDolares * tasaDefault) + ventasAjuste), // Incluye ajuste God Mode
-    totalTarjeta: safe(totalTarjeta),
-    totalTransferencia: safe(totalTransferencia),
-    totalCredito: safe(totalCredito),
-    totalNoEfectivo: safe(totalTarjeta + totalTransferencia + totalCredito),
-    sumDevolucionesCancelaciones: 0,
-    totalHidden: 0,
+    efectivoEsperadoDolares: safe(efectivoEsperadoDolares),
+
+    // Desglose por método de pago de Ventas
+    vEfectivoC: safe(vEfectivoC),
+    vEfectivoD: safe(vEfectivoD),
+    vTarjeta: safe(vTarjeta),
+    vTransf: safe(vTransf),
+    vCredito: safe(vCredito),
+
+    // Desglose por método de pago de Abonos
+    aEfectivoC: safe(aEfectivoC),
+    aEfectivoD: safe(aEfectivoD),
+    aTarjeta: safe(aTarjeta),
+    aTransf: safe(aTransf),
+
+    // Totales agregados por método
+    totalEfectivo: safe(vEfectivoC + aEfectivoC),
+    totalTarjeta: safe(vTarjeta + aTarjeta),
+    totalTransferencia: safe(vTransf + aTransf),
+    totalCredito: safe(vCredito),
+    totalDolares: safe(vEfectivoD + aEfectivoD),
+    totalNoEfectivo: safe(vTarjeta + aTarjeta + vTransf + aTransf + vCredito),
+
+    totalEntradas: safe(totalEntradas),
+    totalSalidas: safe(totalSalidas),
+    totalGastos: safe(totalSalidas),
+    totalIngresos: safe(totalEntradas),
+    movimientoNetoEfectivo: safe(movimientoNetoEfectivoC + (movimientoNetoDolares * tasaDefault)),
     tasaRef: tasaDefault,
-    vEfectivoC: safe(totalEfectivo),
-    vEfectivoD: safe(totalDolares),
-    vTarjeta: safe(totalTarjeta),
-    vTransf: safe(totalTransferencia),
-    vCredito: safe(totalCredito),
-    // Métricas originales del servidor para debug
-    totalEfectivo: safe(totalEfectivo),
-    totalIngresos: safe(totalIngresos),
-    totalGastos: safe(totalGastos),
-    movimientoNetoEfectivo: safe(movimientoNetoEfectivo)
+    totalHidden: safe(totalAjustesEfectivo)
   };
 }
 
@@ -379,7 +399,23 @@ router.get('/session', async (req, res) => {
     `, [userId]);
 
     if (openRows.length > 0) {
-      return res.json(mapRowToSession(openRows[0]));
+      const openSession = openRows[0];
+      const aperturaDate = new Date(openSession.fecha_apertura);
+      const isPastSession = (Date.now() - aperturaDate.getTime()) > (24 * 60 * 60 * 1000);
+
+      // Si la sesión abierta es de un día anterior (> 24h), cerrarla automáticamente
+      if (isPastSession) {
+        await pool.query(`
+          UPDATE cierres_caja 
+          SET fecha_cierre = DATE_ADD(fecha_apertura, INTERVAL 8 HOUR),
+              final_real = final_esperado,
+              diferencia = 0,
+              observaciones = 'Cierre automático de sesión previa sin cerrar'
+          WHERE id = ?
+        `, [openSession.id]);
+      } else {
+        return res.json(mapRowToSession(openSession));
+      }
     }
 
     // 2. Si no hay abierta, buscar la última CERRADA (para UI de "abrir caja")
@@ -739,63 +775,81 @@ router.post('/session/close', async (req, res) => {
 });
 
 
-// ───────── Reporte (MIGRADO A SQL) ─────────
+// ───────── Reporte (MIGRADO A SQL CON AUDITORÍA EXACTA) ─────────
 // GET /api/caja/reporte?date=YYYY-MM-DD
 router.get('/reporte', async (req, res) => {
-  const dateStr = (req.query.date || localDayKey(new Date())).trim(); // YYYY-MM-DD
+  const todayStr = localDayKey(new Date());
+  const dateStr = (req.query.date || todayStr).trim(); // YYYY-MM-DD
+  const isToday = dateStr === todayStr;
 
   try {
-    // 1. Obtener Cierres Completados desde SQL
-    const [rows] = await pool.query(`
+    // 1. Obtener Cierres Completados desde SQL (SOLO sesiones con fecha_cierre válida)
+    const [closedRows] = await pool.query(`
       SELECT * FROM cierres_caja 
       WHERE DATE(DATE_SUB(fecha_apertura, INTERVAL 6 HOUR)) = ?
+        AND fecha_cierre IS NOT NULL
+        AND fecha_cierre >= '2000-01-01'
       ORDER BY fecha_cierre DESC
     `, [dateStr]);
 
-    const cerradas = rows.map(r => {
+    const cerradas = closedRows.map(r => {
       const session = mapRowToSession(r);
       return {
         ...session,
-        // Mantener compatibilidad con campos esperados por el frontend legacy
         id: r.id,
         sql: true,
         abierta_por: r.usuario_nombre,
         cerrada_por: r.cerrado_por_nombre || r.usuario_nombre,
         hora_apertura: r.fecha_apertura,
         hora_cierre: r.fecha_cierre,
-        monto_inicial: Number(r.monto_inicial),
-        esperado: Number(r.final_esperado),
-        contado: Number(r.final_real),
-        diferencia: Number(r.diferencia),
-        total_efectivo: Number(r.total_ventas_efectivo),
-        total_tarjeta: Number(r.total_ventas_tarjeta),
-        total_transferencia: Number(r.total_ventas_transferencia),
-        total_credito: Number(r.total_ventas_credito),
-        total_dolares: Number(r.total_dolares || 0),
-        total_gastos: Number(r.total_salidas),
-        total_ingresos: Number(r.total_entradas),
+        monto_inicial: Number(r.monto_inicial || 0),
+        esperado: Number(r.final_esperado || session.stats?.efectivoEsperado || 0),
+        contado: r.final_real !== null ? Number(r.final_real) : null,
+        diferencia: r.diferencia !== null ? Number(r.diferencia) : null,
+        total_efectivo: Number(session.stats?.totalEfectivo || r.total_ventas_efectivo || 0),
+        total_tarjeta: Number(session.stats?.totalTarjeta || r.total_ventas_tarjeta || 0),
+        total_transferencia: Number(session.stats?.totalTransferencia || r.total_ventas_transferencia || 0),
+        total_credito: Number(session.stats?.totalCredito || r.total_ventas_credito || 0),
+        total_dolares: Number(session.stats?.totalDolares || r.total_dolares || 0),
+        total_gastos: Number(session.stats?.totalGastos || r.total_salidas || 0),
+        total_ingresos: Number(session.stats?.totalIngresos || r.total_entradas || 0),
         detalles_json: r.detalles_json
       };
     });
 
     // 2. Obtener Sesiones ABIERTAS desde SQL
-    const [activeRows] = await pool.query(`
+    let activeQuery = `
       SELECT * FROM cierres_caja 
-      WHERE fecha_cierre IS NULL
-      AND DATE(DATE_SUB(fecha_apertura, INTERVAL 6 HOUR)) = ?
-    `, [dateStr]);
+      WHERE (fecha_cierre IS NULL OR fecha_cierre < '2000-01-01')
+        AND DATE(DATE_SUB(fecha_apertura, INTERVAL 6 HOUR)) = ?
+      ORDER BY fecha_apertura DESC
+    `;
+    let activeParams = [dateStr];
+
+    if (isToday) {
+      activeQuery = `
+        SELECT * FROM cierres_caja 
+        WHERE (fecha_cierre IS NULL OR fecha_cierre < '2000-01-01')
+          AND (DATE(DATE_SUB(fecha_apertura, INTERVAL 6 HOUR)) = ? OR fecha_apertura >= NOW() - INTERVAL 24 HOUR)
+        ORDER BY fecha_apertura DESC
+      `;
+      activeParams = [dateStr];
+    }
+
+    const [activeRows] = await pool.query(activeQuery, activeParams);
 
     const abiertas = activeRows.map(r => {
       const session = mapRowToSession(r);
       return {
         ...session,
+        id: r.id,
         abierta_por: r.usuario_nombre,
         hora_apertura: r.fecha_apertura,
-        monto_inicial: Number(r.monto_inicial || 0)
+        monto_inicial: Number(r.monto_inicial || 0),
+        esperado: Number(session.stats?.efectivoEsperado || r.final_esperado || 0)
       };
     });
 
-    // Retorno limpio, SIN legacy JSON merging.
     res.json({ abiertas, cerradas });
 
   } catch (error) {
@@ -804,69 +858,32 @@ router.get('/reporte', async (req, res) => {
   }
 });
 
-// GET /api/caja/abiertas/activas (Para CashReport: mostrar quién está trabajando)
+// GET /api/caja/abiertas/activas (Para CashReport: mostrar quién está trabajando con estadísticas completas)
 router.get('/abiertas/activas', async (req, res) => {
   try {
-    // Consulta SQL: sessiones sin cerrar.
-    // Usamos columnas explícitas para evitar errores con columnas no usadas o corruptas
-    const cols = [
-      'id', 'usuario_id', 'usuario_nombre', 'monto_inicial', 
-      'CAST(fecha_apertura AS CHAR) as fa_char', 
-      'CAST(fecha_cierre AS CHAR) as fc_char',
-      'fecha_apertura', 'fecha_cierre', 'detalles_json'
-    ].join(', ');
-
     const [rows] = await pool.query(`
-      SELECT ${cols} FROM cierres_caja 
-      WHERE (fecha_cierre IS NULL OR fecha_cierre < '1970-01-01')
+      SELECT * FROM cierres_caja 
+      WHERE (fecha_cierre IS NULL OR fecha_cierre < '2000-01-01')
+        AND fecha_apertura >= NOW() - INTERVAL 24 HOUR
       ORDER BY fecha_apertura DESC
     `);
 
-    console.log(`[DEBUG] /abiertas/activas found ${rows.length} sessions.`);
-
-    let finalRows = rows;
-    if (rows.length === 0) {
-      const [recentRows] = await pool.query(`
-        SELECT ${cols} FROM cierres_caja 
-        WHERE fecha_apertura > NOW() - INTERVAL 48 HOUR
-          AND (fecha_cierre IS NULL OR fecha_cierre < '1900-01-01' OR CAST(fecha_cierre AS CHAR) = '0000-00-00 00:00:00')
-        ORDER BY fecha_apertura DESC
-      `);
-      finalRows = recentRows;
-      if (recentRows.length > 0) {
-        console.log(`[DEBUG] /abiertas/activas fallback found ${recentRows.length} sessions.`);
-      }
-    }
-
-    const abiertas = finalRows.map(row => {
-      let details = {};
-      try {
-        details = (typeof row.detalles_json === 'string')
-          ? JSON.parse(row.detalles_json)
-          : (row.detalles_json || {});
-      } catch { details = {}; }
-
+    const abiertas = rows.map(row => {
+      const session = mapRowToSession(row);
       return {
-        id: row.id,
-        // Usar fa_char si fecha_apertura falla, pero mysql2 suele parsear bien si no es 0000
-        openedAt: row.fecha_apertura || row.fa_char, 
-        openedBy: { id: row.usuario_id, name: row.usuario_nombre },
-        monto_inicial: Number(row.monto_inicial || 0),
-        tasaDolar: Number(details.tasaDolar || 0),
+        ...session,
         abierta_por: row.usuario_nombre,
+        hora_apertura: row.fecha_apertura
       };
     });
 
-    abiertas.sort((a, b) => new Date(b.openedAt) - new Date(a.openedAt));
     res.json({ abiertas });
 
   } catch (error) {
     console.error('CRITICAL ERROR /abiertas/activas:', error);
-    // Devolvemos el error detallado para debug en producción
     res.status(500).json({ 
       message: 'Error obteniendo sesiones activas', 
       error: error.message,
-      stack: error.stack,
       abiertas: [] 
     });
   }

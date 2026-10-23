@@ -15,7 +15,7 @@ import {
 } from 'chart.js';
 import {
   FaCalendarAlt, FaChartBar, FaStar, FaUserFriends,
-  FaWarehouse, FaMoneyBillWave, FaArrowUp, FaFilter, FaSync, FaArrowLeft, FaPrint
+  FaWarehouse, FaMoneyBillWave, FaArrowUp, FaFilter, FaSync, FaArrowLeft, FaPrint, FaLockOpen
 } from 'react-icons/fa';
 import { createGlobalStyle } from 'styled-components';
 import { useNavigate } from 'react-router-dom';
@@ -251,6 +251,56 @@ const KPIValue = styled.div`
 
 const KPISub = styled.div`
     font-size: 0.85rem; color: #94a3b8; font-weight: 500;
+`;
+
+const LiveCajaBanner = styled.div`
+  background: white;
+  border-radius: 20px;
+  border: 1px solid #bbf7d0;
+  box-shadow: 0 4px 15px -3px rgba(22, 163, 74, 0.08);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  animation: ${fadeIn} 0.5s ease-out;
+
+  @media (min-width: 1024px) {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+`;
+
+const LiveCajaMetrics = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 1rem;
+  width: 100%;
+
+  .metric-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+
+    .label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .val {
+      font-size: 1.15rem;
+      font-weight: 800;
+      font-family: 'Roboto Mono', monospace;
+      color: #0f172a;
+    }
+    .sub {
+      font-size: 0.7rem;
+      color: #94a3b8;
+    }
+  }
 `;
 
 // --- SECCIÓN DE CONTENIDO (GRÁFICA Y LISTAS) ---
@@ -664,6 +714,85 @@ const Finances = () => {
         </ControlsContainer>
       </Header>
 
+      {/* BANNER EN VIVO DE CAJA SI ES HOY O CAJA TRUTH */}
+      {(activeFilter === 'today' || salesSummary?.caja_truth) && (
+        <LiveCajaBanner>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: '220px' }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12, background: '#dcfce7',
+              display: 'grid', placeItems: 'center', color: '#16a34a', fontSize: '1.2rem'
+            }}>
+              <FaLockOpen />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#166534' }}>Cajas de Hoy</span>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#16a34a', color: 'white', padding: '1px 6px', borderRadius: 9999 }}>EN VIVO</span>
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                {salesSummary.sesiones_abiertas || 0} abierta(s) · {salesSummary.sesiones_cerradas || 0} cerrada(s)
+              </div>
+            </div>
+          </div>
+
+          <LiveCajaMetrics>
+            <div className="metric-item">
+              <span className="label">Efectivo en Cajón</span>
+              <span className="val" style={{ color: '#15803d' }}>
+                {formatCurrency(salesSummary.efectivo_esperado || 0)}
+              </span>
+              <span className="sub">
+                C$ {(salesSummary.efectivo_cordobas || 0).toFixed(2)} + ${(salesSummary.efectivo_dolares || 0).toFixed(2)} USD
+              </span>
+            </div>
+
+            <div className="metric-item">
+              <span className="label">Cobros Digitales</span>
+              <span className="val" style={{ color: '#2563eb' }}>
+                {formatCurrency((salesSummary.total_tarjeta || 0) + (salesSummary.total_transferencia || 0))}
+              </span>
+              <span className="sub">Tarjeta + Transferencia</span>
+            </div>
+
+            <div className="metric-item">
+              <span className="label">Ventas al Crédito</span>
+              <span className="val" style={{ color: '#b45309' }}>
+                {formatCurrency(salesSummary.total_credito || 0)}
+              </span>
+              <span className="sub">Por cobrar</span>
+            </div>
+
+            <div className="metric-item">
+              <span className="label">Abonos Recibidos</span>
+              <span className="val" style={{ color: '#0891b2' }}>
+                {formatCurrency(salesSummary.total_abonos || 0)}
+              </span>
+              <span className="sub">Recuperación de cartera</span>
+            </div>
+
+            <div className="metric-item">
+              <span className="label">Salidas / Gastos</span>
+              <span className="val" style={{ color: '#dc2626' }}>
+                -{formatCurrency(salesSummary.total_gastos || 0)}
+              </span>
+              <span className="sub">Egresos de caja</span>
+            </div>
+          </LiveCajaMetrics>
+
+          <button
+            onClick={() => navigate('/cash-report')}
+            style={{
+              background: '#0f172a', color: 'white', border: 'none', padding: '0.65rem 1.1rem',
+              borderRadius: 12, fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
+              boxShadow: '0 2px 6px rgba(15, 23, 42, 0.15)'
+            }}
+          >
+            Auditar Cajas ➜
+          </button>
+        </LiveCajaBanner>
+      )}
+
       {/* 4 GRANDES KPIs */}
       <DashboardGrid>
         <KPICard
@@ -675,13 +804,13 @@ const Finances = () => {
         >
           <KPIHeader><FaChartBar /> Ventas Totales</KPIHeader>
           <KPIValue>{formatCurrency(displayedSummary.ventas_brutas)}</KPIValue>
-          <KPISub>En el periodo seleccionado</KPISub>
+          <KPISub>{(activeFilter === 'today' || salesSummary?.caja_truth) ? '🟢 En vivo desde Cajas Abiertas de Hoy' : 'En el periodo seleccionado'}</KPISub>
         </KPICard>
 
         <KPICard>
           <KPIHeader style={{ color: '#16a34a' }}><FaMoneyBillWave /> Ganancia Estimada</KPIHeader>
           <KPIValue style={{ color: '#16a34a' }}>{formatCurrency(displayedSummary.ganancia_total)}</KPIValue>
-          <KPISub>Margen bruto calculado</KPISub>
+          <KPISub>{(activeFilter === 'today' || salesSummary?.caja_truth) ? 'Margen neto productos de hoy' : 'Margen bruto calculado'}</KPISub>
         </KPICard>
 
         <KPICard>

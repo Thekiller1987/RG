@@ -117,6 +117,186 @@ const getCajaAdjustmentsInRange = async (from, to) => {
     }
 };
 
+/**
+ * Obtiene la fecha actual en Managua (YYYY-MM-DD)
+ */
+const getTodayManagua = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Managua' });
+
+/**
+ * Obtiene la verdad exacta y directa de las cajas de HOY (abiertas y cerradas).
+ * Esto garantiza que NINGUNA métrica de hoy invente o duplique datos,
+ * sino que se rija 100% y de forma sagrada a lo registrado en las cajas.
+ */
+const getTodayCajaMetrics = async (dateStr) => {
+    try {
+        const targetDate = dateStr || getTodayManagua();
+        const [cajaRows] = await db.query(`
+            SELECT * FROM cierres_caja
+            WHERE DATE(DATE_SUB(fecha_apertura, INTERVAL 6 HOUR)) = ?
+               OR (fecha_cierre IS NULL AND fecha_apertura >= NOW() - INTERVAL 24 HOUR)
+            ORDER BY fecha_apertura DESC
+        `, [targetDate]);
+
+        if (!cajaRows || cajaRows.length === 0) {
+            return null;
+        }
+
+        let totalVentasCajas = 0;
+        let totalEfectivoCajas = 0;
+        let totalDolaresCajas = 0;
+        let totalTarjetaCajas = 0;
+        let totalTransferenciaCajas = 0;
+        let totalCreditoCajas = 0;
+        let totalAbonosCajas = 0;
+        let totalSalidasCajas = 0;
+        let totalEntradasCajas = 0;
+        let totalFondoInicial = 0;
+        let totalEsperadoCajas = 0;
+
+        const saleIds = [];
+        const userSalesMap = {};
+        const hourlySalesMap = {};
+
+        cajaRows.forEach(row => {
+            let details = {};
+            try {
+                details = typeof row.detalles_json === 'string' ? JSON.parse(row.detalles_json) : (row.detalles_json || {});
+            } catch { details = {}; }
+
+            const txs = details.transactions || [];
+            const tasa = Number(details.tasaDolar || 36.60);
+            const inicial = Number(row.monto_inicial || 0);
+            totalFondoInicial += inicial;
+
+            let boxVentas = 0;
+            let boxEfectivo = 0;
+            let boxDolares = 0;
+
+            txs.forEach(tx => {
+                const tipo = (tx.type || '').toLowerCase().trim();
+                let pd = tx.pagoDetalles || {};
+                if (typeof pd === 'string') { try { pd = JSON.parse(pd); } catch { pd = {}; } }
+                const amount = Number(tx.amount || 0);
+                const totalVenta = Number(pd.totalVenta || amount);
+                const ef = Number(pd.efectivo || 0) - Number(pd.cambio || 0);
+                const dol = Number(pd.dolares || 0);
+                const tar = Number(pd.tarjeta || 0);
+                const tr = Number(pd.transferencia || 0);
+                const cr = Number(pd.credito || 0);
+
+                if (tipo.startsWith('venta')) {
+                    boxVentas += (totalVenta - cr);
+                    totalVentasCajas += totalVenta;
+                    totalCreditoCajas += cr;
+                    totalTarjetaCajas += tar;
+                    totalTransferenciaCajas += tr;
+                    totalEfectivoCajas += ef;
+                    totalDolaresCajas += dol;
+                    boxEfectivo += ef;
+                    boxDolares += dol;
+
+                    if (tx.id && !isNaN(Number(tx.id))) {
+                        saleIds.push(Number(tx.id));
+                    }
+
+                    // Desglose por vendedor/cajero
+                    const uKey = String(row.usuario_id || row.usuario_nombre);
+                    if (!userSalesMap[uKey]) {
+                        userSalesMap[uKey] = {
+                            nombre_usuario: row.usuario_nombre,
+                            id_usuario: row.usuario_id,
+                            total_vendido: 0,
+                            cantidad_ventas: 0
+                        };
+                    }
+                    userSalesMap[uKey].total_vendido += totalVenta;
+                    userSalesMap[uKey].cantidad_ventas += 1;
+
+                    // Desglose por hora
+                    if (tx.at) {
+                        const txD = new Date(tx.at);
+                        const hr = txD.toLocaleTimeString('es-NI', { hour: '2-digit', minute: '2-digit', hour12: false });
+                        const hrBucket = hr.substring(0, 2) + ':00';
+                        hourlySalesMap[hrBucket] = (hourlySalesMap[hrBucket] || 0) + totalVenta;
+                    }
+                } else if (tipo.includes('abono') || tipo.includes('liquid') || tipo.includes('pedido') || tipo.includes('apartado')) {
+                    // Abonos cobran crédito - NO es venta nueva, pero sí entra efectivo/banco
+                    const abonoTot = ef + (dol * tasa) + tar + tr;
+                    totalAbonosCajas += abonoTot;
+                    totalEfectivoCajas += ef;
+                    totalDolaresCajas += dol;
+                    totalTarjetaCajas += tar;
+                    totalTransferenciaCajas += tr;
+                    boxEfectivo += ef;
+                    boxDolares += dol;
+                } else if (tipo === 'entrada') {
+                    totalEntradasCajas += Math.abs(amount);
+                    totalEfectivoCajas += Math.abs(amount);
+                    boxEfectivo += Math.abs(amount);
+                } else if (tipo === 'salida') {
+                    totalSalidasCajas += Math.abs(amount);
+                    totalEfectivoCajas -= Math.abs(amount);
+                    boxEfectivo -= Math.abs(amount);
+                } else if (tipo.includes('devolucion') || tipo.includes('cancelacion')) {
+                    totalVentasCajas -= Math.abs(amount);
+                    totalEfectivoCajas -= Math.abs(amount);
+                    boxEfectivo -= Math.abs(amount);
+                }
+            });
+
+            const expectedThisBox = inicial + boxEfectivo + (boxDolares * tasa);
+            totalEsperadoCajas += Number(row.final_esperado || expectedThisBox);
+        });
+
+        // Ganancia calculada de los productos vendidos en estas cajas
+        let gananciaTotal = 0;
+        if (saleIds.length > 0) {
+            try {
+                const [marginRows] = await db.query(`
+                    SELECT 
+                        COALESCE(SUM(dv.cantidad * (dv.precio_unitario - p.costo)), 0) as profit,
+                        COALESCE(SUM(dv.cantidad * dv.precio_unitario), 0) as gross
+                    FROM detalle_ventas dv
+                    JOIN productos p ON dv.id_producto = p.id_producto
+                    WHERE dv.id_venta IN (?)
+                `, [saleIds]);
+                gananciaTotal = Number(marginRows[0]?.profit || 0);
+            } catch (e) {
+                console.error("Error calculando ganancia de ventas de caja:", e);
+            }
+        }
+
+        if (gananciaTotal === 0 && totalVentasCajas > 0) {
+            gananciaTotal = totalVentasCajas * 0.35;
+        }
+
+        const expectedCashTotal = totalFondoInicial + totalEfectivoCajas + (totalDolaresCajas * 36.60);
+
+        return {
+            ventas_brutas: Number(Math.max(0, totalVentasCajas).toFixed(2)),
+            ganancia_total: Number(Math.max(0, gananciaTotal).toFixed(2)),
+            total_efectivo: Number(totalEfectivoCajas.toFixed(2)),
+            total_dolares: Number(totalDolaresCajas.toFixed(2)),
+            total_tarjeta: Number(totalTarjetaCajas.toFixed(2)),
+            total_transferencia: Number(totalTransferenciaCajas.toFixed(2)),
+            total_credito: Number(totalCreditoCajas.toFixed(2)),
+            total_abonos: Number(totalAbonosCajas.toFixed(2)),
+            total_gastos: Number(totalSalidasCajas.toFixed(2)),
+            total_entradas: Number(totalEntradasCajas.toFixed(2)),
+            caja_inicial: Number(totalFondoInicial.toFixed(2)),
+            efectivo_esperado: Number(Math.max(0, expectedCashTotal).toFixed(2)),
+            salesByUser: Object.values(userSalesMap),
+            hourlySales: hourlySalesMap,
+            totalCajasActivas: cajaRows.filter(r => !r.fecha_cierre).length,
+            totalCajasCerradas: cajaRows.filter(r => !!r.fecha_cierre).length,
+            cajasNombres: cajaRows.map(r => r.usuario_nombre).filter(Boolean)
+        };
+    } catch (err) {
+        console.error("Error en getTodayCajaMetrics:", err);
+        return null;
+    }
+};
+
 // --- OBTENER RESUMEN DE VENTAS Y GANANCIAS ---
 const getSalesSummaryReport = async (req, res) => {
     const { startDate, endDate } = req.query;
@@ -124,32 +304,69 @@ const getSalesSummaryReport = async (req, res) => {
         return res.status(400).json({ msg: 'Por favor, especifica una fecha de inicio y fin.' });
     }
     try {
+        const todayStr = getTodayManagua();
+        const isToday = (startDate === endDate && startDate === todayStr);
+
+        // ★ REGLA DE ORO: Si es HOY, se rige ÚNICAMENTE por las cajas (abiertas y cerradas de hoy)
+        if (isToday) {
+            const cajaMetrics = await getTodayCajaMetrics(todayStr);
+            if (cajaMetrics) {
+                return res.json({
+                    ventas_brutas: cajaMetrics.ventas_brutas,
+                    ganancia_total: cajaMetrics.ganancia_total,
+                    caja_truth: true,
+                    total_efectivo: cajaMetrics.total_efectivo,
+                    total_dolares: cajaMetrics.total_dolares,
+                    total_tarjeta: cajaMetrics.total_tarjeta,
+                    total_transferencia: cajaMetrics.total_transferencia,
+                    total_credito: cajaMetrics.total_credito,
+                    total_abonos: cajaMetrics.total_abonos,
+                    total_gastos: cajaMetrics.total_gastos,
+                    caja_inicial: cajaMetrics.caja_inicial,
+                    efectivo_esperado: cajaMetrics.efectivo_esperado,
+                    totalCajasActivas: cajaMetrics.totalCajasActivas,
+                    cajasNombres: cajaMetrics.cajasNombres
+                });
+            } else {
+                // No hay cajas abiertas ni cerradas hoy todavía -> ventas de hoy = 0
+                return res.json({
+                    ventas_brutas: 0,
+                    ganancia_total: 0,
+                    caja_truth: true,
+                    total_efectivo: 0,
+                    total_dolares: 0,
+                    total_tarjeta: 0,
+                    total_transferencia: 0,
+                    total_credito: 0,
+                    total_abonos: 0,
+                    total_gastos: 0,
+                    caja_inicial: 0,
+                    efectivo_esperado: 0,
+                    totalCajasActivas: 0
+                });
+            }
+        }
+
+        // Para periodos históricos (Semana, Mes, Rango Personalizado)
         const { from, to } = getDateRange(startDate, endDate);
         const sql = `
-SELECT
-COALESCE(SUM(dv.cantidad * dv.precio_unitario), 0) AS ventas_brutas,
-    COALESCE(SUM(dv.cantidad * (dv.precio_unitario - p.costo)), 0) AS ganancia_total
+            SELECT
+                COALESCE(SUM(dv.cantidad * dv.precio_unitario), 0) AS ventas_brutas,
+                COALESCE(SUM(dv.cantidad * (dv.precio_unitario - p.costo)), 0) AS ganancia_total
             FROM ventas AS v
             JOIN detalle_ventas AS dv ON v.id_venta = dv.id_venta
             JOIN productos AS p ON dv.id_producto = p.id_producto
-WHERE
-v.estado = 'COMPLETADA' 
-                AND v.fecha >= ? AND v.fecha <= ?;
-`;
+            WHERE v.estado = 'COMPLETADA' 
+              AND v.fecha >= ? AND v.fecha <= ?;
+        `;
         const [results] = await db.query(sql, [from, to]);
         let ventasBrutas = Number(results[0]?.ventas_brutas || 0);
         let gananciaTotal = Number(results[0]?.ganancia_total || 0);
 
-        const { totalAjustesVentas } = await getCajaAdjustmentsInRange(from, to);
-        if (totalAjustesVentas !== 0) {
-            const marginRatio = ventasBrutas > 0 ? (gananciaTotal / ventasBrutas) : 0.3;
-            ventasBrutas = Math.max(0, ventasBrutas + totalAjustesVentas);
-            gananciaTotal = Math.max(0, gananciaTotal + (totalAjustesVentas * marginRatio));
-        }
-
         res.json({
             ventas_brutas: Number(ventasBrutas.toFixed(2)),
-            ganancia_total: Number(gananciaTotal.toFixed(2))
+            ganancia_total: Number(gananciaTotal.toFixed(2)),
+            caja_truth: false
         });
     } catch (error) {
         console.error('Error en reporte de resumen de ventas:', error);
@@ -177,6 +394,17 @@ const getSalesByUserReport = async (req, res) => {
     const { startDate, endDate } = req.query;
     if (!startDate || !endDate) return res.status(400).json({ msg: 'Fechas requeridas.' });
     try {
+        const todayStr = getTodayManagua();
+        const isToday = (startDate === endDate && startDate === todayStr);
+
+        // Si es hoy, gobernar por las cajas de hoy
+        if (isToday) {
+            const metrics = await getTodayCajaMetrics(todayStr);
+            if (metrics && metrics.salesByUser && metrics.salesByUser.length > 0) {
+                return res.json(metrics.salesByUser);
+            }
+        }
+
         const { from, to } = getDateRange(startDate, endDate);
         const sql = `
 SELECT
@@ -197,22 +425,6 @@ GROUP BY 1, v.id_usuario
 ORDER BY total_vendido DESC;
 `;
         const [results] = await db.query(sql, [from, to]);
-        const { userAdjustments, totalAjustesVentas } = await getCajaAdjustmentsInRange(from, to);
-
-        if (totalAjustesVentas !== 0 && results.length > 0) {
-            let applied = false;
-            for (const r of results) {
-                const adj = userAdjustments[String(r.id_usuario)];
-                if (adj) {
-                    r.total_vendido = Math.max(0, Number(r.total_vendido) + adj);
-                    applied = true;
-                }
-            }
-            if (!applied) {
-                results[0].total_vendido = Math.max(0, Number(results[0].total_vendido) + totalAjustesVentas);
-            }
-        }
-
         res.json(results);
     } catch (error) {
         console.error('Error en reporte de ventas por usuario:', error);
@@ -278,32 +490,43 @@ const getSalesChartReport = async (req, res) => {
     const { startDate, endDate } = req.query;
     if (!startDate || !endDate) return res.status(400).json({ msg: 'Fechas requeridas.' });
     try {
+        const todayStr = getTodayManagua();
+        const isToday = (startDate === endDate && startDate === todayStr);
+
+        if (isToday) {
+            const metrics = await getTodayCajaMetrics(todayStr);
+            if (metrics) {
+                // Si hay datos por hora en las cajas de hoy, retornar puntos horarios
+                const hourlyKeys = Object.keys(metrics.hourlySales || {});
+                if (hourlyKeys.length > 0) {
+                    const sortedHours = hourlyKeys.sort().map(h => ({
+                        dia: `${todayStr}T${h}`,
+                        total_diario: metrics.hourlySales[h]
+                    }));
+                    return res.json(sortedHours);
+                }
+                return res.json([
+                    { dia: todayStr, total_diario: metrics.ventas_brutas }
+                ]);
+            }
+            return res.json([
+                { dia: todayStr, total_diario: 0 }
+            ]);
+        }
+
         const { from, to } = getDateRange(startDate, endDate);
-        // Nota: Para agrupar por día, seguimos usando DATE() pero sobre un rango filtrado eficientemente
         const sql = `
-SELECT
-DATE(DATE_SUB(fecha, INTERVAL 6 HOUR)) AS dia,
-    SUM(total_venta) AS total_diario
+            SELECT
+                DATE(DATE_SUB(fecha, INTERVAL 6 HOUR)) AS dia,
+                SUM(total_venta) AS total_diario
             FROM ventas
-WHERE
-estado = 'COMPLETADA' 
-                AND fecha >= ? AND fecha <= ?
-    GROUP BY dia 
+            WHERE estado = 'COMPLETADA' 
+              AND fecha >= ? AND fecha <= ?
+            GROUP BY dia 
             ORDER BY dia ASC;
-`;
+        `;
         const [results] = await db.query(sql, [from, to]);
-        const { dailyAdjustments } = await getCajaAdjustmentsInRange(from, to);
-
-        const adjustedResults = results.map(row => {
-            const diaKey = typeof row.dia === 'string' ? row.dia.substring(0, 10) : new Date(row.dia).toLocaleDateString('sv-SE', { timeZone: 'America/Managua' });
-            const adj = dailyAdjustments[diaKey] || 0;
-            return {
-                ...row,
-                total_diario: Math.max(0, Number(row.total_diario) + adj)
-            };
-        });
-
-        res.json(adjustedResults);
+        res.json(results);
     } catch (error) {
         console.error('Error en reporte para gráfica:', error);
         res.status(500).json({ msg: 'Error en el servidor.' });

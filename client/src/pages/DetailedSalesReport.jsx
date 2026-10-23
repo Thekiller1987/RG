@@ -12,8 +12,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { rankItems } from '../utils/searchEngine';
 import { Chart } from 'chart.js/auto';
 
-/* ================== CONFIG ================== */
-const API_URL = 'https://sistema.multirepuestosrg.com/api';
+import { API_URL } from '../service/api';
 
 /* ================== HELPERS ================== */
 function todayManagua() {
@@ -791,10 +790,28 @@ function KddDashboardView({ sales }) {
         return count > 0 ? count : 42;
     }, [allProducts]);
 
-    // Arqueo Seguro
+    // Arqueo Seguro vinculado al efectivo real
+    const salesCashTotal = useMemo(() => {
+        if (!Array.isArray(sales)) return 0;
+        return sales.reduce((acc, s) => {
+            const m = String(s.metodo_pago || '').toLowerCase();
+            if (m.includes('efectivo') || !m) {
+                return acc + Number(s.total || s.total_neto || 0);
+            }
+            return acc;
+        }, 0);
+    }, [sales]);
+
     const [montoInicial, setMontoInicial] = useState(100);
-    const [ventasEfectivo, setVentasEfectivo] = useState(1250);
-    const [cajaReal, setCajaReal] = useState(1350);
+    const [ventasEfectivo, setVentasEfectivo] = useState(() => salesCashTotal || 0);
+    const [cajaReal, setCajaReal] = useState(() => 100 + (salesCashTotal || 0));
+
+    useEffect(() => {
+        if (salesCashTotal > 0) {
+            setVentasEfectivo(salesCashTotal);
+            setCajaReal(Number(montoInicial) + salesCashTotal);
+        }
+    }, [salesCashTotal, montoInicial]);
 
     const esperadoCaja = Number(montoInicial) + Number(ventasEfectivo);
     const arqueoDiferencia = Number(cajaReal) - esperadoCaja;
