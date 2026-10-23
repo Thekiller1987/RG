@@ -1004,6 +1004,7 @@ const POS = () => {
             showAlert={showAlert}
             showConfirmation={showConfirmation}
             initialTasaDolar={tasaDolar}
+            onOpenSecretModal={() => { closeModal(); setSecretModalOpen(true); }}
             onOpenCaja={async (montoInicial, tasa) => {
               try {
                 const newSession = await api.openCajaSession({

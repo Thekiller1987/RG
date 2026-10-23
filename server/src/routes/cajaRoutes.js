@@ -237,36 +237,42 @@ function calcularTotalesSesion(transactions, details) {
     }
     // 6. AJUSTES INTERNOS (God Mode)
     else if (tipo === 'ajuste') {
-      const isPaired = (curTx, allTxs) => {
-        if (d.target !== 'ventas_totales') return false;
-        const txTime = new Date(curTx.at || 0).getTime();
-        return (allTxs || []).some(other => {
-          let od = other.pagoDetalles || {};
-          if (typeof od === 'string') { try { od = JSON.parse(od); } catch { od = {}; } }
-          return other !== curTx &&
-            (other.type || '').toLowerCase() === 'ajuste' &&
-            od.target === 'efectivo' &&
-            Math.abs(Number(other.amount) - Number(curTx.amount)) < 0.01 &&
-            Math.abs(new Date(other.at || 0).getTime() - txTime) < 5000;
-        });
-      };
+      const hasExplicitVentasAjuste = (transactions || []).some(otherTx => {
+        let od = otherTx.pagoDetalles || {};
+        if (typeof od === 'string') { try { od = JSON.parse(od); } catch { od = {}; } }
+        return (otherTx.type || '').toLowerCase() === 'ajuste' && 
+               (od.target === 'ventas_totales' || otherTx.target === 'ventas_totales');
+      });
 
       const monto = txAmount;
       if (d.target === 'efectivo') {
         vEfectivoC += monto;
         totalAjustesEfectivo += monto;
-      } else if (d.target === 'dolares') {
-        vEfectivoD += monto;
-      } else if (d.target === 'tarjeta') {
-        vTarjeta += monto;
-      } else if (d.target === 'transferencia') {
-        vTransf += monto;
-      } else if (d.target === 'credito') {
-        vCredito += monto;
-      } else if (d.target === 'ventas_totales') {
-        if (!isPaired(tx, transactions)) {
+        if (!hasExplicitVentasAjuste) {
           totalAjustesVentas += monto;
         }
+      } else if (d.target === 'dolares') {
+        vEfectivoD += monto;
+        if (!hasExplicitVentasAjuste) {
+          totalAjustesVentas += (monto * tasaDefault);
+        }
+      } else if (d.target === 'tarjeta') {
+        vTarjeta += monto;
+        if (!hasExplicitVentasAjuste) {
+          totalAjustesVentas += monto;
+        }
+      } else if (d.target === 'transferencia') {
+        vTransf += monto;
+        if (!hasExplicitVentasAjuste) {
+          totalAjustesVentas += monto;
+        }
+      } else if (d.target === 'credito') {
+        vCredito += monto;
+        if (!hasExplicitVentasAjuste) {
+          totalAjustesVentas += monto;
+        }
+      } else if (d.target === 'ventas_totales') {
+        totalAjustesVentas += monto;
       }
     }
   });

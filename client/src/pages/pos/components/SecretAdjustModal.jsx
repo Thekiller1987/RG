@@ -70,14 +70,13 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
             const targetVT = parseFloat(override.ventas_totales);
             const tasaRef = Number(currentStats?.tasaRef || 36.60);
 
-            let cashAdjustmentSalesImpact = 0;
-
             if (!isNaN(targetC)) {
-                const currentC = Number(currentStats?.netCordobas || 0);
+                const currentC = Number(currentStats?.efectivoEsperadoCordobas !== undefined 
+                    ? currentStats.efectivoEsperadoCordobas 
+                    : (Number(currentStats?.cajaInicial || 0) + Number(currentStats?.netCordobas || 0)));
                 const diffC = targetC - currentC;
                 if (Math.abs(diffC) > 0.01) {
                     activeAdjustments.push({ target: 'efectivo', amount: diffC });
-                    cashAdjustmentSalesImpact += diffC;
                 }
             }
 
@@ -86,16 +85,14 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
                 const diffD = targetD - currentD;
                 if (Math.abs(diffD) > 0.01) {
                     activeAdjustments.push({ target: 'dolares', amount: diffD });
-                    cashAdjustmentSalesImpact += (diffD * tasaRef);
                 }
             }
 
             if (!isNaN(targetVT)) {
                 const currentVT = Number(currentStats?.totalVentasDia || 0);
                 const diffVT = targetVT - currentVT;
-                const remainingVT = diffVT - cashAdjustmentSalesImpact;
-                if (Math.abs(remainingVT) > 0.01) {
-                    activeAdjustments.push({ target: 'ventas_totales', amount: remainingVT });
+                if (Math.abs(diffVT) > 0.01) {
+                    activeAdjustments.push({ target: 'ventas_totales', amount: diffVT });
                 }
             }
         }
@@ -162,8 +159,8 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
                         </p>
                         <div style={{ background: '#343a40', padding: 10, borderRadius: 6, marginBottom: 10 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#aaa', marginBottom: 5 }}>
-                                <span>Sistema Actual:</span>
-                                <span>C$ {Number(currentStats?.netCordobas || 0).toFixed(2)}</span>
+                                <span>Sistema Actual (Total en Cajón):</span>
+                                <span>C$ {Number(currentStats?.efectivoEsperadoCordobas !== undefined ? currentStats.efectivoEsperadoCordobas : (Number(currentStats?.cajaInicial || 0) + Number(currentStats?.netCordobas || 0))).toFixed(2)}</span>
                             </div>
                             <AdjustRow style={{ background: 'transparent', padding: 0, marginBottom: 0 }}>
                                 <label style={{ color: '#fff' }}>Real en Caja (C$)</label>

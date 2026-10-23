@@ -244,29 +244,25 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
         } else if (t.includes('devolucion') || t.includes('cancelacion') || t.includes('anulacion')) {
             tVentasDia -= Math.abs(totalRevenue);
         } else if (t === 'ajuste') {
-            const isPaired = (curTx, allTxs) => {
-                if (curTx.pagoDetalles?.target !== 'ventas_totales') return false;
-                const txTime = new Date(curTx.at || 0).getTime();
-                return (allTxs || []).some(other => 
-                    other !== curTx &&
-                    (other.type || '').toLowerCase() === 'ajuste' &&
-                    other.pagoDetalles?.target === 'efectivo' &&
-                    Math.abs(Number(other.amount) - Number(curTx.amount)) < 0.01 &&
-                    Math.abs(new Date(other.at || 0).getTime() - txTime) < 5000
-                );
-            };
+            const hasExplicitVentasAjuste = validTransactions.some(otherTx => 
+                (otherTx.type || '').toLowerCase() === 'ajuste' && 
+                (otherTx.pagoDetalles?.target === 'ventas_totales' || otherTx.target === 'ventas_totales')
+            );
 
             if (pd.target === 'efectivo') {
-                tVentasDia += txAmount;
-            } else if (pd.target === 'dolares') {
-                tVentasDia += (txAmount * tasaRef);
-            } else if (pd.target === 'tarjeta' || pd.target === 'credito' || pd.target === 'transferencia') {
-                tVentasDia += txAmount;
-            } else if (pd.target === 'ventas_totales') {
-                // Si viene de un par con efectivo, efectivo ya lo sumó a tVentasDia
-                if (!isPaired(tx, validTransactions)) {
+                if (!hasExplicitVentasAjuste) {
                     tVentasDia += txAmount;
                 }
+            } else if (pd.target === 'dolares') {
+                if (!hasExplicitVentasAjuste) {
+                    tVentasDia += (txAmount * tasaRef);
+                }
+            } else if (pd.target === 'tarjeta' || pd.target === 'credito' || pd.target === 'transferencia') {
+                if (!hasExplicitVentasAjuste) {
+                    tVentasDia += txAmount;
+                }
+            } else if (pd.target === 'ventas_totales') {
+                tVentasDia += txAmount;
             }
         }
 

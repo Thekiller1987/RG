@@ -91,7 +91,8 @@ const resolveClientName = (tx, clients) => {
 
 const CajaModal = ({
   currentUser, isCajaOpen, session, onOpenCaja, onCloseCaja,
-  onClose, isAdmin, showConfirmation, showAlert, initialTasaDolar, clients = []
+  onClose, isAdmin, showConfirmation, showAlert, initialTasaDolar, clients = [],
+  onOpenSecretModal
 }) => {
   const [montoApertura, setMontoApertura] = useState('');
   const [tasaDolar, setTasaDolar] = useState(initialTasaDolar || 36.60);
@@ -488,15 +489,40 @@ const CajaModal = ({
         ) : (
           /* --- CONFIRMAR CIERRE (Input Conteo) --- */
           <div>
-            <h3 style={{ color: '#dc3545', borderBottom: '2px solid #dc3545', paddingBottom: 10 }}>
-              Arqueo y Cierre
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #dc3545', paddingBottom: 10, marginBottom: 15 }}>
+              <h3 style={{ color: '#dc3545', margin: 0 }}>
+                Arqueo y Cierre
+              </h3>
+              {onOpenSecretModal && (
+                <button
+                  type="button"
+                  onClick={onOpenSecretModal}
+                  style={{
+                    background: '#1e293b',
+                    color: '#ffc107',
+                    border: '1px solid #ffc107',
+                    borderRadius: 6,
+                    padding: '4px 10px',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
+                  }}
+                  title="Ajustar números con GOD MODE"
+                >
+                  ⚡ GOD MODE
+                </button>
+              )}
+            </div>
+
             <div style={{ background: '#e9ecef', padding: 10, borderRadius: 6, marginBottom: 15 }}>
               <TotalsRow style={{ fontSize: '1.1rem' }}><span><FaUserClock /> Abrió:</span><strong>{openedByName}</strong></TotalsRow>
             </div>
 
             <div style={{ marginTop: 8, padding: '15px', backgroundColor: '#f8f9fa', borderRadius: 6, border: '1px dashed #ced4da' }}>
-              <div style={{ fontWeight: '800', marginBottom: 10, fontSize: '1.2rem', color: '#495057' }}>Efectivo a Tener:</div>
+              <div style={{ fontWeight: '800', marginBottom: 10, fontSize: '1.2rem', color: '#495057' }}>Efectivo a Tener en Cajón:</div>
               <TotalsRow style={{ fontSize: '1.3rem' }}><span>Córdobas:</span><strong style={{ color: '#198754' }}>C$ {Number(efectivoEsperadoCordobas).toLocaleString()}</strong></TotalsRow>
               <TotalsRow style={{ fontSize: '1.3rem' }}><span>Dólares:</span><strong style={{ color: '#198754' }}>$ {Number(efectivoEsperadoDolares).toLocaleString()}</strong></TotalsRow>
               <TotalsRow $bold style={{ marginTop: 10, borderTop: '2px solid #ccc', paddingTop: 10, fontSize: '1.5rem' }}><span>TOTAL (C$):</span><span>{money(efectivoEsperado)}</span></TotalsRow>
@@ -512,6 +538,25 @@ const CajaModal = ({
                 <TotalsRow $bold style={{ marginTop: 6, borderTop: '1px dashed #856404', paddingTop: 6, fontSize: '1.15rem', color: '#856404' }}><span>Total No Efectivo:</span><span>{money(totalNoEfectivo)}</span></TotalsRow>
               </div>
             )}
+
+            {/* Resumen Unificado del Turno (Identico al Cash Report) */}
+            <div style={{ marginTop: 12, padding: '12px 15px', backgroundColor: '#eff6ff', borderRadius: 6, border: '1px solid #bfdbfe' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#1e40af' }}>🌟 Total Turno Arqueado:</span>
+                <strong style={{ fontSize: '1.3rem', color: '#1e40af', fontFamily: 'monospace' }}>
+                  {money(efectivoEsperado + totalNoEfectivo)}
+                </strong>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#3b82f6', marginTop: 2 }}>
+                Efectivo a tener ({money(efectivoEsperado)}) + No Efectivo ({money(totalNoEfectivo)})
+              </div>
+
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #bfdbfe', display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#475569', flexWrap: 'wrap', gap: 6 }}>
+                <span>Ventas Facturadas: <strong>{money(ingresosTotalesNetos)}</strong></span>
+                <span>Fondo Inicial: <strong>{money(cajaInicial)}</strong></span>
+                {totalSalidasDia > 0 && <span style={{ color: '#dc2626' }}>Gastos: <strong>-{money(totalSalidasDia)}</strong></span>}
+              </div>
+            </div>
 
             <label style={{ display: 'block', marginTop: 20, fontWeight: 800, fontSize: '1.3rem' }}>Monto Contado Físico (C$)</label>
             <SearchInput type="number" step="0.01" value={montoContado} onChange={e => setMontoContado(e.target.value)} autoFocus placeholder="Total Billetes + Monedas" style={{ fontSize: '1.5rem', padding: '12px', height: 'auto' }} />
