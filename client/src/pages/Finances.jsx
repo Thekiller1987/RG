@@ -15,7 +15,7 @@ import {
 } from 'chart.js';
 import {
   FaCalendarAlt, FaChartBar, FaStar, FaUserFriends,
-  FaWarehouse, FaMoneyBillWave, FaArrowUp, FaFilter, FaSync, FaArrowLeft, FaPrint, FaLockOpen
+  FaWarehouse, FaMoneyBillWave, FaArrowUp, FaFilter, FaSync, FaArrowLeft, FaPrint, FaLockOpen, FaUserSecret
 } from 'react-icons/fa';
 import { createGlobalStyle } from 'styled-components';
 import { useNavigate } from 'react-router-dom';
@@ -197,6 +197,29 @@ const PrintButtonHeader = styled(RefreshButton)`
   background: #10b981;
   box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
   &:hover { background: #059669; box-shadow: 0 6px 15px rgba(16, 185, 129, 0.4); }
+`;
+
+const GodModeButton = styled.button`
+  background: ${props => props.$active ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : '#0f172a'};
+  color: ${props => props.$active ? '#0f172a' : '#f59e0b'};
+  border: 1px solid ${props => props.$active ? '#f59e0b' : '#334155'};
+  padding: 0.55rem 0.95rem;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: ${props => props.$active ? '0 4px 12px rgba(245, 158, 11, 0.35)' : '0 2px 4px rgba(0,0,0,0.1)'};
+  white-space: nowrap;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
+    background: ${props => props.$active ? '#d97706' : '#1e293b'};
+  }
 `;
 
 // --- DASHBOARD GRID ---
@@ -456,7 +479,7 @@ const Finances = () => {
     }
   };
 
-  // --- RECALCULOS VISUALES CON OVERRIDE ACTIVO ---
+  // --- RECALCULOS VISUALES CON OVERRIDE ACTIVO (GOD MODE) ---
   const displayedSummary = useMemo(() => {
     if (!overrideConfig || !overrideConfig.active) {
       return salesSummary;
@@ -476,10 +499,46 @@ const Finances = () => {
       g += Number(overrideConfig.relGanancia || 0);
     }
 
+    // Overrides de Caja
+    const efEsperado = (overrideConfig.targetEfectivo !== null && overrideConfig.targetEfectivo !== undefined && !isNaN(overrideConfig.targetEfectivo))
+      ? Number(overrideConfig.targetEfectivo)
+      : (salesSummary.efectivo_esperado || 0);
+
+    const efCordobas = (overrideConfig.targetEfectivoCordobas !== null && overrideConfig.targetEfectivoCordobas !== undefined && !isNaN(overrideConfig.targetEfectivoCordobas))
+      ? Number(overrideConfig.targetEfectivoCordobas)
+      : (salesSummary.efectivo_cordobas || 0);
+
+    const efDolares = (overrideConfig.targetEfectivoDolares !== null && overrideConfig.targetEfectivoDolares !== undefined && !isNaN(overrideConfig.targetEfectivoDolares))
+      ? Number(overrideConfig.targetEfectivoDolares)
+      : (salesSummary.efectivo_dolares || 0);
+
+    const digital = (overrideConfig.targetDigital !== null && overrideConfig.targetDigital !== undefined && !isNaN(overrideConfig.targetDigital))
+      ? Number(overrideConfig.targetDigital)
+      : ((salesSummary.total_tarjeta || 0) + (salesSummary.total_transferencia || 0));
+
+    const credito = (overrideConfig.targetCredito !== null && overrideConfig.targetCredito !== undefined && !isNaN(overrideConfig.targetCredito))
+      ? Number(overrideConfig.targetCredito)
+      : (salesSummary.total_credito || 0);
+
+    const abonos = (overrideConfig.targetAbonos !== null && overrideConfig.targetAbonos !== undefined && !isNaN(overrideConfig.targetAbonos))
+      ? Number(overrideConfig.targetAbonos)
+      : (salesSummary.total_abonos || 0);
+
+    const gastos = (overrideConfig.targetGastos !== null && overrideConfig.targetGastos !== undefined && !isNaN(overrideConfig.targetGastos))
+      ? Number(overrideConfig.targetGastos)
+      : (salesSummary.total_gastos || 0);
+
     return {
       ...salesSummary,
       ventas_brutas: Math.max(0, v),
-      ganancia_total: Math.max(0, g)
+      ganancia_total: Math.max(0, g),
+      efectivo_esperado: efEsperado,
+      efectivo_cordobas: efCordobas,
+      efectivo_dolares: efDolares,
+      total_digital: digital,
+      total_credito: credito,
+      total_abonos: abonos,
+      total_gastos: gastos
     };
   }, [salesSummary, overrideConfig]);
 
@@ -489,6 +548,28 @@ const Finances = () => {
     }
     return inventoryValue;
   }, [inventoryValue, overrideConfig]);
+
+  const displayedTopProduct = useMemo(() => {
+    const realTop = topProducts[0] || null;
+    if (!overrideConfig || !overrideConfig.active) {
+      return realTop;
+    }
+    if (overrideConfig.targetTopProductName || (overrideConfig.targetTopProductQty !== null && overrideConfig.targetTopProductQty !== undefined)) {
+      return {
+        nombre: overrideConfig.targetTopProductName || realTop?.nombre || 'Producto Estrella',
+        total_unidades_vendidas: (overrideConfig.targetTopProductQty !== null && overrideConfig.targetTopProductQty !== undefined && !isNaN(overrideConfig.targetTopProductQty))
+          ? Number(overrideConfig.targetTopProductQty)
+          : (realTop?.total_unidades_vendidas || 0)
+      };
+    }
+    return realTop;
+  }, [topProducts, overrideConfig]);
+
+  const shouldShowLiveBanner = useMemo(() => {
+    if (overrideConfig?.active && overrideConfig.hideLiveBanner) return false;
+    if (overrideConfig?.active && overrideConfig.forceLiveBanner) return true;
+    return (activeFilter === 'today' || salesSummary?.caja_truth);
+  }, [overrideConfig, activeFilter, salesSummary]);
 
   const displayedChartData = useMemo(() => {
     if (!overrideConfig?.active || !overrideConfig?.syncChart || !chartData?.datasets?.[0]?.data?.length) {
@@ -517,24 +598,37 @@ const Finances = () => {
   }, [chartData, overrideConfig, salesSummary, displayedSummary]);
 
   const displayedSalesByUser = useMemo(() => {
-    if (!overrideConfig?.active || !overrideConfig?.syncUser || !salesByUser?.length) {
-      return salesByUser;
-    }
-    const realV = Number(salesSummary?.ventas_brutas || 0);
-    const targetV = Number(displayedSummary.ventas_brutas);
-    const diff = targetV - realV;
+    if (!overrideConfig?.active) return salesByUser;
 
-    if (Math.abs(diff) < 0.01) return salesByUser;
-
-    return salesByUser.map((u, idx) => {
-      if (idx === 0) {
-        return {
-          ...u,
-          total_vendido: Math.max(0, Number(((Number(u.total_vendido) || 0) + diff).toFixed(2)))
+    let list = Array.isArray(salesByUser) ? [...salesByUser] : [];
+    if (overrideConfig.targetTopSellerName || (overrideConfig.targetTopSellerAmount !== null && overrideConfig.targetTopSellerAmount !== undefined && !isNaN(overrideConfig.targetTopSellerAmount))) {
+      if (list.length === 0) {
+        list = [{
+          nombre_usuario: overrideConfig.targetTopSellerName || 'Cajero Principal',
+          total_vendido: Number(overrideConfig.targetTopSellerAmount || 0)
+        }];
+      } else {
+        list[0] = {
+          ...list[0],
+          nombre_usuario: overrideConfig.targetTopSellerName || list[0].nombre_usuario,
+          total_vendido: (overrideConfig.targetTopSellerAmount !== null && overrideConfig.targetTopSellerAmount !== undefined && !isNaN(overrideConfig.targetTopSellerAmount))
+            ? Number(overrideConfig.targetTopSellerAmount)
+            : list[0].total_vendido
         };
       }
-      return u;
-    });
+    } else if (overrideConfig.syncUser && list.length > 0) {
+      const realV = Number(salesSummary?.ventas_brutas || 0);
+      const targetV = Number(displayedSummary.ventas_brutas);
+      const diff = targetV - realV;
+
+      if (Math.abs(diff) >= 0.01) {
+        list[0] = {
+          ...list[0],
+          total_vendido: Math.max(0, Number(((Number(list[0].total_vendido) || 0) + diff).toFixed(2)))
+        };
+      }
+    }
+    return list;
   }, [salesByUser, overrideConfig, salesSummary, displayedSummary]);
 
   // MANEJO DE PERIODOS RÁPIDOS
@@ -710,12 +804,15 @@ const Finances = () => {
             <PrintButtonHeader onClick={handlePrint} title="Imprimir Reporte">
               <FaPrint />
             </PrintButtonHeader>
+            <GodModeButton $active={Boolean(overrideConfig?.active)} onClick={() => setSecretModalOpen(true)} title="GOD MODE - Modificar Todo Libremente">
+              <FaUserSecret /> {overrideConfig?.active ? '⚡ GOD MODE (ACTIVO)' : '⚡ GOD MODE'}
+            </GodModeButton>
           </DateGroup>
         </ControlsContainer>
       </Header>
 
-      {/* BANNER EN VIVO DE CAJA SI ES HOY O CAJA TRUTH */}
-      {(activeFilter === 'today' || salesSummary?.caja_truth) && (
+      {/* BANNER EN VIVO DE CAJA (MODIFICABLE POR GOD MODE O REAL) */}
+      {shouldShowLiveBanner && (
         <LiveCajaBanner>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: '220px' }}>
             <div style={{
@@ -727,7 +824,9 @@ const Finances = () => {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#166534' }}>Cajas de Hoy</span>
-                <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#16a34a', color: 'white', padding: '1px 6px', borderRadius: 9999 }}>EN VIVO</span>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#16a34a', color: 'white', padding: '1px 6px', borderRadius: 9999 }}>
+                  {overrideConfig?.active ? 'MODIFICADO' : 'EN VIVO'}
+                </span>
               </div>
               <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
                 {salesSummary.sesiones_abiertas || 0} abierta(s) · {salesSummary.sesiones_cerradas || 0} cerrada(s)
@@ -739,17 +838,17 @@ const Finances = () => {
             <div className="metric-item">
               <span className="label">Efectivo en Cajón</span>
               <span className="val" style={{ color: '#15803d' }}>
-                {formatCurrency(salesSummary.efectivo_esperado || 0)}
+                {formatCurrency(displayedSummary.efectivo_esperado || 0)}
               </span>
               <span className="sub">
-                C$ {(salesSummary.efectivo_cordobas || 0).toFixed(2)} + ${(salesSummary.efectivo_dolares || 0).toFixed(2)} USD
+                C$ {Number(displayedSummary.efectivo_cordobas || 0).toFixed(2)} + ${Number(displayedSummary.efectivo_dolares || 0).toFixed(2)} USD
               </span>
             </div>
 
             <div className="metric-item">
               <span className="label">Cobros Digitales</span>
               <span className="val" style={{ color: '#2563eb' }}>
-                {formatCurrency((salesSummary.total_tarjeta || 0) + (salesSummary.total_transferencia || 0))}
+                {formatCurrency(displayedSummary.total_digital !== undefined ? displayedSummary.total_digital : ((salesSummary.total_tarjeta || 0) + (salesSummary.total_transferencia || 0)))}
               </span>
               <span className="sub">Tarjeta + Transferencia</span>
             </div>
@@ -757,7 +856,7 @@ const Finances = () => {
             <div className="metric-item">
               <span className="label">Ventas al Crédito</span>
               <span className="val" style={{ color: '#b45309' }}>
-                {formatCurrency(salesSummary.total_credito || 0)}
+                {formatCurrency(displayedSummary.total_credito || 0)}
               </span>
               <span className="sub">Por cobrar</span>
             </div>
@@ -765,7 +864,7 @@ const Finances = () => {
             <div className="metric-item">
               <span className="label">Abonos Recibidos</span>
               <span className="val" style={{ color: '#0891b2' }}>
-                {formatCurrency(salesSummary.total_abonos || 0)}
+                {formatCurrency(displayedSummary.total_abonos || 0)}
               </span>
               <span className="sub">Recuperación de cartera</span>
             </div>
@@ -773,7 +872,7 @@ const Finances = () => {
             <div className="metric-item">
               <span className="label">Salidas / Gastos</span>
               <span className="val" style={{ color: '#dc2626' }}>
-                -{formatCurrency(salesSummary.total_gastos || 0)}
+                -{formatCurrency(displayedSummary.total_gastos || 0)}
               </span>
               <span className="sub">Egresos de caja</span>
             </div>
@@ -800,33 +899,33 @@ const Finances = () => {
           dark
           onDoubleClick={() => setSecretModalOpen(true)}
           style={{ cursor: 'pointer' }}
-          title="Ventas Totales"
+          title="Ventas Totales (Doble click para GOD MODE)"
         >
           <KPIHeader><FaChartBar /> Ventas Totales</KPIHeader>
           <KPIValue>{formatCurrency(displayedSummary.ventas_brutas)}</KPIValue>
-          <KPISub>{(activeFilter === 'today' || salesSummary?.caja_truth) ? '🟢 En vivo desde Cajas Abiertas de Hoy' : 'En el periodo seleccionado'}</KPISub>
+          <KPISub>{overrideConfig?.active ? '⚡ Modificado por GOD MODE' : (activeFilter === 'today' || salesSummary?.caja_truth) ? '🟢 En vivo desde Cajas Abiertas de Hoy' : 'En el periodo seleccionado'}</KPISub>
         </KPICard>
 
         <KPICard>
           <KPIHeader style={{ color: '#16a34a' }}><FaMoneyBillWave /> Ganancia Estimada</KPIHeader>
           <KPIValue style={{ color: '#16a34a' }}>{formatCurrency(displayedSummary.ganancia_total)}</KPIValue>
-          <KPISub>{(activeFilter === 'today' || salesSummary?.caja_truth) ? 'Margen neto productos de hoy' : 'Margen bruto calculado'}</KPISub>
+          <KPISub>{overrideConfig?.active ? '⚡ Modificado por GOD MODE' : (activeFilter === 'today' || salesSummary?.caja_truth) ? 'Margen neto productos de hoy' : 'Margen bruto calculado'}</KPISub>
         </KPICard>
 
         <KPICard>
           <KPIHeader style={{ color: '#0f172a' }}><FaWarehouse /> Valor Inventario</KPIHeader>
           <KPIValue>{formatCurrency(displayedInventoryValue)}</KPIValue>
-          <KPISub>Capital en mercadería (Actual)</KPISub>
+          <KPISub>{overrideConfig?.active && overrideConfig.targetInventory ? '⚡ Modificado por GOD MODE' : 'Capital en mercadería (Actual)'}</KPISub>
         </KPICard>
 
         <KPICard gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" dark>
           <KPIHeader><FaStar /> Producto Top</KPIHeader>
-          {topProducts[0] ? (
+          {displayedTopProduct ? (
             <>
               <div style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {topProducts[0].nombre}
+                {displayedTopProduct.nombre}
               </div>
-              <KPISub>{topProducts[0].total_unidades_vendidas} unidades vendidas</KPISub>
+              <KPISub>{displayedTopProduct.total_unidades_vendidas} unidades vendidas</KPISub>
             </>
           ) : (
             <KPIValue style={{ fontSize: '1.5rem' }}>—</KPIValue>
@@ -903,12 +1002,14 @@ const Finances = () => {
         </ListsContainer>
       </ContentSection>
 
-      {/* MODAL SECRETO FINANZAS */}
+      {/* MODAL SECRETO FINANZAS (GOD MODE) */}
       <FinancesSecretModal
         isOpen={secretModalOpen}
         onClose={() => setSecretModalOpen(false)}
         realSummary={salesSummary}
         realInventory={inventoryValue}
+        realTopProducts={topProducts}
+        realSalesByUser={salesByUser}
         currentOverride={overrideConfig}
         onSaveOverride={handleSaveOverride}
         onResetOverride={handleResetOverride}
