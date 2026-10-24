@@ -131,7 +131,7 @@ const CajaModal = ({
 
   const {
     cajaInicial, netCordobas, netDolares, efectivoEsperado, efectivoEsperadoCordobas, efectivoEsperadoDolares,
-    totalTarjeta, totalTransferencia, totalCredito, totalNoEfectivo,
+    totalTarjeta, totalTransferencia, totalCredito, totalNoEfectivo, totalSalidasDia = 0,
     sumDevolucionesCancelaciones, totalHidden, tasaRef,
     vEfectivoC, vEfectivoD, vTarjeta, vTransf, vCredito,
     aEfectivoC, aEfectivoD, aTarjeta, aTransf,
@@ -554,7 +554,7 @@ const CajaModal = ({
               <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #bfdbfe', display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#475569', flexWrap: 'wrap', gap: 6 }}>
                 <span>Ventas Facturadas: <strong>{money(ingresosTotalesNetos)}</strong></span>
                 <span>Fondo Inicial: <strong>{money(cajaInicial)}</strong></span>
-                {totalSalidasDia > 0 && <span style={{ color: '#dc2626' }}>Gastos: <strong>-{money(totalSalidasDia)}</strong></span>}
+                {(totalSalidasDia || stats?.totalSalidasDia || 0) > 0 && <span style={{ color: '#dc2626' }}>Gastos: <strong>-{money(totalSalidasDia || stats?.totalSalidasDia || 0)}</strong></span>}
               </div>
             </div>
 
