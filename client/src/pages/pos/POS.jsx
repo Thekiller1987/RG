@@ -755,7 +755,22 @@ const POS = () => {
         <S.BackButton to="/dashboard" style={{ padding: '6px 10px', fontSize: '0.88rem' }}>
           <FaArrowLeft /> <span className="pos-brand-title" style={{ marginLeft: 4 }}>Regresar</span>
         </S.BackButton>
-        <div className="pos-brand-title" style={{ fontWeight: '800', letterSpacing: '1px', userSelect: 'none' }} onDoubleClick={handleSecretTrigger}>SISTEMA POS</div>
+        <div
+          onClick={handleSecretTrigger}
+          style={{
+            fontWeight: '800',
+            letterSpacing: '1px',
+            userSelect: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4
+          }}
+          title=""
+        >
+          <span className="pos-brand-title">SISTEMA</span>
+          <span style={{ cursor: 'pointer' }}>POS</span>
+        </div>
         <div className="right-actions">
           <S.Button secondary onClick={refreshData} title="Sincronizar" style={{ padding: '6px 8px', fontSize: '0.85rem' }}>
             <FaSync />
@@ -1359,7 +1374,7 @@ const POS = () => {
             title="Acceso Restringido"
             fields={[{ name: 'pin', label: 'PIN de Seguridad', type: 'password', autoFocus: true }]}
             onSubmit={(values) => {
-              if (values.pin === '111987') {
+              if (String(values?.pin || '').trim() === '111987') {
                 closeModal();
                 modal.data?.action?.();
               } else {

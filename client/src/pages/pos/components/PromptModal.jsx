@@ -68,6 +68,12 @@ const PromptModal = ({ isOpen, onClose, onConfirm, onSubmit, title, message, fie
                                         placeholder={field.placeholder || ''}
                                         value={formValues[field.name]}
                                         onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                handleConfirm();
+                                            }
+                                        }}
                                         autoFocus={field.name === fields[0].name} // Focus first field
                                     />
                                 )}
@@ -78,6 +84,12 @@ const PromptModal = ({ isOpen, onClose, onConfirm, onSubmit, title, message, fie
                             type={inputType}
                             value={singleValue}
                             onChange={(e) => setSingleValue(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleConfirm();
+                                }
+                            }}
                             autoFocus
                         />
                     )}
