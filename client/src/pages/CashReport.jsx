@@ -857,34 +857,35 @@ const CashReport = () => {
       {error && <div style={{ textAlign: 'center', margin: '2rem', color: theme.danger }}><FaExclamationTriangle /> {error}</div>}
 
       {/* BANNER EJECUTIVO CONSOLIDADO DEL DÍA */}
+      {/* BANNER EJECUTIVO CONSOLIDADO DEL DÍA */}
       <h3 style={{ marginLeft: '0.5rem', marginBottom: '1rem', color: theme.text, display: 'flex', alignItems: 'center', gap: 8 }}>
         🏛️ Resumen Consolidado del Día {isSelectedToday && <span style={{ fontSize: '0.8rem', color: '#16a34a', background: '#dcfce7', padding: '2px 8px', borderRadius: 9999 }}>🟢 En Vivo</span>}
       </h3>
       <SummaryGrid className="no-print">
-        <SummaryCard $color="#0284c7" $valColor="#0369a1" style={{ background: '#f0f9ff' }}>
-          <span className="label" style={{ color: '#0369a1' }}>💵 Efectivo en Cajón (A Arquear)</span>
-          <span className="value">{fmtMoney(dailySummary.totalEfectivoEsperado)}</span>
-          <span className="sub">C$ {dailySummary.totalEfectivoC.toFixed(2)} + ${dailySummary.totalEfectivoD.toFixed(2)} USD (Misma suma POS)</span>
-        </SummaryCard>
-        <SummaryCard $color="#8b5cf6" $valColor="#6d28d9">
-          <span className="label">💳 Total No Efectivo</span>
-          <span className="value">{fmtMoney(dailySummary.totalDigital + dailySummary.totalCredito)}</span>
-          <span className="sub">Tarjeta: {fmtMoney(dailySummary.totalDigital)} · Crédito: {fmtMoney(dailySummary.totalCredito)}</span>
-        </SummaryCard>
-        <SummaryCard $color="#10b981" $valColor="#047857" style={{ background: '#ecfdf5' }}>
-          <span className="label" style={{ color: '#047857' }}>🌟 Total Turno Arqueado</span>
-          <span className="value">{fmtMoney(dailySummary.totalEfectivoEsperado + dailySummary.totalDigital + dailySummary.totalCredito)}</span>
-          <span className="sub">Efectivo en Cajón + Total No Efectivo</span>
-        </SummaryCard>
         <SummaryCard $color="#16a34a" $valColor="#166534">
-          <span className="label">🧾 Ventas Facturadas Netas</span>
+          <span className="label">Ventas Facturadas Netas</span>
           <span className="value">{fmtMoney(dailySummary.totalVentas)}</span>
           <span className="sub">Contado + Crédito - Devoluciones</span>
         </SummaryCard>
-        <SummaryCard $color="#64748b" $valColor="#334155">
-          <span className="label">🏦 Fondo Inicial Apertura</span>
-          <span className="value">{fmtMoney(dailySummary.totalCajaInicial)}</span>
-          <span className="sub">Base física en cajas</span>
+        <SummaryCard $color="#0284c7" $valColor="#0369a1">
+          <span className="label">Efectivo Físico en Cajas</span>
+          <span className="value">{fmtMoney(dailySummary.totalEfectivoEsperado)}</span>
+          <span className="sub">C$ {dailySummary.totalEfectivoC.toFixed(2)} + ${dailySummary.totalEfectivoD.toFixed(2)} USD</span>
+        </SummaryCard>
+        <SummaryCard $color="#8b5cf6" $valColor="#6d28d9">
+          <span className="label">Cobros Digitales</span>
+          <span className="value">{fmtMoney(dailySummary.totalDigital)}</span>
+          <span className="sub">Tarjetas + Transferencias</span>
+        </SummaryCard>
+        <SummaryCard $color="#f59e0b" $valColor="#b45309">
+          <span className="label">Ventas al Crédito</span>
+          <span className="value">{fmtMoney(dailySummary.totalCredito)}</span>
+          <span className="sub">Cuentas por cobrar del día</span>
+        </SummaryCard>
+        <SummaryCard $color="#06b6d4" $valColor="#0e7490">
+          <span className="label">Abonos Recibidos</span>
+          <span className="value">{fmtMoney(dailySummary.totalAbonos)}</span>
+          <span className="sub">Recuperación de cartera</span>
         </SummaryCard>
         <SummaryCard $color="#ef4444" $valColor="#b91c1c">
           <span className="label">Salidas / Gastos</span>
@@ -892,45 +893,6 @@ const CashReport = () => {
           <span className="sub">Egresos directos de cajón</span>
         </SummaryCard>
       </SummaryGrid>
-
-      {/* BANNER DE CUADRE UNIFICADO (1 SOLO CUADRE 1:1 CON EL POS) */}
-      <div className="no-print" style={{
-        background: '#f8fafc',
-        border: '1.5px solid #cbd5e1',
-        borderRadius: '12px',
-        padding: '0.9rem 1.25rem',
-        marginBottom: '2rem',
-        display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '1rem',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '1.4rem' }}>🎯</span>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#1e293b' }}>
-              CUADRE UNIFICADO: 1 SOLO CUADRE EXACTO 1:1 CON EL POS
-            </div>
-            <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-              Mismas cifras exactas del arqueo en terminal: Cajón + No Efectivo = Total Turno.
-            </div>
-          </div>
-        </div>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap',
-          background: '#fff', padding: '6px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem'
-        }}>
-          <span>Cajón: <strong style={{ color: '#0369a1' }}>{fmtMoney(dailySummary.totalEfectivoEsperado)}</strong></span>
-          <span style={{ color: '#94a3b8' }}>+</span>
-          <span>No Efectivo: <strong style={{ color: '#6d28d9' }}>{fmtMoney(dailySummary.totalDigital + dailySummary.totalCredito)}</strong></span>
-          <span style={{ color: '#94a3b8' }}>=</span>
-          <span style={{ background: '#ecfdf5', color: '#047857', padding: '2px 8px', borderRadius: '4px', fontWeight: 800 }}>
-            Total Turno: {fmtMoney(dailySummary.totalEfectivoEsperado + dailySummary.totalDigital + dailySummary.totalCredito)}
-          </span>
-        </div>
-      </div>
 
       {/* Grid ABIERTAS */}
       <h3 style={{ marginLeft: '0.5rem', marginBottom: '1rem', color: theme.text, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -955,66 +917,41 @@ const CashReport = () => {
                 <Badge isOpen>🟢 En Operación</Badge>
               </CardHeader>
               <CardBody>
-                {/* Banner de Efectivo Físico en Cajón (1:1 con POS) */}
+                {/* Banner Principal de Ventas */}
                 <div style={{
-                  background: '#f0f9ff', padding: '1rem', borderRadius: '10px', border: '1px solid #bae6fd',
-                  display: 'flex', flexDirection: 'column', gap: '0.4rem'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: '800', color: '#0369a1', fontSize: '0.9rem' }}>
-                      💵 Efectivo a Tener en Cajón (A Arqueo):
-                    </span>
-                    <span style={{ fontSize: '1.3rem', fontWeight: '800', color: '#0369a1', fontFamily: 'Roboto Mono' }}>
-                      {fmtMoney(stats.efectivoEsperado)}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#0284c7' }}>
-                    <span>Físico Desglosado:</span>
-                    <strong>{fmtMoney(stats.efectivoEsperadoCordobas)} C$ + ${Number(stats.efectivoEsperadoDolares).toFixed(2)} USD</strong>
-                  </div>
-                </div>
-
-                {/* Resumen No Efectivo y Total Turno (1:1 con POS) */}
-                <div style={{
-                  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem'
-                }}>
-                  <div style={{ background: '#fff3cd', padding: '0.75rem', borderRadius: '8px', border: '1px solid #fde047' }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#856404', textTransform: 'uppercase' }}>💳 Total No Efectivo</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#856404', fontFamily: 'Roboto Mono', marginTop: 2 }}>
-                      {fmtMoney(stats.totalNoEfectivo)}
-                    </div>
-                    <div style={{ fontSize: '0.7rem', color: '#a16207' }}>
-                      Tarj: {fmtMoney(stats.totalTarjeta + stats.totalTransferencia)} · Créd: {fmtMoney(stats.totalCredito)}
-                    </div>
-                  </div>
-
-                  <div style={{ background: '#ecfdf5', padding: '0.75rem', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#065f46', textTransform: 'uppercase' }}>🌟 Total Turno Arqueado</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#065f46', fontFamily: 'Roboto Mono', marginTop: 2 }}>
-                      {fmtMoney(stats.efectivoEsperado + stats.totalNoEfectivo)}
-                    </div>
-                    <div style={{ fontSize: '0.7rem', color: '#047857' }}>
-                      Efectivo + No Efectivo
-                    </div>
-                  </div>
-                </div>
-
-                {/* Banner de Ventas Facturadas Turno */}
-                <div style={{
-                  background: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0',
+                  background: '#f0fdf4', padding: '1rem', borderRadius: '10px', border: '1px solid #bbf7d0',
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                 }}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontWeight: '700', color: '#334155', textTransform: 'uppercase', fontSize: '0.75rem' }}>
-                      🧾 Ventas Facturadas Turno
+                    <span style={{ fontWeight: '700', color: '#166534', textTransform: 'uppercase', fontSize: '0.8rem', letterSpacing: '0.05em' }}>
+                      💰 Ventas Facturadas Turno
                     </span>
-                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#15803d' }}>
                       (Contado + Crédito - Devoluciones)
                     </span>
                   </div>
-                  <span style={{ fontSize: '1.15rem', fontWeight: '800', color: '#1e293b', fontFamily: 'Roboto Mono' }}>
+                  <span style={{ fontSize: '1.25rem', fontWeight: '800', color: '#166534', fontFamily: 'Roboto Mono' }}>
                     {fmtMoney(stats.totalVentasDia)}
                   </span>
+                </div>
+
+                {/* Banner de Efectivo Físico en Mano */}
+                <div style={{
+                  background: '#fff', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0',
+                  display: 'flex', flexDirection: 'column', gap: '0.4rem'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '6px' }}>
+                    <span style={{ fontWeight: '700', color: theme.primary, fontSize: '0.85rem' }}>
+                      💵 Efectivo Esperado en Cajón:
+                    </span>
+                    <span style={{ fontSize: '1.2rem', fontWeight: '800', color: theme.primary, fontFamily: 'Roboto Mono' }}>
+                      {fmtMoney(stats.efectivoEsperado)}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: theme.textLight }}>
+                    <span>Físico Desglosado:</span>
+                    <strong>{fmtMoney(stats.efectivoEsperadoCordobas)} C$ + ${Number(stats.efectivoEsperadoDolares).toFixed(2)} USD</strong>
+                  </div>
                 </div>
 
                 {/* Desglose Detallado */}
