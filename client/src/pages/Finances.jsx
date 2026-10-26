@@ -15,7 +15,7 @@ import {
 } from 'chart.js';
 import {
   FaCalendarAlt, FaChartBar, FaStar, FaUserFriends,
-  FaWarehouse, FaMoneyBillWave, FaArrowUp, FaFilter, FaSync, FaArrowLeft, FaPrint, FaLockOpen, FaUserSecret
+  FaWarehouse, FaMoneyBillWave, FaArrowUp, FaFilter, FaSync, FaArrowLeft, FaPrint, FaLockOpen
 } from 'react-icons/fa';
 import { createGlobalStyle } from 'styled-components';
 import { useNavigate } from 'react-router-dom';
@@ -197,29 +197,6 @@ const PrintButtonHeader = styled(RefreshButton)`
   background: #10b981;
   box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
   &:hover { background: #059669; box-shadow: 0 6px 15px rgba(16, 185, 129, 0.4); }
-`;
-
-const GodModeButton = styled.button`
-  background: ${props => props.$active ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : '#0f172a'};
-  color: ${props => props.$active ? '#0f172a' : '#f59e0b'};
-  border: 1px solid ${props => props.$active ? '#f59e0b' : '#334155'};
-  padding: 0.55rem 0.95rem;
-  border-radius: 12px;
-  font-weight: 800;
-  font-size: 0.82rem;
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: ${props => props.$active ? '0 4px 12px rgba(245, 158, 11, 0.35)' : '0 2px 4px rgba(0,0,0,0.1)'};
-  white-space: nowrap;
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
-    background: ${props => props.$active ? '#d97706' : '#1e293b'};
-  }
 `;
 
 // --- DASHBOARD GRID ---
@@ -804,9 +781,6 @@ const Finances = () => {
             <PrintButtonHeader onClick={handlePrint} title="Imprimir Reporte">
               <FaPrint />
             </PrintButtonHeader>
-            <GodModeButton $active={Boolean(overrideConfig?.active)} onClick={() => setSecretModalOpen(true)} title="GOD MODE - Modificar Todo Libremente">
-              <FaUserSecret /> {overrideConfig?.active ? '⚡ GOD MODE (ACTIVO)' : '⚡ GOD MODE'}
-            </GodModeButton>
           </DateGroup>
         </ControlsContainer>
       </Header>
@@ -899,23 +873,23 @@ const Finances = () => {
           dark
           onDoubleClick={() => setSecretModalOpen(true)}
           style={{ cursor: 'pointer' }}
-          title="Ventas Totales (Doble click para GOD MODE)"
+          title="Ventas Totales"
         >
           <KPIHeader><FaChartBar /> Ventas Totales</KPIHeader>
           <KPIValue>{formatCurrency(displayedSummary.ventas_brutas)}</KPIValue>
-          <KPISub>{overrideConfig?.active ? '⚡ Modificado por GOD MODE' : (activeFilter === 'today' || salesSummary?.caja_truth) ? '🟢 En vivo desde Cajas Abiertas de Hoy' : 'En el periodo seleccionado'}</KPISub>
+          <KPISub>{overrideConfig?.active ? '⚡ Modificado' : (activeFilter === 'today' || salesSummary?.caja_truth) ? '🟢 En vivo desde Cajas Abiertas de Hoy' : 'En el periodo seleccionado'}</KPISub>
         </KPICard>
 
         <KPICard>
           <KPIHeader style={{ color: '#16a34a' }}><FaMoneyBillWave /> Ganancia Estimada</KPIHeader>
           <KPIValue style={{ color: '#16a34a' }}>{formatCurrency(displayedSummary.ganancia_total)}</KPIValue>
-          <KPISub>{overrideConfig?.active ? '⚡ Modificado por GOD MODE' : (activeFilter === 'today' || salesSummary?.caja_truth) ? 'Margen neto productos de hoy' : 'Margen bruto calculado'}</KPISub>
+          <KPISub>{overrideConfig?.active ? '⚡ Modificado' : (activeFilter === 'today' || salesSummary?.caja_truth) ? 'Margen neto productos de hoy' : 'Margen bruto calculado'}</KPISub>
         </KPICard>
 
         <KPICard>
           <KPIHeader style={{ color: '#0f172a' }}><FaWarehouse /> Valor Inventario</KPIHeader>
           <KPIValue>{formatCurrency(displayedInventoryValue)}</KPIValue>
-          <KPISub>{overrideConfig?.active && overrideConfig.targetInventory ? '⚡ Modificado por GOD MODE' : 'Capital en mercadería (Actual)'}</KPISub>
+          <KPISub>{overrideConfig?.active && overrideConfig.targetInventory ? '⚡ Modificado' : 'Capital en mercadería (Actual)'}</KPISub>
         </KPICard>
 
         <KPICard gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" dark>
