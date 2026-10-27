@@ -18,9 +18,9 @@ async function getLiveBusinessContext() {
   try {
     // 1. Estado de Cajas de Hoy
     const [cajas] = await pool.query(`
-      SELECT id, id_usuario, fecha_apertura, fecha_cierre, monto_inicial, monto_final, estado, detalles_json 
+      SELECT id, usuario_id, usuario_nombre, fecha_apertura, fecha_cierre, monto_inicial, detalles_json 
       FROM cierres_caja 
-      WHERE DATE(fecha_apertura) = CURDATE() OR estado = 'abierta'
+      WHERE DATE(fecha_apertura) = CURDATE() OR fecha_cierre IS NULL
       ORDER BY id DESC LIMIT 5
     `);
 
@@ -60,9 +60,11 @@ async function getLiveBusinessContext() {
           }
         });
 
-        if (c.estado === 'abierta') {
+        const isAbierta = !c.fecha_cierre;
+        if (isAbierta) {
           abiertas.push({
             cajaId: c.id,
+            usuarioNombre: c.usuario_nombre,
             montoInicial: Number(c.monto_inicial || 0),
             ventasTurno: ventasCaja,
             efectivoEsperado: efCaja,
