@@ -74,15 +74,18 @@ async function handleTelegramMessage(token, message) {
   if (text.startsWith('/start') || text.startsWith('/help') || text.startsWith('/ayuda')) {
     const welcome = `🚗 *¡Hola, ${userName}!* Soy *ADA*, el Asistente Inteligente oficial de *Multirepuestos RG* 🤖\n\n` +
       `Estoy conectada directamente a la base de datos de tu empresa en tiempo real.\n\n` +
-      `📌 *Comandos directos:*\n` +
+      `📌 *Comandos directos de Negocio:*\n` +
       `• /ventas — Ventas facturadas y cobros de hoy\n` +
-      `• /caja — Dinero en cajón y cajas abiertas\n` +
+      `• /semana — Ventas de toda la semana y desglose por día\n` +
+      `• /vendedores — Rendimiento y ventas por vendedor/empleado\n` +
+      `• /caja — Dinero en cajón y cajas abiertas hoy\n` +
+      `• /cierres — Historial de ventas por caja y arqueos recientes\n` +
       `• /stock <nombre> — Consultar existencia y precios de un repuesto\n` +
       `• /bajostock — Repuestos con menos de 5 unidades\n` +
       `• /deudas — Clientes con saldo pendiente\n` +
       `• /login <pin> — Autenticar este chat como Administrador\n\n` +
       `💬 *O simplemente escribe cualquier pregunta en lenguaje natural:*\n` +
-      `_Ej: "¿Cuánto se vendió hoy en efectivo?", "¿Tenemos llantas aro 17?", "¿Quién es el cliente que más debe?"_`;
+      `_Ej: "¿Cuánto vendimos en toda la semana?", "¿Quién es el vendedor que más factura?", "¿Cómo cerró la última caja?"_`;
 
     await sendTelegramMessage(token, chatId, welcome);
     return;
@@ -114,6 +117,78 @@ async function handleTelegramMessage(token, message) {
       `• *Digital (Tarjeta/Transf):* C$ ${(Number(vHoy.ventas_tarjeta || 0) + Number(vHoy.ventas_transferencia || 0)).toLocaleString()}\n` +
       `• *Crédito:* C$ ${Number(vHoy.ventas_credito || 0).toLocaleString()}\n\n` +
       `💵 *Efectivo en Cajón:* C$ ${Number(cHoy.efectivoEsperadoTotalCordobas || 0).toLocaleString()}`;
+    await sendTelegramMessage(token, chatId, msg);
+    return;
+  }
+
+  if (text === '/semana' || text === '/semanal') {
+    const ctx = await getLiveBusinessContext();
+    const vSem = ctx.ventasSemana || {};
+    const det = ctx.ventasSemanaDetalle || [];
+    const diasTrad = { 'Monday': 'Lunes', 'Tuesday': 'Martes', 'Wednesday': 'Miércoles', 'Thursday': 'Jueves', 'Friday': 'Viernes', 'Saturday': 'Sábado', 'Sunday': 'Domingo' };
+
+    let msg = `📅 *Ventas de Toda la Semana (Últimos 7 Días) — Multirepuestos RG*\n\n` +
+      `• *Total Facturado:* C$ ${Number(vSem.total_facturado_semana || 0).toLocaleString()}\n` +
+      `• *Tickets Emitidos:* ${vSem.total_tickets_semana || 0} facturas\n` +
+      `• *Promedio Diario:* C$ ${Math.round(vSem.promedio_diario || 0).toLocaleString()}\n` +
+      `• *En Efectivo:* C$ ${Number(vSem.total_efectivo_semana || 0).toLocaleString()}\n` +
+      `• *Al Crédito:* C$ ${Number(vSem.total_credito_semana || 0).toLocaleString()}\n\n` +
+      `📊 *Desglose Día por Día:*\n`;
+
+    det.forEach(d => {
+      const diaNom = diasTrad[d.dia_nombre] || d.dia_nombre;
+      const fStr = String(d.dia).substring(0, 10);
+      msg += `• *${diaNom}* (${fStr}): C$ ${Number(d.total_dia).toLocaleString()} (${d.tickets} tks)\n`;
+    });
+
+    await sendTelegramMessage(token, chatId, msg);
+    return;
+  }
+
+  if (text === '/vendedores' || text === '/empleados') {
+    const ctx = await getLiveBusinessContext();
+    const vSem = ctx.ventasVendedorSemana || [];
+    const vMes = ctx.ventasVendedorMes || [];
+    const emps = ctx.empleadosActivos || [];
+
+    let msg = `👥 *Rendimiento de Ventas por Empleado / Vendedor*\n\n` +
+      `🏆 *Ventas Últimos 7 Días:*\n`;
+    vSem.forEach((v, i) => {
+      msg += `${i + 1}. *${v.vendedor}*: C$ ${Number(v.total_vendido).toLocaleString()} (${v.tickets} facturas)\n`;
+    });
+
+    msg += `\n📅 *Acumulado en el Mes:*\n`;
+    vMes.forEach((v, i) => {
+      msg += `${i + 1}. *${v.vendedor}*: C$ ${Number(v.total_vendido).toLocaleString()} (${v.tickets} facturas)\n`;
+    });
+
+    if (emps.length > 0) {
+      msg += `\n🧑‍💼 *Vendedores Registrados:* ${emps.map(e => e.nombre).join(', ')}`;
+    }
+
+    await sendTelegramMessage(token, chatId, msg);
+    return;
+  }
+
+  if (text === '/cierres' || text === '/cajas') {
+    const ctx = await getLiveBusinessContext();
+    const cHoy = ctx.cajaHoy || {};
+    const cierres = ctx.ultimosCierresCaja || [];
+
+    let msg = `💰 *Venta por Caja y Arqueos Recientes — Multirepuestos RG*\n\n` +
+      `• *Cajas Abiertas Hoy:* ${(cHoy.cajasAbiertas || []).length}\n` +
+      `• *Efectivo Esperado en Cajón Hoy:* C$ ${Number(cHoy.efectivoEsperadoTotalCordobas || 0).toLocaleString()}\n\n` +
+      `📋 *Últimos Turnos y Arqueos:*\n`;
+
+    cierres.forEach(c => {
+      const dif = Number(c.diferencia || 0);
+      const difStr = dif === 0 ? '✅ Cuadrada exacta' : (dif > 0 ? `⚠️ Sobrante +C$ ${dif.toLocaleString()}` : `❌ Faltante -C$ ${Math.abs(dif).toLocaleString()}`);
+      msg += `\n📦 *Caja #${c.caja_id}* [${c.estado}] (${c.usuario_nombre} — ${c.apertura}):\n` +
+        `  • Ventas Turno: C$ ${Number(c.total_ventas_caja || 0).toLocaleString()} (Efec: C$ ${Number(c.total_ventas_efectivo || 0).toLocaleString()})\n` +
+        `  • Esperado: C$ ${Number(c.final_esperado || 0).toLocaleString()} | Real: C$ ${Number(c.final_real || 0).toLocaleString()}\n` +
+        `  • Arqueo: ${difStr}\n`;
+    });
+
     await sendTelegramMessage(token, chatId, msg);
     return;
   }

@@ -95,10 +95,10 @@ async function getLiveBusinessContext() {
       SELECT 
         COUNT(id_venta) AS total_tickets,
         COALESCE(SUM(total_venta), 0) AS total_facturado,
-        COALESCE(SUM(CASE WHEN tipo_pago LIKE '%efectivo%' OR metodo_pago LIKE '%efectivo%' THEN total_venta ELSE 0 END), 0) AS ventas_efectivo,
-        COALESCE(SUM(CASE WHEN tipo_pago LIKE '%tarjeta%' OR metodo_pago LIKE '%tarjeta%' THEN total_venta ELSE 0 END), 0) AS ventas_tarjeta,
-        COALESCE(SUM(CASE WHEN tipo_pago LIKE '%transfer%' OR metodo_pago LIKE '%transfer%' THEN total_venta ELSE 0 END), 0) AS ventas_transferencia,
-        COALESCE(SUM(CASE WHEN tipo_pago LIKE '%credito%' OR metodo_pago LIKE '%credito%' THEN total_venta ELSE 0 END), 0) AS ventas_credito
+        COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(pago_detalles, '$.efectivo')) AS DECIMAL(10,2))), 0) AS ventas_efectivo,
+        COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(pago_detalles, '$.tarjeta')) AS DECIMAL(10,2))), 0) AS ventas_tarjeta,
+        COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(pago_detalles, '$.transferencia')) AS DECIMAL(10,2))), 0) AS ventas_transferencia,
+        COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(pago_detalles, '$.credito')) AS DECIMAL(10,2))), 0) AS ventas_credito
       FROM ventas
       WHERE DATE(fecha) = CURDATE() AND estado != 'CANCELADA'
     `);
@@ -109,12 +109,105 @@ async function getLiveBusinessContext() {
       SELECT 
         COUNT(id_venta) AS total_tickets_mes,
         COALESCE(SUM(total_venta), 0) AS total_facturado_mes,
-        COALESCE(SUM(CASE WHEN tipo_pago LIKE '%efectivo%' OR metodo_pago LIKE '%efectivo%' THEN total_venta ELSE 0 END), 0) AS ventas_efectivo_mes,
-        COALESCE(SUM(CASE WHEN tipo_pago LIKE '%credito%' OR metodo_pago LIKE '%credito%' THEN total_venta ELSE 0 END), 0) AS ventas_credito_mes
+        COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(pago_detalles, '$.efectivo')) AS DECIMAL(10,2))), 0) AS ventas_efectivo_mes,
+        COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(pago_detalles, '$.credito')) AS DECIMAL(10,2))), 0) AS ventas_credito_mes
       FROM ventas
       WHERE MONTH(fecha) = MONTH(CURDATE()) AND YEAR(fecha) = YEAR(CURDATE()) AND estado != 'CANCELADA'
     `);
     context.ventasMes = ventasMesRows[0] || {};
+
+    // 2c. Resumen de Ventas de Toda la Semana (Últimos 7 días) y Desglose Diario
+    const [ventasSemanaRows] = await pool.query(`
+      SELECT 
+        DATE(fecha) AS dia,
+        DAYNAME(fecha) AS dia_nombre,
+        COUNT(id_venta) AS tickets,
+        COALESCE(SUM(total_venta), 0) AS total_dia,
+        COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(pago_detalles, '$.efectivo')) AS DECIMAL(10,2))), 0) AS efectivo_dia,
+        COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(pago_detalles, '$.credito')) AS DECIMAL(10,2))), 0) AS credito_dia,
+        COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(pago_detalles, '$.tarjeta')) AS DECIMAL(10,2))), 0) AS tarjeta_dia,
+        COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(pago_detalles, '$.transferencia')) AS DECIMAL(10,2))), 0) AS transferencia_dia
+      FROM ventas
+      WHERE fecha >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND estado != 'CANCELADA'
+      GROUP BY DATE(fecha), DAYNAME(fecha)
+      ORDER BY dia DESC
+    `);
+    context.ventasSemanaDetalle = ventasSemanaRows;
+    const totalSem = ventasSemanaRows.reduce((a, b) => a + Number(b.total_dia || 0), 0);
+    const ticketsSem = ventasSemanaRows.reduce((a, b) => a + Number(b.tickets || 0), 0);
+    const efecSem = ventasSemanaRows.reduce((a, b) => a + Number(b.efectivo_dia || 0), 0);
+    const credSem = ventasSemanaRows.reduce((a, b) => a + Number(b.credito_dia || 0), 0);
+    context.ventasSemana = {
+      total_facturado_semana: totalSem,
+      total_tickets_semana: ticketsSem,
+      total_efectivo_semana: efecSem,
+      total_credito_semana: credSem,
+      promedio_diario: ventasSemanaRows.length ? (totalSem / ventasSemanaRows.length) : 0
+    };
+
+    // 2d. Ventas por Empleado / Vendedor (Últimos 7 días)
+    const [ventasVendedorSemanaRows] = await pool.query(`
+      SELECT 
+        COALESCE(e.nombre, u.nombre_usuario, 'Caja Principal') AS vendedor,
+        COUNT(v.id_venta) AS tickets,
+        COALESCE(SUM(v.total_venta), 0) AS total_vendido
+      FROM ventas v
+      LEFT JOIN empleados e ON v.id_empleado = e.id_empleado
+      LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
+      WHERE v.fecha >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND v.estado != 'CANCELADA'
+      GROUP BY vendedor
+      ORDER BY total_vendido DESC
+      LIMIT 8
+    `);
+    context.ventasVendedorSemana = ventasVendedorSemanaRows;
+
+    // 2e. Ventas por Empleado / Vendedor (Mes Actual)
+    const [ventasVendedorMesRows] = await pool.query(`
+      SELECT 
+        COALESCE(e.nombre, u.nombre_usuario, 'Caja Principal') AS vendedor,
+        COUNT(v.id_venta) AS tickets,
+        COALESCE(SUM(v.total_venta), 0) AS total_vendido
+      FROM ventas v
+      LEFT JOIN empleados e ON v.id_empleado = e.id_empleado
+      LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
+      WHERE MONTH(v.fecha) = MONTH(CURDATE()) AND YEAR(v.fecha) = YEAR(CURDATE()) AND v.estado != 'CANCELADA'
+      GROUP BY vendedor
+      ORDER BY total_vendido DESC
+      LIMIT 8
+    `);
+    context.ventasVendedorMes = ventasVendedorMesRows;
+
+    // 2f. Últimos Cierres y Venta por Caja (Arqueos)
+    const [ultimosCierresRows] = await pool.query(`
+      SELECT 
+        id AS caja_id,
+        usuario_nombre,
+        DATE_FORMAT(fecha_apertura, '%Y-%m-%d %H:%i') AS apertura,
+        DATE_FORMAT(fecha_cierre, '%Y-%m-%d %H:%i') AS cierre,
+        IF(fecha_cierre IS NULL, 'ABIERTA', 'CERRADA') AS estado,
+        monto_inicial,
+        total_ventas_efectivo,
+        total_ventas_tarjeta,
+        total_ventas_transferencia,
+        total_ventas_credito,
+        (COALESCE(total_ventas_efectivo,0) + COALESCE(total_ventas_tarjeta,0) + COALESCE(total_ventas_transferencia,0) + COALESCE(total_ventas_credito,0)) AS total_ventas_caja,
+        final_esperado,
+        final_real,
+        diferencia
+      FROM cierres_caja
+      ORDER BY id DESC
+      LIMIT 5
+    `);
+    context.ultimosCierresCaja = ultimosCierresRows;
+
+    // 2g. Plantilla de Personal / Vendedores Activos
+    const [empleadosRows] = await pool.query(`
+      SELECT id_empleado, nombre, cargo, activo 
+      FROM empleados 
+      WHERE activo = 1
+      ORDER BY nombre ASC
+    `);
+    context.empleadosActivos = empleadosRows;
 
     // 3. Resumen Global de Inventario
     const [invRows] = await pool.query(`
@@ -259,7 +352,83 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
     return resp;
   }
 
-  // Ventas de hoy / Mes / Dinero / Caja
+  // 1. Ventas de Toda la Semana
+  if (q.includes('semana') || q.includes('semanal') || q.includes('ultimos 7') || q.includes('últimos 7')) {
+    const vSem = context.ventasSemana || {};
+    const det = context.ventasSemanaDetalle || [];
+    const diasTrad = { 'Monday': 'Lunes', 'Tuesday': 'Martes', 'Wednesday': 'Miércoles', 'Thursday': 'Jueves', 'Friday': 'Viernes', 'Saturday': 'Sábado', 'Sunday': 'Domingo' };
+
+    let resp = `📅 **Ventas de Toda la Semana (Últimos 7 Días) — Multirepuestos RG:**\n\n`;
+    resp += `• **Total Facturado en la Semana:** C$ ${Number(vSem.total_facturado_semana || 0).toLocaleString()}\n`;
+    resp += `• **Tickets Emitidos:** ${vSem.total_tickets_semana || 0} facturas\n`;
+    resp += `• **Promedio Diario:** C$ ${Math.round(vSem.promedio_diario || 0).toLocaleString()}\n`;
+    resp += `• **En Efectivo:** C$ ${Number(vSem.total_efectivo_semana || 0).toLocaleString()}\n`;
+    resp += `• **Al Crédito:** C$ ${Number(vSem.total_credito_semana || 0).toLocaleString()}\n\n`;
+    
+    if (det.length > 0) {
+      resp += `📊 **Desglose Día por Día:**\n`;
+      det.forEach(d => {
+        const diaNom = diasTrad[d.dia_nombre] || d.dia_nombre;
+        const fechaStr = String(d.dia).substring(0, 10);
+        resp += `• **${diaNom}** (${fechaStr}): **C$ ${Number(d.total_dia).toLocaleString()}** (${d.tickets} facturas)\n`;
+      });
+    }
+    return resp;
+  }
+
+  // 2. Ventas por Empleado / Vendedor
+  if (q.includes('emplead') || q.includes('vendedor') || q.includes('quien vendio') || q.includes('quien vendió') || q.includes('venden')) {
+    const vSem = context.ventasVendedorSemana || [];
+    const vMes = context.ventasVendedorMes || [];
+    const emps = context.empleadosActivos || [];
+
+    let resp = `👥 **Rendimiento de Ventas por Empleado / Vendedor:**\n\n`;
+    resp += `🏆 **Ventas en los Últimos 7 Días:**\n`;
+    if (vSem.length > 0) {
+      vSem.forEach((v, i) => {
+        resp += `${i + 1}. **${v.vendedor}**: C$ ${Number(v.total_vendido).toLocaleString()} (${v.tickets} facturas)\n`;
+      });
+    } else {
+      resp += `• No hay registro de ventas en los últimos 7 días.\n`;
+    }
+
+    if (vMes.length > 0) {
+      resp += `\n📅 **Acumulado en el Mes Actual:**\n`;
+      vMes.forEach((v, i) => {
+        resp += `${i + 1}. **${v.vendedor}**: C$ ${Number(v.total_vendido).toLocaleString()} (${v.tickets} facturas)\n`;
+      });
+    }
+
+    if (emps.length > 0) {
+      resp += `\n🧑‍💼 **Plantilla de Vendedores Registrados:** ${emps.map(e => e.nombre).join(', ')}.`;
+    }
+    return resp;
+  }
+
+  // 3. Venta por Caja / Arqueos y Cierres de Caja
+  if (q.includes('cierre') || q.includes('arqueo') || q.includes('por caja') || (q.includes('caja') && !q.includes('hoy'))) {
+    const cHoy = context.cajaHoy || {};
+    const cierres = context.ultimosCierresCaja || [];
+
+    let resp = `💵 **Venta por Caja y Arqueos Recientes — Multirepuestos RG:**\n\n`;
+    resp += `• **Efectivo esperado en cajón hoy:** C$ ${Number(cHoy.efectivoEsperadoTotalCordobas || 0).toLocaleString()}\n`;
+    resp += `• **Cajas abiertas actualmente:** ${(cHoy.cajasAbiertas || []).length} abiertas\n\n`;
+
+    if (cierres.length > 0) {
+      resp += `📋 **Últimos Cierres y Arqueos Registrados:**\n`;
+      cierres.forEach(c => {
+        const dif = Number(c.diferencia || 0);
+        const estadoDif = dif === 0 ? '✅ Cuadrada exacta' : (dif > 0 ? `⚠️ Sobrante: +C$ ${dif.toLocaleString()}` : `❌ Faltante: -C$ ${Math.abs(dif).toLocaleString()}`);
+        resp += `• **Caja #${c.caja_id}** [${c.estado}] (${c.usuario_nombre || 'Usuario'} — ${c.apertura}):\n`;
+        resp += `  - Ventas del turno: **C$ ${Number(c.total_ventas_caja || 0).toLocaleString()}** (Efec: C$ ${Number(c.total_ventas_efectivo || 0).toLocaleString()})\n`;
+        resp += `  - Cierre: Esperado **C$ ${Number(c.final_esperado || 0).toLocaleString()}** | Real entregado: **C$ ${Number(c.final_real || 0).toLocaleString()}**\n`;
+        resp += `  - Arqueo: ${estadoDif}\n\n`;
+      });
+    }
+    return resp;
+  }
+
+  // 4. Ventas de hoy / Mes / Dinero general
   if (q.includes('venta') || q.includes('vendido') || q.includes('hoy') || q.includes('mes') || q.includes('caja') || q.includes('dinero') || q.includes('cuanto hay')) {
     const vHoy = context.ventasHoy || {};
     const vMes = context.ventasMes || {};
@@ -322,10 +491,12 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
   return `🤖 **ADA — Asistente Multirepuestos RG**\n\n` +
     `Estoy lista para ayudarte con las consultas de tu negocio. Puedes preguntarme directamente por:\n` +
     `• 💵 *"¿Cuánto se ha vendido hoy y qué hay en caja?"*\n` +
-    `• 📦 *"Repuestos con stock bajo"* o buscar un repuesto por nombre/código.\n` +
+    `• 📅 *"¿Cuánto hemos vendido en toda la semana y cuál fue el mejor día?"*\n` +
+    `• 👥 *"¿Cuánto vendió cada empleado o vendedor?"*\n` +
+    `• 💰 *"¿Cómo cerraron las últimas cajas y qué diferencias hubo?"*\n` +
+    `• 📦 *"Repuestos con stock bajo"* o buscar repuestos por nombre/código.\n` +
     `• 💳 *"¿Qué clientes tienen deudas pendientes?"*\n` +
-    `• 🏆 *"¿Cuáles son los productos más vendidos?"*\n` +
-    `• 📊 *"Resumen de inventario y capital"*\n\n` +
+    `• 🏆 *"¿Cuáles son los productos más vendidos?"*\n\n` +
     `*(💡 Estoy conectada a la base de datos de tu empresa en tiempo real).*`;
 }
 
@@ -334,6 +505,7 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
  */
 function formatCompactBusinessContext(context, specificProducts = []) {
   const v = context.ventasHoy || {};
+  const vSem = context.ventasSemana || {};
   const vMes = context.ventasMes || {};
   const c = context.cajaHoy || {};
   const inv = context.resumenInventario || {};
@@ -341,8 +513,39 @@ function formatCompactBusinessContext(context, specificProducts = []) {
   let text = `DATOS EN TIEMPO REAL (BASE DE DATOS MULTIREPUESTOS RG):\n`;
   text += `- Fecha/Hora: ${context.fechaHoraActual}\n`;
   text += `- Ventas Hoy: Facturado C$ ${Number(v.total_facturado || 0).toLocaleString()} en ${v.total_tickets || 0} tickets (Efectivo: C$ ${Number(v.ventas_efectivo || 0).toLocaleString()}, Digital: C$ ${(Number(v.ventas_tarjeta || 0) + Number(v.ventas_transferencia || 0)).toLocaleString()}, Crédito: C$ ${Number(v.ventas_credito || 0).toLocaleString()})\n`;
+
+  if (vSem.total_facturado_semana > 0) {
+    text += `- Ventas Toda la Semana (Últimos 7 días): Facturado C$ ${Number(vSem.total_facturado_semana).toLocaleString()} en ${vSem.total_tickets_semana} tickets (Efectivo: C$ ${Number(vSem.total_efectivo_semana).toLocaleString()}, Crédito: C$ ${Number(vSem.total_credito_semana).toLocaleString()}, Promedio diario: C$ ${Math.round(vSem.promedio_diario).toLocaleString()})\n`;
+    if (context.ventasSemanaDetalle && context.ventasSemanaDetalle.length > 0) {
+      const diasTrad = { 'Monday': 'Lun', 'Tuesday': 'Mar', 'Wednesday': 'Mié', 'Thursday': 'Jue', 'Friday': 'Vie', 'Saturday': 'Sáb', 'Sunday': 'Dom' };
+      const dias = context.ventasSemanaDetalle.map(d => `${diasTrad[d.dia_nombre] || d.dia_nombre} ${String(d.dia).substring(0, 10)}: C$ ${Number(d.total_dia).toLocaleString()} (${d.tickets} tks)`).join('; ');
+      text += `- Desglose Diario Semana: ${dias}\n`;
+    }
+  }
+
   text += `- Ventas del Mes: Facturado C$ ${Number(vMes.total_facturado_mes || 0).toLocaleString()} en ${vMes.total_tickets_mes || 0} tickets (Efectivo Mes: C$ ${Number(vMes.ventas_efectivo_mes || 0).toLocaleString()}, Crédito Mes: C$ ${Number(vMes.ventas_credito_mes || 0).toLocaleString()})\n`;
+
+  if (context.ventasVendedorSemana && context.ventasVendedorSemana.length > 0) {
+    const vend = context.ventasVendedorSemana.map(v => `${v.vendedor}: C$ ${Number(v.total_vendido).toLocaleString()} (${v.tickets} tks)`).join('; ');
+    text += `- Ventas por Vendedor (Semana): ${vend}\n`;
+  }
+
+  if (context.empleadosActivos && context.empleadosActivos.length > 0) {
+    const emps = context.empleadosActivos.map(e => `${e.nombre} (${e.cargo})`).join(', ');
+    text += `- Personal de Ventas Registrado: ${emps}\n`;
+  }
+
   text += `- Cajas Activas: ${(c.cajasAbiertas || []).length} abiertas. Efectivo esperado en cajón: C$ ${Number(c.efectivoEsperadoTotalCordobas || 0).toLocaleString()}\n`;
+
+  if (context.ultimosCierresCaja && context.ultimosCierresCaja.length > 0) {
+    text += `- Cierres y Arqueos de Caja Recientes:\n`;
+    context.ultimosCierresCaja.slice(0, 4).forEach(ca => {
+      const dif = Number(ca.diferencia || 0);
+      const difStr = dif === 0 ? 'Exacta (C$ 0)' : (dif > 0 ? `Sobrante +C$ ${dif.toLocaleString()}` : `Faltante -C$ ${Math.abs(dif).toLocaleString()}`);
+      text += `  * Caja #${ca.caja_id} [${ca.estado}] (${ca.usuario_nombre}, ${ca.apertura}): Ventas Turno C$ ${Number(ca.total_ventas_caja || 0).toLocaleString()} (Efec: C$ ${Number(ca.total_ventas_efectivo || 0).toLocaleString()}) | Esperado C$ ${Number(ca.final_esperado || 0).toLocaleString()} | Real C$ ${Number(ca.final_real || 0).toLocaleString()} | Arqueo: ${difStr}\n`;
+    });
+  }
+
   text += `- Inventario: ${Number(inv.total_productos_distintos || 0).toLocaleString()} repuestos (${Number(inv.total_unidades_fisicas || 0).toLocaleString()} unidades). Valor venta: C$ ${Number(inv.valor_total_venta || 0).toLocaleString()}\n`;
 
   if (context.stockCritico && context.stockCritico.length > 0) {
@@ -387,7 +590,7 @@ Tu función es asistir a la gerencia, propietarios y vendedores con respuestas e
 
 REGLAS DE IDENTIDAD Y SEGURIDAD:
 1. TU IDENTIDAD ES ÚNICAMENTE "ADA". NUNCA menciones que eres Gemini, Google, OpenAI ni modelos externos. Si te preguntan quién eres o qué modelo eres, responde siempre: "Soy ADA, el Asistente Inteligente de Negocios desarrollado a medida para Multirepuestos RG".
-2. RESTRICCIÓN ESTRICTA DE ÁMBITO (SOLO NEGOCIO): Únicamente tienes autorización para responder sobre operaciones de Multirepuestos RG (ventas, cajas, dinero en cajón, precios de repuestos, existencia, inventario, clientes deudores y métricas del negocio).
+2. RESTRICCIÓN ESTRICTA DE ÁMBITO (SOLO NEGOCIO): Únicamente tienes autorización para responder sobre operaciones de Multirepuestos RG (ventas de la semana, del mes, hoy, rendimiento de empleados/vendedores, arqueos y ventas por caja, precios de repuestos, existencia, inventario, clientes deudores y métricas del negocio).
 3. SI EL USUARIO HACE PREGUNTAS FUERA DEL NEGOCIO (ej. poemas, chistes, recetas, tareas escolares, política, historia, programación o temas ajenos): DEBES RECHAZAR LA PREGUNTA AMABLEMENTE: "Estimado usuario, como asistente oficial de Multirepuestos RG, solo estoy capacitada para atender consultas operativas, financieras y de inventario de nuestra empresa. ¿En qué aspecto del negocio puedo colaborarle?".
 4. FORMATO: Responde en español formal nicaragüense, claro, conciso, usando Markdown elegante (viñetas y negritas). Usa "C$" para Córdobas y "$" para Dólares. Nunca inventes productos que no existan en el catálogo.
 
@@ -499,7 +702,10 @@ async function askBusinessAI({ question, history = [], userId = null }) {
     'repuesto', 'repuestos', 'tienen', 'tenemos', 'hay', 'vende', 'venden', 'stock', 'quedan', 
     'queda', 'existencia', 'existencias', 'por', 'para', 'con', 'del', 'las', 'los', 'una', 
     'uno', 'unos', 'unas', 'que', 'como', 'cual', 'cuales', 'sobre', 'este', 'esta', 'estos',
-    'estas', 'favor', 'porfa', 'hola', 'buenas', 'dime', 'consultar', 'busca', 'buscar'
+    'estas', 'favor', 'porfa', 'hola', 'buenas', 'dime', 'consultar', 'busca', 'buscar',
+    'semana', 'semanal', 'dias', 'dia', 'empleado', 'empleados', 'vendedor', 'vendedores',
+    'caja', 'cajas', 'cierre', 'cierres', 'arqueo', 'arqueos', 'turno', 'turnos',
+    'ayer', 'antier', 'mes', 'mensual', 'total', 'totales', 'quien', 'quienes'
   ]);
 
   const cleanWords = question

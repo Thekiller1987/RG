@@ -457,14 +457,17 @@ const AIAssistantWidget = () => {
             <Chip onClick={() => handleChipClick('¿Cuánto se ha vendido hoy y qué hay en caja?')}>
               💵 Ventas de Hoy
             </Chip>
+            <Chip onClick={() => handleChipClick('¿Cuánto hemos vendido en toda la semana y cuál fue el mejor día?')}>
+              📅 Ventas de la Semana
+            </Chip>
+            <Chip onClick={() => handleChipClick('¿Cuánto vendió cada empleado o vendedor?')}>
+              👥 Ventas por Empleado
+            </Chip>
+            <Chip onClick={() => handleChipClick('¿Cómo cerraron las últimas cajas y qué diferencias hubo?')}>
+              💰 Cierres de Caja
+            </Chip>
             <Chip onClick={() => handleChipClick('¿Qué repuestos tienen stock crítico o bajo?')}>
               📦 Stock Bajo
-            </Chip>
-            <Chip onClick={() => handleChipClick('¿Qué clientes tienen crédito pendiente?')}>
-              💳 Clientes Deudores
-            </Chip>
-            <Chip onClick={() => handleChipClick('¿Cuáles son los repuestos más vendidos del mes?')}>
-              🏆 Top Vendidos
             </Chip>
           </SuggestionsContainer>
 
