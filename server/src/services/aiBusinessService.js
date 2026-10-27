@@ -104,6 +104,18 @@ async function getLiveBusinessContext() {
     `);
     context.ventasHoy = ventasHoyRows[0] || {};
 
+    // 2b. Resumen de Ventas Facturadas del Mes Actual
+    const [ventasMesRows] = await pool.query(`
+      SELECT 
+        COUNT(id_venta) AS total_tickets_mes,
+        COALESCE(SUM(total_venta), 0) AS total_facturado_mes,
+        COALESCE(SUM(CASE WHEN tipo_pago LIKE '%efectivo%' OR metodo_pago LIKE '%efectivo%' THEN total_venta ELSE 0 END), 0) AS ventas_efectivo_mes,
+        COALESCE(SUM(CASE WHEN tipo_pago LIKE '%credito%' OR metodo_pago LIKE '%credito%' THEN total_venta ELSE 0 END), 0) AS ventas_credito_mes
+      FROM ventas
+      WHERE MONTH(fecha) = MONTH(CURDATE()) AND YEAR(fecha) = YEAR(CURDATE()) AND estado != 'CANCELADA'
+    `);
+    context.ventasMes = ventasMesRows[0] || {};
+
     // 3. Resumen Global de Inventario
     const [invRows] = await pool.query(`
       SELECT 
@@ -156,19 +168,47 @@ async function getLiveBusinessContext() {
 }
 
 /**
- * Busca repuestos específicos por coincidencia de texto (para responder dudas de productos puntuales).
+ * Busca repuestos específicos permitiendo múltiples palabras clave (AND) para máxima precisión.
+ * Ej: "aceite maxima" busca productos que contengan "aceite" Y "maxima".
  */
 async function searchProductsForQuery(queryText) {
-  if (!queryText || queryText.length < 2) return [];
+  if (!queryText || !String(queryText).trim()) return [];
   try {
-    const clean = `%${queryText.trim()}%`;
-    const [rows] = await pool.query(`
+    const rawTokens = String(queryText).trim().split(/\s+/).filter(t => t.length >= 2);
+    if (!rawTokens.length) return [];
+
+    // 1. Búsqueda con todos los tokens usando AND (ej: 'aceite' AND 'maxima')
+    const conditions = [];
+    const params = [];
+    rawTokens.forEach(t => {
+      const pattern = `%${t}%`;
+      conditions.push(`(nombre LIKE ? OR codigo LIKE ? OR descripcion LIKE ?)`);
+      params.push(pattern, pattern, pattern);
+    });
+
+    const [rowsAnd] = await pool.query(`
       SELECT id_producto, codigo, nombre, descripcion, existencia, stock_reservado, venta, mayoreo, costo
       FROM productos
-      WHERE nombre LIKE ? OR codigo LIKE ? OR descripcion LIKE ?
-      LIMIT 8
-    `, [clean, clean, clean]);
-    return rows;
+      WHERE ${conditions.join(' AND ')}
+      LIMIT 12
+    `, params);
+
+    if (rowsAnd.length > 0) {
+      return rowsAnd;
+    }
+
+    // 2. Si no hubo coincidencias exactas con todos los tokens juntos y había más de 1 token, intentar coincidencia OR
+    if (rawTokens.length > 1) {
+      const [rowsOr] = await pool.query(`
+        SELECT id_producto, codigo, nombre, descripcion, existencia, stock_reservado, venta, mayoreo, costo
+        FROM productos
+        WHERE ${conditions.join(' OR ')}
+        LIMIT 8
+      `, params);
+      return rowsOr;
+    }
+
+    return [];
   } catch (e) {
     console.error('[AIBusinessService] Error buscando repuestos:', e.message);
     return [];
@@ -176,15 +216,13 @@ async function searchProductsForQuery(queryText) {
 }
 
 /**
- * Obtiene la API Key de Gemini desde process.env o desde la tabla business_config.
+ * Obtiene la API Key de Gemini desde la base de datos o desde process.env.
+ * Prioriza la base de datos para que la clave guardada en business_config mande siempre.
  */
 async function getGeminiApiKey() {
   const sanitize = (key) => (key ? String(key).trim().replace(/[\r\n"']/g, '') : null);
 
-  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
-    const k = sanitize(process.env.GEMINI_API_KEY);
-    if (k) return k;
-  }
+  // 1. Priorizar base de datos (donde está la clave verificada del negocio)
   try {
     const [rows] = await pool.query('SELECT gemini_api_key FROM business_config WHERE id = 1 LIMIT 1');
     if (rows.length && rows[0].gemini_api_key) {
@@ -193,6 +231,12 @@ async function getGeminiApiKey() {
     }
   } catch (e) {
     // Si la columna aún no existe o hay error
+  }
+
+  // 2. Si no hay en BD, buscar en process.env
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
+    const k = sanitize(process.env.GEMINI_API_KEY);
+    if (k) return k;
   }
   return null;
 }
@@ -215,17 +259,19 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
     return resp;
   }
 
-  // Ventas de hoy / Dinero / Caja
-  if (q.includes('venta') || q.includes('hoy') || q.includes('caja') || q.includes('dinero') || q.includes('cuanto hay')) {
+  // Ventas de hoy / Mes / Dinero / Caja
+  if (q.includes('venta') || q.includes('vendido') || q.includes('hoy') || q.includes('mes') || q.includes('caja') || q.includes('dinero') || q.includes('cuanto hay')) {
     const vHoy = context.ventasHoy || {};
+    const vMes = context.ventasMes || {};
     const cHoy = context.cajaHoy || {};
-    return `📊 **Resumen de Ventas y Caja de Hoy (${context.fechaHoraActual}):**\n\n` +
+    return `📊 **Resumen de Ventas y Caja — Multirepuestos RG:**\n\n` +
+      `📅 *Fecha:* ${context.fechaHoraActual}\n\n` +
       `• **Total Facturado Hoy:** C$ ${Number(vHoy.total_facturado || 0).toLocaleString()} (${vHoy.total_tickets || 0} facturas)\n` +
-      `• **Ventas en Efectivo:** C$ ${Number(vHoy.ventas_efectivo || 0).toLocaleString()}\n` +
-      `• **Ventas Digitales (Tarjeta/Transf):** C$ ${(Number(vHoy.ventas_tarjeta || 0) + Number(vHoy.ventas_transferencia || 0)).toLocaleString()}\n` +
-      `• **Ventas al Crédito:** C$ ${Number(vHoy.ventas_credito || 0).toLocaleString()}\n\n` +
+      `• **Total Facturado en el Mes:** C$ ${Number(vMes.total_facturado_mes || 0).toLocaleString()} (${vMes.total_tickets_mes || 0} facturas)\n` +
+      `• **Ventas en Efectivo Hoy:** C$ ${Number(vHoy.ventas_efectivo || 0).toLocaleString()}\n` +
+      `• **Ventas al Crédito Hoy:** C$ ${Number(vHoy.ventas_credito || 0).toLocaleString()}\n\n` +
       `💵 **Estado de Caja Activa:**\n` +
-      `• Efectivo esperado a tener en cajón: **C$ ${Number(cHoy.efectivoEsperadoTotalCordobas || 0).toLocaleString()}**\n` +
+      `• Efectivo esperado en cajón: **C$ ${Number(cHoy.efectivoEsperadoTotalCordobas || 0).toLocaleString()}**\n` +
       `• Cajas abiertas en el sistema: **${(cHoy.cajasAbiertas || []).length} caja(s)**.`;
   }
 
@@ -288,13 +334,15 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
  */
 function formatCompactBusinessContext(context, specificProducts = []) {
   const v = context.ventasHoy || {};
+  const vMes = context.ventasMes || {};
   const c = context.cajaHoy || {};
   const inv = context.resumenInventario || {};
 
   let text = `DATOS EN TIEMPO REAL (BASE DE DATOS MULTIREPUESTOS RG):\n`;
   text += `- Fecha/Hora: ${context.fechaHoraActual}\n`;
   text += `- Ventas Hoy: Facturado C$ ${Number(v.total_facturado || 0).toLocaleString()} en ${v.total_tickets || 0} tickets (Efectivo: C$ ${Number(v.ventas_efectivo || 0).toLocaleString()}, Digital: C$ ${(Number(v.ventas_tarjeta || 0) + Number(v.ventas_transferencia || 0)).toLocaleString()}, Crédito: C$ ${Number(v.ventas_credito || 0).toLocaleString()})\n`;
-  text += `- Cajas Activas: ${c.cajasAbiertas?.length || 0} abiertas. Efectivo esperado en cajón: C$ ${Number(c.efectivoEsperadoTotalCordobas || 0).toLocaleString()}\n`;
+  text += `- Ventas del Mes: Facturado C$ ${Number(vMes.total_facturado_mes || 0).toLocaleString()} en ${vMes.total_tickets_mes || 0} tickets (Efectivo Mes: C$ ${Number(vMes.ventas_efectivo_mes || 0).toLocaleString()}, Crédito Mes: C$ ${Number(vMes.ventas_credito_mes || 0).toLocaleString()})\n`;
+  text += `- Cajas Activas: ${(c.cajasAbiertas || []).length} abiertas. Efectivo esperado en cajón: C$ ${Number(c.efectivoEsperadoTotalCordobas || 0).toLocaleString()}\n`;
   text += `- Inventario: ${Number(inv.total_productos_distintos || 0).toLocaleString()} repuestos (${Number(inv.total_unidades_fisicas || 0).toLocaleString()} unidades). Valor venta: C$ ${Number(inv.valor_total_venta || 0).toLocaleString()}\n`;
 
   if (context.stockCritico && context.stockCritico.length > 0) {
@@ -372,7 +420,7 @@ ${formatCompactBusinessContext(context, specificProducts)}
     contents,
     generationConfig: {
       temperature: 0.2,
-      maxOutputTokens: 350 // Respuestas concisas, ejecutivas y ultra rápidas
+      maxOutputTokens: 650 // Amplio espacio para listas de productos y balances sin truncamiento
     }
   };
 
@@ -446,13 +494,23 @@ async function askBusinessAI({ question, history = [], userId = null }) {
   const context = await getLiveBusinessContext();
 
   // Buscar repuestos específicos si se menciona algún término de producto
-  const words = question.split(/\s+/).filter(w => w.length >= 3 && !['cuanto', 'donde', 'precio', 'repuesto', 'repuestos', 'tienen', 'vende', 'venden', 'stock', 'quedan', 'cuantos'].includes(w.toLowerCase()));
+  const STOP_WORDS = new Set([
+    'cuanto', 'cuantos', 'cuanta', 'cuantas', 'donde', 'precio', 'precios', 'costo', 'cuesta', 
+    'repuesto', 'repuestos', 'tienen', 'tenemos', 'hay', 'vende', 'venden', 'stock', 'quedan', 
+    'queda', 'existencia', 'existencias', 'por', 'para', 'con', 'del', 'las', 'los', 'una', 
+    'uno', 'unos', 'unas', 'que', 'como', 'cual', 'cuales', 'sobre', 'este', 'esta', 'estos',
+    'estas', 'favor', 'porfa', 'hola', 'buenas', 'dime', 'consultar', 'busca', 'buscar'
+  ]);
+
+  const cleanWords = question
+    .toLowerCase()
+    .replace(/[¿?¡!.,:;()_]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length >= 3 && !STOP_WORDS.has(w));
+
   let specificProducts = [];
-  if (words.length > 0) {
-    specificProducts = await searchProductsForQuery(words.slice(0, 3).join(' '));
-    if (!specificProducts.length && words.length > 1) {
-      specificProducts = await searchProductsForQuery(words[0]);
-    }
+  if (cleanWords.length > 0) {
+    specificProducts = await searchProductsForQuery(cleanWords.join(' '));
   }
 
   const apiKey = await getGeminiApiKey();
