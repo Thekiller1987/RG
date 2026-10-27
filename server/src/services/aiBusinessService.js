@@ -357,32 +357,8 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
     return resp;
   }
 
-  // 1. Ventas de Toda la Semana
-  if (q.includes('semana') || q.includes('semanal') || q.includes('ultimos 7') || q.includes('últimos 7')) {
-    const vSem = context.ventasSemana || {};
-    const det = context.ventasSemanaDetalle || [];
-    const diasTrad = { 'Monday': 'Lunes', 'Tuesday': 'Martes', 'Wednesday': 'Miércoles', 'Thursday': 'Jueves', 'Friday': 'Viernes', 'Saturday': 'Sábado', 'Sunday': 'Domingo' };
-
-    let resp = `📅 **Ventas de Toda la Semana (Últimos 7 Días) — Multirepuestos RG:**\n\n`;
-    resp += `• **Total Facturado en la Semana:** C$ ${Number(vSem.total_facturado_semana || 0).toLocaleString()}\n`;
-    resp += `• **Tickets Emitidos:** ${vSem.total_tickets_semana || 0} facturas\n`;
-    resp += `• **Promedio Diario:** C$ ${Math.round(vSem.promedio_diario || 0).toLocaleString()}\n`;
-    resp += `• **En Efectivo:** C$ ${Number(vSem.total_efectivo_semana || 0).toLocaleString()}\n`;
-    resp += `• **Al Crédito:** C$ ${Number(vSem.total_credito_semana || 0).toLocaleString()}\n\n`;
-    
-    if (det.length > 0) {
-      resp += `📊 **Desglose Día por Día:**\n`;
-      det.forEach(d => {
-        const diaNom = diasTrad[d.dia_nombre] || d.dia_nombre;
-        const fechaStr = String(d.dia).substring(0, 10);
-        resp += `• **${diaNom}** (${fechaStr}): **C$ ${Number(d.total_dia).toLocaleString()}** (${d.tickets} facturas)\n`;
-      });
-    }
-    return resp;
-  }
-
-  // 2. Ventas por Empleado / Vendedor
-  if (q.includes('emplead') || q.includes('vendedor') || q.includes('quien vendio') || q.includes('quien vendió') || q.includes('venden')) {
+  // 1. Ventas por Empleado / Vendedor
+  if (q.includes('emplead') || q.includes('vendedor') || q.includes('quien vendio') || q.includes('quien vendió') || q.includes('venden') || q.includes('personal')) {
     const vSem = context.ventasVendedorSemana || [];
     const vMes = context.ventasVendedorMes || [];
     const emps = context.empleadosActivos || [];
@@ -406,6 +382,30 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
 
     if (emps.length > 0) {
       resp += `\n🧑‍💼 **Plantilla de Vendedores Registrados:** ${emps.map(e => e.nombre).join(', ')}.`;
+    }
+    return resp;
+  }
+
+  // 2. Ventas de Toda la Semana
+  if (q.includes('semana') || q.includes('semanal') || q.includes('ultimos 7') || q.includes('últimos 7')) {
+    const vSem = context.ventasSemana || {};
+    const det = context.ventasSemanaDetalle || [];
+    const diasTrad = { 'Monday': 'Lunes', 'Tuesday': 'Martes', 'Wednesday': 'Miércoles', 'Thursday': 'Jueves', 'Friday': 'Viernes', 'Saturday': 'Sábado', 'Sunday': 'Domingo' };
+
+    let resp = `📅 **Ventas de Toda la Semana (Últimos 7 Días) — Multirepuestos RG:**\n\n`;
+    resp += `• **Total Facturado en la Semana:** C$ ${Number(vSem.total_facturado_semana || 0).toLocaleString()}\n`;
+    resp += `• **Tickets Emitidos:** ${vSem.total_tickets_semana || 0} facturas\n`;
+    resp += `• **Promedio Diario:** C$ ${Math.round(vSem.promedio_diario || 0).toLocaleString()}\n`;
+    resp += `• **En Efectivo:** C$ ${Number(vSem.total_efectivo_semana || 0).toLocaleString()}\n`;
+    resp += `• **Al Crédito:** C$ ${Number(vSem.total_credito_semana || 0).toLocaleString()}\n\n`;
+    
+    if (det.length > 0) {
+      resp += `📊 **Desglose Día por Día:**\n`;
+      det.forEach(d => {
+        const diaNom = diasTrad[d.dia_nombre] || d.dia_nombre;
+        const fechaStr = String(d.dia).substring(0, 10);
+        resp += `• **${diaNom}** (${fechaStr}): **C$ ${Number(d.total_dia).toLocaleString()}** (${d.tickets} facturas)\n`;
+      });
     }
     return resp;
   }
