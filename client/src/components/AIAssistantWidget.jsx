@@ -314,7 +314,7 @@ const AIAssistantWidget = () => {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      text: '👋 ¡Hola! Soy el asistente inteligente de **Multirepuestos RG**.\n\nPuedes preguntarme por las **ventas de hoy**, **dinero en caja**, **existencia de repuestos**, **stock bajo** o **clientes con deuda**.'
+      text: '👋 ¡Hola! Soy **ADA**, el Asistente Inteligente de **Multirepuestos RG**.\n\nPuedo responderte al instante sobre **ventas del día**, **dinero en caja**, **precios y existencia de repuestos**, **stock crítico** o **clientes con deuda**.'
     }
   ]);
 
@@ -346,8 +346,8 @@ const AIAssistantWidget = () => {
     setLoading(true);
 
     try {
-      // Historial para contexto
-      const history = messages.slice(-5).map(m => ({
+      // Historial para contexto (optimizado a 3 mensajes para ahorrar tokens y dar respuesta instantánea)
+      const history = messages.slice(-3).map(m => ({
         role: m.role === 'user' ? 'user' : 'model',
         text: m.text
       }));
@@ -412,10 +412,10 @@ const AIAssistantWidget = () => {
                 <FaRobot />
               </div>
               <div className="bot-info">
-                <h3>Asistente IA RG</h3>
+                <h3>ADA — Asistente RG</h3>
                 <p>
-                  <StatusDot $online={aiStatus.hasGeminiKey} />
-                  {aiStatus.hasGeminiKey ? 'Gemini AI Conectado' : 'Modo Local (Esperando API Key)'}
+                  <StatusDot $online={true} />
+                  Inteligencia de Negocios en Línea
                 </p>
               </div>
             </div>

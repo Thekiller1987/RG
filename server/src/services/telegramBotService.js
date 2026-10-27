@@ -72,8 +72,8 @@ async function handleTelegramMessage(token, message) {
 
   // Comando /start o /ayuda
   if (text.startsWith('/start') || text.startsWith('/help') || text.startsWith('/ayuda')) {
-    const welcome = `🚗 *¡Hola, ${userName}!* Bienvenido al Bot Oficial de *Multirepuestos RG* 🤖\n\n` +
-      `Estoy conectado directamente a la base de datos de tu negocio en tiempo real.\n\n` +
+    const welcome = `🚗 *¡Hola, ${userName}!* Soy *ADA*, el Asistente Inteligente oficial de *Multirepuestos RG* 🤖\n\n` +
+      `Estoy conectada directamente a la base de datos de tu empresa en tiempo real.\n\n` +
       `📌 *Comandos directos:*\n` +
       `• /ventas — Ventas facturadas y cobros de hoy\n` +
       `• /caja — Dinero en cajón y cajas abiertas\n` +

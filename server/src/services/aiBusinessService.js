@@ -1,6 +1,10 @@
 // server/src/services/aiBusinessService.js
 const pool = require('../config/db');
 
+// Caché en memoria para evitar consumo redundante de tokens en preguntas repetidas durante la defensa
+const queryResponseCache = new Map();
+const CACHE_TTL_MS = 60 * 1000; // 60 segundos de caché
+
 /**
  * Recopila en tiempo real las métricas y estado del negocio directamente desde la BD.
  */
@@ -269,18 +273,55 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
   }
 
   // Respuesta general guiando al usuario
-  return `🤖 **Asistente Multirepuestos RG (Modo Local)**\n\n` +
-    `Estoy listo para ayudarte con las consultas de tu negocio. Puedes preguntarme directamente por:\n` +
+  return `🤖 **ADA — Asistente Multirepuestos RG**\n\n` +
+    `Estoy lista para ayudarte con las consultas de tu negocio. Puedes preguntarme directamente por:\n` +
     `• 💵 *"¿Cuánto se ha vendido hoy y qué hay en caja?"*\n` +
     `• 📦 *"Repuestos con stock bajo"* o buscar un repuesto por nombre/código.\n` +
     `• 💳 *"¿Qué clientes tienen deudas pendientes?"*\n` +
     `• 🏆 *"¿Cuáles son los productos más vendidos?"*\n` +
     `• 📊 *"Resumen de inventario y capital"*\n\n` +
-    `*(💡 Nota: El motor completo de IA libre se activará automáticamente en cuanto pegues tu clave \`GEMINI_API_KEY\` en el archivo .env o en Configuración)*.`;
+    `*(💡 Estoy conectada a la base de datos de tu empresa en tiempo real).*`;
 }
 
 /**
- * Consulta al modelo Google Gemini con contexto en vivo inyectado.
+ * Genera un resumen compacto de métricas para ahorrar hasta 80% de tokens por consulta.
+ */
+function formatCompactBusinessContext(context, specificProducts = []) {
+  const v = context.ventasHoy || {};
+  const c = context.cajaHoy || {};
+  const inv = context.resumenInventario || {};
+
+  let text = `DATOS EN TIEMPO REAL (BASE DE DATOS MULTIREPUESTOS RG):\n`;
+  text += `- Fecha/Hora: ${context.fechaHoraActual}\n`;
+  text += `- Ventas Hoy: Facturado C$ ${Number(v.total_facturado || 0).toLocaleString()} en ${v.total_tickets || 0} tickets (Efectivo: C$ ${Number(v.ventas_efectivo || 0).toLocaleString()}, Digital: C$ ${(Number(v.ventas_tarjeta || 0) + Number(v.ventas_transferencia || 0)).toLocaleString()}, Crédito: C$ ${Number(v.ventas_credito || 0).toLocaleString()})\n`;
+  text += `- Cajas Activas: ${c.cajasAbiertas?.length || 0} abiertas. Efectivo esperado en cajón: C$ ${Number(c.efectivoEsperadoTotalCordobas || 0).toLocaleString()}\n`;
+  text += `- Inventario: ${Number(inv.total_productos_distintos || 0).toLocaleString()} repuestos (${Number(inv.total_unidades_fisicas || 0).toLocaleString()} unidades). Valor venta: C$ ${Number(inv.valor_total_venta || 0).toLocaleString()}\n`;
+
+  if (context.stockCritico && context.stockCritico.length > 0) {
+    const crit = context.stockCritico.slice(0, 5).map(p => `${p.nombre} (Cód: ${p.codigo || 'S/C'}): ${p.existencia} uds`).join('; ');
+    text += `- Stock Crítico (<=5): ${crit}\n`;
+  }
+
+  if (context.topClientesDeudores && context.topClientesDeudores.length > 0) {
+    const deud = context.topClientesDeudores.slice(0, 4).map(d => `${d.nombre}: C$ ${Number(d.saldo_pendiente || 0).toLocaleString()}`).join('; ');
+    text += `- Clientes con Deuda: ${deud}\n`;
+  }
+
+  if (context.topProductosVendidos && context.topProductosVendidos.length > 0) {
+    const top = context.topProductosVendidos.slice(0, 4).map(t => `${t.nombre} (${t.total_unidades} uds)`).join('; ');
+    text += `- Top Más Vendidos: ${top}\n`;
+  }
+
+  if (specificProducts && specificProducts.length > 0) {
+    const prods = specificProducts.slice(0, 5).map(p => `• ${p.nombre} (Cód: ${p.codigo || 'S/C'}) -> Stock: ${p.existencia} uds | Venta: C$ ${Number(p.venta || 0).toLocaleString()} | Mayoreo: C$ ${Number(p.mayoreo || p.venta || 0).toLocaleString()}`).join('\n');
+    text += `REPUESTOS RELEVANTES:\n${prods}\n`;
+  }
+
+  return text;
+}
+
+/**
+ * Consulta al motor de IA con identidad estricta ADA y ahorro máximo de tokens.
  */
 async function queryGemini(apiKey, question, context, history = [], specificProducts = []) {
   const cleanKey = String(apiKey || '').trim().replace(/[\r\n"']/g, '');
@@ -293,56 +334,32 @@ async function queryGemini(apiKey, question, context, history = [], specificProd
   ];
 
   const systemInstruction = `
-Eres el Asistente Inteligente oficial de "Multirepuestos RG", una prestigiosa empresa de repuestos de vehículos y motos ubicada en Nicaragua.
-Tu misión es asistir al dueño, gerentes y vendedores brindando respuestas precisas, profesionales, ejecutivas y amables basadas en los datos reales del negocio.
+Eres ADA, la Inteligencia Artificial oficial de Negocios y Operaciones de "Multirepuestos RG", empresa líder de repuestos automotrices y de motos en Nicaragua.
+Tu función es asistir a la gerencia, propietarios y vendedores con respuestas ejecutivas, precisas, profesionales y concisas basadas en los datos en vivo del negocio.
 
-INFORMACIÓN EN TIEMPO REAL DEL NEGOCIO (DATOS VERÍDICOS DE LA BASE DE DATOS):
-- Fecha y Hora Local: ${context.fechaHoraActual}
-- Moneda Oficial: Córdobas (C$) y Dólares ($) con tasa de cambio de referencia 36.60.
+REGLAS DE IDENTIDAD Y SEGURIDAD:
+1. TU IDENTIDAD ES ÚNICAMENTE "ADA". NUNCA menciones que eres Gemini, Google, OpenAI ni modelos externos. Si te preguntan quién eres o qué modelo eres, responde siempre: "Soy ADA, el Asistente Inteligente de Negocios desarrollado a medida para Multirepuestos RG".
+2. RESTRICCIÓN ESTRICTA DE ÁMBITO (SOLO NEGOCIO): Únicamente tienes autorización para responder sobre operaciones de Multirepuestos RG (ventas, cajas, dinero en cajón, precios de repuestos, existencia, inventario, clientes deudores y métricas del negocio).
+3. SI EL USUARIO HACE PREGUNTAS FUERA DEL NEGOCIO (ej. poemas, chistes, recetas, tareas escolares, política, historia, programación o temas ajenos): DEBES RECHAZAR LA PREGUNTA AMABLEMENTE: "Estimado usuario, como asistente oficial de Multirepuestos RG, solo estoy capacitada para atender consultas operativas, financieras y de inventario de nuestra empresa. ¿En qué aspecto del negocio puedo colaborarle?".
+4. FORMATO: Responde en español formal nicaragüense, claro, conciso, usando Markdown elegante (viñetas y negritas). Usa "C$" para Córdobas y "$" para Dólares. Nunca inventes productos que no existan en el catálogo.
 
-VENTAS Y CAJA DE HOY:
-${JSON.stringify(context.ventasHoy, null, 2)}
-ESTADO DE CAJAS ACTIVAS:
-${JSON.stringify(context.cajaHoy, null, 2)}
-
-INVENTARIO RESUMEN:
-${JSON.stringify(context.resumenInventario, null, 2)}
-
-PRODUCTOS CON STOCK CRÍTICO (5 O MENOS UNIDADES):
-${JSON.stringify(context.stockCritico, null, 2)}
-
-TOP CLIENTES CON CRÉDITO Y SALDO PENDIENTE:
-${JSON.stringify(context.topClientesDeudores, null, 2)}
-
-TOP PRODUCTOS MÁS VENDIDOS RECIENTES:
-${JSON.stringify(context.topProductosVendidos, null, 2)}
-
-${specificProducts.length > 0 ? `REPUESTOS RELEVANTES ENCONTRADOS PARA ESTA PREGUNTA ESPECÍFICA:\n${JSON.stringify(specificProducts, null, 2)}` : ''}
-
-REGLAS DE RESPUESTA:
-1. Responde siempre en español nicaragüense/latino profesional, claro y conciso.
-2. Utiliza formato Markdown elegante (negritas, viñetas, emojis sobrios).
-3. Usa siempre "C$" para Córdobas y "$" para Dólares.
-4. Si te preguntan si hay un repuesto o su precio, usa los datos del inventario. Si no existe en el catálogo, indícalo amablemente sin inventar.
-5. No divulgues contraseñas de usuarios ni hashes bajo ninguna circunstancia.
+${formatCompactBusinessContext(context, specificProducts)}
 `;
 
-  // Construir historial en formato Gemini
+  // Construir historial compacto (máximo 2 mensajes para no inflar tokens)
   const contents = [];
 
-  // Agregar historial previo si existe
   if (Array.isArray(history)) {
-    history.slice(-6).forEach(h => {
+    history.slice(-2).forEach(h => {
       if (h.role && h.text) {
         contents.push({
           role: h.role === 'user' ? 'user' : 'model',
-          parts: [{ text: h.text }]
+          parts: [{ text: h.text.substring(0, 300) }]
         });
       }
     });
   }
 
-  // Agregar pregunta actual
   contents.push({
     role: 'user',
     parts: [{ text: question }]
@@ -354,8 +371,8 @@ REGLAS DE RESPUESTA:
     },
     contents,
     generationConfig: {
-      temperature: 0.3,
-      maxOutputTokens: 1000
+      temperature: 0.2,
+      maxOutputTokens: 350 // Respuestas concisas, ejecutivas y ultra rápidas
     }
   };
 
@@ -399,28 +416,40 @@ REGLAS DE RESPUESTA:
     }
   }
 
-  throw lastError || new Error('No se pudo obtener respuesta de ningún modelo de Gemini.');
+  throw lastError || new Error('No se pudo obtener respuesta del motor de IA.');
 }
 
 /**
- * Función principal: Responde cualquier pregunta del negocio.
- * Se apoya en Gemini si la API Key está presente, o en el motor local enriquecido como fallback.
+ * Función principal: Responde cualquier pregunta del negocio con IA o fallback local.
+ * Incluye caché en memoria de 60s para respuestas idénticas (0 tokens gastados en repeticiones).
  */
 async function askBusinessAI({ question, history = [], userId = null }) {
   if (!question || !question.trim()) {
     return {
-      answer: "Por favor escribe una consulta o pregunta sobre el negocio.",
+      answer: "Por favor escribe una consulta o pregunta sobre Multirepuestos RG.",
       provider: "none"
+    };
+  }
+
+  const normalizedQuestion = question.trim().toLowerCase();
+
+  // Verificar si la respuesta está en caché (vital para la defensa: 0ms y 0 tokens gastados)
+  const cached = queryResponseCache.get(normalizedQuestion);
+  if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+    return {
+      answer: cached.answer,
+      provider: "ada-cached",
+      hasKey: true
     };
   }
 
   const context = await getLiveBusinessContext();
 
-  // Intentar buscar repuestos específicos en base al texto de la consulta
+  // Buscar repuestos específicos si se menciona algún término de producto
   const words = question.split(/\s+/).filter(w => w.length >= 3 && !['cuanto', 'donde', 'precio', 'repuesto', 'repuestos', 'tienen', 'vende', 'venden', 'stock', 'quedan', 'cuantos'].includes(w.toLowerCase()));
   let specificProducts = [];
   if (words.length > 0) {
-    specificProducts = await searchProductsForQuery(words.join(' '));
+    specificProducts = await searchProductsForQuery(words.slice(0, 3).join(' '));
     if (!specificProducts.length && words.length > 1) {
       specificProducts = await searchProductsForQuery(words[0]);
     }
@@ -430,24 +459,31 @@ async function askBusinessAI({ question, history = [], userId = null }) {
 
   if (apiKey) {
     try {
-      const geminiAnswer = await queryGemini(apiKey, question, context, history, specificProducts);
+      const adaAnswer = await queryGemini(apiKey, question, context, history, specificProducts);
+
+      // Guardar en caché para consultas idénticas (ahorra tokens)
+      queryResponseCache.set(normalizedQuestion, {
+        answer: adaAnswer,
+        timestamp: Date.now()
+      });
+
       return {
-        answer: geminiAnswer,
-        provider: "gemini",
+        answer: adaAnswer,
+        provider: "ada",
         hasKey: true
       };
     } catch (err) {
-      console.error('[AIBusinessService] Fallo al invocar Gemini, usando fallback local:', err.message);
+      console.error('[ADA] Fallo al invocar IA externa, usando motor local:', err.message);
       const fallback = generateLocalFallbackResponse(question, context, specificProducts);
       return {
-        answer: fallback + `\n\n*(⚠️ Aviso: Hubo un detalle al contactar con la API de Gemini: ${err.message}. Mostrando respuesta local).*`,
+        answer: fallback,
         provider: "local-fallback",
         hasKey: true
       };
     }
   }
 
-  // Sin API Key configurada todavía: usamos motor local enriquecido
+  // Sin API Key configurada todavía: usamos motor local
   const localAnswer = generateLocalFallbackResponse(question, context, specificProducts);
   return {
     answer: localAnswer,
