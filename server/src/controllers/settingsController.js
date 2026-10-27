@@ -86,8 +86,14 @@ const updateSettings = async (req, res) => {
     if (ticket_transfer_footer !== undefined) { fields.push('ticket_transfer_footer = ?'); values.push(ticket_transfer_footer); }
     if (mayorista_pin !== undefined) { fields.push('mayorista_pin = ?'); values.push(mayorista_pin); }
     if (req.body.finances_override_json !== undefined) { fields.push('finances_override_json = ?'); values.push(req.body.finances_override_json); }
-    if (req.body.gemini_api_key !== undefined) { fields.push('gemini_api_key = ?'); values.push(req.body.gemini_api_key.trim()); }
-    if (req.body.telegram_bot_token !== undefined) { fields.push('telegram_bot_token = ?'); values.push(req.body.telegram_bot_token.trim()); }
+    if (req.body.gemini_api_key !== undefined) { 
+        fields.push('gemini_api_key = ?'); 
+        values.push(req.body.gemini_api_key ? String(req.body.gemini_api_key).trim().replace(/[\r\n"']/g, '') : null); 
+    }
+    if (req.body.telegram_bot_token !== undefined) { 
+        fields.push('telegram_bot_token = ?'); 
+        values.push(req.body.telegram_bot_token ? String(req.body.telegram_bot_token).trim().replace(/[\r\n"']/g, '') : null); 
+    }
 
     if (fields.length === 0) return res.status(400).json({ message: 'No hay campos para actualizar' });
 

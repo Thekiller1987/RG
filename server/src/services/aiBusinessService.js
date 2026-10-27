@@ -175,13 +175,17 @@ async function searchProductsForQuery(queryText) {
  * Obtiene la API Key de Gemini desde process.env o desde la tabla business_config.
  */
 async function getGeminiApiKey() {
+  const sanitize = (key) => (key ? String(key).trim().replace(/[\r\n"']/g, '') : null);
+
   if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
-    return process.env.GEMINI_API_KEY.trim();
+    const k = sanitize(process.env.GEMINI_API_KEY);
+    if (k) return k;
   }
   try {
     const [rows] = await pool.query('SELECT gemini_api_key FROM business_config WHERE id = 1 LIMIT 1');
-    if (rows.length && rows[0].gemini_api_key && rows[0].gemini_api_key.trim()) {
-      return rows[0].gemini_api_key.trim();
+    if (rows.length && rows[0].gemini_api_key) {
+      const k = sanitize(rows[0].gemini_api_key);
+      if (k) return k;
     }
   } catch (e) {
     // Si la columna aún no existe o hay error
@@ -279,12 +283,13 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
  * Consulta al modelo Google Gemini con contexto en vivo inyectado.
  */
 async function queryGemini(apiKey, question, context, history = [], specificProducts = []) {
+  const cleanKey = String(apiKey || '').trim().replace(/[\r\n"']/g, '');
+
   const CANDIDATE_MODELS = [
     'gemini-3.5-flash',
     'gemini-3.5-flash-lite',
-    'gemini-flash-latest',
-    'gemini-2.5-flash',
-    'gemini-1.5-flash'
+    'gemini-3.8-flash',
+    'gemini-flash-latest'
   ];
 
   const systemInstruction = `
@@ -358,13 +363,16 @@ REGLAS DE RESPUESTA:
 
   for (const model of CANDIDATE_MODELS) {
     try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(cleanKey)}`;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
 
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-goog-api-key': cleanKey
+        },
         body: JSON.stringify(requestBody),
         signal: controller.signal
       });
@@ -373,7 +381,11 @@ REGLAS DE RESPUESTA:
       if (!response.ok) {
         const errorText = await response.text();
         lastError = new Error(`Gemini [${model}] status ${response.status}: ${errorText}`);
-        continue; // Intentar con el siguiente modelo
+        // Si el error es de autenticación (401/403), no tiene sentido probar más modelos con la misma clave
+        if (response.status === 401 || response.status === 403) {
+          break;
+        }
+        continue;
       }
 
       const data = await response.json();
