@@ -913,9 +913,10 @@ async function queryGemini(apiKey, question, context, history = [], specificProd
 
   const CANDIDATE_MODELS = [
     'gemini-3.5-flash-lite',
-    'gemini-3.5-flash',
-    'gemini-3.8-flash',
-    'gemini-flash-latest'
+    'gemini-flash-lite-latest',
+    'gemini-3.1-flash-lite',
+    'gemini-flash-latest',
+    'gemini-3.5-flash'
   ];
 
   const systemInstruction = `
@@ -953,8 +954,7 @@ ${formatCompactBusinessContext(context, specificProducts)}
     contents,
     generationConfig: {
       temperature: 0.2,
-      maxOutputTokens: 1200,
-      thinkingConfig: { thinkingBudget: 0 }
+      maxOutputTokens: 1200
     }
   };
 
