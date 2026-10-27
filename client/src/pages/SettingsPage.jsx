@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useSettings } from '../context/SettingsContext';
 import { updateSettings as apiUpdateSettings, uploadLogo } from '../service/settingsApi';
-import { useAuth } from '../context/AuthContext';
-import { FaSave, FaBuilding, FaPhone, FaMapMarkerAlt, FaIdCard, FaImage, FaReceipt, FaFileInvoice, FaExchangeAlt } from 'react-icons/fa';
+import { FaSave, FaBuilding, FaPhone, FaMapMarkerAlt, FaIdCard, FaImage, FaReceipt, FaFileInvoice, FaExchangeAlt, FaRobot, FaTelegramPlane } from 'react-icons/fa';
 
 const Container = styled.div`
   padding: 2rem;
@@ -292,6 +291,37 @@ const SettingsPage = () => {
                         placeholder="Ej: Salida de inventario autorizada."
                         style={{ minHeight: '60px' }}
                     />
+                </FormGroup>
+
+                {/* --- SECCIÓN INTELIGENCIA ARTIFICIAL & TELEGRAM --- */}
+                <SectionTitle><FaRobot /> Inteligencia Artificial & Bot de Telegram</SectionTitle>
+
+                <FormGroup>
+                    <Label><FaRobot /> Google Gemini API Key</Label>
+                    <Input
+                        type="password"
+                        name="gemini_api_key"
+                        value={formData.gemini_api_key || ''}
+                        onChange={handleChange}
+                        placeholder="Pega aquí tu API Key de Gemini (ej: AIzaSy...)"
+                    />
+                    <small style={{ color: '#64748b', display: 'block', marginTop: '4px', fontSize: '0.82rem' }}>
+                        💡 <strong>100% Gratis:</strong> Obtén tu clave en <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" style={{ color: '#3b82f6' }}>Google AI Studio</a>. Permite responder consultas avanzadas de negocio en lenguaje natural.
+                    </small>
+                </FormGroup>
+
+                <FormGroup>
+                    <Label><FaTelegramPlane /> Telegram Bot Token</Label>
+                    <Input
+                        type="password"
+                        name="telegram_bot_token"
+                        value={formData.telegram_bot_token || ''}
+                        onChange={handleChange}
+                        placeholder="Token de BotFather (ej: 789123456:AAHq_...)"
+                    />
+                    <small style={{ color: '#64748b', display: 'block', marginTop: '4px', fontSize: '0.82rem' }}>
+                        🤖 Permite hacer consultas de ventas, caja, stock y clientes directamente desde tu Telegram.
+                    </small>
                 </FormGroup>
 
                 <Button type="submit" disabled={loading || uploadingLogo}>

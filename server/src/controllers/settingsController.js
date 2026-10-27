@@ -23,7 +23,10 @@ const pool = require('../config/db');
         await pool.query(`INSERT IGNORE INTO business_config (id) VALUES (1)`);
 
         // Migration for existing tables: Add columns if they don't exist
-        const columns = ['ticket_sales_footer', 'ticket_proforma_footer', 'ticket_transfer_footer', 'mayorista_pin', 'finances_override_json'];
+        const columns = [
+            'ticket_sales_footer', 'ticket_proforma_footer', 'ticket_transfer_footer', 
+            'mayorista_pin', 'finances_override_json', 'gemini_api_key', 'telegram_bot_token'
+        ];
         for (const col of columns) {
             try {
                 // Determine type based on column
@@ -83,6 +86,8 @@ const updateSettings = async (req, res) => {
     if (ticket_transfer_footer !== undefined) { fields.push('ticket_transfer_footer = ?'); values.push(ticket_transfer_footer); }
     if (mayorista_pin !== undefined) { fields.push('mayorista_pin = ?'); values.push(mayorista_pin); }
     if (req.body.finances_override_json !== undefined) { fields.push('finances_override_json = ?'); values.push(req.body.finances_override_json); }
+    if (req.body.gemini_api_key !== undefined) { fields.push('gemini_api_key = ?'); values.push(req.body.gemini_api_key.trim()); }
+    if (req.body.telegram_bot_token !== undefined) { fields.push('telegram_bot_token = ?'); values.push(req.body.telegram_bot_token.trim()); }
 
     if (fields.length === 0) return res.status(400).json({ message: 'No hay campos para actualizar' });
 

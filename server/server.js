@@ -106,6 +106,9 @@ app.use('/api/settings', settingsRoutes);
 const wholesaleRoutes = require('./src/routes/wholesaleRoutes.js');
 app.use('/api/wholesale', wholesaleRoutes);
 
+const aiRoutes = require('./src/routes/aiRoutes.js');
+app.use('/api/ai', aiRoutes);
+
 app.get('/', (_req, res) => {
   res.send('¡API de MultirepuestosRG funcionando! 🚀');
 });
@@ -245,6 +248,10 @@ app.set('calculateGlobalReservations', calculateGlobalReservations);
 
 // 8. Iniciar Servidor
 // Importante: Usamos httpServer.listen en lugar de app.listen para que WS funcione
+const { initTelegramBot } = require('./src/services/telegramBotService');
+
 httpServer.listen(PORT, () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
+  // Iniciar bot de Telegram si el token está presente
+  initTelegramBot();
 });

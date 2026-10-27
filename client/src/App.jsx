@@ -33,6 +33,7 @@ const WholesalePromotions = React.lazy(() => import('./pages/WholesalePromotions
 const WholesaleMenu = React.lazy(() => import('./pages/WholesaleMenu.jsx'));
 const WholesaleCatalog = React.lazy(() => import('./pages/WholesaleCatalog.jsx'));
 const BiConsole = React.lazy(() => import('./pages/BiConsole.jsx'));
+import AIAssistantWidget from './components/AIAssistantWidget.jsx';
 
 // Simple fallback component
 const Loading = () => (
@@ -297,6 +298,9 @@ function App() {
           <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
         </Routes>
       </AnimatePresence>
+
+      {/* Asistente Flotante de IA para Consultas de Negocio */}
+      {user && <AIAssistantWidget />}
     </React.Suspense>
   );
 }

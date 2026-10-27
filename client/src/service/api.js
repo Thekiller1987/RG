@@ -654,3 +654,21 @@ export const togglePromotionStatus = async (id, token) => {
 export const deletePromotion = async (id, token) => {
     return await request('delete', `/wholesale/promotions/${id}`, token);
 };
+
+// ===================================================================
+// --- SECCIÓN DE INTELIGENCIA ARTIFICIAL (IA RG) ---
+// ===================================================================
+export const askAI = async (question, history = [], token = null) => {
+    const t = token || localStorage.getItem('token');
+    return await request('post', '/ai/ask', t, { question, history });
+};
+
+export const getAIStatus = async (token = null) => {
+    const t = token || localStorage.getItem('token');
+    return await request('get', '/ai/status', t);
+};
+
+export const saveAIConfig = async (config, token = null) => {
+    const t = token || localStorage.getItem('token');
+    return await request('post', '/ai/config', t, config);
+};
