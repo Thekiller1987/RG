@@ -623,7 +623,10 @@ ${formatCompactBusinessContext(context, specificProducts)}
     contents,
     generationConfig: {
       temperature: 0.2,
-      maxOutputTokens: 650 // Amplio espacio para listas de productos y balances sin truncamiento
+      maxOutputTokens: 1200,
+      thinkingConfig: {
+        thinkingBudget: 0
+      }
     }
   };
 
