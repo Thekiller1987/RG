@@ -341,8 +341,13 @@ async function getGeminiApiKey() {
 function generateLocalFallbackResponse(question, context, specificProducts = []) {
   const q = question.toLowerCase();
 
-  // Si preguntó por productos específicos y encontramos coincidencias
-  if (specificProducts.length > 0) {
+  const isBusinessMetricQuestion = q.includes('semana') || q.includes('emplead') || q.includes('vendedor') || 
+    q.includes('caja') || q.includes('cierre') || q.includes('arqueo') || q.includes('quien vendio') || 
+    q.includes('quien vendió') || q.includes('cuanto se vendio') || q.includes('cuanto se ha vendido') || 
+    q.includes('cuanto hemos vendido') || q.includes('mejor dia') || q.includes('mejor día');
+
+  // Si preguntó por productos específicos y encontramos coincidencias (y NO es consulta de métricas)
+  if (specificProducts.length > 0 && !isBusinessMetricQuestion) {
     let resp = `🔍 **Repuestos encontrados en inventario:**\n\n`;
     specificProducts.forEach(p => {
       resp += `• **${p.nombre}** (Cód: \`${p.codigo || 'S/C'}\`)\n`;
@@ -578,8 +583,8 @@ async function queryGemini(apiKey, question, context, history = [], specificProd
   const cleanKey = String(apiKey || '').trim().replace(/[\r\n"']/g, '');
 
   const CANDIDATE_MODELS = [
-    'gemini-3.5-flash',
     'gemini-3.5-flash-lite',
+    'gemini-3.5-flash',
     'gemini-3.8-flash',
     'gemini-flash-latest'
   ];
@@ -636,7 +641,7 @@ ${formatCompactBusinessContext(context, specificProducts)}
     try {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(cleanKey)}`;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -708,7 +713,9 @@ async function askBusinessAI({ question, history = [], userId = null }) {
     'estas', 'favor', 'porfa', 'hola', 'buenas', 'dime', 'consultar', 'busca', 'buscar',
     'semana', 'semanal', 'dias', 'dia', 'empleado', 'empleados', 'vendedor', 'vendedores',
     'caja', 'cajas', 'cierre', 'cierres', 'arqueo', 'arqueos', 'turno', 'turnos',
-    'ayer', 'antier', 'mes', 'mensual', 'total', 'totales', 'quien', 'quienes'
+    'ayer', 'antier', 'mes', 'mensual', 'total', 'totales', 'quien', 'quién', 'quienes', 'quiénes',
+    'vendio', 'vendió', 'vendieron', 'vendimos', 'venta', 'ventas', 'vendido', 'mas', 'más', 'cada',
+    'diferencia', 'diferencias', 'hubo', 'cerraron', 'cerró', 'abrieron', 'abrió', 'mejor'
   ]);
 
   const cleanWords = question
