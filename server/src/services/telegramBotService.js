@@ -1,11 +1,12 @@
 // server/src/services/telegramBotService.js
 const pool = require('../config/db');
-const { askBusinessAI, getLiveBusinessContext, searchProductsForQuery } = require('./aiBusinessService');
+const { askBusinessAI, getLiveBusinessContext, searchProductsForQuery, getProductPhoto } = require('./aiBusinessService');
 
 let isPolling = false;
 let pollingAbortController = null;
 let lastUpdateId = 0;
-const authenticatedChats = new Set(); // Chats que han ingresado el PIN
+const authenticatedChats = new Set();
+const telegramHistories = new Map(); // Historial en memoria por chatId // Chats que han ingresado el PIN
 
 /**
  * Obtiene el token del bot de Telegram desde .env o business_config.
@@ -57,6 +58,39 @@ async function sendTelegramMessage(token, chatId, text, options = {}) {
     }
   } catch (e) {
     console.error(`[TelegramBot] Error enviando mensaje al chat ${chatId}:`, e.message);
+  }
+}
+
+/**
+ * Envía una fotografía en Base64 a un chat de Telegram usando FormData nativo de Node.js.
+ */
+async function sendTelegramPhoto(token, chatId, base64Image, caption = '') {
+  try {
+    const raw = base64Image.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(raw, 'base64');
+    const formData = new FormData();
+    formData.append('chat_id', String(chatId));
+    formData.append('photo', new Blob([buffer], { type: 'image/jpeg' }), 'repuesto.jpg');
+    if (caption) {
+      formData.append('caption', caption.substring(0, 1024));
+    }
+
+    const url = `https://api.telegram.org/bot${token}/sendPhoto`;
+    const res = await fetch(url, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!res.ok) {
+      if (caption) {
+        await sendTelegramMessage(token, chatId, caption);
+      }
+    }
+  } catch (e) {
+    console.error(`[TelegramBot] Error enviando foto al chat ${chatId}:`, e.message);
+    if (caption) {
+      await sendTelegramMessage(token, chatId, caption);
+    }
   }
 }
 
@@ -118,6 +152,17 @@ async function handleTelegramMessage(token, message) {
       `• *Crédito:* C$ ${Number(vHoy.ventas_credito || 0).toLocaleString()}\n\n` +
       `💵 *Efectivo en Cajón:* C$ ${Number(cHoy.efectivoEsperadoTotalCordobas || 0).toLocaleString()}`;
     await sendTelegramMessage(token, chatId, msg);
+    return;
+  }
+
+  if (text.startsWith('/foto ')) {
+    const queryTerm = text.replace('/foto ', '').trim();
+    const photoRes = await getProductPhoto(queryTerm);
+    if (photoRes.image) {
+      await sendTelegramPhoto(token, chatId, photoRes.image, photoRes.answer);
+    } else {
+      await sendTelegramMessage(token, chatId, photoRes.answer);
+    }
     return;
   }
 
@@ -261,13 +306,27 @@ async function handleTelegramMessage(token, message) {
     // Notificar al usuario que estamos procesando
     await sendTelegramMessage(token, chatId, "⏳ _Consultando datos en tiempo real..._");
 
+    const chatHist = telegramHistories.get(chatId) || [];
+
     const result = await askBusinessAI({
       question: text,
-      history: [],
+      history: chatHist,
       userId: `telegram-${chatId}`
     });
 
-    await sendTelegramMessage(token, chatId, result.answer);
+    // Guardar en el historial de conversación del chat
+    chatHist.push({ role: 'user', text });
+    chatHist.push({ role: 'assistant', text: result.answer });
+    if (chatHist.length > 8) {
+      chatHist.splice(0, chatHist.length - 8);
+    }
+    telegramHistories.set(chatId, chatHist);
+
+    if (result.image) {
+      await sendTelegramPhoto(token, chatId, result.image, result.answer);
+    } else {
+      await sendTelegramMessage(token, chatId, result.answer);
+    }
   } catch (err) {
     console.error('[TelegramBot] Error procesando consulta con IA:', err.message);
     await sendTelegramMessage(token, chatId, `⚠️ Ocurrió un error al procesar tu consulta: ${err.message}`);

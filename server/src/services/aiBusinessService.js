@@ -13,6 +13,13 @@ async function getLiveBusinessContext() {
     fechaHoraActual: new Date().toLocaleString('es-NI', { timeZone: 'America/Managua' }),
     cajaHoy: null,
     ventasHoy: null,
+    ventasMes: null,
+    ventasSemana: null,
+    ventasSemanaDetalle: [],
+    ventasVendedorSemana: [],
+    ventasVendedorMes: [],
+    ultimosCierresCaja: [],
+    empleadosActivos: [],
     stockCritico: [],
     topClientesDeudores: [],
     topProductosVendidos: [],
@@ -262,7 +269,7 @@ async function getLiveBusinessContext() {
 
 /**
  * Busca repuestos específicos permitiendo múltiples palabras clave (AND) para máxima precisión.
- * Ej: "aceite maxima" busca productos que contengan "aceite" Y "maxima".
+ * Incluye bandera tiene_imagen para saber si el producto cuenta con fotografía en Base64.
  */
 async function searchProductsForQuery(queryText) {
   if (!queryText || !String(queryText).trim()) return [];
@@ -280,7 +287,8 @@ async function searchProductsForQuery(queryText) {
     });
 
     const [rowsAnd] = await pool.query(`
-      SELECT id_producto, codigo, nombre, descripcion, existencia, stock_reservado, venta, mayoreo, costo
+      SELECT id_producto, codigo, nombre, descripcion, existencia, stock_reservado, venta, mayoreo, costo,
+             IF(imagen IS NOT NULL AND CHAR_LENGTH(imagen) > 20, 1, 0) AS tiene_imagen
       FROM productos
       WHERE ${conditions.join(' AND ')}
       LIMIT 12
@@ -293,7 +301,8 @@ async function searchProductsForQuery(queryText) {
     // 2. Si no hubo coincidencias exactas con todos los tokens juntos y había más de 1 token, intentar coincidencia OR
     if (rawTokens.length > 1) {
       const [rowsOr] = await pool.query(`
-        SELECT id_producto, codigo, nombre, descripcion, existencia, stock_reservado, venta, mayoreo, costo
+        SELECT id_producto, codigo, nombre, descripcion, existencia, stock_reservado, venta, mayoreo, costo,
+               IF(imagen IS NOT NULL AND CHAR_LENGTH(imagen) > 20, 1, 0) AS tiene_imagen
         FROM productos
         WHERE ${conditions.join(' OR ')}
         LIMIT 8
@@ -309,22 +318,343 @@ async function searchProductsForQuery(queryText) {
 }
 
 /**
+ * Obtiene la fotografía en Base64 de un repuesto según la consulta o el historial.
+ */
+async function getProductPhoto(question, history = []) {
+  // Limpiar términos para encontrar el nombre o código del repuesto
+  const cleaned = question
+    .replace(/[¿?¡!.,:;()_]/g, ' ')
+    .replace(/\b(muestrame|muéstrame|muestra|ver|enseñame|enséñame|dame|pon|mostrar|foto|fotos|fotografia|fotografía|imagen|imagenes|imágenes|del|de\s+la|de\s+los|de\s+las|de|el|la|los|las|un|una|repuesto|repuestos|producto|productos|porfa|favor|tienes|como\s+se\s+ve|cómo\s+se\s+ve)\b/gi, ' ')
+    .trim();
+
+  let searchTerm = cleaned;
+
+  // Si no se especificó un producto en la pregunta (ej. el usuario sólo dijo "muestrame la foto"):
+  // Buscar en el historial el último repuesto mencionado
+  if (!searchTerm || searchTerm.length < 2) {
+    if (Array.isArray(history) && history.length > 0) {
+      for (let i = history.length - 1; i >= 0; i--) {
+        const msgText = String(history[i].text || '');
+        const codeMatch = msgText.match(/`([^`]+)`/) || msgText.match(/C[oó]d(?:igo)?:\s*([A-Za-z0-9_.-]+)/i);
+        const nameMatch = msgText.match(/\*\*([^*]+)\*\*/) || msgText.match(/•\s*([A-Za-z0-9\s_.-]+?)(?:\s*\(|\s*\[|\n|$)/);
+
+        if (codeMatch && codeMatch[1] && codeMatch[1].trim() !== 'S/C') {
+          searchTerm = codeMatch[1].trim();
+          break;
+        } else if (nameMatch && nameMatch[1] && !nameMatch[1].includes('Repuestos') && !nameMatch[1].includes('Resumen') && !nameMatch[1].includes('Ventas')) {
+          searchTerm = nameMatch[1].trim();
+          break;
+        }
+      }
+    }
+  }
+
+  if (!searchTerm || searchTerm.length < 2) {
+    return {
+      answer: `📷 Para mostrarte la fotografía de un repuesto, por favor indícame su nombre o código. Por ejemplo:\n• *"Muéstrame la foto de llanta 100.90-17"*\n• *"Foto de flasher"*\n• *"Foto de empaque culata"*`,
+      image: null,
+      product: null
+    };
+  }
+
+  try {
+    const tokens = searchTerm.split(/\s+/).filter(t => t.length >= 2);
+    const conditions = [];
+    const params = [];
+    tokens.forEach(t => {
+      const p = `%${t}%`;
+      conditions.push('(nombre LIKE ? OR codigo LIKE ? OR descripcion LIKE ?)');
+      params.push(p, p, p);
+    });
+
+    // 1. Intentar con AND priorizando productos que SÍ tengan imagen cargada
+    let [rows] = await pool.query(`
+      SELECT id_producto, codigo, nombre, descripcion, existencia, stock_reservado, venta, mayoreo, imagen
+      FROM productos
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY (imagen IS NOT NULL AND CHAR_LENGTH(imagen) > 20) DESC, existencia DESC
+      LIMIT 1
+    `, params);
+
+    // 2. Si no hubo coincidencia con AND y había más de 1 token, intentar OR
+    if (!rows.length && tokens.length > 1) {
+      const [rowsOr] = await pool.query(`
+        SELECT id_producto, codigo, nombre, descripcion, existencia, stock_reservado, venta, mayoreo, imagen
+        FROM productos
+        WHERE ${conditions.join(' OR ')}
+        ORDER BY (imagen IS NOT NULL AND CHAR_LENGTH(imagen) > 20) DESC, existencia DESC
+        LIMIT 1
+      `, params);
+      rows = rowsOr;
+    }
+
+    if (!rows.length) {
+      return {
+        answer: `🔍 No encontré ningún repuesto en el catálogo que coincida con **"${searchTerm}"**. Por favor verifica el nombre o código e intenta nuevamente.`,
+        image: null,
+        product: null
+      };
+    }
+
+    const prod = rows[0];
+    const rawImg = prod.imagen ? (Buffer.isBuffer(prod.imagen) ? prod.imagen.toString('utf-8') : String(prod.imagen)) : null;
+    const hasImage = rawImg && rawImg.length > 20;
+
+    let base64Image = null;
+    if (hasImage) {
+      base64Image = rawImg.startsWith('data:') ? rawImg : `data:image/jpeg;base64,${rawImg}`;
+    }
+
+    const prodInfo = {
+      id: prod.id_producto,
+      codigo: prod.codigo,
+      nombre: prod.nombre,
+      existencia: prod.existencia,
+      stock_reservado: prod.stock_reservado || 0,
+      venta: prod.venta,
+      mayoreo: prod.mayoreo || prod.venta
+    };
+
+    if (hasImage) {
+      const text = `📷 Aquí tienes la fotografía de **${prod.nombre}**:\n\n` +
+        `• **Código:** \`${prod.codigo || 'S/C'}\`\n` +
+        `• **Existencia:** **${prod.existencia} unidades** (Reservado: ${prod.stock_reservado || 0})\n` +
+        `• **Precio Venta:** **C$ ${Number(prod.venta).toLocaleString()}** | Mayoreo: **C$ ${Number(prod.mayoreo || prod.venta).toLocaleString()}**`;
+
+      return {
+        answer: text,
+        image: base64Image,
+        product: prodInfo
+      };
+    } else {
+      const text = `📷 El repuesto **${prod.nombre}** (Cód: \`${prod.codigo || 'S/C'}\`) está registrado en el inventario:\n\n` +
+        `• **Existencia:** **${prod.existencia} unidades**\n` +
+        `• **Precio:** **C$ ${Number(prod.venta).toLocaleString()}**\n\n` +
+        `⚠️ Actualmente este repuesto **no tiene una fotografía cargada** en la base de datos. Puedes asignarla desde el módulo de Gestión de Inventario.`;
+
+      return {
+        answer: text,
+        image: null,
+        product: prodInfo
+      };
+    }
+  } catch (err) {
+    console.error('[AIBusinessService] Error buscando foto del repuesto:', err.message);
+    return {
+      answer: `⚠️ Ocurrió un error al consultar la imagen del producto: ${err.message}`,
+      image: null,
+      product: null
+    };
+  }
+}
+
+/**
+ * Extrae el nombre del empleado o usuario mencionado en una consulta.
+ */
+function extractEmployeeName(question, activeEmployees = []) {
+  const q = question.toLowerCase().trim();
+
+  // Nombres conocidos del negocio (waskar, miguelito, walter, rosa, etc.)
+  const knownNames = [
+    'waskar', 'miguelito', 'walter', 'rosa', 'carlos', 'admin', 'lisamara',
+    ...activeEmployees.map(e => e.nombre.toLowerCase().split(/\s+/)[0])
+  ];
+
+  for (const name of knownNames) {
+    if (name.length >= 3 && q.includes(name)) {
+      return name;
+    }
+  }
+
+  // Patrones regex
+  const patterns = [
+    /(?:ventas?|reporte|facturaci[oó]n|tickets?)\s+(?:de\s+)?([a-zA-ZáéíóúñÁÉÍÓÚÑ]+)/i,
+    /(?:cu[aá]nto\s+(?:ha\s+)?vendi[oó])\s+([a-zA-ZáéíóúñÁÉÍÓÚÑ]+)/i,
+    /(?:qu[eé]\s+(?:ha\s+)?vendido)\s+([a-zA-ZáéíóúñÁÉÍÓÚÑ]+)/i
+  ];
+
+  const IGNORE_WORDS = new Set([
+    'hoy', 'ayer', 'antier', 'mes', 'semana', 'ano', 'año', 'caja', 'cajas', 'tienda', 'negocio',
+    'inventario', 'repuesto', 'repuestos', 'producto', 'productos', 'contado', 'credito', 'crédito',
+    'efectivo', 'todos', 'cada', 'un', 'una', 'el', 'la', 'los', 'las', 'del', 'dia', 'día', 'general'
+  ]);
+
+  for (const pat of patterns) {
+    const match = q.match(pat);
+    if (match && match[1]) {
+      const cand = match[1].trim().toLowerCase();
+      if (!IGNORE_WORDS.has(cand) && cand.length >= 3) {
+        return cand;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Genera el reporte de ventas completo para un vendedor o usuario específico (ej: Waskar).
+ */
+async function getEmployeeSalesReport(personQuery) {
+  if (!personQuery || !String(personQuery).trim()) return null;
+  const term = `%${String(personQuery).trim().toLowerCase()}%`;
+
+  try {
+    // 1. Buscar coincidencias en empleados y usuarios
+    const [empMatches] = await pool.query(
+      'SELECT id_empleado, nombre, cargo FROM empleados WHERE LOWER(nombre) LIKE ?',
+      [term]
+    );
+    const [userMatches] = await pool.query(
+      'SELECT id_usuario, nombre_usuario, rol FROM usuarios WHERE LOWER(nombre_usuario) LIKE ?',
+      [term]
+    );
+
+    const hasMatch = empMatches.length > 0 || userMatches.length > 0;
+    if (!hasMatch) {
+      // Verificar si hay ventas registradas con ese nombre
+      const [checkVentas] = await pool.query(`
+        SELECT COUNT(v.id_venta) AS total
+        FROM ventas v
+        LEFT JOIN empleados e ON v.id_empleado = e.id_empleado
+        LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
+        WHERE (LOWER(e.nombre) LIKE ? OR LOWER(u.nombre_usuario) LIKE ?)
+      `, [term, term]);
+
+      if (!checkVentas[0] || Number(checkVentas[0].total) === 0) {
+        return null;
+      }
+    }
+
+    const officialName = empMatches[0]?.nombre || userMatches[0]?.nombre_usuario || personQuery;
+    const roleInfo = empMatches[0]?.cargo || userMatches[0]?.rol || 'Vendedor';
+
+    // 2. Métricas de ventas del vendedor / usuario
+    const [metricsRows] = await pool.query(`
+      SELECT
+        -- Hoy
+        COALESCE(SUM(CASE WHEN DATE(v.fecha) = CURDATE() THEN v.total_venta ELSE 0 END), 0) AS total_hoy,
+        COUNT(CASE WHEN DATE(v.fecha) = CURDATE() THEN v.id_venta ELSE NULL END) AS tickets_hoy,
+        COALESCE(SUM(CASE WHEN DATE(v.fecha) = CURDATE() THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(v.pago_detalles, '$.efectivo')) AS DECIMAL(10,2)) ELSE 0 END), 0) AS efec_hoy,
+        COALESCE(SUM(CASE WHEN DATE(v.fecha) = CURDATE() THEN (CAST(JSON_UNQUOTE(JSON_EXTRACT(v.pago_detalles, '$.tarjeta')) AS DECIMAL(10,2)) + CAST(JSON_UNQUOTE(JSON_EXTRACT(v.pago_detalles, '$.transferencia')) AS DECIMAL(10,2))) ELSE 0 END), 0) AS digital_hoy,
+        COALESCE(SUM(CASE WHEN DATE(v.fecha) = CURDATE() THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(v.pago_detalles, '$.credito')) AS DECIMAL(10,2)) ELSE 0 END), 0) AS cred_hoy,
+
+        -- Mes Actual
+        COALESCE(SUM(CASE WHEN MONTH(v.fecha) = MONTH(CURDATE()) AND YEAR(v.fecha) = YEAR(CURDATE()) THEN v.total_venta ELSE 0 END), 0) AS total_mes,
+        COUNT(CASE WHEN MONTH(v.fecha) = MONTH(CURDATE()) AND YEAR(v.fecha) = YEAR(CURDATE()) THEN v.id_venta ELSE NULL END) AS tickets_mes,
+        COALESCE(SUM(CASE WHEN MONTH(v.fecha) = MONTH(CURDATE()) AND YEAR(v.fecha) = YEAR(CURDATE()) THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(v.pago_detalles, '$.efectivo')) AS DECIMAL(10,2)) ELSE 0 END), 0) AS efec_mes,
+        COALESCE(SUM(CASE WHEN MONTH(v.fecha) = MONTH(CURDATE()) AND YEAR(v.fecha) = YEAR(CURDATE()) THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(v.pago_detalles, '$.credito')) AS DECIMAL(10,2)) ELSE 0 END), 0) AS cred_mes,
+
+        -- Últimos 7 Días
+        COALESCE(SUM(CASE WHEN v.fecha >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) THEN v.total_venta ELSE 0 END), 0) AS total_semana,
+        COUNT(CASE WHEN v.fecha >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) THEN v.id_venta ELSE NULL END) AS tickets_semana,
+
+        -- Histórico total
+        COALESCE(SUM(v.total_venta), 0) AS total_historico,
+        COUNT(v.id_venta) AS tickets_historico,
+        MAX(v.fecha) AS ultima_venta
+      FROM ventas v
+      LEFT JOIN empleados e ON v.id_empleado = e.id_empleado
+      LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
+      WHERE (LOWER(e.nombre) LIKE ? OR LOWER(u.nombre_usuario) LIKE ?)
+        AND v.estado != 'CANCELADA'
+    `, [term, term]);
+
+    const m = metricsRows[0] || {};
+
+    // 3. Últimas 3 ventas individuales
+    const [ultimas] = await pool.query(`
+      SELECT v.id_venta, v.fecha, v.total_venta, v.tipo_pago,
+             COALESCE(e.nombre, u.nombre_usuario) AS vendedor
+      FROM ventas v
+      LEFT JOIN empleados e ON v.id_empleado = e.id_empleado
+      LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
+      WHERE (LOWER(e.nombre) LIKE ? OR LOWER(u.nombre_usuario) LIKE ?)
+        AND v.estado != 'CANCELADA'
+      ORDER BY v.id_venta DESC
+      LIMIT 3
+    `, [term, term]);
+
+    // 4. Verificar si tiene caja activa hoy
+    const [cajas] = await pool.query(`
+      SELECT id, usuario_nombre, monto_inicial, fecha_apertura, fecha_cierre
+      FROM cierres_caja
+      WHERE (LOWER(usuario_nombre) LIKE ? OR usuario_id = ?)
+        AND (DATE(fecha_apertura) = CURDATE() OR fecha_cierre IS NULL)
+      ORDER BY id DESC LIMIT 1
+    `, [term, userMatches[0]?.id_usuario || -1]);
+
+    const cajaActiva = cajas[0];
+
+    // Formatear reporte
+    let resp = `👤 **Reporte de Ventas — ${officialName.toUpperCase()}** *(${roleInfo})*:\n\n`;
+
+    resp += `📅 **Ventas de Hoy:**\n`;
+    if (Number(m.total_hoy) > 0 || Number(m.tickets_hoy) > 0) {
+      resp += `• **Total Facturado Hoy:** **C$ ${Number(m.total_hoy).toLocaleString()}** (${m.tickets_hoy} facturas)\n`;
+      resp += `• **En Efectivo:** C$ ${Number(m.efec_hoy).toLocaleString()} | **Al Crédito:** C$ ${Number(m.cred_hoy).toLocaleString()}`;
+      if (Number(m.digital_hoy) > 0) resp += ` | **Digital:** C$ ${Number(m.digital_hoy).toLocaleString()}`;
+      resp += `\n\n`;
+    } else {
+      resp += `• No registra ventas facturadas el día de hoy (C$ 0 — 0 facturas).\n\n`;
+    }
+
+    resp += `🗓️ **Acumulado en el Mes Actual:**\n`;
+    if (Number(m.total_mes) > 0) {
+      resp += `• **Total Facturado:** **C$ ${Number(m.total_mes).toLocaleString()}** (${m.tickets_mes} facturas)\n`;
+      resp += `• **En Efectivo:** C$ ${Number(m.efec_mes).toLocaleString()} | **Al Crédito:** C$ ${Number(m.cred_mes).toLocaleString()}\n\n`;
+    } else {
+      resp += `• No registra ventas en el mes en curso (C$ 0 — 0 facturas).\n\n`;
+    }
+
+    resp += `📊 **Rendimiento Últimos 7 Días:**\n`;
+    if (Number(m.total_semana) > 0) {
+      resp += `• **Facturado en la Semana:** **C$ ${Number(m.total_semana).toLocaleString()}** (${m.tickets_semana} facturas)\n\n`;
+    } else {
+      resp += `• Sin ventas en los últimos 7 días (C$ 0).\n\n`;
+    }
+
+    resp += `🏆 **Historial Acumulado en el Sistema:**\n`;
+    resp += `• **Total Histórico Facturado:** **C$ ${Number(m.total_historico || 0).toLocaleString()}** (${Number(m.tickets_historico || 0).toLocaleString()} facturas emitidas)\n`;
+    if (m.ultima_venta) {
+      const fUlt = new Date(m.ultima_venta).toLocaleDateString('es-NI', { timeZone: 'America/Managua' });
+      resp += `• **Última Venta Registrada:** ${fUlt}\n`;
+    }
+
+    if (ultimas.length > 0) {
+      resp += `\n🧾 **Últimos Tickets Emitidos:**\n`;
+      ultimas.forEach(u => {
+        const fechaStr = new Date(u.fecha).toLocaleDateString('es-NI', { timeZone: 'America/Managua' });
+        resp += `• **Ticket #${u.id_venta}** (${fechaStr}): **C$ ${Number(u.total_venta).toLocaleString()}**\n`;
+      });
+    }
+
+    if (cajaActiva) {
+      const estadoCaja = cajaActiva.fecha_cierre ? 'Cerrada' : '🟢 ABIERTA';
+      resp += `\n💵 **Estado de Caja:** Caja #${cajaActiva.id} (${estadoCaja}) — Fondo inicial: C$ ${Number(cajaActiva.monto_inicial || 0).toLocaleString()}`;
+    }
+
+    return resp;
+  } catch (error) {
+    console.error('[AIBusinessService] Error obteniendo reporte de empleado:', error.message);
+    return null;
+  }
+}
+
+/**
  * Obtiene la API Key de Gemini desde la base de datos o desde process.env.
- * Prioriza la base de datos para que la clave guardada en business_config mande siempre.
  */
 async function getGeminiApiKey() {
   const sanitize = (key) => (key ? String(key).trim().replace(/[\r\n"']/g, '') : null);
 
-  // 1. Priorizar base de datos (donde está la clave verificada del negocio)
+  // 1. Priorizar base de datos
   try {
     const [rows] = await pool.query('SELECT gemini_api_key FROM business_config WHERE id = 1 LIMIT 1');
     if (rows.length && rows[0].gemini_api_key) {
       const k = sanitize(rows[0].gemini_api_key);
       if (k) return k;
     }
-  } catch (e) {
-    // Si la columna aún no existe o hay error
-  }
+  } catch (e) {}
 
   // 2. Si no hay en BD, buscar en process.env
   if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
@@ -335,8 +665,7 @@ async function getGeminiApiKey() {
 }
 
 /**
- * Generador de respuesta local inteligente cuando aún no se ha ingresado la API Key de Gemini.
- * Esto asegura que el sistema responda de inmediato con datos reales sin romperse.
+ * Generador de respuesta local inteligente.
  */
 function generateLocalFallbackResponse(question, context, specificProducts = []) {
   const q = question.toLowerCase();
@@ -344,7 +673,9 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
   const isBusinessMetricQuestion = q.includes('semana') || q.includes('emplead') || q.includes('vendedor') || 
     q.includes('caja') || q.includes('cierre') || q.includes('arqueo') || q.includes('quien vendio') || 
     q.includes('quien vendió') || q.includes('cuanto se vendio') || q.includes('cuanto se ha vendido') || 
-    q.includes('cuanto hemos vendido') || q.includes('mejor dia') || q.includes('mejor día');
+    q.includes('cuanto hemos vendido') || q.includes('mejor dia') || q.includes('mejor día') ||
+    q.includes('mes') || q.includes('mensual') || q.includes('hoy') || q.includes('facturad') ||
+    q.includes('total de venta') || q.includes('dinero');
 
   // Si preguntó por productos específicos y encontramos coincidencias (y NO es consulta de métricas)
   if (specificProducts.length > 0 && !isBusinessMetricQuestion) {
@@ -352,7 +683,11 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
     specificProducts.forEach(p => {
       resp += `• **${p.nombre}** (Cód: \`${p.codigo || 'S/C'}\`)\n`;
       resp += `  - Existencia: **${p.existencia} unidades** (Reservado: ${p.stock_reservado || 0})\n`;
-      resp += `  - Precio Público: **C$ ${Number(p.venta || 0).toLocaleString()}** | Mayoreo: **C$ ${Number(p.mayoreo || p.venta || 0).toLocaleString()}**\n\n`;
+      resp += `  - Precio Público: **C$ ${Number(p.venta || 0).toLocaleString()}** | Mayoreo: **C$ ${Number(p.mayoreo || p.venta || 0).toLocaleString()}**\n`;
+      if (p.tiene_imagen) {
+        resp += `  - 📸 *Escribe "muéstrame la foto" para ver su imagen.*\n`;
+      }
+      resp += `\n`;
     });
     return resp;
   }
@@ -381,7 +716,8 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
     }
 
     if (emps.length > 0) {
-      resp += `\n🧑‍💼 **Plantilla de Vendedores Registrados:** ${emps.map(e => e.nombre).join(', ')}.`;
+      resp += `\n🧑‍💼 **Plantilla de Vendedores Registrados:** ${emps.map(e => e.nombre).join(', ')}.\n`;
+      resp += `💡 *Puedes preguntar por las ventas de cualquiera de ellos (ej: "ventas waskar").*`;
     }
     return resp;
   }
@@ -410,6 +746,29 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
     return resp;
   }
 
+  // 2b. Ventas del Mes Actual (Específico)
+  if (q.includes('mes') || q.includes('mensual')) {
+    const vMes = context.ventasMes || {};
+    const vHoy = context.ventasHoy || {};
+    const vendMes = context.ventasVendedorMes || [];
+
+    let resp = `🗓️ **Resumen de Ventas del Mes Actual — Multirepuestos RG:**\n\n`;
+    resp += `• **Total Facturado en el Mes:** **C$ ${Number(vMes.total_facturado_mes || 0).toLocaleString()}**\n`;
+    resp += `• **Facturas / Tickets Emitidos:** **${Number(vMes.total_tickets_mes || 0).toLocaleString()} facturas**\n`;
+    resp += `• **Ventas en Efectivo:** C$ ${Number(vMes.ventas_efectivo_mes || 0).toLocaleString()}\n`;
+    resp += `• **Ventas al Crédito:** C$ ${Number(vMes.ventas_credito_mes || 0).toLocaleString()}\n`;
+    resp += `• **Ventas Registradas Hoy:** C$ ${Number(vHoy.total_facturado || 0).toLocaleString()} (${vHoy.total_tickets || 0} tickets)\n\n`;
+
+    if (vendMes.length > 0) {
+      resp += `👥 **Top Vendedores en el Mes:**\n`;
+      vendMes.slice(0, 5).forEach((v, i) => {
+        resp += `${i + 1}. **${v.vendedor}**: C$ ${Number(v.total_vendido).toLocaleString()} (${v.tickets} tks)\n`;
+      });
+    }
+
+    return resp;
+  }
+
   // 3. Venta por Caja / Arqueos y Cierres de Caja
   if (q.includes('cierre') || q.includes('arqueo') || q.includes('por caja') || (q.includes('caja') && !q.includes('hoy'))) {
     const cHoy = context.cajaHoy || {};
@@ -433,8 +792,8 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
     return resp;
   }
 
-  // 4. Ventas de hoy / Mes / Dinero general
-  if (q.includes('venta') || q.includes('vendido') || q.includes('hoy') || q.includes('mes') || q.includes('caja') || q.includes('dinero') || q.includes('cuanto hay')) {
+  // 4. Ventas de hoy / Dinero general
+  if (q.includes('venta') || q.includes('vendido') || q.includes('hoy') || q.includes('caja') || q.includes('dinero') || q.includes('cuanto hay')) {
     const vHoy = context.ventasHoy || {};
     const vMes = context.ventasMes || {};
     const cHoy = context.cajaHoy || {};
@@ -496,17 +855,17 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
   return `🤖 **ADA — Asistente Multirepuestos RG**\n\n` +
     `Estoy lista para ayudarte con las consultas de tu negocio. Puedes preguntarme directamente por:\n` +
     `• 💵 *"¿Cuánto se ha vendido hoy y qué hay en caja?"*\n` +
+    `• 🗓️ *"¿Cuáles son las ventas del mes?"*\n` +
+    `• 👤 *"Ventas de Waskar"* o de cualquier empleado.\n` +
+    `• 📷 *"Muéstrame la foto de [repuesto]"* para ver fotos del catálogo.\n` +
     `• 📅 *"¿Cuánto hemos vendido en toda la semana y cuál fue el mejor día?"*\n` +
-    `• 👥 *"¿Cuánto vendió cada empleado o vendedor?"*\n` +
-    `• 💰 *"¿Cómo cerraron las últimas cajas y qué diferencias hubo?"*\n` +
-    `• 📦 *"Repuestos con stock bajo"* o buscar repuestos por nombre/código.\n` +
-    `• 💳 *"¿Qué clientes tienen deudas pendientes?"*\n` +
-    `• 🏆 *"¿Cuáles son los productos más vendidos?"*\n\n` +
-    `*(💡 Estoy conectada a la base de datos de tu empresa en tiempo real).*`;
+    `• 💰 *"¿Cómo cerraron las últimas cajas?"*\n` +
+    `• 📦 *"Repuestos con stock bajo"* o buscar repuestos por nombre/código.\n\n` +
+    `*(💡 Conectada a la base de datos de tu empresa en tiempo real).*`;
 }
 
 /**
- * Genera un resumen compacto de métricas para ahorrar hasta 80% de tokens por consulta.
+ * Genera un resumen compacto de métricas para IA externa.
  */
 function formatCompactBusinessContext(context, specificProducts = []) {
   const v = context.ventasHoy || {};
@@ -521,52 +880,22 @@ function formatCompactBusinessContext(context, specificProducts = []) {
 
   if (vSem.total_facturado_semana > 0) {
     text += `- Ventas Toda la Semana (Últimos 7 días): Facturado C$ ${Number(vSem.total_facturado_semana).toLocaleString()} en ${vSem.total_tickets_semana} tickets (Efectivo: C$ ${Number(vSem.total_efectivo_semana).toLocaleString()}, Crédito: C$ ${Number(vSem.total_credito_semana).toLocaleString()}, Promedio diario: C$ ${Math.round(vSem.promedio_diario).toLocaleString()})\n`;
-    if (context.ventasSemanaDetalle && context.ventasSemanaDetalle.length > 0) {
-      const diasTrad = { 'Monday': 'Lun', 'Tuesday': 'Mar', 'Wednesday': 'Mié', 'Thursday': 'Jue', 'Friday': 'Vie', 'Saturday': 'Sáb', 'Sunday': 'Dom' };
-      const dias = context.ventasSemanaDetalle.map(d => `${diasTrad[d.dia_nombre] || d.dia_nombre} ${String(d.dia).substring(0, 10)}: C$ ${Number(d.total_dia).toLocaleString()} (${d.tickets} tks)`).join('; ');
-      text += `- Desglose Diario Semana: ${dias}\n`;
-    }
   }
 
   text += `- Ventas del Mes: Facturado C$ ${Number(vMes.total_facturado_mes || 0).toLocaleString()} en ${vMes.total_tickets_mes || 0} tickets (Efectivo Mes: C$ ${Number(vMes.ventas_efectivo_mes || 0).toLocaleString()}, Crédito Mes: C$ ${Number(vMes.ventas_credito_mes || 0).toLocaleString()})\n`;
 
-  if (context.ventasVendedorSemana && context.ventasVendedorSemana.length > 0) {
-    const vend = context.ventasVendedorSemana.map(v => `${v.vendedor}: C$ ${Number(v.total_vendido).toLocaleString()} (${v.tickets} tks)`).join('; ');
-    text += `- Ventas por Vendedor (Semana): ${vend}\n`;
+  if (context.ventasVendedorMes && context.ventasVendedorMes.length > 0) {
+    const vend = context.ventasVendedorMes.map(v => `${v.vendedor}: C$ ${Number(v.total_vendido).toLocaleString()} (${v.tickets} tks)`).join('; ');
+    text += `- Ventas por Vendedor (Mes Actual): ${vend}\n`;
   }
 
   if (context.empleadosActivos && context.empleadosActivos.length > 0) {
     const emps = context.empleadosActivos.map(e => `${e.nombre} (${e.cargo})`).join(', ');
-    text += `- Personal de Ventas Registrado: ${emps}\n`;
+    text += `- Personal Registrado: ${emps}\n`;
   }
 
   text += `- Cajas Activas: ${(c.cajasAbiertas || []).length} abiertas. Efectivo esperado en cajón: C$ ${Number(c.efectivoEsperadoTotalCordobas || 0).toLocaleString()}\n`;
-
-  if (context.ultimosCierresCaja && context.ultimosCierresCaja.length > 0) {
-    text += `- Cierres y Arqueos de Caja Recientes:\n`;
-    context.ultimosCierresCaja.slice(0, 4).forEach(ca => {
-      const dif = Number(ca.diferencia || 0);
-      const difStr = dif === 0 ? 'Exacta (C$ 0)' : (dif > 0 ? `Sobrante +C$ ${dif.toLocaleString()}` : `Faltante -C$ ${Math.abs(dif).toLocaleString()}`);
-      text += `  * Caja #${ca.caja_id} [${ca.estado}] (${ca.usuario_nombre}, ${ca.apertura}): Ventas Turno C$ ${Number(ca.total_ventas_caja || 0).toLocaleString()} (Efec: C$ ${Number(ca.total_ventas_efectivo || 0).toLocaleString()}) | Esperado C$ ${Number(ca.final_esperado || 0).toLocaleString()} | Real C$ ${Number(ca.final_real || 0).toLocaleString()} | Arqueo: ${difStr}\n`;
-    });
-  }
-
   text += `- Inventario: ${Number(inv.total_productos_distintos || 0).toLocaleString()} repuestos (${Number(inv.total_unidades_fisicas || 0).toLocaleString()} unidades). Valor venta: C$ ${Number(inv.valor_total_venta || 0).toLocaleString()}\n`;
-
-  if (context.stockCritico && context.stockCritico.length > 0) {
-    const crit = context.stockCritico.slice(0, 5).map(p => `${p.nombre} (Cód: ${p.codigo || 'S/C'}): ${p.existencia} uds`).join('; ');
-    text += `- Stock Crítico (<=5): ${crit}\n`;
-  }
-
-  if (context.topClientesDeudores && context.topClientesDeudores.length > 0) {
-    const deud = context.topClientesDeudores.slice(0, 4).map(d => `${d.nombre}: C$ ${Number(d.saldo_pendiente || 0).toLocaleString()}`).join('; ');
-    text += `- Clientes con Deuda: ${deud}\n`;
-  }
-
-  if (context.topProductosVendidos && context.topProductosVendidos.length > 0) {
-    const top = context.topProductosVendidos.slice(0, 4).map(t => `${t.nombre} (${t.total_unidades} uds)`).join('; ');
-    text += `- Top Más Vendidos: ${top}\n`;
-  }
 
   if (specificProducts && specificProducts.length > 0) {
     const prods = specificProducts.slice(0, 5).map(p => `• ${p.nombre} (Cód: ${p.codigo || 'S/C'}) -> Stock: ${p.existencia} uds | Venta: C$ ${Number(p.venta || 0).toLocaleString()} | Mayoreo: C$ ${Number(p.mayoreo || p.venta || 0).toLocaleString()}`).join('\n');
@@ -577,7 +906,7 @@ function formatCompactBusinessContext(context, specificProducts = []) {
 }
 
 /**
- * Consulta al motor de IA con identidad estricta ADA y ahorro máximo de tokens.
+ * Consulta al motor de IA externo.
  */
 async function queryGemini(apiKey, question, context, history = [], specificProducts = []) {
   const cleanKey = String(apiKey || '').trim().replace(/[\r\n"']/g, '');
@@ -596,15 +925,13 @@ Tu función es asistir a la gerencia, propietarios y vendedores con respuestas e
 REGLAS DE IDENTIDAD Y SEGURIDAD:
 1. TU IDENTIDAD ES ÚNICAMENTE "ADA". NUNCA menciones que eres Gemini, Google, OpenAI ni modelos externos. Si te preguntan quién eres o qué modelo eres, responde siempre: "Soy ADA, el Asistente Inteligente de Negocios desarrollado a medida para Multirepuestos RG".
 2. RESTRICCIÓN ESTRICTA DE ÁMBITO (SOLO NEGOCIO): Únicamente tienes autorización para responder sobre operaciones de Multirepuestos RG (ventas de la semana, del mes, hoy, rendimiento de empleados/vendedores, arqueos y ventas por caja, precios de repuestos, existencia, inventario, clientes deudores y métricas del negocio).
-3. SI EL USUARIO HACE PREGUNTAS FUERA DEL NEGOCIO (ej. poemas, chistes, recetas, tareas escolares, política, historia, programación o temas ajenos): DEBES RECHAZAR LA PREGUNTA AMABLEMENTE: "Estimado usuario, como asistente oficial de Multirepuestos RG, solo estoy capacitada para atender consultas operativas, financieras y de inventario de nuestra empresa. ¿En qué aspecto del negocio puedo colaborarle?".
-4. FORMATO: Responde en español formal nicaragüense, claro, conciso, usando Markdown elegante (viñetas y negritas). Usa "C$" para Córdobas y "$" para Dólares. Nunca inventes productos que no existan en el catálogo.
+3. SI EL USUARIO HACE PREGUNTAS FUERA DEL NEGOCIO: Rechaza amablemente indicando que solo estás autorizada para consultas de Multirepuestos RG.
+4. FORMATO: Responde en español formal nicaragüense, claro, conciso, usando Markdown elegante (viñetas y negritas). Usa "C$" para Córdobas y "$" para Dólares.
 
 ${formatCompactBusinessContext(context, specificProducts)}
 `;
 
-  // Construir historial compacto (máximo 2 mensajes para no inflar tokens)
   const contents = [];
-
   if (Array.isArray(history)) {
     history.slice(-2).forEach(h => {
       if (h.role && h.text) {
@@ -622,16 +949,12 @@ ${formatCompactBusinessContext(context, specificProducts)}
   });
 
   const requestBody = {
-    system_instruction: {
-      parts: [{ text: systemInstruction }]
-    },
+    system_instruction: { parts: [{ text: systemInstruction }] },
     contents,
     generationConfig: {
       temperature: 0.2,
       maxOutputTokens: 1200,
-      thinkingConfig: {
-        thinkingBudget: 0
-      }
+      thinkingConfig: { thinkingBudget: 0 }
     }
   };
 
@@ -657,19 +980,13 @@ ${formatCompactBusinessContext(context, specificProducts)}
       if (!response.ok) {
         const errorText = await response.text();
         lastError = new Error(`Gemini [${model}] status ${response.status}: ${errorText}`);
-        // Si el error es de autenticación (401/403), no tiene sentido probar más modelos con la misma clave
-        if (response.status === 401 || response.status === 403) {
-          break;
-        }
+        if (response.status === 401 || response.status === 403) break;
         continue;
       }
 
       const data = await response.json();
       const textOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (textOutput) {
-        return textOutput;
-      }
+      if (textOutput) return textOutput;
     } catch (err) {
       lastError = err;
     }
@@ -680,23 +997,70 @@ ${formatCompactBusinessContext(context, specificProducts)}
 
 /**
  * Función principal: Responde cualquier pregunta del negocio con IA o fallback local.
- * Incluye caché en memoria de 60s para respuestas idénticas (0 tokens gastados en repeticiones).
  */
 async function askBusinessAI({ question, history = [], userId = null }) {
   if (!question || !question.trim()) {
     return {
       answer: "Por favor escribe una consulta o pregunta sobre Multirepuestos RG.",
+      image: null,
+      product: null,
       provider: "none"
     };
   }
 
-  const normalizedQuestion = question.trim().toLowerCase();
+  const rawQ = question.trim();
+  const normalizedQuestion = rawQ.toLowerCase();
 
-  // Verificar si la respuesta está en caché (vital para la defensa: 0ms y 0 tokens gastados)
+  // 1. VERIFICAR SI PIDE FOTOGRAFÍA DE UN PRODUCTO
+  const isPhotoQuery = /\b(foto|fotos|fotografia|fotografía|imagen|imagenes|imágenes)\b/i.test(rawQ) ||
+    /\b(muestrame|muéstrame|muestra|enseñame|enséñame|ver)\s+(?:la\s+)?(?:foto|fotografia|fotografía|imagen)/i.test(rawQ) ||
+    /\b(como\s+se\s+ve|cómo\s+se\s+ve)\b/i.test(rawQ);
+
+  if (isPhotoQuery) {
+    const photoResult = await getProductPhoto(rawQ, history);
+    return {
+      answer: photoResult.answer,
+      image: photoResult.image,
+      product: photoResult.product,
+      provider: "ada-catalog-photo",
+      hasKey: true
+    };
+  }
+
+  // 2. VERIFICAR SI PREGUNTA POR VENTAS DE UN EMPLEADO / VENDEDOR ESPECÍFICO (ej: "ventas waskar", "ventas de waskar")
+  const activeEmps = [];
+  try {
+    const [emps] = await pool.query('SELECT nombre FROM empleados WHERE activo = 1');
+    emps.forEach(e => activeEmps.push(e));
+  } catch (e) {}
+
+  const targetEmployee = extractEmployeeName(rawQ, activeEmps);
+  const isEmployeeSalesQuery = targetEmployee && (
+    normalizedQuestion.includes('venta') || normalizedQuestion.includes('vendio') || normalizedQuestion.includes('vendió') ||
+    normalizedQuestion.includes('reporte') || normalizedQuestion.includes('cuanto') || normalizedQuestion.includes('factur') ||
+    normalizedQuestion.includes('ticket') || normalizedQuestion.includes('de')
+  );
+
+  if (isEmployeeSalesQuery) {
+    const empReport = await getEmployeeSalesReport(targetEmployee);
+    if (empReport) {
+      return {
+        answer: empReport,
+        image: null,
+        product: null,
+        provider: "ada-employee-report",
+        hasKey: true
+      };
+    }
+  }
+
+  // Verificar si la respuesta está en caché (60s)
   const cached = queryResponseCache.get(normalizedQuestion);
   if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
     return {
       answer: cached.answer,
+      image: null,
+      product: null,
       provider: "ada-cached",
       hasKey: true
     };
@@ -704,7 +1068,7 @@ async function askBusinessAI({ question, history = [], userId = null }) {
 
   const context = await getLiveBusinessContext();
 
-  // Buscar repuestos específicos si se menciona algún término de producto
+  // STOP WORDS AMPLIADO para no disparar búsquedas de productos accidentales
   const STOP_WORDS = new Set([
     'cuanto', 'cuantos', 'cuanta', 'cuantas', 'donde', 'precio', 'precios', 'costo', 'cuesta', 
     'repuesto', 'repuestos', 'tienen', 'tenemos', 'hay', 'vende', 'venden', 'stock', 'quedan', 
@@ -715,27 +1079,38 @@ async function askBusinessAI({ question, history = [], userId = null }) {
     'caja', 'cajas', 'cierre', 'cierres', 'arqueo', 'arqueos', 'turno', 'turnos',
     'ayer', 'antier', 'mes', 'mensual', 'total', 'totales', 'quien', 'quién', 'quienes', 'quiénes',
     'vendio', 'vendió', 'vendieron', 'vendimos', 'venta', 'ventas', 'vendido', 'mas', 'más', 'cada',
-    'diferencia', 'diferencias', 'hubo', 'cerraron', 'cerró', 'abrieron', 'abrió', 'mejor'
+    'diferencia', 'diferencias', 'hubo', 'cerraron', 'cerró', 'abrieron', 'abrió', 'mejor',
+    'son', 'es', 'el', 'la', 'de', 'al', 'dame', 'dar', 'muestra', 'muestrame', 'muéstrame',
+    'ver', 'reporte', 'reportes', 'resumen', 'detalle', 'foto', 'fotos', 'imagen', 'imagenes'
   ]);
 
-  const cleanWords = question
-    .toLowerCase()
-    .replace(/[¿?¡!.,:;()_]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length >= 3 && !STOP_WORDS.has(w));
+  const isBusinessMetric = normalizedQuestion.includes('semana') || normalizedQuestion.includes('emplead') || 
+    normalizedQuestion.includes('vendedor') || normalizedQuestion.includes('caja') || normalizedQuestion.includes('cierre') || 
+    normalizedQuestion.includes('arqueo') || normalizedQuestion.includes('quien vendio') || normalizedQuestion.includes('quien vendió') || 
+    normalizedQuestion.includes('cuanto se vendio') || normalizedQuestion.includes('cuanto se ha vendido') || 
+    normalizedQuestion.includes('cuanto hemos vendido') || normalizedQuestion.includes('mejor dia') || 
+    normalizedQuestion.includes('mes') || normalizedQuestion.includes('mensual') || normalizedQuestion.includes('hoy') || 
+    normalizedQuestion.includes('facturad') || normalizedQuestion.includes('total de venta');
 
   let specificProducts = [];
-  if (cleanWords.length > 0) {
-    specificProducts = await searchProductsForQuery(cleanWords.join(' '));
+  if (!isBusinessMetric) {
+    const cleanWords = rawQ
+      .toLowerCase()
+      .replace(/[¿?¡!.,:;()_]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length >= 3 && !STOP_WORDS.has(w));
+
+    if (cleanWords.length > 0) {
+      specificProducts = await searchProductsForQuery(cleanWords.join(' '));
+    }
   }
 
   const apiKey = await getGeminiApiKey();
 
   if (apiKey) {
     try {
-      const adaAnswer = await queryGemini(apiKey, question, context, history, specificProducts);
+      const adaAnswer = await queryGemini(apiKey, rawQ, context, history, specificProducts);
 
-      // Guardar en caché para consultas idénticas (ahorra tokens)
       queryResponseCache.set(normalizedQuestion, {
         answer: adaAnswer,
         timestamp: Date.now()
@@ -743,24 +1118,30 @@ async function askBusinessAI({ question, history = [], userId = null }) {
 
       return {
         answer: adaAnswer,
+        image: null,
+        product: null,
         provider: "ada",
         hasKey: true
       };
     } catch (err) {
       console.error('[ADA] Fallo al invocar IA externa, usando motor local:', err.message);
-      const fallback = generateLocalFallbackResponse(question, context, specificProducts);
+      const fallback = generateLocalFallbackResponse(rawQ, context, specificProducts);
       return {
         answer: fallback,
+        image: null,
+        product: null,
         provider: "local-fallback",
         hasKey: true
       };
     }
   }
 
-  // Sin API Key configurada todavía: usamos motor local
-  const localAnswer = generateLocalFallbackResponse(question, context, specificProducts);
+  // Sin API Key configurada: usar motor local
+  const localAnswer = generateLocalFallbackResponse(rawQ, context, specificProducts);
   return {
     answer: localAnswer,
+    image: null,
+    product: null,
     provider: "local-waiting-key",
     hasKey: false
   };
@@ -770,5 +1151,8 @@ module.exports = {
   askBusinessAI,
   getLiveBusinessContext,
   getGeminiApiKey,
-  searchProductsForQuery
+  searchProductsForQuery,
+  getEmployeeSalesReport,
+  getProductPhoto,
+  extractEmployeeName
 };

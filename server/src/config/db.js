@@ -2,12 +2,23 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
+const isWindows = process.platform === 'win32';
+const host = process.env.DB_HOST || 'localhost';
+let password = process.env.DB_PASSWORD;
+
+if (!password) {
+  password = isWindows ? 'AppSegura_2025!' : 'Multirepuestos_RG_2026_SecurePass!';
+} else if (isWindows && password === 'Multirepuestos_RG_2026_SecurePass!') {
+  // Entorno de desarrollo local en Windows
+  password = 'AppSegura_2025!';
+}
+
 // Crear pool de conexiones usando variables del .env
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
+  host: host,
   port: Number(process.env.DB_PORT) || 3306,
   user: process.env.DB_USER || 'appuser',
-  password: process.env.DB_PASSWORD || 'AppSegura_2025!',
+  password: password,
   database: process.env.DB_DATABASE || 'multirepuestosrg',
   waitForConnections: true,
   connectionLimit: 30,

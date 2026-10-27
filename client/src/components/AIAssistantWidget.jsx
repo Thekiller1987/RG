@@ -1,20 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
 import { 
   FaRobot, FaPaperPlane, FaTimes, FaSync, FaLightbulb, 
-  FaCopy, FaCheck, FaExclamationTriangle, FaChartLine, FaBoxes, FaUserClock
+  FaCopy, FaCheck, FaExclamationTriangle, FaChartLine, FaBoxes, FaUserClock,
+  FaExpand, FaImage
 } from 'react-icons/fa';
 import { askAI, getAIStatus } from '../service/api';
 
 // --- ANIMACIONES ---
 const popIn = keyframes`
-  0% { transform: scale(0.8) translateY(20px); opacity: 0; }
+  0% { transform: scale(0.85) translateY(20px); opacity: 0; }
   100% { transform: scale(1) translateY(0); opacity: 1; }
 `;
 
 const pulseGlow = keyframes`
-  0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.5); }
-  70% { box-shadow: 0 0 0 14px rgba(99, 102, 241, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.55); }
+  70% { box-shadow: 0 0 0 16px rgba(99, 102, 241, 0); }
   100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
 `;
 
@@ -23,17 +25,18 @@ const spin = keyframes`
   100% { transform: rotate(360deg); }
 `;
 
-// --- ESTILOS ---
+// --- ESTILOS RESPONSIVOS ---
 const WidgetContainer = styled.div`
   position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 9999;
+  bottom: ${props => props.$isPosOnMobile ? 'calc(80px + env(safe-area-inset-bottom, 0px))' : 'calc(24px + env(safe-area-inset-bottom, 0px))'};
+  right: calc(16px + env(safe-area-inset-right, 0px));
+  z-index: 9999999;
   font-family: 'Outfit', sans-serif;
+  pointer-events: auto;
 
   @media (max-width: 640px) {
-    bottom: 80px;
-    right: 16px;
+    bottom: ${props => props.$isPosOnMobile ? 'calc(82px + env(safe-area-inset-bottom, 0px))' : 'calc(18px + env(safe-area-inset-bottom, 0px))'};
+    right: calc(14px + env(safe-area-inset-right, 0px));
   }
 `;
 
@@ -49,17 +52,25 @@ const FloatingButton = styled.button`
   justify-content: center;
   font-size: 1.5rem;
   cursor: pointer;
-  box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.4), 0 8px 10px -6px rgba(79, 70, 229, 0.3);
+  box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.5), 0 8px 10px -6px rgba(79, 70, 229, 0.4);
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   animation: ${pulseGlow} 2.5s infinite;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+
+  @media (max-width: 640px) {
+    width: 54px;
+    height: 54px;
+    font-size: 1.35rem;
+  }
 
   &:hover {
     transform: scale(1.08) translateY(-2px);
-    box-shadow: 0 15px 30px -5px rgba(79, 70, 229, 0.5);
+    box-shadow: 0 15px 30px -5px rgba(79, 70, 229, 0.6);
   }
 
   &:active {
-    transform: scale(0.95);
+    transform: scale(0.92);
   }
 `;
 
@@ -67,18 +78,33 @@ const ChatWindow = styled.div`
   position: absolute;
   bottom: 70px;
   right: 0;
-  width: 420px;
-  height: 560px;
+  width: 430px;
+  height: 580px;
   max-width: calc(100vw - 32px);
-  max-height: calc(100vh - 120px);
+  max-height: calc(100vh - 110px);
   background: #0f172a;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 20px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
   overflow: hidden;
-  animation: ${popIn} 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: ${popIn} 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+
+  @media (max-width: 640px) {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100dvh;
+    max-width: 100vw;
+    max-height: 100dvh;
+    border-radius: 0;
+    border: none;
+    z-index: 10000000;
+  }
 `;
 
 const ChatHeader = styled.div`
@@ -135,8 +161,8 @@ const ChatHeader = styled.div`
       background: rgba(255, 255, 255, 0.06);
       border: none;
       color: #94a3b8;
-      width: 30px;
-      height: 30px;
+      width: 32px;
+      height: 32px;
       border-radius: 8px;
       display: flex;
       align-items: center;
@@ -178,11 +204,11 @@ const MessagesArea = styled.div`
 `;
 
 const MessageBubble = styled.div`
-  max-width: 85%;
+  max-width: 88%;
   padding: 0.75rem 1rem;
   border-radius: 14px;
   font-size: 0.88rem;
-  line-height: 1.45;
+  line-height: 1.48;
   position: relative;
   word-break: break-word;
 
@@ -195,13 +221,120 @@ const MessageBubble = styled.div`
     align-self: flex-start;
     background: #1e293b;
     color: #e2e8f0;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-bottom-left-radius: 4px;
   `}
 
   p { margin: 0 0 6px 0; &:last-child { margin-bottom: 0; } }
   strong { color: #f8fafc; font-weight: 700; }
   code { background: rgba(0,0,0,0.3); padding: 1px 4px; border-radius: 4px; font-family: monospace; font-size: 0.85em; }
+`;
+
+const ProductImageCard = styled.div`
+  margin-top: 10px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #090d16;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+
+  img {
+    width: 100%;
+    max-height: 220px;
+    object-fit: contain;
+    background: #000;
+    display: block;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: scale(1.02);
+    }
+  }
+
+  .image-action-bar {
+    padding: 8px 12px;
+    background: rgba(15, 23, 42, 0.85);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+
+    button {
+      background: rgba(99, 102, 241, 0.2);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+
+      &:hover {
+        background: #4f46e5;
+        color: white;
+      }
+    }
+  }
+`;
+
+const LightboxOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  z-index: 10000001;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  animation: ${popIn} 0.2s ease-out;
+
+  .lightbox-content {
+    position: relative;
+    max-width: 90vw;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    img {
+      max-width: 100%;
+      max-height: 78vh;
+      object-fit: contain;
+      border-radius: 12px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .close-btn {
+      position: absolute;
+      top: -42px;
+      right: 0;
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      transition: all 0.2s;
+
+      &:hover {
+        background: #ef4444;
+      }
+    }
+  }
 `;
 
 const SuggestionsContainer = styled.div`
@@ -219,7 +352,7 @@ const Chip = styled.button`
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #cbd5e1;
-  padding: 4px 10px;
+  padding: 5px 11px;
   border-radius: 20px;
   font-size: 0.75rem;
   white-space: nowrap;
@@ -310,15 +443,18 @@ const AIAssistantWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState(null);
   const [aiStatus, setAiStatus] = useState({ hasGeminiKey: false, hasTelegramToken: false });
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      text: '👋 ¡Hola! Soy **ADA**, el Asistente Inteligente de **Multirepuestos RG**.\n\nPuedo responderte al instante sobre **ventas del día**, **dinero en caja**, **precios y existencia de repuestos**, **stock crítico** o **clientes con deuda**.'
+      text: `👋 ¡Hola! Soy **ADA**, el Asistente Inteligente de **Multirepuestos RG**.\n\nPuedo responderte al instante sobre **ventas del día**, **ventas de Waskar**, **ventas del mes**, **dinero en caja**, **fotografías de repuestos** o **stock crítico**.`
     }
   ]);
 
   const messagesEndRef = useRef(null);
+  const location = useLocation();
+  const isPosOnMobile = location.pathname === '/pos';
 
   // Cargar estado de la IA al montar
   useEffect(() => {
@@ -346,7 +482,6 @@ const AIAssistantWidget = () => {
     setLoading(true);
 
     try {
-      // Historial para contexto (optimizado a 3 mensajes para ahorrar tokens y dar respuesta instantánea)
       const history = messages.slice(-3).map(m => ({
         role: m.role === 'user' ? 'user' : 'model',
         text: m.text
@@ -355,7 +490,9 @@ const AIAssistantWidget = () => {
       const res = await askAI(userMsg.text, history);
       const botMsg = {
         role: 'assistant',
-        text: res?.answer || 'No se obtuvo respuesta del servidor.'
+        text: res?.answer || 'No se obtuvo respuesta del servidor.',
+        image: res?.image || null,
+        product: res?.product || null
       };
       setMessages(prev => [...prev, botMsg]);
 
@@ -375,16 +512,14 @@ const AIAssistantWidget = () => {
     }
   };
 
-  // Sugerencias rápidas
   const handleChipClick = (suggestion) => {
     handleSend(suggestion);
   };
 
-  // Formateador simple de texto markdown (negritas, saltos de línea y viñetas)
   const formatText = (content) => {
-    const lines = content.split('\n');
+    if (!content) return null;
+    const lines = String(content).split('\n');
     return lines.map((line, idx) => {
-      // Reemplazo básico de negritas **texto**
       const parts = line.split(/(\*\*.*?\*\*)/g);
       const renderedLine = parts.map((part, pIdx) => {
         if (part.startsWith('**') && part.endsWith('**')) {
@@ -403,97 +538,130 @@ const AIAssistantWidget = () => {
   };
 
   return (
-    <WidgetContainer>
-      {isOpen && (
-        <ChatWindow>
-          <ChatHeader>
-            <div className="header-left">
-              <div className="bot-avatar">
-                <FaRobot />
+    <>
+      <WidgetContainer $isPosOnMobile={isPosOnMobile}>
+        {isOpen && (
+          <ChatWindow>
+            <ChatHeader>
+              <div className="header-left">
+                <div className="bot-avatar">
+                  <FaRobot />
+                </div>
+                <div className="bot-info">
+                  <h3>ADA — Asistente RG</h3>
+                  <p>
+                    <StatusDot $online={true} />
+                    Inteligencia de Negocios en Línea
+                  </p>
+                </div>
               </div>
-              <div className="bot-info">
-                <h3>ADA — Asistente RG</h3>
-                <p>
-                  <StatusDot $online={true} />
-                  Inteligencia de Negocios en Línea
-                </p>
+              <div className="header-actions">
+                <button 
+                  title="Limpiar chat" 
+                  onClick={() => setMessages([
+                    {
+                      role: 'assistant',
+                      text: 'Chat reiniciado. ¿En qué puedo ayudarte hoy sobre Multirepuestos RG?'
+                    }
+                  ])}
+                >
+                  <FaSync size={12} />
+                </button>
+                <button title="Cerrar" onClick={() => setIsOpen(false)}>
+                  <FaTimes size={15} />
+                </button>
               </div>
-            </div>
-            <div className="header-actions">
-              <button 
-                title="Limpiar chat" 
-                onClick={() => setMessages([
-                  {
-                    role: 'assistant',
-                    text: 'Chat reiniciado. ¿En qué puedo ayudarte hoy sobre Multirepuestos RG?'
-                  }
-                ])}
-              >
-                <FaSync size={12} />
+            </ChatHeader>
+
+            <MessagesArea>
+              {messages.map((m, i) => (
+                <MessageBubble key={i} $user={m.role === 'user'}>
+                  {formatText(m.text)}
+                  {m.image && (
+                    <ProductImageCard>
+                      <img 
+                        src={m.image} 
+                        alt={m.product?.nombre || 'Foto del repuesto'} 
+                        onClick={() => setLightboxImage(m.image)}
+                        title="Toca para ampliar fotografía"
+                      />
+                      <div className="image-action-bar">
+                        <span>{m.product?.codigo ? `Cód: ${m.product.codigo}` : 'Catálogo RG'}</span>
+                        <button type="button" onClick={() => setLightboxImage(m.image)}>
+                          <FaExpand size={10} /> Ampliar
+                        </button>
+                      </div>
+                    </ProductImageCard>
+                  )}
+                </MessageBubble>
+              ))}
+
+              {loading && (
+                <LoadingDots>
+                  <FaSync className="spinner" />
+                  <span>Consultando datos del negocio...</span>
+                </LoadingDots>
+              )}
+              <div ref={messagesEndRef} />
+            </MessagesArea>
+
+            <SuggestionsContainer>
+              <Chip onClick={() => handleChipClick('¿Cuánto se ha vendido hoy y qué hay en caja?')}>
+                💵 Ventas Hoy
+              </Chip>
+              <Chip onClick={() => handleChipClick('¿Cuáles son las ventas del mes?')}>
+                🗓️ Ventas del Mes
+              </Chip>
+              <Chip onClick={() => handleChipClick('Ventas de Waskar')}>
+                👤 Ventas de Waskar
+              </Chip>
+              <Chip onClick={() => handleChipClick('¿Cuánto hemos vendido en toda la semana?')}>
+                📅 Ventas de la Semana
+              </Chip>
+              <Chip onClick={() => handleChipClick('¿Cuánto vendió cada empleado o vendedor?')}>
+                👥 Por Empleado
+              </Chip>
+              <Chip onClick={() => handleChipClick('¿Qué repuestos tienen stock crítico o bajo?')}>
+                📦 Stock Bajo
+              </Chip>
+            </SuggestionsContainer>
+
+            <InputArea onSubmit={(e) => { e.preventDefault(); handleSend(); }}>
+              <input
+                type="text"
+                placeholder="Pregunta ventas, repuestos, fotos..."
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                disabled={loading}
+                autoFocus
+              />
+              <button type="submit" disabled={loading || !input.trim()} title="Enviar consulta">
+                <FaPaperPlane size={14} />
               </button>
-              <button title="Cerrar" onClick={() => setIsOpen(false)}>
-                <FaTimes size={14} />
-              </button>
-            </div>
-          </ChatHeader>
+            </InputArea>
+          </ChatWindow>
+        )}
 
-          <MessagesArea>
-            {messages.map((m, i) => (
-              <MessageBubble key={i} $user={m.role === 'user'}>
-                {formatText(m.text)}
-              </MessageBubble>
-            ))}
+        <FloatingButton 
+          onClick={() => setIsOpen(!isOpen)} 
+          title="Asistente de Inteligencia Artificial RG"
+        >
+          {isOpen ? <FaTimes /> : <FaRobot />}
+        </FloatingButton>
+      </WidgetContainer>
 
-            {loading && (
-              <LoadingDots>
-                <FaSync className="spinner" />
-                <span>Analizando datos del negocio...</span>
-              </LoadingDots>
-            )}
-            <div ref={messagesEndRef} />
-          </MessagesArea>
-
-          <SuggestionsContainer>
-            <Chip onClick={() => handleChipClick('¿Cuánto se ha vendido hoy y qué hay en caja?')}>
-              💵 Ventas de Hoy
-            </Chip>
-            <Chip onClick={() => handleChipClick('¿Cuánto hemos vendido en toda la semana y cuál fue el mejor día?')}>
-              📅 Ventas de la Semana
-            </Chip>
-            <Chip onClick={() => handleChipClick('¿Cuánto vendió cada empleado o vendedor?')}>
-              👥 Ventas por Empleado
-            </Chip>
-            <Chip onClick={() => handleChipClick('¿Cómo cerraron las últimas cajas y qué diferencias hubo?')}>
-              💰 Cierres de Caja
-            </Chip>
-            <Chip onClick={() => handleChipClick('¿Qué repuestos tienen stock crítico o bajo?')}>
-              📦 Stock Bajo
-            </Chip>
-          </SuggestionsContainer>
-
-          <InputArea onSubmit={(e) => { e.preventDefault(); handleSend(); }}>
-            <input
-              type="text"
-              placeholder="Pregunta sobre ventas, repuestos, caja..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              disabled={loading}
-              autoFocus
-            />
-            <button type="submit" disabled={loading || !input.trim()} title="Enviar consulta">
-              <FaPaperPlane size={14} />
+      {/* Lightbox Modal de fotografía a pantalla completa */}
+      {lightboxImage && (
+        <LightboxOverlay onClick={() => setLightboxImage(null)}>
+          <div className="lightbox-content" onClick={e => e.stopPropagation()}>
+            <button className="close-btn" onClick={() => setLightboxImage(null)} title="Cerrar">
+              <FaTimes />
             </button>
-          </InputArea>
-        </ChatWindow>
+            <img src={lightboxImage} alt="Fotografía del repuesto ampliada" />
+          </div>
+        </LightboxOverlay>
       )}
-
-      <FloatingButton 
-        onClick={() => setIsOpen(!isOpen)} 
-        title="Asistente de Inteligencia Artificial RG"
-      >
-        {isOpen ? <FaTimes /> : <FaRobot />}
-      </FloatingButton>
-    </WidgetContainer>
+    </>
   );
 };
 
