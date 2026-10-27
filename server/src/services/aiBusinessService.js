@@ -279,7 +279,13 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
  * Consulta al modelo Google Gemini con contexto en vivo inyectado.
  */
 async function queryGemini(apiKey, question, context, history = [], specificProducts = []) {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const CANDIDATE_MODELS = [
+    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-flash-latest',
+    'gemini-2.5-flash',
+    'gemini-1.5-flash'
+  ];
 
   const systemInstruction = `
 Eres el Asistente Inteligente oficial de "Multirepuestos RG", una prestigiosa empresa de repuestos de vehículos y motos ubicada en Nicaragua.
@@ -348,25 +354,40 @@ REGLAS DE RESPUESTA:
     }
   };
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody)
-  });
+  let lastError = null;
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini API Error [${response.status}]: ${errorText}`);
+  for (const model of CANDIDATE_MODELS) {
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        lastError = new Error(`Gemini [${model}] status ${response.status}: ${errorText}`);
+        continue; // Intentar con el siguiente modelo
+      }
+
+      const data = await response.json();
+      const textOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (textOutput) {
+        return textOutput;
+      }
+    } catch (err) {
+      lastError = err;
+    }
   }
 
-  const data = await response.json();
-  const textOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-  if (!textOutput) {
-    throw new Error('Respuesta vacía recibida de Gemini.');
-  }
-
-  return textOutput;
+  throw lastError || new Error('No se pudo obtener respuesta de ningún modelo de Gemini.');
 }
 
 /**
