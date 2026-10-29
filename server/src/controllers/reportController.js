@@ -129,11 +129,14 @@ const getTodayManagua = () => new Date().toLocaleDateString('sv-SE', { timeZone:
  */
 const getTodayCajaMetrics = async (dateStr) => {
     try {
+        const safe = (v) => { const n = Number(v); return (isNaN(n) || !isFinite(n)) ? 0 : n; };
         const targetDate = dateStr || getTodayManagua();
+        const isTargetToday = (targetDate === getTodayManagua());
+
         const [cajaRows] = await db.query(`
             SELECT * FROM cierres_caja
             WHERE DATE(DATE_SUB(fecha_apertura, INTERVAL 6 HOUR)) = ?
-               OR (fecha_cierre IS NULL AND fecha_apertura >= NOW() - INTERVAL 24 HOUR)
+               ${isTargetToday ? "OR ((fecha_cierre IS NULL OR fecha_cierre < '2000-01-01') AND fecha_apertura >= NOW() - INTERVAL 24 HOUR)" : ""}
             ORDER BY fecha_apertura DESC
         `, [targetDate]);
 
@@ -142,6 +145,7 @@ const getTodayCajaMetrics = async (dateStr) => {
         }
 
         let totalVentasCajas = 0;
+        let rawVentasBrutas = 0;
         let totalEfectivoCajas = 0;
         let totalDolaresCajas = 0;
         let totalTarjetaCajas = 0;
@@ -152,6 +156,7 @@ const getTodayCajaMetrics = async (dateStr) => {
         let totalEntradasCajas = 0;
         let totalFondoInicial = 0;
         let totalEsperadoCajas = 0;
+        let totalEsperadoCordobas = 0;
 
         const saleIds = [];
         const userSalesMap = {};
@@ -163,30 +168,70 @@ const getTodayCajaMetrics = async (dateStr) => {
                 details = typeof row.detalles_json === 'string' ? JSON.parse(row.detalles_json) : (row.detalles_json || {});
             } catch { details = {}; }
 
-            const txs = details.transactions || [];
-            const tasa = Number(details.tasaDolar || 36.60);
-            const inicial = Number(row.monto_inicial || 0);
+            const rawTxs = Array.isArray(details.transactions) ? details.transactions : [];
+            const seenIds = new Set();
+            const txs = [];
+            for (const tx of rawTxs) {
+                if (tx?.id && seenIds.has(tx.id)) continue;
+                if (tx?.id) seenIds.add(tx.id);
+                txs.push(tx);
+            }
+
+            const tasa = safe(details.tasaDolar) || 36.60;
+            const inicial = Math.max(0, safe(details.initialAmount ?? row.monto_inicial ?? 0));
             totalFondoInicial += inicial;
 
             let boxVentas = 0;
             let boxEfectivo = 0;
             let boxDolares = 0;
+            let lastSaleHourBucket = null;
+
+            const uKey = String(row.usuario_id || row.usuario_nombre || 'Caja');
+            if (!userSalesMap[uKey]) {
+                userSalesMap[uKey] = {
+                    nombre_usuario: row.usuario_nombre || 'Caja General',
+                    id_usuario: row.usuario_id,
+                    total_vendido: 0,
+                    cantidad_ventas: 0
+                };
+            }
 
             txs.forEach(tx => {
-                const tipo = (tx.type || '').toLowerCase().trim();
-                let pd = tx.pagoDetalles || {};
+                let tipo = (tx?.type || '').toLowerCase().trim();
+                tipo = tipo.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                let pd = tx?.pagoDetalles || {};
                 if (typeof pd === 'string') { try { pd = JSON.parse(pd); } catch { pd = {}; } }
-                const amount = Number(tx.amount || 0);
-                const totalVenta = Number(pd.totalVenta || amount);
-                const ef = Number(pd.efectivo || 0) - Number(pd.cambio || 0);
-                const dol = Number(pd.dolares || 0);
-                const tar = Number(pd.tarjeta || 0);
-                const tr = Number(pd.transferencia || 0);
-                const cr = Number(pd.credito || 0);
+                if (!pd || typeof pd !== 'object') pd = {};
+
+                const amount = safe(tx.amount);
+                const totalVenta = safe(pd.totalVenta) || amount;
+                const txEfectivo = safe(pd.efectivo);
+                const txDolares = safe(pd.dolares);
+                const txCambio = safe(pd.cambio);
+                const txIngresoCaja = safe(pd.ingresoCaja);
+                const tar = safe(pd.tarjeta);
+                const tr = safe(pd.transferencia);
+                const cr = safe(pd.credito);
 
                 if (tipo.startsWith('venta')) {
-                    boxVentas += (totalVenta - cr);
-                    totalVentasCajas += totalVenta;
+                    const ventaRev = Math.abs(totalVenta || amount);
+                    boxVentas += ventaRev;
+                    totalVentasCajas += ventaRev;
+                    rawVentasBrutas += ventaRev;
+
+                    let ef = 0;
+                    let dol = 0;
+                    if (txEfectivo > 0.001 || txDolares > 0.001 || txCambio > 0.001) {
+                        ef = txEfectivo - txCambio;
+                        dol = txDolares;
+                    } else if (txIngresoCaja > 0.001) {
+                        ef = txIngresoCaja;
+                    } else {
+                        const noEf = tar + tr + cr;
+                        const residual = totalVenta - noEf;
+                        if (residual > 0.001) ef = residual;
+                    }
+
                     totalCreditoCajas += cr;
                     totalTarjetaCajas += tar;
                     totalTransferenciaCajas += tr;
@@ -199,28 +244,30 @@ const getTodayCajaMetrics = async (dateStr) => {
                         saleIds.push(Number(tx.id));
                     }
 
-                    // Desglose por vendedor/cajero
-                    const uKey = String(row.usuario_id || row.usuario_nombre);
-                    if (!userSalesMap[uKey]) {
-                        userSalesMap[uKey] = {
-                            nombre_usuario: row.usuario_nombre,
-                            id_usuario: row.usuario_id,
-                            total_vendido: 0,
-                            cantidad_ventas: 0
-                        };
-                    }
-                    userSalesMap[uKey].total_vendido += totalVenta;
+                    userSalesMap[uKey].total_vendido += ventaRev;
                     userSalesMap[uKey].cantidad_ventas += 1;
 
-                    // Desglose por hora
                     if (tx.at) {
                         const txD = new Date(tx.at);
-                        const hr = txD.toLocaleTimeString('es-NI', { hour: '2-digit', minute: '2-digit', hour12: false });
+                        const hr = txD.toLocaleTimeString('es-NI', { timeZone: 'America/Managua', hour: '2-digit', minute: '2-digit', hour12: false });
                         const hrBucket = hr.substring(0, 2) + ':00';
-                        hourlySalesMap[hrBucket] = (hourlySalesMap[hrBucket] || 0) + totalVenta;
+                        lastSaleHourBucket = hrBucket;
+                        hourlySalesMap[hrBucket] = (hourlySalesMap[hrBucket] || 0) + ventaRev;
                     }
                 } else if (tipo.includes('abono') || tipo.includes('liquid') || tipo.includes('pedido') || tipo.includes('apartado')) {
-                    // Abonos cobran crédito - NO es venta nueva, pero sí entra efectivo/banco
+                    let ef = 0;
+                    let dol = 0;
+                    if (txDolares > 0.001) {
+                        dol = txDolares;
+                        ef = txEfectivo;
+                    } else if (txEfectivo > 0.001) {
+                        ef = txEfectivo;
+                    } else if (txIngresoCaja > 0.001) {
+                        ef = txIngresoCaja;
+                    } else {
+                        const noEf = tar + tr;
+                        ef = Math.max(0, amount - noEf);
+                    }
                     const abonoTot = ef + (dol * tasa) + tar + tr;
                     totalAbonosCajas += abonoTot;
                     totalEfectivoCajas += ef;
@@ -238,9 +285,28 @@ const getTodayCajaMetrics = async (dateStr) => {
                     totalEfectivoCajas -= Math.abs(amount);
                     boxEfectivo -= Math.abs(amount);
                 } else if (tipo.includes('devolucion') || tipo.includes('cancelacion') || tipo.includes('anulacion')) {
-                    totalVentasCajas -= Math.abs(amount);
-                    totalEfectivoCajas -= Math.abs(amount);
-                    boxEfectivo -= Math.abs(amount);
+                    const revAmt = Math.abs(totalVenta || amount);
+                    boxVentas -= revAmt;
+                    totalVentasCajas -= revAmt;
+                    rawVentasBrutas -= revAmt;
+                    userSalesMap[uKey].total_vendido -= revAmt;
+
+                    let cashRev = 0;
+                    if (pd.ingresoCaja !== undefined && pd.ingresoCaja !== null) {
+                        cashRev = Math.abs(safe(pd.ingresoCaja));
+                    } else if (txEfectivo > 0.001) {
+                        cashRev = txEfectivo;
+                    } else {
+                        const noEf = tar + tr + cr;
+                        const cashPart = Math.abs(amount) - noEf;
+                        if (cashPart > 0.001) cashRev = cashPart;
+                    }
+                    totalEfectivoCajas -= cashRev;
+                    boxEfectivo -= cashRev;
+
+                    if (lastSaleHourBucket) {
+                        hourlySalesMap[lastSaleHourBucket] = Math.max(0, (hourlySalesMap[lastSaleHourBucket] || 0) - revAmt);
+                    }
                 } else if (tipo === 'ajuste') {
                     const target = pd.target || tx.target || 'efectivo';
                     const txTime = new Date(tx.at || 0).getTime();
@@ -255,32 +321,48 @@ const getTodayCajaMetrics = async (dateStr) => {
                         return Math.abs(oTime - txTime) < 5000;
                     });
 
+                    let salesDelta = 0;
                     if (target === 'efectivo') {
                         boxEfectivo += amount;
                         totalEfectivoCajas += amount;
-                        totalVentasCajas += amount;
+                        salesDelta = amount;
                     } else if (target === 'dolares') {
                         boxDolares += amount;
                         totalDolaresCajas += amount;
-                        totalVentasCajas += (amount * tasa);
+                        salesDelta = (amount * tasa);
                     } else if (target === 'tarjeta') {
                         totalTarjetaCajas += amount;
-                        totalVentasCajas += amount;
+                        salesDelta = amount;
                     } else if (target === 'transferencia') {
                         totalTransferenciaCajas += amount;
-                        totalVentasCajas += amount;
+                        salesDelta = amount;
                     } else if (target === 'credito') {
                         totalCreditoCajas += amount;
-                        totalVentasCajas += amount;
+                        salesDelta = amount;
                     } else if (target === 'ventas_totales' && !isPairedDuplicate) {
                         boxEfectivo += amount;
                         totalEfectivoCajas += amount;
-                        totalVentasCajas += amount;
+                        salesDelta = amount;
+                    }
+
+                    if (salesDelta !== 0) {
+                        boxVentas += salesDelta;
+                        totalVentasCajas += salesDelta;
+                        userSalesMap[uKey].total_vendido += salesDelta;
+
+                        // Aplicar también a la gráfica horaria para que cuadre con Ventas Totales
+                        const bucketKeys = Object.keys(hourlySalesMap);
+                        const targetBucket = lastSaleHourBucket || bucketKeys[bucketKeys.length - 1] || '12:00';
+                        hourlySalesMap[targetBucket] = Math.max(0, Number(((hourlySalesMap[targetBucket] || 0) + salesDelta).toFixed(2)));
                     }
                 }
             });
 
-            const expectedThisBox = inicial + boxEfectivo + (boxDolares * tasa);
+            userSalesMap[uKey].total_vendido = Math.max(0, Number(userSalesMap[uKey].total_vendido.toFixed(2)));
+
+            const expectedCordobasBox = inicial + boxEfectivo;
+            const expectedThisBox = expectedCordobasBox + (boxDolares * tasa);
+            totalEsperadoCordobas += expectedCordobasBox;
             totalEsperadoCajas += expectedThisBox;
         });
 
@@ -302,14 +384,22 @@ const getTodayCajaMetrics = async (dateStr) => {
             }
         }
 
-        if (gananciaTotal === 0 && totalVentasCajas > 0) {
-            gananciaTotal = totalVentasCajas * 0.35;
+        // Si hubo ajustes secretos que cambiaron las ventas totales, escalar proporcionalmente la ganancia estimada
+        const cleanVentasNetas = Math.max(0, totalVentasCajas);
+        if (rawVentasBrutas > 0 && Math.abs(cleanVentasNetas - rawVentasBrutas) > 0.01) {
+            gananciaTotal = gananciaTotal * (cleanVentasNetas / rawVentasBrutas);
         }
 
-        const expectedCashTotal = totalFondoInicial + totalEfectivoCajas + (totalDolaresCajas * 36.60);
+        if (gananciaTotal === 0 && cleanVentasNetas > 0) {
+            gananciaTotal = cleanVentasNetas * 0.35;
+        }
+
+        const isOpenRow = (r) => !r.fecha_cierre || new Date(r.fecha_cierre) < new Date('2000-01-01');
+        const abiertasCount = cajaRows.filter(isOpenRow).length;
+        const cerradasCount = cajaRows.length - abiertasCount;
 
         return {
-            ventas_brutas: Number(Math.max(0, totalVentasCajas).toFixed(2)),
+            ventas_brutas: Number(cleanVentasNetas.toFixed(2)),
             ganancia_total: Number(Math.max(0, gananciaTotal).toFixed(2)),
             total_efectivo: Number(totalEfectivoCajas.toFixed(2)),
             total_dolares: Number(totalDolaresCajas.toFixed(2)),
@@ -320,11 +410,15 @@ const getTodayCajaMetrics = async (dateStr) => {
             total_gastos: Number(totalSalidasCajas.toFixed(2)),
             total_entradas: Number(totalEntradasCajas.toFixed(2)),
             caja_inicial: Number(totalFondoInicial.toFixed(2)),
-            efectivo_esperado: Number(Math.max(0, expectedCashTotal).toFixed(2)),
-            salesByUser: Object.values(userSalesMap),
+            efectivo_cordobas: Number(totalEsperadoCordobas.toFixed(2)),
+            efectivo_dolares: Number(totalDolaresCajas.toFixed(2)),
+            efectivo_esperado: Number(totalEsperadoCajas.toFixed(2)),
+            salesByUser: Object.values(userSalesMap).filter(u => u.cantidad_ventas > 0 || u.total_vendido > 0),
             hourlySales: hourlySalesMap,
-            totalCajasActivas: cajaRows.filter(r => !r.fecha_cierre).length,
-            totalCajasCerradas: cajaRows.filter(r => !!r.fecha_cierre).length,
+            totalCajasActivas: abiertasCount,
+            totalCajasCerradas: cerradasCount,
+            sesiones_abiertas: abiertasCount,
+            sesiones_cerradas: cerradasCount,
             cajasNombres: cajaRows.map(r => r.usuario_nombre).filter(Boolean)
         };
     } catch (err) {
@@ -341,11 +435,12 @@ const getSalesSummaryReport = async (req, res) => {
     }
     try {
         const todayStr = getTodayManagua();
-        const isToday = (startDate === endDate && startDate === todayStr);
+        const isSingleDay = (startDate === endDate);
+        const isToday = (isSingleDay && startDate === todayStr);
 
-        // ★ REGLA DE ORO: Si es HOY, se rige ÚNICAMENTE por las cajas (abiertas y cerradas de hoy)
-        if (isToday) {
-            const cajaMetrics = await getTodayCajaMetrics(todayStr);
+        // ★ REGLA DE ORO: Si es un día único con cajas (especialmente HOY), se rige 100% por las cajas
+        if (isSingleDay) {
+            const cajaMetrics = await getTodayCajaMetrics(startDate);
             if (cajaMetrics) {
                 return res.json({
                     ventas_brutas: cajaMetrics.ventas_brutas,
@@ -359,11 +454,16 @@ const getSalesSummaryReport = async (req, res) => {
                     total_abonos: cajaMetrics.total_abonos,
                     total_gastos: cajaMetrics.total_gastos,
                     caja_inicial: cajaMetrics.caja_inicial,
+                    efectivo_cordobas: cajaMetrics.efectivo_cordobas,
+                    efectivo_dolares: cajaMetrics.efectivo_dolares,
                     efectivo_esperado: cajaMetrics.efectivo_esperado,
                     totalCajasActivas: cajaMetrics.totalCajasActivas,
+                    totalCajasCerradas: cajaMetrics.totalCajasCerradas,
+                    sesiones_abiertas: cajaMetrics.sesiones_abiertas,
+                    sesiones_cerradas: cajaMetrics.sesiones_cerradas,
                     cajasNombres: cajaMetrics.cajasNombres
                 });
-            } else {
+            } else if (isToday) {
                 // No hay cajas abiertas ni cerradas hoy todavía -> ventas de hoy = 0
                 return res.json({
                     ventas_brutas: 0,
@@ -377,8 +477,13 @@ const getSalesSummaryReport = async (req, res) => {
                     total_abonos: 0,
                     total_gastos: 0,
                     caja_inicial: 0,
+                    efectivo_cordobas: 0,
+                    efectivo_dolares: 0,
                     efectivo_esperado: 0,
-                    totalCajasActivas: 0
+                    totalCajasActivas: 0,
+                    totalCajasCerradas: 0,
+                    sesiones_abiertas: 0,
+                    sesiones_cerradas: 0
                 });
             }
         }
@@ -396,11 +501,17 @@ const getSalesSummaryReport = async (req, res) => {
               AND v.fecha >= ? AND v.fecha <= ?;
         `;
         const [results] = await db.query(sql, [from, to]);
-        let ventasBrutas = Number(results[0]?.ventas_brutas || 0);
+        let rawVentas = Number(results[0]?.ventas_brutas || 0);
         let gananciaTotal = Number(results[0]?.ganancia_total || 0);
 
+        const { totalAjustesVentas } = await getCajaAdjustmentsInRange(from, to);
+        const adjustedVentas = Math.max(0, rawVentas + totalAjustesVentas);
+        if (rawVentas > 0 && Math.abs(adjustedVentas - rawVentas) > 0.01) {
+            gananciaTotal = Math.max(0, gananciaTotal * (adjustedVentas / rawVentas));
+        }
+
         res.json({
-            ventas_brutas: Number(ventasBrutas.toFixed(2)),
+            ventas_brutas: Number(adjustedVentas.toFixed(2)),
             ganancia_total: Number(gananciaTotal.toFixed(2)),
             caja_truth: false
         });
@@ -430,12 +541,10 @@ const getSalesByUserReport = async (req, res) => {
     const { startDate, endDate } = req.query;
     if (!startDate || !endDate) return res.status(400).json({ msg: 'Fechas requeridas.' });
     try {
-        const todayStr = getTodayManagua();
-        const isToday = (startDate === endDate && startDate === todayStr);
+        const isSingleDay = (startDate === endDate);
 
-        // Si es hoy, gobernar por las cajas de hoy
-        if (isToday) {
-            const metrics = await getTodayCajaMetrics(todayStr);
+        if (isSingleDay) {
+            const metrics = await getTodayCajaMetrics(startDate);
             if (metrics && metrics.salesByUser && metrics.salesByUser.length > 0) {
                 return res.json(metrics.salesByUser);
             }
@@ -461,7 +570,17 @@ GROUP BY 1, v.id_usuario
 ORDER BY total_vendido DESC;
 `;
         const [results] = await db.query(sql, [from, to]);
-        res.json(results);
+        const { userAdjustments } = await getCajaAdjustmentsInRange(from, to);
+
+        const adjustedResults = results.map(r => {
+            const adj = Number(userAdjustments[String(r.id_usuario)] || 0);
+            return {
+                ...r,
+                total_vendido: Math.max(0, Number((Number(r.total_vendido || 0) + adj).toFixed(2)))
+            };
+        });
+
+        res.json(adjustedResults);
     } catch (error) {
         console.error('Error en reporte de ventas por usuario:', error);
         res.status(500).json({ msg: 'Error en el servidor.' });
@@ -526,27 +645,25 @@ const getSalesChartReport = async (req, res) => {
     const { startDate, endDate } = req.query;
     if (!startDate || !endDate) return res.status(400).json({ msg: 'Fechas requeridas.' });
     try {
-        const todayStr = getTodayManagua();
-        const isToday = (startDate === endDate && startDate === todayStr);
+        const isSingleDay = (startDate === endDate);
 
-        if (isToday) {
-            const metrics = await getTodayCajaMetrics(todayStr);
+        if (isSingleDay) {
+            const metrics = await getTodayCajaMetrics(startDate);
             if (metrics) {
-                // Si hay datos por hora en las cajas de hoy, retornar puntos horarios
                 const hourlyKeys = Object.keys(metrics.hourlySales || {});
                 if (hourlyKeys.length > 0) {
                     const sortedHours = hourlyKeys.sort().map(h => ({
-                        dia: `${todayStr}T${h}`,
+                        dia: `${startDate}T${h}`,
                         total_diario: metrics.hourlySales[h]
                     }));
                     return res.json(sortedHours);
                 }
                 return res.json([
-                    { dia: todayStr, total_diario: metrics.ventas_brutas }
+                    { dia: startDate, total_diario: metrics.ventas_brutas }
                 ]);
             }
             return res.json([
-                { dia: todayStr, total_diario: 0 }
+                { dia: startDate, total_diario: 0 }
             ]);
         }
 
@@ -562,7 +679,20 @@ const getSalesChartReport = async (req, res) => {
             ORDER BY dia ASC;
         `;
         const [results] = await db.query(sql, [from, to]);
-        res.json(results);
+        const { dailyAdjustments } = await getCajaAdjustmentsInRange(from, to);
+
+        const adjustedChart = results.map(r => {
+            const dStr = typeof r.dia === 'string'
+                ? r.dia.split('T')[0]
+                : new Date(r.dia).toLocaleDateString('sv-SE', { timeZone: 'America/Managua' });
+            const adj = Number(dailyAdjustments[dStr] || 0);
+            return {
+                ...r,
+                total_diario: Math.max(0, Number((Number(r.total_diario || 0) + adj).toFixed(2)))
+            };
+        });
+
+        res.json(adjustedChart);
     } catch (error) {
         console.error('Error en reporte para gráfica:', error);
         res.status(500).json({ msg: 'Error en el servidor.' });
