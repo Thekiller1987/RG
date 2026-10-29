@@ -107,17 +107,6 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
             tTarjeta += txTarjeta;
             tTransf += txTransf;
             tCredito += txCredito;
-        } else if (t === 'ajuste') {
-            if (pd.target === 'tarjeta') {
-                tTarjeta += txAmount;
-                vTarjeta += txAmount;
-            } else if (pd.target === 'credito') {
-                tCredito += txAmount;
-                vCredito += txAmount;
-            } else if (pd.target === 'transferencia') {
-                tTransf += txAmount;
-                vTransf += txAmount;
-            }
         }
 
         // ══════════════════════════════════════════════════════
@@ -195,36 +184,40 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
             }
 
         } else if (t === 'ajuste') {
-            const isPairedWithEfectivo = (curTx, allTxs) => {
-                if (curTx.pagoDetalles?.target !== 'ventas_totales') return false;
-                const txTime = new Date(curTx.at || 0).getTime();
-                return (allTxs || []).some(other => 
-                    other !== curTx &&
-                    (other.type || '').toLowerCase() === 'ajuste' &&
-                    other.pagoDetalles?.target === 'efectivo' &&
-                    Math.abs(Number(other.amount) - Number(curTx.amount)) < 0.01 &&
-                    Math.abs(new Date(other.at || 0).getTime() - txTime) < 5000
-                );
-            };
+            const target = pd.target || tx.target || 'efectivo';
+            const txTime = new Date(tx.at || 0).getTime();
+            const isPairedDuplicate = target === 'ventas_totales' && validTransactions.some(other => {
+                if (other === tx) return false;
+                if ((other?.type || '').toLowerCase().trim() !== 'ajuste') return false;
+                let opd = other?.pagoDetalles || {};
+                if (typeof opd === 'string') { try { opd = JSON.parse(opd); } catch { opd = {}; } }
+                const oTarget = opd.target || other.target || '';
+                if (!oTarget || oTarget === 'ventas_totales') return false;
+                const oTime = new Date(other.at || 0).getTime();
+                return Math.abs(oTime - txTime) < 5000;
+            });
 
-            if (pd.target === 'efectivo') {
+            if (target === 'efectivo') {
                 netCordobas += txAmount;
                 vEfectivoC += txAmount;
                 if (pd.hidden) totalHidden += txAmount;
-            } else if (pd.target === 'dolares') {
+            } else if (target === 'dolares') {
                 netDolares += txAmount;
                 vEfectivoD += txAmount;
-            } else if (pd.target === 'tarjeta') {
+            } else if (target === 'tarjeta') {
                 vTarjeta += txAmount;
                 tTarjeta += txAmount;
-            } else if (pd.target === 'credito') {
+            } else if (target === 'credito') {
                 vCredito += txAmount;
                 tCredito += txAmount;
-            } else if (pd.target === 'transferencia') {
+            } else if (target === 'transferencia') {
                 vTransf += txAmount;
                 tTransf += txAmount;
-            } else if (pd.target === 'ventas_totales') {
-                // ventas_totales es contable: NUNCA modifica el dinero en mano (netCordobas)
+            } else if (target === 'ventas_totales' && !isPairedDuplicate) {
+                // Si se ajustó ventas_totales de forma independiente, ajustar también efectivo para cuadrar POS y Gestión de Cajas
+                netCordobas += txAmount;
+                vEfectivoC += txAmount;
+                if (pd.hidden) totalHidden += txAmount;
             }
 
         } else {
@@ -244,24 +237,24 @@ export const calculateCajaStats = (transactions, initialAmount = 0, tasaDolar = 
         } else if (t.includes('devolucion') || t.includes('cancelacion') || t.includes('anulacion')) {
             tVentasDia -= Math.abs(totalRevenue);
         } else if (t === 'ajuste') {
-            const hasExplicitVentasAjuste = validTransactions.some(otherTx => 
-                (otherTx.type || '').toLowerCase() === 'ajuste' && 
-                (otherTx.pagoDetalles?.target === 'ventas_totales' || otherTx.target === 'ventas_totales')
-            );
+            const target = pd.target || tx.target || 'efectivo';
+            const txTime = new Date(tx.at || 0).getTime();
+            const isPairedDuplicate = target === 'ventas_totales' && validTransactions.some(other => {
+                if (other === tx) return false;
+                if ((other?.type || '').toLowerCase().trim() !== 'ajuste') return false;
+                let opd = other?.pagoDetalles || {};
+                if (typeof opd === 'string') { try { opd = JSON.parse(opd); } catch { opd = {}; } }
+                const oTarget = opd.target || other.target || '';
+                if (!oTarget || oTarget === 'ventas_totales') return false;
+                const oTime = new Date(other.at || 0).getTime();
+                return Math.abs(oTime - txTime) < 5000;
+            });
 
-            if (pd.target === 'efectivo') {
-                if (!hasExplicitVentasAjuste) {
-                    tVentasDia += txAmount;
-                }
-            } else if (pd.target === 'dolares') {
-                if (!hasExplicitVentasAjuste) {
-                    tVentasDia += (txAmount * tasaRef);
-                }
-            } else if (pd.target === 'tarjeta' || pd.target === 'credito' || pd.target === 'transferencia') {
-                if (!hasExplicitVentasAjuste) {
-                    tVentasDia += txAmount;
-                }
-            } else if (pd.target === 'ventas_totales') {
+            if (target === 'efectivo' || target === 'tarjeta' || target === 'credito' || target === 'transferencia') {
+                tVentasDia += txAmount;
+            } else if (target === 'dolares') {
+                tVentasDia += (txAmount * tasaRef);
+            } else if (target === 'ventas_totales' && !isPairedDuplicate) {
                 tVentasDia += txAmount;
             }
         }

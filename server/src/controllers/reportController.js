@@ -237,15 +237,51 @@ const getTodayCajaMetrics = async (dateStr) => {
                     totalSalidasCajas += Math.abs(amount);
                     totalEfectivoCajas -= Math.abs(amount);
                     boxEfectivo -= Math.abs(amount);
-                } else if (tipo.includes('devolucion') || tipo.includes('cancelacion')) {
+                } else if (tipo.includes('devolucion') || tipo.includes('cancelacion') || tipo.includes('anulacion')) {
                     totalVentasCajas -= Math.abs(amount);
                     totalEfectivoCajas -= Math.abs(amount);
                     boxEfectivo -= Math.abs(amount);
+                } else if (tipo === 'ajuste') {
+                    const target = pd.target || tx.target || 'efectivo';
+                    const txTime = new Date(tx.at || 0).getTime();
+                    const isPairedDuplicate = target === 'ventas_totales' && txs.some(other => {
+                        if (other === tx) return false;
+                        if ((other?.type || '').toLowerCase().trim() !== 'ajuste') return false;
+                        let opd = other?.pagoDetalles || {};
+                        if (typeof opd === 'string') { try { opd = JSON.parse(opd); } catch { opd = {}; } }
+                        const oTarget = opd.target || other.target || '';
+                        if (!oTarget || oTarget === 'ventas_totales') return false;
+                        const oTime = new Date(other.at || 0).getTime();
+                        return Math.abs(oTime - txTime) < 5000;
+                    });
+
+                    if (target === 'efectivo') {
+                        boxEfectivo += amount;
+                        totalEfectivoCajas += amount;
+                        totalVentasCajas += amount;
+                    } else if (target === 'dolares') {
+                        boxDolares += amount;
+                        totalDolaresCajas += amount;
+                        totalVentasCajas += (amount * tasa);
+                    } else if (target === 'tarjeta') {
+                        totalTarjetaCajas += amount;
+                        totalVentasCajas += amount;
+                    } else if (target === 'transferencia') {
+                        totalTransferenciaCajas += amount;
+                        totalVentasCajas += amount;
+                    } else if (target === 'credito') {
+                        totalCreditoCajas += amount;
+                        totalVentasCajas += amount;
+                    } else if (target === 'ventas_totales' && !isPairedDuplicate) {
+                        boxEfectivo += amount;
+                        totalEfectivoCajas += amount;
+                        totalVentasCajas += amount;
+                    }
                 }
             });
 
             const expectedThisBox = inicial + boxEfectivo + (boxDolares * tasa);
-            totalEsperadoCajas += Number(row.final_esperado || expectedThisBox);
+            totalEsperadoCajas += expectedThisBox;
         });
 
         // Ganancia calculada de los productos vendidos en estas cajas

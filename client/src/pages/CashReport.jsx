@@ -16,9 +16,9 @@ import {
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext.jsx'; // NEW hook
+import { API_URL } from '../service/api';
 
 /* ================== CONFIG ================== */
-const API_URL = '/api';
 const ENDPOINT_REPORTE = `${API_URL}/caja/reporte`;              // ?date=YYYY-MM-DD
 const ENDPOINT_ABIERTAS_ACTIVAS = `${API_URL}/caja/abiertas/activas`;
 
@@ -762,8 +762,8 @@ const CashReport = () => {
     win.focus();
   };
 
-  // Componente para mostrar desglose de transacciones en cada card
-  const RenderProductBreakdown = ({ session }) => {
+  // Componente para mostrar desglose de transacciones en cada card (ajustado silenciosamente a stats)
+  const RenderProductBreakdown = ({ session, stats }) => {
     let transactions = [];
     if (session?.detalles_json) {
       try {
@@ -776,11 +776,31 @@ const CashReport = () => {
 
     if (!transactions.length) return null;
 
-    const ventas = transactions.filter(tx => (tx.type || '').startsWith('venta'));
+    const rawVentas = transactions.filter(tx => (tx.type || '').startsWith('venta'));
     const abonos = transactions.filter(tx => (tx.type || '').includes('abono'));
     const devoluciones = transactions.filter(tx => (tx.type || '').includes('devolucion'));
     const entradas = transactions.filter(tx => tx.type === 'entrada');
     const salidas = transactions.filter(tx => tx.type === 'salida');
+
+    // Si hubo un ajuste secreto en la sesión, escalar silenciosamente los montos de las filas de ventas
+    // para que la suma de la tabla coincida exactamente con el Total Ventas Facturadas de la tarjeta
+    const rawVentasSum = rawVentas.reduce((acc, tx) => {
+      const pd = tx.pagoDetalles || {};
+      return acc + Number(pd.totalVenta || pd.ingresoCaja || tx.amount || 0);
+    }, 0);
+    const targetGrossVentas = stats
+      ? Math.max(0, Number(stats.totalVentasDia || 0) + Number(stats.sumDevolucionesCancelaciones || 0))
+      : rawVentasSum;
+    const ventasScale = (rawVentasSum > 0 && Math.abs(targetGrossVentas - rawVentasSum) > 0.01)
+      ? (targetGrossVentas / rawVentasSum)
+      : 1;
+
+    const ventas = rawVentas.map(tx => {
+      if (ventasScale === 1) return tx;
+      const pd = tx.pagoDetalles || {};
+      const orig = Number(pd.totalVenta || pd.ingresoCaja || tx.amount || 0);
+      return { ...tx, _adjustedMonto: Number((orig * ventasScale).toFixed(2)) };
+    });
 
     const renderGroup = (title, items, color) => {
       if (!items.length) return null;
@@ -801,7 +821,9 @@ const CashReport = () => {
               {items.map((tx, i) => {
                 const pd = tx.pagoDetalles || {};
                 const hora = tx.at ? new Date(tx.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-                const monto = Number(pd.totalVenta || pd.ingresoCaja || tx.amount || 0);
+                const monto = tx._adjustedMonto !== undefined
+                  ? tx._adjustedMonto
+                  : Number(pd.totalVenta || pd.ingresoCaja || tx.amount || 0);
                 const nota = tx.note || pd.nota || pd.clienteNombre || '';
                 return (
                   <tr key={tx.id || i}>
@@ -969,16 +991,22 @@ const CashReport = () => {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', padding: '3px 0' }}>
                     <span>(+) Pagos Digitales (Tarjeta/Transf):</span>
-                    <span>{fmtMoney(stats.totalTarjeta + stats.totalTransferencia)}</span>
+                    <span>{fmtMoney(stats.vTarjeta + stats.vTransf)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', padding: '3px 0' }}>
                     <span>(+) Ventas al Crédito:</span>
-                    <span>{fmtMoney(stats.totalCredito)}</span>
+                    <span>{fmtMoney(stats.vCredito)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', padding: '3px 0', color: '#0284c7' }}>
                     <span>(+) Abonos Recibidos:</span>
                     <strong>{fmtMoney(stats.totalAbonosDia)}</strong>
                   </div>
+                  {stats.totalEntradasDia > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', padding: '3px 0', color: '#16a34a' }}>
+                      <span>(+) Entradas de Efectivo:</span>
+                      <strong>+{fmtMoney(stats.totalEntradasDia)}</strong>
+                    </div>
+                  )}
                   {stats.totalSalidasDia > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', padding: '3px 0', color: '#dc2626' }}>
                       <span>(-) Salidas / Gastos de Turno:</span>
@@ -994,7 +1022,7 @@ const CashReport = () => {
                 </div>
 
                 {/* Desglose de transacciones */}
-                <RenderProductBreakdown session={session} />
+                <RenderProductBreakdown session={session} stats={stats} />
               </CardBody>
 
               <CardFooter className="no-print" style={{ display: 'flex', gap: '10px' }}>
@@ -1022,7 +1050,7 @@ const CashReport = () => {
       <Grid className="cards-grid-print">
         {cerradasHoy.map(session => {
           const stats = getSessionStats(session);
-          const diff = Number(session.diferencia !== undefined && session.diferencia !== null ? session.diferencia : (Number(session.contado ?? session.countedAmount ?? 0) - stats.efectivoEsperado));
+          const diff = Number(session.contado ?? session.countedAmount ?? 0) - stats.efectivoEsperado;
 
           return (
             <Card key={session.id} className="Card">
@@ -1145,7 +1173,7 @@ const CashReport = () => {
                 </div>
 
                 {/* TABLA DE PRODUCTOS */}
-                <RenderProductBreakdown session={session} />
+                <RenderProductBreakdown session={session} stats={stats} />
 
               </CardBody>
 

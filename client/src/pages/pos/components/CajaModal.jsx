@@ -111,21 +111,9 @@ const CajaModal = ({
 
   const transactions = useMemo(() => Array.isArray(session?.transactions) ? session.transactions : [], [session]);
 
-  // --------- Clasificación y totales (100% AUTORIDAD DEL SERVIDOR) ----------
+  // --------- Clasificación y totales (Unificado 100% con POS y Gestión de Cajas) ----------
   const stats = useMemo(() => {
-    // Usar SIEMPRE el cálculo local basado en las transacciones para tener las nuevas variables
-    // de desglose (vEfectivoC, vEfectivoD) porque session.stats histórico no las tiene.
-    const fallbackStats = calculateCajaStats(transactions, (session?.initialAmount || 0), (session?.tasaDolar || initialTasaDolar));
-
-    // Si el server mandó un stats con las nuevas variables, lo usamos, si no, nos fiamos del cálculo local.
-    if (session?.stats && session.stats.vEfectivoC !== undefined) {
-      return {
-        ...session.stats,
-        lists: session.stats.lists || fallbackStats.lists
-      };
-    }
-
-    return fallbackStats;
+    return calculateCajaStats(transactions, (session?.initialAmount || 0), (session?.tasaDolar || initialTasaDolar));
   }, [transactions, session, initialTasaDolar]);
 
   const {
@@ -137,14 +125,7 @@ const CajaModal = ({
     lists: { ventasContado, devoluciones, cancelaciones, entradas, salidas, abonos }
   } = stats;
 
-  const baseIngresos = (
-    (vEfectivoC || 0) + ((vEfectivoD || 0) * tasaRef) + (vTarjeta || 0) + (vTransf || 0) + (vCredito || 0) +
-    (aEfectivoC || 0) + ((aEfectivoD || 0) * tasaRef) + (aTarjeta || 0) + (aTransf || 0)
-  ) - (sumDevolucionesCancelaciones || 0);
-
-  const ingresosTotalesNetos = (stats?.totalVentasDia !== undefined && stats?.totalVentasDia !== null && stats.totalVentasDia > 0)
-    ? stats.totalVentasDia
-    : baseIngresos;
+  const ingresosTotalesNetos = Number(stats?.totalVentasDia || 0) + Number(stats?.totalAbonosDia || 0);
 
   const diferencia = (Number(montoContado || 0) - efectivoEsperado);
   const openedAt = session?.openedAt ? new Date(session.openedAt) : null;

@@ -141,6 +141,15 @@ function calcularTotalesSesion(transactions, details) {
   // Helper anti-NaN
   const safe = (v) => { const n = Number(v); return (isNaN(n) || !isFinite(n)) ? 0 : n; };
 
+  // Deduplicar transacciones por ID para evitar doble conteo
+  const seenIds = new Set();
+  const validTransactions = [];
+  for (const tx of (Array.isArray(transactions) ? transactions : [])) {
+    if (tx?.id && seenIds.has(tx.id)) continue;
+    if (tx?.id) seenIds.add(tx.id);
+    validTransactions.push(tx);
+  }
+
   let totalVentasContado = 0;
   let totalVentasCredito = 0;
   let totalDevoluciones = 0;
@@ -150,10 +159,11 @@ function calcularTotalesSesion(transactions, details) {
   let totalEntradas = 0, totalSalidas = 0;
   let totalAjustesVentas = 0;
   let totalAjustesEfectivo = 0;
+  let devolucionesEfectivoC = 0;
 
   const tasaDefault = safe(details?.tasaDolar) || 36.60;
 
-  (transactions || []).forEach(tx => {
+  validTransactions.forEach(tx => {
     let tipo = (tx.type || '').toLowerCase().trim();
     tipo = tipo.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     let d = tx.pagoDetalles || {};
@@ -169,7 +179,6 @@ function calcularTotalesSesion(transactions, details) {
     const txTarjeta = safe(d.tarjeta);
     const txTransf = safe(d.transferencia);
     const txCredito = safe(d.credito);
-    const txTasa = safe(d.tasaDolarAlMomento) || tasaDefault;
 
     // 1. VENTAS FACTURADAS
     if (tipo.startsWith('venta')) {
@@ -218,60 +227,58 @@ function calcularTotalesSesion(transactions, details) {
     else if (tipo === 'salida') {
       totalSalidas += Math.abs(txAmount);
     }
-    // 5. DEVOLUCIONES / CANCELACIONES (RESTA A VENTAS Y RESTA A EFECTIVO)
+    // 5. DEVOLUCIONES / CANCELACIONES (RESTA A VENTAS Y RESTA A EFECTIVO FÍSICO)
     else if (tipo.includes('devolucion') || tipo.includes('cancelacion') || tipo.includes('anulacion')) {
-      totalDevoluciones += Math.abs(txAmount);
+      const revAmount = Math.abs(txTotalVenta || txAmount);
+      totalDevoluciones += revAmount;
 
-      if (txTarjeta > 0.001) vTarjeta -= txTarjeta;
-      if (txTransf > 0.001) vTransf -= txTransf;
-      if (txCredito > 0.001) vCredito -= txCredito;
-      if (txDolares > 0.001) vEfectivoD -= txDolares;
-
-      const noEf = txTarjeta + txTransf + txCredito;
-      const cashPart = Math.abs(txAmount) - noEf;
-      if (cashPart > 0.001) {
-        vEfectivoC -= cashPart;
+      if (d.ingresoCaja !== undefined && d.ingresoCaja !== null) {
+        devolucionesEfectivoC += Math.abs(safe(d.ingresoCaja));
       } else if (txEfectivo > 0.001) {
-        vEfectivoC -= txEfectivo;
+        devolucionesEfectivoC += txEfectivo;
+      } else {
+        const noEf = txTarjeta + txTransf + txCredito;
+        const cashPart = Math.abs(txAmount) - noEf;
+        if (cashPart > 0.001) {
+          devolucionesEfectivoC += cashPart;
+        }
       }
     }
-    // 6. AJUSTES INTERNOS (God Mode)
+    // 6. AJUSTES INTERNOS (God Mode) - Sincronizado 100% con cajaUtils.js
     else if (tipo === 'ajuste') {
-      const hasExplicitVentasAjuste = (transactions || []).some(otherTx => {
-        let od = otherTx.pagoDetalles || {};
+      const target = d.target || tx.target || 'efectivo';
+      const txTime = new Date(tx.at || 0).getTime();
+      const isPairedDuplicate = target === 'ventas_totales' && validTransactions.some(other => {
+        if (other === tx) return false;
+        if ((other?.type || '').toLowerCase().trim() !== 'ajuste') return false;
+        let od = other?.pagoDetalles || {};
         if (typeof od === 'string') { try { od = JSON.parse(od); } catch { od = {}; } }
-        return (otherTx.type || '').toLowerCase() === 'ajuste' && 
-               (od.target === 'ventas_totales' || otherTx.target === 'ventas_totales');
+        const oTarget = od.target || other.target || '';
+        if (!oTarget || oTarget === 'ventas_totales') return false;
+        const oTime = new Date(other.at || 0).getTime();
+        return Math.abs(oTime - txTime) < 5000;
       });
 
       const monto = txAmount;
-      if (d.target === 'efectivo') {
+      if (target === 'efectivo') {
         vEfectivoC += monto;
         totalAjustesEfectivo += monto;
-        if (!hasExplicitVentasAjuste) {
-          totalAjustesVentas += monto;
-        }
-      } else if (d.target === 'dolares') {
+        totalAjustesVentas += monto;
+      } else if (target === 'dolares') {
         vEfectivoD += monto;
-        if (!hasExplicitVentasAjuste) {
-          totalAjustesVentas += (monto * tasaDefault);
-        }
-      } else if (d.target === 'tarjeta') {
+        totalAjustesVentas += (monto * tasaDefault);
+      } else if (target === 'tarjeta') {
         vTarjeta += monto;
-        if (!hasExplicitVentasAjuste) {
-          totalAjustesVentas += monto;
-        }
-      } else if (d.target === 'transferencia') {
+        totalAjustesVentas += monto;
+      } else if (target === 'transferencia') {
         vTransf += monto;
-        if (!hasExplicitVentasAjuste) {
-          totalAjustesVentas += monto;
-        }
-      } else if (d.target === 'credito') {
+        totalAjustesVentas += monto;
+      } else if (target === 'credito') {
         vCredito += monto;
-        if (!hasExplicitVentasAjuste) {
-          totalAjustesVentas += monto;
-        }
-      } else if (d.target === 'ventas_totales') {
+        totalAjustesVentas += monto;
+      } else if (target === 'ventas_totales' && !isPairedDuplicate) {
+        vEfectivoC += monto;
+        totalAjustesEfectivo += monto;
         totalAjustesVentas += monto;
       }
     }
@@ -281,13 +288,13 @@ function calcularTotalesSesion(transactions, details) {
   const cajaInicial = safe(details?.initialAmount || 0);
 
   // Ventas Totales Netas = (Ventas Contado + Ventas Credito) - Devoluciones + Ajustes
-  const totalVentasDia = Math.max(0, safe(totalVentasContado + totalVentasCredito - totalDevoluciones + totalAjustesVentas));
+  const totalVentasDia = safe(totalVentasContado + totalVentasCredito - totalDevoluciones + totalAjustesVentas);
 
   // Total Abonos Cobrados
   const totalAbonosDia = safe(aEfectivoC + (aEfectivoD * tasaDefault) + aTarjeta + aTransf);
 
   // Movimiento Físico Neto de Efectivo
-  const movimientoNetoEfectivoC = (vEfectivoC + aEfectivoC + totalEntradas - totalSalidas);
+  const movimientoNetoEfectivoC = (vEfectivoC - devolucionesEfectivoC + aEfectivoC + totalEntradas - totalSalidas);
   const movimientoNetoDolares = (vEfectivoD + aEfectivoD);
 
   // Efectivo Esperado en Caja (C$ y USD)
@@ -302,6 +309,7 @@ function calcularTotalesSesion(transactions, details) {
     totalVentasCredito: safe(totalVentasCredito),
     totalAbonosDia: safe(totalAbonosDia),
     totalDevoluciones: safe(totalDevoluciones),
+    sumDevolucionesCancelaciones: safe(totalDevoluciones),
 
     // Efectivo en mano
     netCordobas: safe(movimientoNetoEfectivoC),
@@ -324,7 +332,7 @@ function calcularTotalesSesion(transactions, details) {
     aTransf: safe(aTransf),
 
     // Totales agregados por método
-    totalEfectivo: safe(vEfectivoC + aEfectivoC),
+    totalEfectivo: safe(vEfectivoC - devolucionesEfectivoC + aEfectivoC),
     totalTarjeta: safe(vTarjeta + aTarjeta),
     totalTransferencia: safe(vTransf + aTransf),
     totalCredito: safe(vCredito),
@@ -332,7 +340,9 @@ function calcularTotalesSesion(transactions, details) {
     totalNoEfectivo: safe(vTarjeta + aTarjeta + vTransf + aTransf + vCredito),
 
     totalEntradas: safe(totalEntradas),
+    totalEntradasDia: safe(totalEntradas),
     totalSalidas: safe(totalSalidas),
+    totalSalidasDia: safe(totalSalidas),
     totalGastos: safe(totalSalidas),
     totalIngresos: safe(totalEntradas),
     movimientoNetoEfectivo: safe(movimientoNetoEfectivoC + (movimientoNetoDolares * tasaDefault)),
@@ -867,12 +877,13 @@ router.get('/reporte', async (req, res) => {
 // GET /api/caja/abiertas/activas (Para CashReport: mostrar quién está trabajando con estadísticas completas)
 router.get('/abiertas/activas', async (req, res) => {
   try {
+    const todayKey = localDayKey(new Date());
     const [rows] = await pool.query(`
       SELECT * FROM cierres_caja 
       WHERE (fecha_cierre IS NULL OR fecha_cierre < '2000-01-01')
-        AND fecha_apertura >= NOW() - INTERVAL 24 HOUR
+        AND (DATE(DATE_SUB(fecha_apertura, INTERVAL 6 HOUR)) = ? OR fecha_apertura >= NOW() - INTERVAL 24 HOUR)
       ORDER BY fecha_apertura DESC
-    `);
+    `, [todayKey]);
 
     const abiertas = rows.map(row => {
       const session = mapRowToSession(row);
