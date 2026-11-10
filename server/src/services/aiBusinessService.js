@@ -428,6 +428,20 @@ async function getLiveBusinessContext() {
     `);
     context.topProductosVendidos = topProdRows;
 
+    // 7. Top 8 Productos Más Vendidos de Hoy (Hora Managua UTC-6)
+    const [topProdHoyRows] = await pool.query(`
+      SELECT p.nombre, p.codigo, SUM(dv.cantidad) as total_unidades, SUM(dv.cantidad * dv.precio_unitario) as total_generado
+      FROM detalle_ventas dv
+      JOIN ventas v ON dv.id_venta = v.id_venta
+      JOIN productos p ON dv.id_producto = p.id_producto
+      WHERE DATE(DATE_SUB(v.fecha, INTERVAL 6 HOUR)) = DATE(DATE_SUB(NOW(), INTERVAL 6 HOUR))
+        AND v.estado != 'CANCELADA'
+      GROUP BY p.id_producto, p.nombre, p.codigo
+      ORDER BY total_unidades DESC, total_generado DESC
+      LIMIT 8
+    `);
+    context.topProductosVendidosHoy = topProdHoyRows;
+
   } catch (error) {
     console.error('[AIBusinessService] Error recopilando contexto:', error.message);
   }
@@ -930,6 +944,42 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
     return resp;
   }
 
+  // 0. Más vendidos (Hoy o del Mes) — Evaluar ANTES de Ventas del Mes/Hoy para que "producto más vendido del mes/hoy" responda el ranking de productos
+  if (q.includes('mas vendido') || q.includes('más vendido') || q.includes('producto top') || q.includes('productos top') || q.includes('popular') || q.includes('estrella') || q.includes('rotacion') || q.includes('rotación')) {
+    const topMes = context.topProductosVendidos || [];
+    const topHoy = context.topProductosVendidosHoy || [];
+    const pideHoy = q.includes('hoy') || q.includes('dia') || q.includes('día');
+
+    if (pideHoy) {
+      let resp = `🏆 **Productos Más Vendidos de Hoy — Multirepuestos RG:**\n\n`;
+      if (topHoy.length > 0) {
+        topHoy.forEach((p, idx) => {
+          resp += `${idx + 1}. **${p.nombre}** (Cód: \`${p.codigo || 'S/C'}\`) ➔ **${p.total_unidades} unidades** vendidas hoy (**C$ ${Number(p.total_generado || 0).toLocaleString()}**)\n`;
+        });
+      } else {
+        resp += `• A esta hora del día aún no se registran productos facturados hoy.\n`;
+      }
+      if (topMes.length > 0) {
+        resp += `\n📅 **Top #1 del Mes Actual (Referencia):**\n`;
+        topMes.slice(0, 3).forEach((p, idx) => {
+          resp += `${idx + 1}. **${p.nombre}** (Cód: \`${p.codigo || 'S/C'}\`) ➔ **${p.total_unidades} unidades** en el mes (**C$ ${Number(p.total_generado || 0).toLocaleString()}**)\n`;
+        });
+      }
+      return resp;
+    }
+
+    if (!topMes.length) return "No hay registro de productos vendidos en los últimos 30 días.";
+    let resp = `🏆 **Top Productos Más Vendidos del Mes — Multirepuestos RG:**\n\n`;
+    topMes.forEach((p, idx) => {
+      resp += `${idx + 1}. **${p.nombre}** (Cód: \`${p.codigo || 'S/C'}\`) ➔ **${p.total_unidades} unidades** vendidas (**C$ ${Number(p.total_generado || 0).toLocaleString()}**)\n`;
+    });
+    if (topHoy.length > 0) {
+      const top1Hoy = topHoy[0];
+      resp += `\n🔥 **Más vendido hoy:** **${top1Hoy.nombre}** con **${top1Hoy.total_unidades} unidades** (**C$ ${Number(top1Hoy.total_generado || 0).toLocaleString()}**).`;
+    }
+    return resp;
+  }
+
   // 1. Ventas por Empleado / Vendedor
   if (q.includes('emplead') || q.includes('vendedor') || q.includes('quien vendio') || q.includes('quien vendió') || q.includes('venden') || q.includes('personal')) {
     const vSem = context.ventasVendedorSemana || [];
@@ -1173,9 +1223,14 @@ function formatCompactBusinessContext(context, specificProducts = []) {
 
   text += `- Inventario Global: ${Number(inv.total_productos_distintos || 0).toLocaleString()} productos distintos (${Number(inv.total_unidades_fisicas || 0).toLocaleString()} unidades físicas). Valor Costo: C$ ${Number(inv.valor_total_costo || 0).toLocaleString()}. Valor Venta: C$ ${Number(inv.valor_total_venta || 0).toLocaleString()}\n`;
 
+  if (context.topProductosVendidosHoy && context.topProductosVendidosHoy.length > 0) {
+    const topHoy = context.topProductosVendidosHoy.map((p, i) => `${i + 1}. ${p.nombre} (Cód: ${p.codigo || 'S/C'}): ${p.total_unidades} uds, C$ ${Number(p.total_generado || 0).toLocaleString()}`).join('; ');
+    text += `- Top Productos Más Vendidos Hoy: ${topHoy}\n`;
+  }
+
   if (context.topProductosVendidos && context.topProductosVendidos.length > 0) {
     const topP = context.topProductosVendidos.map((p, i) => `${i + 1}. ${p.nombre} (Cód: ${p.codigo || 'S/C'}): ${p.total_unidades} uds, C$ ${Number(p.total_generado || 0).toLocaleString()}`).join('; ');
-    text += `- Top Productos Más Vendidos (Últimos 30 días): ${topP}\n`;
+    text += `- Top Productos Más Vendidos del Mes (Últimos 30 días): ${topP}\n`;
   }
 
   if (context.topClientesDeudores && context.topClientesDeudores.length > 0) {
@@ -1302,6 +1357,9 @@ ${formatCompactBusinessContext(context, specificProducts)}
  */
 function isDirectStructuredReportQuery(q) {
   return (
+    ((q.includes('venta') || q.includes('vend')) && q.includes('hoy')) ||
+    ((q.includes('venta') || q.includes('vend')) && q.includes('mes')) ||
+    ((q.includes('venta') || q.includes('vend')) && q.includes('semana')) ||
     q.includes('vendido hoy') ||
     q.includes('ventas de hoy') ||
     q.includes('ventas hoy') ||
@@ -1319,6 +1377,10 @@ function isDirectStructuredReportQuery(q) {
     q.includes('cada vendedor') ||
     q.includes('por empleado') ||
     q.includes('por vendedor') ||
+    q.includes('quien vendio') ||
+    q.includes('quién vendió') ||
+    q.includes('quien ha vendido') ||
+    q.includes('quién ha vendido') ||
     q.includes('ultimas cajas') ||
     q.includes('últimas cajas') ||
     q.includes('cerraron las') ||
@@ -1332,8 +1394,13 @@ function isDirectStructuredReportQuery(q) {
     q.includes('clientes que deben') ||
     q.includes('clientes deudores') ||
     q.includes('cuentas por cobrar') ||
+    q.includes('mas vendido') ||
+    q.includes('más vendido') ||
     q.includes('mas vendidos') ||
     q.includes('más vendidos') ||
+    q.includes('producto top') ||
+    q.includes('productos top') ||
+    q.includes('producto estrella') ||
     q.includes('valor total del inventario') ||
     q.includes('valor del inventario') ||
     q.includes('resumen de inventario')
