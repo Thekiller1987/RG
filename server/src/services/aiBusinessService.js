@@ -436,13 +436,36 @@ async function getLiveBusinessContext() {
 }
 
 /**
+ * Normaliza un término de búsqueda de repuesto quitando tildes y plurales finales (ej. "bujías" -> "bujia")
+ */
+function normalizeProductToken(word) {
+  let w = String(word || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+  if (w.length > 5 && w.endsWith('ciones')) {
+    w = w.slice(0, -2); // fricciones -> friccion
+  } else if (w.length > 4 && w.endsWith('es') && !/[aeiou]es$/.test(w)) {
+    w = w.slice(0, -2);
+  } else if (w.length > 4 && w.endsWith('s')) {
+    w = w.slice(0, -1); // bujias -> bujia, llantas -> llanta
+  }
+  return w;
+}
+
+/**
  * Busca repuestos específicos permitiendo múltiples palabras clave (AND) para máxima precisión.
  * Incluye bandera tiene_imagen para saber si el producto cuenta con fotografía en Base64.
  */
 async function searchProductsForQuery(queryText) {
   if (!queryText || !String(queryText).trim()) return [];
   try {
-    const rawTokens = String(queryText).trim().split(/\s+/).filter(t => t.length >= 2);
+    const rawTokens = String(queryText)
+      .trim()
+      .split(/\s+/)
+      .map(normalizeProductToken)
+      .filter(t => t.length >= 2);
     if (!rawTokens.length) return [];
 
     // 1. Búsqueda con todos los tokens usando AND (ej: 'aceite' AND 'maxima')
@@ -561,7 +584,7 @@ async function getProductPhoto(question, history = []) {
   }
 
   try {
-    const tokens = searchTerm.split(/\s+/).filter(t => t.length >= 2);
+    const tokens = searchTerm.split(/\s+/).map(normalizeProductToken).filter(t => t.length >= 2);
     const conditions = [];
     const params = [];
     tokens.forEach(t => {
@@ -1421,7 +1444,8 @@ async function askBusinessAI(input, maybeHistory = []) {
     'diferencia', 'diferencias', 'hubo', 'cerraron', 'cerró', 'abrieron', 'abrió', 'mejor',
     'son', 'es', 'el', 'la', 'de', 'al', 'dame', 'dar', 'muestra', 'muestrame', 'muéstrame',
     'ver', 'reporte', 'reportes', 'resumen', 'detalle', 'foto', 'fotos', 'imagen', 'imagenes',
-    'clientes', 'cliente', 'deuda', 'deudas', 'deben', 'inventario', 'valor', 'productos', 'producto'
+    'clientes', 'cliente', 'deuda', 'deudas', 'deben', 'inventario', 'valor', 'productos', 'producto',
+    'tienes', 'tiene', 'disponible', 'disponibles', 'cuestan', 'valen', 'vale'
   ]);
 
   const isBusinessMetric = normalizedQuestion.includes('semana') || normalizedQuestion.includes('emplead') || 
@@ -1431,7 +1455,8 @@ async function askBusinessAI(input, maybeHistory = []) {
     normalizedQuestion.includes('cuanto hemos vendido') || normalizedQuestion.includes('mejor dia') || 
     normalizedQuestion.includes('mes') || normalizedQuestion.includes('mensual') || normalizedQuestion.includes('hoy') || 
     normalizedQuestion.includes('facturad') || normalizedQuestion.includes('total de venta') ||
-    normalizedQuestion.includes('deuda') || normalizedQuestion.includes('debe') || normalizedQuestion.includes('inventario');
+    normalizedQuestion.includes('deuda') || normalizedQuestion.includes('debe') || normalizedQuestion.includes('inventario') ||
+    normalizedQuestion.includes('recomendacion') || normalizedQuestion.includes('recomendaciones') || normalizedQuestion.includes('estrategia');
 
   let specificProducts = [];
   if (!isBusinessMetric) {
@@ -1439,10 +1464,20 @@ async function askBusinessAI(input, maybeHistory = []) {
       .toLowerCase()
       .replace(/[¿?¡!.,:;()_]/g, ' ')
       .split(/\s+/)
-      .filter(w => w.length >= 3 && !STOP_WORDS.has(w));
+      .filter(w => w.length >= 3 && !STOP_WORDS.has(w) && !STOP_WORDS.has(normalizeProductToken(w)));
 
     if (cleanWords.length > 0) {
       specificProducts = await searchProductsForQuery(cleanWords.join(' '));
+      if (specificProducts.length > 0) {
+        const catalogAnswer = generateLocalFallbackResponse(rawQ, context, specificProducts);
+        return {
+          answer: catalogAnswer,
+          image: null,
+          product: null,
+          provider: "ada-catalog-search",
+          hasKey: true
+        };
+      }
     }
   }
 
