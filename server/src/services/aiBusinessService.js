@@ -981,7 +981,7 @@ function generateLocalFallbackResponse(question, context, specificProducts = [])
   }
 
   // 1. Ventas por Empleado / Vendedor
-  if (q.includes('emplead') || q.includes('vendedor') || q.includes('quien vendio') || q.includes('quien vendió') || q.includes('venden') || q.includes('personal')) {
+  if (q.includes('emplead') || q.includes('vendedor') || q.includes('quien vendio') || q.includes('quien vendió') || q.includes('quién vendió') || q.includes('quien ha vendido') || q.includes('quién ha vendido') || q.includes('quien vende') || q.includes('quién vende') || q.includes('venden') || q.includes('personal')) {
     const vSem = context.ventasVendedorSemana || [];
     const vMes = context.ventasVendedorMes || [];
     const emps = context.empleadosActivos || [];
