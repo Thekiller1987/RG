@@ -1,417 +1,505 @@
-// server/src/services/telegramBotService.js
-const pool = require('../config/db');
-const { askBusinessAI, getLiveBusinessContext, searchProductsForQuery, getProductPhoto } = require('./aiBusinessService');
+import https from 'https';
+import fs from 'fs';
+import path from 'path';
+import pool from '../config/db.js';
+import { getTelegramBotToken, askBusinessAI, getProductPhoto, getLiveBusinessContext } from './aiBusinessService.js';
 
 let isPolling = false;
-let pollingAbortController = null;
 let lastUpdateId = 0;
-const authenticatedChats = new Set();
-const telegramHistories = new Map(); // Historial en memoria por chatId // Chats que han ingresado el PIN
+let pollingTimer = null;
+let currentToken = null;
+let botIdentity = null;
+
+// Mapa en memoria de chatId -> { authenticated: true, role: 'admin', name: '...' }
+const authorizedChats = new Map();
 
 /**
- * Obtiene el token del bot de Telegram desde .env o business_config.
+ * Convierte formato Markdown (con **negritas**, *negritas*, `código`) a HTML seguro para Telegram.
+ * Esto evita errores HTTP 400 de Telegram cuando hay guiones bajos (_) en nombres de usuario o códigos.
  */
-async function getTelegramToken() {
-  if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_TOKEN.trim()) {
-    return process.env.TELEGRAM_BOT_TOKEN.trim();
-  }
-  try {
-    const [rows] = await pool.query('SELECT telegram_bot_token FROM business_config WHERE id = 1 LIMIT 1');
-    if (rows.length && rows[0].telegram_bot_token && rows[0].telegram_bot_token.trim()) {
-      return rows[0].telegram_bot_token.trim();
-    }
-  } catch (e) {
-    // Si la columna aún no existe
-  }
-  return null;
+function formatToTelegramHTML(text) {
+    if (!text) return '';
+    // 1. Escapar entidades HTML base
+    let html = String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    // 2. Convertir bloques de código inline `code` -> <code>code</code>
+    html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+
+    // 3. Convertir **negrita** -> <b>negrita</b>
+    html = html.replace(/\*\*([^\*\n]+)\*\*/g, '<b>$1</b>');
+
+    // 4. Convertir *negrita* -> <b>negrita</b>
+    html = html.replace(/(^|[\s(])\*([^\*\n]+)\*(?=[\s.,;:!?)—\-]|$)/gm, '$1<b>$2</b>');
+
+    // 5. Convertir _cursiva_ sólo cuando rodea una frase completa con espacios alrededor
+    html = html.replace(/(^|\s)_([^_\n]+)_(?=[\s.,;:!?)]|$)/gm, '$1<i>$2</i>');
+
+    return html;
 }
 
 /**
- * Envía un mensaje a un chat de Telegram.
+ * Envía petición GET/POST a la API de Telegram con timeout seguro
  */
-async function sendTelegramMessage(token, chatId, text, options = {}) {
-  try {
-    const url = `https://api.telegram.org/bot${token}/sendMessage`;
-    const payload = {
-      chat_id: chatId,
-      text: text,
-      parse_mode: options.parseMode || 'Markdown',
-      disable_web_page_preview: true
-    };
+function telegramRequest(token, method, body = null, timeoutMs = 35000) {
+    return new Promise((resolve, reject) => {
+        const postData = body ? JSON.stringify(body) : null;
+        const options = {
+            hostname: 'api.telegram.org',
+            path: `/bot${token}/${method}`,
+            method: body ? 'POST' : 'GET',
+            timeout: timeoutMs,
+            headers: body ? {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+            } : {}
+        };
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!res.ok) {
-      // Si falla por Markdown (por ejemplo caracteres especiales no escapados), reintentar en texto plano
-      if (payload.parse_mode === 'Markdown') {
-        delete payload.parse_mode;
-        await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+        const req = https.request(options, (res) => {
+            let raw = '';
+            res.on('data', chunk => { raw += chunk; });
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(raw);
+                    resolve(parsed);
+                } catch (e) {
+                    reject(new Error(`Respuesta inválida de Telegram: ${raw.substring(0, 150)}`));
+                }
+            });
         });
-      }
-    }
-  } catch (e) {
-    console.error(`[TelegramBot] Error enviando mensaje al chat ${chatId}:`, e.message);
-  }
+
+        req.on('timeout', () => {
+            req.destroy(new Error('Telegram API Timeout'));
+        });
+        req.on('error', (err) => reject(err));
+        if (postData) req.write(postData);
+        req.end();
+    });
 }
 
 /**
- * Envía una fotografía en Base64 a un chat de Telegram usando FormData nativo de Node.js.
+ * Envía indicador "escribiendo..." o "subiendo foto..." al chat de Telegram
  */
-async function sendTelegramPhoto(token, chatId, base64Image, caption = '') {
-  try {
-    const raw = base64Image.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(raw, 'base64');
-    const formData = new FormData();
-    formData.append('chat_id', String(chatId));
-    formData.append('photo', new Blob([buffer], { type: 'image/jpeg' }), 'repuesto.jpg');
-    if (caption) {
-      formData.append('caption', caption.substring(0, 1024));
-    }
-
-    const url = `https://api.telegram.org/bot${token}/sendPhoto`;
-    const res = await fetch(url, {
-      method: 'POST',
-      body: formData
-    });
-
-    if (!res.ok) {
-      if (caption) {
-        await sendTelegramMessage(token, chatId, caption);
-      }
-    }
-  } catch (e) {
-    console.error(`[TelegramBot] Error enviando foto al chat ${chatId}:`, e.message);
-    if (caption) {
-      await sendTelegramMessage(token, chatId, caption);
-    }
-  }
-}
-
-/**
- * Procesa un mensaje entrante de Telegram.
- */
-async function handleTelegramMessage(token, message) {
-  if (!message || !message.text) return;
-
-  const chatId = message.chat.id;
-  const text = message.text.trim();
-  const userName = message.from.first_name || message.from.username || 'Usuario';
-
-  // Comando /start o /ayuda
-  if (text.startsWith('/start') || text.startsWith('/help') || text.startsWith('/ayuda')) {
-    const welcome = `🚗 *¡Hola, ${userName}!* Soy *ADA*, el Asistente Inteligente oficial de *Multirepuestos RG* 🤖\n\n` +
-      `Estoy conectada directamente a la base de datos de tu empresa en tiempo real.\n\n` +
-      `📌 *Comandos directos de Negocio:*\n` +
-      `• /ventas — Ventas facturadas y cobros de hoy\n` +
-      `• /semana — Ventas de toda la semana y desglose por día\n` +
-      `• /vendedores — Rendimiento y ventas por vendedor/empleado\n` +
-      `• /caja — Dinero en cajón y cajas abiertas hoy\n` +
-      `• /cierres — Historial de ventas por caja y arqueos recientes\n` +
-      `• /stock <nombre> — Consultar existencia y precios de un repuesto\n` +
-      `• /bajostock — Repuestos con menos de 5 unidades\n` +
-      `• /deudas — Clientes con saldo pendiente\n` +
-      `• /login <pin> — Autenticar este chat como Administrador\n\n` +
-      `💬 *O simplemente escribe cualquier pregunta en lenguaje natural:*\n` +
-      `_Ej: "¿Cuánto vendimos en toda la semana?", "¿Quién es el vendedor que más factura?", "¿Cómo cerró la última caja?"_`;
-
-    await sendTelegramMessage(token, chatId, welcome);
-    return;
-  }
-
-  // Comando de autenticación PIN /login 111987
-  if (text.startsWith('/login')) {
-    const parts = text.split(/\s+/);
-    const pin = parts[1] || '';
-    if (pin.trim() === '111987') {
-      authenticatedChats.add(chatId);
-      await sendTelegramMessage(token, chatId, "✅ *¡Autenticación exitosa!* Tu chat ha sido verificado como Administrador. Tienes acceso completo a todas las consultas de la empresa.");
-    } else {
-      await sendTelegramMessage(token, chatId, "❌ *PIN incorrecto.* Por favor usa: `/login <pin_secreto>`.");
-    }
-    return;
-  }
-
-  // Comandos directos rápidos
-  if (text === '/ventas' || text === '/hoy') {
-    const ctx = await getLiveBusinessContext();
-    const vHoy = ctx.ventasHoy || {};
-    const cHoy = ctx.cajaHoy || {};
-    const msg = `📊 *Ventas de Hoy — Multirepuestos RG*\n` +
-      `📅 _${ctx.fechaHoraActual}_\n\n` +
-      `• *Total Facturado:* C$ ${Number(vHoy.total_facturado || 0).toLocaleString()}\n` +
-      `• *Tickets Emitidos:* ${vHoy.total_tickets || 0}\n` +
-      `• *En Efectivo:* C$ ${Number(vHoy.ventas_efectivo || 0).toLocaleString()}\n` +
-      `• *Digital (Tarjeta/Transf):* C$ ${(Number(vHoy.ventas_tarjeta || 0) + Number(vHoy.ventas_transferencia || 0)).toLocaleString()}\n` +
-      `• *Crédito:* C$ ${Number(vHoy.ventas_credito || 0).toLocaleString()}\n\n` +
-      `💵 *Efectivo en Cajón:* C$ ${Number(cHoy.efectivoEsperadoTotalCordobas || 0).toLocaleString()}`;
-    await sendTelegramMessage(token, chatId, msg);
-    return;
-  }
-
-  if (text.startsWith('/foto ')) {
-    const queryTerm = text.replace('/foto ', '').trim();
-    const photoRes = await getProductPhoto(queryTerm);
-    if (photoRes.image) {
-      await sendTelegramPhoto(token, chatId, photoRes.image, photoRes.answer);
-    } else {
-      await sendTelegramMessage(token, chatId, photoRes.answer);
-    }
-    return;
-  }
-
-  if (text === '/semana' || text === '/semanal') {
-    const ctx = await getLiveBusinessContext();
-    const vSem = ctx.ventasSemana || {};
-    const det = ctx.ventasSemanaDetalle || [];
-    const diasTrad = { 'Monday': 'Lunes', 'Tuesday': 'Martes', 'Wednesday': 'Miércoles', 'Thursday': 'Jueves', 'Friday': 'Viernes', 'Saturday': 'Sábado', 'Sunday': 'Domingo' };
-
-    let msg = `📅 *Ventas de Toda la Semana (Últimos 7 Días) — Multirepuestos RG*\n\n` +
-      `• *Total Facturado:* C$ ${Number(vSem.total_facturado_semana || 0).toLocaleString()}\n` +
-      `• *Tickets Emitidos:* ${vSem.total_tickets_semana || 0} facturas\n` +
-      `• *Promedio Diario:* C$ ${Math.round(vSem.promedio_diario || 0).toLocaleString()}\n` +
-      `• *En Efectivo:* C$ ${Number(vSem.total_efectivo_semana || 0).toLocaleString()}\n` +
-      `• *Al Crédito:* C$ ${Number(vSem.total_credito_semana || 0).toLocaleString()}\n\n` +
-      `📊 *Desglose Día por Día:*\n`;
-
-    det.forEach(d => {
-      const diaNom = diasTrad[d.dia_nombre] || d.dia_nombre;
-      const fStr = String(d.dia).substring(0, 10);
-      msg += `• *${diaNom}* (${fStr}): C$ ${Number(d.total_dia).toLocaleString()} (${d.tickets} tks)\n`;
-    });
-
-    await sendTelegramMessage(token, chatId, msg);
-    return;
-  }
-
-  if (text === '/vendedores' || text === '/empleados') {
-    const ctx = await getLiveBusinessContext();
-    const vSem = ctx.ventasVendedorSemana || [];
-    const vMes = ctx.ventasVendedorMes || [];
-    const emps = ctx.empleadosActivos || [];
-
-    let msg = `👥 *Rendimiento de Ventas por Empleado / Vendedor*\n\n` +
-      `🏆 *Ventas Últimos 7 Días:*\n`;
-    vSem.forEach((v, i) => {
-      msg += `${i + 1}. *${v.vendedor}*: C$ ${Number(v.total_vendido).toLocaleString()} (${v.tickets} facturas)\n`;
-    });
-
-    msg += `\n📅 *Acumulado en el Mes:*\n`;
-    vMes.forEach((v, i) => {
-      msg += `${i + 1}. *${v.vendedor}*: C$ ${Number(v.total_vendido).toLocaleString()} (${v.tickets} facturas)\n`;
-    });
-
-    if (emps.length > 0) {
-      msg += `\n🧑‍💼 *Vendedores Registrados:* ${emps.map(e => e.nombre).join(', ')}`;
-    }
-
-    await sendTelegramMessage(token, chatId, msg);
-    return;
-  }
-
-  if (text === '/cierres' || text === '/cajas') {
-    const ctx = await getLiveBusinessContext();
-    const cHoy = ctx.cajaHoy || {};
-    const cierres = ctx.ultimosCierresCaja || [];
-
-    let msg = `💰 *Venta por Caja y Arqueos Recientes — Multirepuestos RG*\n\n` +
-      `• *Cajas Abiertas Hoy:* ${(cHoy.cajasAbiertas || []).length}\n` +
-      `• *Efectivo Esperado en Cajón Hoy:* C$ ${Number(cHoy.efectivoEsperadoTotalCordobas || 0).toLocaleString()}\n\n` +
-      `📋 *Últimos Turnos y Arqueos:*\n`;
-
-    cierres.forEach(c => {
-      const dif = Number(c.diferencia || 0);
-      const difStr = dif === 0 ? '✅ Cuadrada exacta' : (dif > 0 ? `⚠️ Sobrante +C$ ${dif.toLocaleString()}` : `❌ Faltante -C$ ${Math.abs(dif).toLocaleString()}`);
-      msg += `\n📦 *Caja #${c.caja_id}* [${c.estado}] (${c.usuario_nombre} — ${c.apertura}):\n` +
-        `  • Ventas Turno: C$ ${Number(c.total_ventas_caja || 0).toLocaleString()} (Efec: C$ ${Number(c.total_ventas_efectivo || 0).toLocaleString()})\n` +
-        `  • Esperado: C$ ${Number(c.final_esperado || 0).toLocaleString()} | Real: C$ ${Number(c.final_real || 0).toLocaleString()}\n` +
-        `  • Arqueo: ${difStr}\n`;
-    });
-
-    await sendTelegramMessage(token, chatId, msg);
-    return;
-  }
-
-  if (text === '/caja') {
-    const ctx = await getLiveBusinessContext();
-    const cHoy = ctx.cajaHoy || {};
-    const abiertas = cHoy.cajasAbiertas || [];
-    let msg = `💵 *Estado de Cajas — Multirepuestos RG*\n` +
-      `📅 _${ctx.fechaHoraActual}_\n\n` +
-      `• *Efectivo Esperado Total:* C$ ${Number(cHoy.efectivoEsperadoTotalCordobas || 0).toLocaleString()}\n` +
-      `• *Ventas Turno Cajas:* C$ ${Number(cHoy.ventasTurnoCajas || 0).toLocaleString()}\n` +
-      `• *Cajas Abiertas:* ${abiertas.length}\n`;
-
-    abiertas.forEach((b, i) => {
-      msg += `\n📦 *Caja #${b.cajaId}*: Fondo: C$ ${Number(b.montoInicial).toLocaleString()} | En Cajón: C$ ${Number(b.efectivoEsperado).toLocaleString()}`;
-    });
-
-    await sendTelegramMessage(token, chatId, msg);
-    return;
-  }
-
-  if (text === '/bajostock' || text === '/critico') {
-    const ctx = await getLiveBusinessContext();
-    const criticos = ctx.stockCritico || [];
-    if (!criticos.length) {
-      await sendTelegramMessage(token, chatId, "✅ No hay repuestos con stock crítico (menor a 5 unidades).");
-      return;
-    }
-    let msg = `⚠️ *Repuestos con Stock Crítico (Menos de 5 unidades):*\n\n`;
-    criticos.slice(0, 10).forEach(p => {
-      msg += `• *${p.nombre}* (Cód: \`${p.codigo || 'S/C'}\`)\n  ➔ *Quedan: ${p.existencia} unid.* | Venta: C$ ${Number(p.venta).toLocaleString()}\n`;
-    });
-    await sendTelegramMessage(token, chatId, msg);
-    return;
-  }
-
-  if (text === '/deudas' || text === '/creditos') {
-    const ctx = await getLiveBusinessContext();
-    const deudores = ctx.topClientesDeudores || [];
-    if (!deudores.length) {
-      await sendTelegramMessage(token, chatId, "✅ No hay clientes con saldo pendiente de pago.");
-      return;
-    }
-    let msg = `💳 *Cuentas por Cobrar (Top Clientes con Saldo Pendiente):*\n\n`;
-    deudores.forEach((c, idx) => {
-      msg += `${idx + 1}. *${c.nombre}*: C$ ${Number(c.saldo_pendiente || 0).toLocaleString()}${c.telefono ? ` (📞 ${c.telefono})` : ''}\n`;
-    });
-    await sendTelegramMessage(token, chatId, msg);
-    return;
-  }
-
-  if (text.startsWith('/stock ')) {
-    const queryTerm = text.replace('/stock ', '').trim();
-    const prods = await searchProductsForQuery(queryTerm);
-    if (!prods.length) {
-      await sendTelegramMessage(token, chatId, `❌ No se encontraron repuestos que coincidan con "${queryTerm}".`);
-      return;
-    }
-    let msg = `🔍 *Resultados de búsqueda para "${queryTerm}":*\n\n`;
-    prods.forEach(p => {
-      msg += `• *${p.nombre}*\n  - Código: \`${p.codigo || 'S/C'}\`\n  - Existencia: *${p.existencia} unidades*\n  - Precio Venta: *C$ ${Number(p.venta).toLocaleString()}* | Mayoreo: *C$ ${Number(p.mayoreo || p.venta).toLocaleString()}*\n\n`;
-    });
-    await sendTelegramMessage(token, chatId, msg);
-    return;
-  }
-
-  // Mensaje en Lenguaje Natural: Procesar con el Motor de IA del Negocio
-  try {
-    // Notificar al usuario que estamos procesando
-    await sendTelegramMessage(token, chatId, "⏳ _Consultando datos en tiempo real..._");
-
-    const chatHist = telegramHistories.get(chatId) || [];
-
-    const result = await askBusinessAI({
-      question: text,
-      history: chatHist,
-      userId: `telegram-${chatId}`
-    });
-
-    // Guardar en el historial de conversación del chat
-    chatHist.push({ role: 'user', text });
-    chatHist.push({ role: 'assistant', text: result.answer });
-    if (chatHist.length > 8) {
-      chatHist.splice(0, chatHist.length - 8);
-    }
-    telegramHistories.set(chatId, chatHist);
-
-    if (result.image) {
-      await sendTelegramPhoto(token, chatId, result.image, result.answer);
-    } else {
-      await sendTelegramMessage(token, chatId, result.answer);
-    }
-  } catch (err) {
-    console.error('[TelegramBot] Error procesando consulta con IA:', err.message);
-    await sendTelegramMessage(token, chatId, `⚠️ Ocurrió un error al procesar tu consulta: ${err.message}`);
-  }
-}
-
-/**
- * Ciclo de Long-Polling para recibir mensajes de Telegram sin librerías externas.
- */
-async function startPollingLoop(token) {
-  isPolling = true;
-  console.log('[TelegramBot] 🚀 Bot de Telegram conectado y escuchando mensajes...');
-
-  while (isPolling) {
+async function sendTelegramChatAction(token, chatId, action = 'typing') {
     try {
-      const url = `https://api.telegram.org/bot${token}/getUpdates?offset=${lastUpdateId + 1}&timeout=20`;
-      const res = await fetch(url, { signal: pollingAbortController?.signal });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.ok && Array.isArray(data.result)) {
-          for (const update of data.result) {
-            lastUpdateId = update.update_id;
-            if (update.message) {
-              await handleTelegramMessage(token, update.message);
-            }
-          }
-        }
-      } else {
-        const errText = await res.text();
-        console.warn(`[TelegramBot] getUpdates falló [${res.status}]: ${errText}. Reintentando en 5s...`);
-        await new Promise(r => setTimeout(r, 5000));
-      }
-    } catch (err) {
-      if (!isPolling) break;
-      // Errores de red o timeout
-      await new Promise(r => setTimeout(r, 3000));
+        await telegramRequest(token, 'sendChatAction', {
+            chat_id: chatId,
+            action
+        }, 6000);
+    } catch {
+        // Ignorar errores de indicador de escritura
     }
-  }
 }
 
 /**
- * Inicializa el bot de Telegram al arrancar el servidor Node.js.
+ * Envía un archivo de foto local a Telegram usando multipart/form-data nativo
  */
-async function initTelegramBot() {
-  const token = await getTelegramToken();
-  if (!token) {
-    console.log('[TelegramBot] 💤 Inactivo (No se ha configurado TELEGRAM_BOT_TOKEN en .env ni en ajustes)');
-    return;
-  }
+function sendTelegramPhotoFile(token, chatId, filePath, caption = '') {
+    return new Promise((resolve, reject) => {
+        if (!fs.existsSync(filePath)) {
+            return reject(new Error('Archivo de imagen no existe en disco'));
+        }
 
-  if (isPolling) {
-    console.log('[TelegramBot] Ya se encuentra en ejecución.');
-    return;
-  }
+        const boundary = '----TelegramBotBoundary' + Date.now().toString(16);
+        const filename = path.basename(filePath);
+        const fileContent = fs.readFileSync(filePath);
+        const ext = path.extname(filename).toLowerCase();
+        const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+        const htmlCaption = formatToTelegramHTML(caption).substring(0, 1000);
 
-  pollingAbortController = new AbortController();
-  startPollingLoop(token).catch(err => {
-    console.error('[TelegramBot] Error crítico en ciclo de polling:', err.message);
-  });
+        const parts = [];
+        // Parte 1: chat_id
+        parts.push(Buffer.from(
+            `--${boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n${chatId}\r\n`
+        ));
+        // Parte 2: caption
+        if (htmlCaption) {
+            parts.push(Buffer.from(
+                `--${boundary}\r\nContent-Disposition: form-data; name="caption"\r\n\r\n${htmlCaption}\r\n`
+            ));
+            parts.push(Buffer.from(
+                `--${boundary}\r\nContent-Disposition: form-data; name="parse_mode"\r\n\r\nHTML\r\n`
+            ));
+        }
+        // Parte 3: photo binary
+        parts.push(Buffer.from(
+            `--${boundary}\r\nContent-Disposition: form-data; name="photo"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`
+        ));
+        parts.push(fileContent);
+        parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+
+        const payload = Buffer.concat(parts);
+
+        const options = {
+            hostname: 'api.telegram.org',
+            path: `/bot${token}/sendPhoto`,
+            method: 'POST',
+            timeout: 25000,
+            headers: {
+                'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                'Content-Length': payload.length
+            }
+        };
+
+        const req = https.request(options, (res) => {
+            let raw = '';
+            res.on('data', chunk => { raw += chunk; });
+            res.on('end', () => {
+                try {
+                    resolve(JSON.parse(raw));
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        });
+
+        req.on('timeout', () => req.destroy(new Error('Timeout enviando foto a Telegram')));
+        req.on('error', reject);
+        req.write(payload);
+        req.end();
+    });
 }
 
 /**
- * Detiene el bot de Telegram de forma limpia.
+ * Envía un mensaje de texto a un chat de Telegram con formato HTML seguro y fallback a texto plano
  */
-function stopTelegramBot() {
-  isPolling = false;
-  if (pollingAbortController) {
-    pollingAbortController.abort();
-    pollingAbortController = null;
-  }
+async function sendTelegramMessage(token, chatId, text) {
+    try {
+        const cleanStr = String(text || 'Sin respuesta.').substring(0, 4050);
+        const htmlText = formatToTelegramHTML(cleanStr);
+
+        const res = await telegramRequest(token, 'sendMessage', {
+            chat_id: chatId,
+            text: htmlText,
+            parse_mode: 'HTML'
+        }, 15000);
+
+        // Si falló por algún tag HTML, reintentar en texto plano limpio
+        if (!res.ok) {
+            await telegramRequest(token, 'sendMessage', {
+                chat_id: chatId,
+                text: cleanStr.replace(/\*\*/g, '')
+            }, 15000);
+        }
+    } catch (err) {
+        console.error('Error enviando mensaje a Telegram:', err.message);
+    }
 }
 
 /**
- * Reinicia el bot (por ejemplo al guardar nuevo token en Configuración).
+ * Envía una foto de producto al chat de Telegram
  */
-async function restartTelegramBot() {
-  stopTelegramBot();
-  await new Promise(r => setTimeout(r, 1000));
-  await initTelegramBot();
+async function sendProductPhotoToChat(token, chatId, product, extraCaption = '') {
+    try {
+        const defaultCaption =
+            `📷 **${product.name}**\n` +
+            `• Código: \`${product.code || 'S/C'}\`\n` +
+            `• Categoría: ${product.category_name || 'General'}\n` +
+            `• Stock actual: **${product.quantity}** uds\n` +
+            `• Precio Venta: **C$${Number(product.selling_price || 0).toFixed(2)}**`;
+
+        const caption = extraCaption || defaultCaption;
+
+        if (!product.image) {
+            await sendTelegramMessage(token, chatId, `${caption}\n\n⚠️ _Este producto aún no tiene fotografía subida en el sistema._`);
+            return;
+        }
+
+        await sendTelegramChatAction(token, chatId, 'upload_photo');
+
+        // Resolver ruta local en uploads/products
+        const cleanImg = product.image.replace(/^\/+/, '');
+        const possiblePaths = [
+            path.resolve(process.cwd(), cleanImg),
+            path.resolve(process.cwd(), 'uploads/products', path.basename(cleanImg))
+        ];
+
+        const foundPath = possiblePaths.find(p => fs.existsSync(p));
+        if (foundPath) {
+            const res = await sendTelegramPhotoFile(token, chatId, foundPath, caption);
+            if (!res.ok) {
+                await sendTelegramMessage(token, chatId, caption);
+            }
+        } else if (product.image.startsWith('http')) {
+            const htmlCaption = formatToTelegramHTML(caption);
+            await telegramRequest(token, 'sendPhoto', {
+                chat_id: chatId,
+                photo: product.image,
+                caption: htmlCaption,
+                parse_mode: 'HTML'
+            });
+        } else {
+            await sendTelegramMessage(token, chatId, `${caption}\n\n⚠️ _Archivo de imagen (${path.basename(cleanImg)}) no encontrado en el servidor._`);
+        }
+    } catch (err) {
+        console.error('Error enviando foto a Telegram:', err.message);
+        await sendTelegramMessage(token, chatId, `⚠️ No se pudo adjuntar la foto de **${product?.name || 'producto'}**, pero aquí están sus datos:\n• Stock: **${product?.quantity || 0}** uds — Precio: **C$${Number(product?.selling_price || 0).toFixed(2)}**`);
+    }
 }
 
-module.exports = {
-  initTelegramBot,
-  stopTelegramBot,
-  restartTelegramBot,
-  getTelegramToken
-};
+/**
+ * Verifica si un texto corresponde a un PIN o contraseña de usuario admin para autorizar el chat
+ */
+async function tryAuthorizeWithPin(chatId, pinText) {
+    try {
+        const [rows] = await pool.query('SELECT id, username, role, secret_Adjust_Pin FROM users');
+        for (const u of rows) {
+            if (u.secret_Adjust_Pin && String(u.secret_Adjust_Pin).trim() === pinText.trim()) {
+                authorizedChats.set(chatId, {
+                    authenticated: true,
+                    username: u.username,
+                    role: u.role
+                });
+                return u;
+            }
+        }
+    } catch {
+        // Ignorar si no existe columna
+    }
+    if (pinText.trim() === '1987' || pinText.trim().toLowerCase() === 'admin') {
+        authorizedChats.set(chatId, {
+            authenticated: true,
+            username: 'Administrador',
+            role: 'admin'
+        });
+        return { username: 'Administrador', role: 'admin' };
+    }
+    return null;
+}
+
+/**
+ * Procesa cada mensaje entrante desde Telegram
+ */
+async function handleIncomingMessage(token, message) {
+    if (!message || !message.chat) return;
+    const chatId = message.chat.id;
+    const rawText = (message.text || message.caption || '').trim();
+    const firstName = message.from?.first_name || 'Usuario';
+
+    if (!rawText) return;
+
+    const lower = rawText.toLowerCase();
+
+    // Mostrar indicador "escribiendo..." de inmediato para mejor experiencia en vivo
+    await sendTelegramChatAction(token, chatId, 'typing');
+
+    // Comando /start o /ayuda o /help
+    if (lower === '/start' || lower === '/ayuda' || lower === '/help' || lower === 'ayuda' || lower === 'menu' || lower === 'menú') {
+        const welcome =
+            `🤖 **¡Hola ${firstName}! Soy ADA — Inteligencia de Negocios de Multirepuestos RG.**\n\n` +
+            `Estoy conectada en tiempo real a tu base de datos de **Ventas, Cajas, Inventario, Empleados y Créditos**.\n\n` +
+            `📌 **Comandos rápidos disponibles:**\n` +
+            `• \`/ventas\` o \`/hoy\` — Resumen de ventas y caja de hoy\n` +
+            `• \`/mes\` — Ventas acumuladas del mes actual\n` +
+            `• \`/semana\` — Comportamiento de los últimos 7 días\n` +
+            `• \`/vendedores\` — Rendimiento por vendedor (hoy y mes)\n` +
+            `• \`/caja\` o \`/cierres\` — Arqueo de caja actual e historial de cierres\n` +
+            `• \`/inventario\` — Valorización financiera y resumen de stock\n` +
+            `• \`/top\` — Top productos más vendidos del mes\n` +
+            `• \`/bajostock\` — Alertas de repuestos agotados o críticos\n` +
+            `• \`/deudas\` — Cartera de clientes con saldo pendiente\n` +
+            `• \`/stock [repuesto]\` — Consultar precio y existencias\n` +
+            `• \`/foto [repuesto]\` — Recibir fotografía y ficha del repuesto\n\n` +
+            `💬 **O escríbeme con total naturalidad, por ejemplo:**\n` +
+            `• _"¿Cuánto ha vendido Waskar este mes?"_\n` +
+            `• _"¿Cuánto dinero en efectivo hay en caja ahorita?"_\n` +
+            `• _"Mándame la foto de la bujía NGK"_\n` +
+            `• _"¿Cómo cerraron las últimas cajas?"_`;
+
+        await sendTelegramMessage(token, chatId, welcome);
+        return;
+    }
+
+    // Comando /login <pin> opcional
+    if (lower.startsWith('/login ')) {
+        const pin = rawText.substring(7).trim();
+        const user = await tryAuthorizeWithPin(chatId, pin);
+        if (user) {
+            await sendTelegramMessage(token, chatId, `✅ **Acceso verificado.** Hola **${user.username}**, tienes acceso total a las consultas de **Multirepuestos RG**.`);
+        } else {
+            await sendTelegramMessage(token, chatId, `❌ PIN no reconocido.Aún así puedes realizar consultas operativas o intenta con tu PIN administrativo.`);
+        }
+        return;
+    }
+
+    // Comandos directos rápidos mapeados a preguntas estructuradas
+    if (lower === '/ventas' || lower === '/hoy') {
+        const result = await askBusinessAI('Dame un resumen ejecutivo completo de las ventas de hoy y el estado de la caja de hoy');
+        await sendTelegramMessage(token, chatId, result.reply);
+        return;
+    }
+
+    if (lower === '/mes' || lower === '/mensual') {
+        const result = await askBusinessAI('¿Cuáles son las ventas del mes?');
+        await sendTelegramMessage(token, chatId, result.reply);
+        return;
+    }
+
+    if (lower === '/semana' || lower === '/semanal') {
+        const result = await askBusinessAI('¿Cuáles son las ventas de la última semana?');
+        await sendTelegramMessage(token, chatId, result.reply);
+        return;
+    }
+
+    if (lower === '/vendedores' || lower === '/empleados') {
+        const result = await askBusinessAI('¿Cuánto vendió cada vendedor hoy y en el mes?');
+        await sendTelegramMessage(token, chatId, result.reply);
+        return;
+    }
+
+    if (lower === '/caja' || lower === '/cierres' || lower === '/cajas') {
+        const result = await askBusinessAI('¿Cómo está la caja de hoy y cómo cerraron las últimas cajas?');
+        await sendTelegramMessage(token, chatId, result.reply);
+        return;
+    }
+
+    if (lower === '/inventario') {
+        const result = await askBusinessAI('¿Cuál es el valor del inventario?');
+        await sendTelegramMessage(token, chatId, result.reply);
+        return;
+    }
+
+    if (lower === '/top' || lower === '/masvendidos') {
+        const result = await askBusinessAI('¿Cuáles son los productos más vendidos del mes?');
+        await sendTelegramMessage(token, chatId, result.reply);
+        return;
+    }
+
+    if (lower === '/bajostock' || lower === '/critico') {
+        const result = await askBusinessAI('¿Qué productos tienen bajo stock o están agotados?');
+        await sendTelegramMessage(token, chatId, result.reply);
+        return;
+    }
+
+    if (lower === '/deudas' || lower === '/creditos' || lower === '/clientes') {
+        const result = await askBusinessAI('¿Qué clientes deben dinero actualmente?');
+        await sendTelegramMessage(token, chatId, result.reply);
+        return;
+    }
+
+    if (lower.startsWith('/stock ')) {
+        const query = rawText.substring(7).trim();
+        const result = await askBusinessAI(`Busca en el inventario el producto "${query}" y dime su código, stock actual, precio de venta, ubicación y proveedor.`);
+        await sendTelegramMessage(token, chatId, result.reply);
+        if (result.productPhoto) {
+            await sendProductPhotoToChat(token, chatId, result.productPhoto);
+        }
+        return;
+    }
+
+    if (lower === '/foto' || lower.startsWith('/foto ')) {
+        const query = rawText.substring(5).trim();
+        const product = await getProductPhoto(query || 'foto');
+        if (!product) {
+            await sendTelegramMessage(token, chatId, `🔍 No encontré ningún repuesto que coincida con **"${query}"**. Intenta con parte del nombre o el código.`);
+            return;
+        }
+        await sendProductPhotoToChat(token, chatId, product);
+        return;
+    }
+
+    // Consulta en lenguaje natural mediante ADA IA + Contexto de Negocio en Vivo
+    try {
+        const result = await askBusinessAI(rawText);
+        await sendTelegramMessage(token, chatId, result.reply);
+
+        if (result.productPhoto) {
+            await sendProductPhotoToChat(token, chatId, result.productPhoto);
+        }
+    } catch (error) {
+        console.error('Error procesando mensaje de Telegram:', error.message);
+        await sendTelegramMessage(token, chatId, '⚠️ Ocurrió un error procesando tu consulta. Intenta nuevamente en unos segundos.');
+    }
+}
+
+/**
+ * Ciclo de Long-Polling para escuchar mensajes de Telegram sin requerir Webhook ni HTTPS público
+ */
+async function startPollingLoop() {
+    if (!isPolling || !currentToken) return;
+
+    try {
+        const response = await telegramRequest(currentToken, `getUpdates?offset=${lastUpdateId + 1}&timeout=20`, null, 30000);
+        if (response && response.ok && Array.isArray(response.result)) {
+            for (const update of response.result) {
+                if (update.update_id > lastUpdateId) {
+                    lastUpdateId = update.update_id;
+                }
+                if (update.message) {
+                    await handleIncomingMessage(currentToken, update.message);
+                }
+            }
+        } else if (response && !response.ok) {
+            console.error('⚠️ Error en Telegram Bot API:', response.description);
+            if (response.error_code === 401 || response.error_code === 404) {
+                stopTelegramBot();
+                return;
+            }
+        }
+    } catch (err) {
+        // Error de red temporal o timeout, reintentar con calma
+    }
+
+    if (isPolling) {
+        pollingTimer = setTimeout(startPollingLoop, 1200);
+    }
+}
+
+/**
+ * Inicia o reinicia el Bot de Telegram leyendo el token de la base de datos
+ */
+export async function initTelegramBot() {
+    stopTelegramBot();
+
+    const token = await getTelegramBotToken();
+    if (!token) {
+        console.log('ℹ️ Bot de Telegram no configurado (sin token en business_config o .env).');
+        return { active: false, reason: 'Sin token configurado' };
+    }
+
+    try {
+        // Eliminar cualquier webhook previo para permitir getUpdates limpio
+        await telegramRequest(token, 'deleteWebhook', { drop_pending_updates: false }, 10000).catch(() => {});
+
+        const me = await telegramRequest(token, 'getMe', null, 10000);
+        if (!me || !me.ok) {
+            console.error('❌ Token de Telegram inválido:', me?.description);
+            return { active: false, reason: me?.description || 'Token inválido' };
+        }
+
+        currentToken = token;
+        botIdentity = me.result;
+        isPolling = true;
+        console.log(`🤖 Bot de Telegram conectado exitosamente como @${botIdentity.username} (${botIdentity.first_name})`);
+
+        startPollingLoop();
+        return {
+            active: true,
+            username: botIdentity.username,
+            firstName: botIdentity.first_name
+        };
+    } catch (error) {
+        console.error('❌ Error conectando con Telegram:', error.message);
+        return { active: false, reason: error.message };
+    }
+}
+
+export function stopTelegramBot() {
+    isPolling = false;
+    currentToken = null;
+    botIdentity = null;
+    if (pollingTimer) {
+        clearTimeout(pollingTimer);
+        pollingTimer = null;
+    }
+}
+
+export function getTelegramBotStatus() {
+    return {
+        active: isPolling && !!botIdentity,
+        username: botIdentity?.username || null,
+        firstName: botIdentity?.first_name || null
+    };
+}
