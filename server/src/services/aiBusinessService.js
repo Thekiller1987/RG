@@ -1283,10 +1283,14 @@ function isDirectStructuredReportQuery(q) {
     q.includes('ventas de hoy') ||
     q.includes('ventas hoy') ||
     q.includes('hay en caja') ||
+    q.includes('hay en la caja') ||
     q.includes('estado de caja') ||
+    q.includes('estado de la caja') ||
     q.includes('ventas del mes') ||
     q.includes('ventas mes') ||
     q.includes('toda la semana') ||
+    q.includes('ultima semana') ||
+    q.includes('última semana') ||
     q.includes('ventas de la semana') ||
     q.includes('cada empleado') ||
     q.includes('cada vendedor') ||
@@ -1298,7 +1302,10 @@ function isDirectStructuredReportQuery(q) {
     q.includes('stock critico') ||
     q.includes('stock crítico') ||
     q.includes('stock bajo') ||
+    q.includes('bajo stock') ||
+    q.includes('agotados') ||
     q.includes('deuda pendiente') ||
+    q.includes('deben dinero') ||
     q.includes('clientes que deben') ||
     q.includes('clientes deudores') ||
     q.includes('cuentas por cobrar') ||
@@ -1313,10 +1320,15 @@ function isDirectStructuredReportQuery(q) {
 /**
  * Función principal: Responde cualquier pregunta del negocio con precisión total.
  */
-async function askBusinessAI({ question, history = [], userId = null }) {
+async function askBusinessAI(input, maybeHistory = []) {
+  const question = typeof input === 'string' ? input : input?.question;
+  const history = typeof input === 'string' ? maybeHistory : (input?.history || []);
+  const userId = typeof input === 'object' ? (input?.userId || null) : null;
+
   if (!question || !question.trim()) {
     return {
       answer: "Por favor escribe una consulta o pregunta sobre Multirepuestos RG.",
+      reply: "Por favor escribe una consulta o pregunta sobre Multirepuestos RG.",
       image: null,
       product: null,
       provider: "none"
