@@ -53,7 +53,7 @@ const ROLES = {
 };
 
 function App() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, hasPermission } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -124,7 +124,7 @@ function App() {
           <Route
             path="/pos"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR]}>
+              <ProtectedRoute requiredPermission="pos.acceso" allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR]}>
                 <motion.div {...pageTransition}><POS /></motion.div>
               </ProtectedRoute>
             }
@@ -134,7 +134,7 @@ function App() {
           <Route
             path="/wholesale-menu"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR]}>
+              <ProtectedRoute requiredPermission="pos_mayorista.acceso" allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR]}>
                 <motion.div {...pageTransition}><WholesaleMenu /></motion.div>
               </ProtectedRoute>
             }
@@ -143,7 +143,7 @@ function App() {
           <Route
             path="/wholesale-pos"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR]}>
+              <ProtectedRoute requiredPermission="pos_mayorista.acceso" allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR]}>
                 <motion.div {...pageTransition}><WholesalePOS /></motion.div>
               </ProtectedRoute>
             }
@@ -152,7 +152,7 @@ function App() {
           <Route
             path="/wholesale-catalog"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.INVENTARIO]}>
+              <ProtectedRoute requiredPermission={['mayorista.catalogo', 'pos_mayorista.acceso']} allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.INVENTARIO]}>
                 <motion.div {...pageTransition}><WholesaleCatalog /></motion.div>
               </ProtectedRoute>
             }
@@ -161,7 +161,7 @@ function App() {
           <Route
             path="/inventory"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.INVENTARIO]}>
+              <ProtectedRoute requiredPermission="inventario.ver" allowedRoles={[ROLES.ADMIN, ROLES.INVENTARIO]}>
                 <motion.div {...pageTransition}><InventoryManagement /></motion.div>
               </ProtectedRoute>
             }
@@ -170,7 +170,7 @@ function App() {
           <Route
             path="/orders"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.EMPLEADO]}>
+              <ProtectedRoute requiredPermission="pedidos_apartados.acceso" allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.EMPLEADO]}>
                 <motion.div {...pageTransition}><PedidosYApartados /></motion.div>
               </ProtectedRoute>
             }
@@ -179,7 +179,7 @@ function App() {
           <Route
             path="/credits"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.FINANZAS]}>
+              <ProtectedRoute requiredPermission="clientes_creditos.ver" allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.FINANZAS]}>
                 <motion.div {...pageTransition}><ClientesYCreditos /></motion.div>
               </ProtectedRoute>
             }
@@ -188,7 +188,7 @@ function App() {
           <Route
             path="/finances"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS, ROLES.GERENTE]}>
+              <ProtectedRoute requiredPermission="finanzas.ver" allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS, ROLES.GERENTE]}>
                 <motion.div {...pageTransition}><Finances /></motion.div>
               </ProtectedRoute>
             }
@@ -199,7 +199,7 @@ function App() {
           <Route
             path="/admin/users"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <ProtectedRoute requiredPermission="usuarios.acceso" allowedRoles={[ROLES.ADMIN]}>
                 <motion.div {...pageTransition}><UserManagement /></motion.div>
               </ProtectedRoute>
             }
@@ -208,7 +208,7 @@ function App() {
           <Route
             path="/admin/wholesale-promotions"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <ProtectedRoute requiredPermission="mayorista.promociones" allowedRoles={[ROLES.ADMIN]}>
                 <motion.div {...pageTransition}><WholesalePromotions /></motion.div>
               </ProtectedRoute>
             }
@@ -217,7 +217,7 @@ function App() {
           <Route
             path="/upload/inventory"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.INVENTARIO]}>
+              <ProtectedRoute requiredPermission="carga_masiva.acceso" allowedRoles={[ROLES.ADMIN, ROLES.INVENTARIO]}>
                 <motion.div {...pageTransition}><InventoryUpload /></motion.div>
               </ProtectedRoute>
             }
@@ -226,7 +226,7 @@ function App() {
           <Route
             path="/cash-report"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
+              <ProtectedRoute requiredPermission="caja_reportes.ver" allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
                 <motion.div {...pageTransition}><CashReport /></motion.div>
               </ProtectedRoute>
             }
@@ -235,7 +235,7 @@ function App() {
           <Route
             path="/traslados"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.INVENTARIO]}>
+              <ProtectedRoute requiredPermission="salidas_inventario.acceso" allowedRoles={[ROLES.ADMIN, ROLES.INVENTARIO]}>
                 <motion.div {...pageTransition}><InventoryOutflowPage /></motion.div>
               </ProtectedRoute>
             }
@@ -246,7 +246,7 @@ function App() {
           <Route
             path="/detailed-sales-report"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
+              <ProtectedRoute requiredPermission="reportes_ventas.ver" allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
                 <motion.div {...pageTransition}><DetailedSalesReport /></motion.div>
               </ProtectedRoute>
             }
@@ -255,7 +255,7 @@ function App() {
           <Route
             path="/invoices"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS]}>
+              <ProtectedRoute requiredPermission="facturas_proveedores.acceso" allowedRoles={[ROLES.ADMIN, ROLES.FINANZAS]}>
                 <motion.div {...pageTransition}><FacturasProveedores /></motion.div>
               </ProtectedRoute>
             }
@@ -264,7 +264,7 @@ function App() {
           <Route
             path="/solicitudes"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.INVENTARIO, ROLES.FINANZAS, ROLES.GERENTE]}>
+              <ProtectedRoute requiredPermission="solicitudes.acceso" allowedRoles={[ROLES.ADMIN, ROLES.VENDEDOR, ROLES.INVENTARIO, ROLES.FINANZAS, ROLES.GERENTE]}>
                 <motion.div {...pageTransition}><Solicitudes /></motion.div>
               </ProtectedRoute>
             }
@@ -272,7 +272,7 @@ function App() {
 
           {/* Nueva ruta de Empleados */}
           <Route path="/empleados" element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE]}>
+            <ProtectedRoute requiredPermission="empleados.acceso" allowedRoles={[ROLES.ADMIN, ROLES.GERENTE]}>
               <motion.div {...pageTransition}><Empleados /></motion.div>
             </ProtectedRoute>
           } />
@@ -280,7 +280,7 @@ function App() {
           <Route
             path="/settings"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE]}>
+              <ProtectedRoute requiredPermission="configuracion.acceso" allowedRoles={[ROLES.ADMIN, ROLES.GERENTE]}>
                 <motion.div {...pageTransition}><SettingsPage /></motion.div>
               </ProtectedRoute>
             }
@@ -289,7 +289,7 @@ function App() {
           <Route
             path="/bi-console"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
+              <ProtectedRoute requiredPermission="bi_consola.ver" allowedRoles={[ROLES.ADMIN, ROLES.GERENTE, ROLES.FINANZAS]}>
                 <motion.div {...pageTransition}><BiConsole /></motion.div>
               </ProtectedRoute>
             }
@@ -300,7 +300,7 @@ function App() {
       </AnimatePresence>
 
       {/* Asistente Flotante de IA para Consultas de Negocio */}
-      {user && <AIAssistantWidget />}
+      {user && hasPermission('ia_asistente.acceso') && <AIAssistantWidget />}
     </React.Suspense>
   );
 }

@@ -28,7 +28,7 @@ const fmt = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigit
 
 const POS = () => {
   // Contextos
-  const { user, products: initialProducts, token, refreshProducts, clients, allUsers, globalReservations } = useAuth();
+  const { user, products: initialProducts, token, refreshProducts, clients, allUsers, globalReservations, hasPermission } = useAuth();
   const { isCajaOpen, setIsCajaOpen, cajaSession, setCajaSession, tasaDolar, setTasaDolar, closeCajaSession, refreshSession } = useCaja();
   const {
     orders, activeOrderId, setActiveOrderId, activeOrder,
@@ -775,27 +775,35 @@ const POS = () => {
           <S.Button secondary onClick={refreshData} title="Sincronizar" style={{ padding: '6px 8px', fontSize: '0.85rem' }}>
             <FaSync />
           </S.Button>
-          <S.Button secondary onClick={() => openModal('salesHistory')} title="Historial de Ventas" style={{ padding: '6px 8px', fontSize: '0.85rem' }}>
-            <FaHistory />
-          </S.Button>
-          <S.Button secondary onClick={() => openModal('cashEntry')} title="Entrada de Dinero" style={{ padding: '6px 8px', fontSize: '0.85rem' }}>
-            <FaArrowDown color="#10b981" />
-          </S.Button>
-          <S.Button secondary onClick={() => openModal('cashExit')} title="Salida de Dinero" style={{ padding: '6px 8px', fontSize: '0.85rem' }}>
-            <FaArrowUp color="#ef4444" />
-          </S.Button>
-          <S.Button secondary onClick={async () => {
-            // Auto-limpiar duplicados antes de abrir
-            if (isCajaOpen && userId) {
-              try {
-                await api.dedupCajaSession(userId, token);
-                await refreshSession();
-              } catch (e) { console.error('dedup error:', e); }
-            }
-            openModal('caja');
-          }} style={{ padding: '6px 9px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <FaLock /> <span className="pos-brand-title">{currentUser?.nombre_usuario || 'Caja'}</span>
-          </S.Button>
+          {hasPermission('pos.historial_ventas') && (
+            <S.Button secondary onClick={() => openModal('salesHistory')} title="Historial de Ventas" style={{ padding: '6px 8px', fontSize: '0.85rem' }}>
+              <FaHistory />
+            </S.Button>
+          )}
+          {hasPermission('caja.movimientos') && (
+            <>
+              <S.Button secondary onClick={() => openModal('cashEntry')} title="Entrada de Dinero" style={{ padding: '6px 8px', fontSize: '0.85rem' }}>
+                <FaArrowDown color="#10b981" />
+              </S.Button>
+              <S.Button secondary onClick={() => openModal('cashExit')} title="Salida de Dinero" style={{ padding: '6px 8px', fontSize: '0.85rem' }}>
+                <FaArrowUp color="#ef4444" />
+              </S.Button>
+            </>
+          )}
+          {hasPermission('caja.abrir_cerrar') && (
+            <S.Button secondary onClick={async () => {
+              // Auto-limpiar duplicados antes de abrir
+              if (isCajaOpen && userId) {
+                try {
+                  await api.dedupCajaSession(userId, token);
+                  await refreshSession();
+                } catch (e) { console.error('dedup error:', e); }
+              }
+              openModal('caja');
+            }} style={{ padding: '6px 9px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <FaLock /> <span className="pos-brand-title">{currentUser?.nombre_usuario || 'Caja'}</span>
+            </S.Button>
+          )}
         </div>
       </S.HeaderActions>
 
@@ -851,26 +859,28 @@ const POS = () => {
             </S.TicketContainer>
 
             {/* Action Buttons for Cart Management */}
-            <div style={{ display: 'flex', gap: '6px', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-              <S.Button
-                secondary
-                onClick={toggleWholesalePrice}
-                title="Cambiar a Precio Mayorista"
-                disabled={cart.length === 0}
-                style={{ flex: 1, fontSize: '0.75rem', padding: '8px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
-              >
-                <FaTag size={12} /> Mayorista
-              </S.Button>
-              <S.Button
-                secondary
-                onClick={() => openModal('discount')}
-                title="Aplicar Descuento"
-                disabled={cart.length === 0}
-                style={{ flex: 1, fontSize: '0.75rem', padding: '8px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
-              >
-                <FaPercentage size={12} /> Descuento
-              </S.Button>
-            </div>
+            {hasPermission('pos.descuentos') && (
+              <div style={{ display: 'flex', gap: '6px', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                <S.Button
+                  secondary
+                  onClick={toggleWholesalePrice}
+                  title="Cambiar a Precio Mayorista"
+                  disabled={cart.length === 0}
+                  style={{ flex: 1, fontSize: '0.75rem', padding: '8px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
+                >
+                  <FaTag size={12} /> Mayorista
+                </S.Button>
+                <S.Button
+                  secondary
+                  onClick={() => openModal('discount')}
+                  title="Aplicar Descuento"
+                  disabled={cart.length === 0}
+                  style={{ flex: 1, fontSize: '0.75rem', padding: '8px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
+                >
+                  <FaPercentage size={12} /> Descuento
+                </S.Button>
+              </div>
+            )}
 
             {/* Lista de Items en Carrito */}
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', margin: '0.5rem 0', paddingRight: '4px', WebkitOverflowScrolling: 'touch' }}>
@@ -899,17 +909,19 @@ const POS = () => {
                         <div style={{ fontSize: '0.92rem', fontWeight: '900', color: '#15803d', marginTop: '1px' }}>
                           Total: C$ {fmt(Number(item.quantity || 1) * Number(item.precio_venta || 0))}
                         </div>
-                        <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
-                          <S.RoundBtn title="Editar Precio" onClick={() => openModal('editPrice', { item })}>
-                            <FaPencilAlt size={10} />
-                          </S.RoundBtn>
-                          <S.RoundBtn title="Precio Mayorista" onClick={() => handleItemWholesale(item)}>
-                            <FaTag size={10} />
-                          </S.RoundBtn>
-                          <S.RoundBtn title="Descuento Item" onClick={() => openModal('itemDiscount', { item })}>
-                            <FaPercentage size={10} />
-                          </S.RoundBtn>
-                        </div>
+                        {hasPermission('pos.descuentos') && (
+                          <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                            <S.RoundBtn title="Editar Precio" onClick={() => openModal('editPrice', { item })}>
+                              <FaPencilAlt size={10} />
+                            </S.RoundBtn>
+                            <S.RoundBtn title="Precio Mayorista" onClick={() => handleItemWholesale(item)}>
+                              <FaTag size={10} />
+                            </S.RoundBtn>
+                            <S.RoundBtn title="Descuento Item" onClick={() => openModal('itemDiscount', { item })}>
+                              <FaPercentage size={10} />
+                            </S.RoundBtn>
+                          </div>
+                        )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                         <S.QtyControl style={{ padding: '2px' }}>
@@ -942,14 +954,16 @@ const POS = () => {
                   <FaFileInvoice /> Proforma
                 </S.Button>
 
-                <S.Button
-                  primary
-                  style={{ flex: 2, padding: '14px 10px', fontSize: '1.15rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}
-                  onClick={() => openModal('payment', { total })}
-                  disabled={cart.length === 0}
-                >
-                  $ COBRAR (F2)
-                </S.Button>
+                {hasPermission('pos.cobrar') && (
+                  <S.Button
+                    primary
+                    style={{ flex: 2, padding: '14px 10px', fontSize: '1.15rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}
+                    onClick={() => openModal('payment', { total })}
+                    disabled={cart.length === 0}
+                  >
+                    $ COBRAR (F2)
+                  </S.Button>
+                )}
               </div>
             </div>
           </div>

@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect, useCallback, use
 import { useNavigate } from 'react-router-dom';
 import * as api from '../service/api.js';
 import { loadCajaSession, saveCajaSession } from '../utils/caja.js';
+import { checkUserPermission, isMasterAdmin } from '../utils/permissions.js';
 import { toast } from 'react-hot-toast';
 
 const AuthContext = createContext(null);
@@ -46,24 +47,29 @@ export const AuthProvider = ({ children, socket }) => {
             if (!currentToken) return;
 
             const storedUser = localStorage.getItem('user');
-            const parsedUser = storedUser ? JSON.parse(storedUser) : null;
-            const userRole = (parsedUser?.rol || '').trim();
+            let parsedUser = storedUser ? JSON.parse(storedUser) : null;
 
-            // Si no es en background, valida el token (solo al hacer login)
-            if (!isBackground) {
-                try {
-                    await api.fetchMe(currentToken);
-                } catch (authErr) {
-                    if (authErr.status === 401) {
-                        console.error("🚫 Fallo en fetchMe (Validación inicial). Redirigiendo al login...");
-                        logout();
-                        return;
-                    }
+            // Sincronizar siempre el perfil y permisos actualizados del usuario
+            try {
+                const freshMe = await api.fetchMe(currentToken);
+                if (freshMe && (freshMe.id || freshMe.id_usuario)) {
+                    parsedUser = { ...(parsedUser || {}), ...freshMe };
+                    setUser(parsedUser);
+                    localStorage.setItem('user', JSON.stringify(parsedUser));
+                }
+            } catch (authErr) {
+                if (authErr.status === 401) {
+                    console.error("🚫 Fallo en fetchMe (Validación de sesión). Redirigiendo al login...");
+                    logout();
+                    return;
                 }
             }
 
+            const userRole = (parsedUser?.rol || '').trim();
+            const canReadUsers = userRole === 'Administrador' || checkUserPermission(parsedUser, 'usuarios.acceso');
+
             const results = await Promise.allSettled([
-                userRole === 'Administrador' ? api.fetchUsers(currentToken) : Promise.resolve(null),
+                canReadUsers ? api.fetchUsers(currentToken) : Promise.resolve(null),
                 api.fetchProducts(currentToken),
                 api.fetchClients(currentToken),
                 api.fetchCategories(currentToken),
@@ -160,14 +166,41 @@ export const AuthProvider = ({ children, socket }) => {
             }
         };
 
+        const onUserPermissionsUpdated = (payload) => {
+            if (!payload) return;
+            const stored = localStorage.getItem('user');
+            if (!stored) return;
+            try {
+                const current = JSON.parse(stored);
+                const myId = Number(current.id_usuario || current.id);
+                if (myId === Number(payload.id_usuario)) {
+                    if (payload.activo === false) {
+                        logout('Tu cuenta de usuario ha sido suspendida por el Administrador.');
+                        return;
+                    }
+                    const updated = {
+                        ...current,
+                        rol: payload.rol || current.rol,
+                        nombre_usuario: payload.nombre_usuario || current.nombre_usuario,
+                        nombre_completo: payload.nombre_completo || current.nombre_completo,
+                        permisos: payload.permisos || current.permisos
+                    };
+                    setUser(updated);
+                    localStorage.setItem('user', JSON.stringify(updated));
+                    toast.success('Tus permisos de acceso fueron actualizados en tiempo real.');
+                }
+            } catch (e) {}
+        };
+
         socket.on('inventory_update', onInventoryUpdate);
         socket.on('products:update', onInventoryUpdate);
         socket.on('stock:reservations_update', onReservationsUpdate);
         socket.on('clients:update', refreshClients);
+        socket.on('user:permissions_updated', onUserPermissionsUpdated);
         socket.on('users:update', async () => {
             const token = localStorage.getItem('token');
             const currentUser = JSON.parse(localStorage.getItem('user'));
-            if (token && currentUser?.rol === 'Administrador') {
+            if (token && (currentUser?.rol === 'Administrador' || checkUserPermission(currentUser, 'usuarios.acceso'))) {
                 try {
                     const users = await api.fetchUsers(token);
                     setAllUsers(users || []);
@@ -181,9 +214,10 @@ export const AuthProvider = ({ children, socket }) => {
             socket.off('products:update', onInventoryUpdate);
             socket.off('stock:reservations_update', onReservationsUpdate);
             socket.off('clients:update', refreshClients);
+            socket.off('user:permissions_updated', onUserPermissionsUpdated);
             socket.off('users:update');
         };
-    }, [socket, refreshProductsDebounced, refreshClients]);
+    }, [socket, refreshProductsDebounced, refreshClients, logout]);
 
     const hasInitializedRef = useRef(false);
 
@@ -250,6 +284,10 @@ export const AuthProvider = ({ children, socket }) => {
         }
     }, [user, token]);
 
+    const hasPermission = useCallback((permissionKey) => {
+        return checkUserPermission(user, permissionKey);
+    }, [user]);
+
     const value = {
         user,
         token,
@@ -269,6 +307,8 @@ export const AuthProvider = ({ children, socket }) => {
         addCajaTransaction,
         globalReservations,
         getAvailableStock,
+        hasPermission,
+        isMasterAdmin: isMasterAdmin(user),
         socket
     };
 

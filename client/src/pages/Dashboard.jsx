@@ -149,7 +149,7 @@ const CardIcon = styled.div`
 
 // --- Componente Dashboard ---
 const Dashboard = () => {
-    const { user, logout } = useAuth();
+    const { user, logout, hasPermission, isMasterAdmin } = useAuth();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [showWholesaleModal, setShowWholesaleModal] = useState(false);
@@ -163,34 +163,28 @@ const Dashboard = () => {
     }
 
     // ----------------------------------------------------
-    // LÓGICA DE ROLES AJUSTADA (Case Insensitive)
+    // CONTROL GRANULAR DE ACCESOS POR CASILLAS DE PERMISOS
     // ----------------------------------------------------
     const userRole = user.rol || 'N/A';
-    const normalizedRole = userRole.trim().toLowerCase();
 
-    // Roles base
-    const isAdmin = normalizedRole === 'administrador' || normalizedRole === 'admin';
-    const isVendedor = normalizedRole === 'vendedor';
-    const isContador = normalizedRole === 'encargado de finanzas' || normalizedRole === 'contador';
-    const isInventoryManager = normalizedRole === 'encargado de inventario';
+    const canAccessPOS = hasPermission('pos.acceso');
+    const canAccessWholesale = hasPermission('pos_mayorista.acceso');
+    const canAccessOrders = hasPermission('pedidos_apartados.acceso');
+    const canAccessInvoices = hasPermission('facturas_proveedores.acceso');
+    const canAccessCredits = hasPermission('clientes_creditos.ver');
+    const canAccessFinances = hasPermission('finanzas.ver');
+    const canAccessEmpleados = hasPermission('empleados.acceso');
+    const canAccessInventory = hasPermission('inventario.ver');
+    const canAccessMassUpload = hasPermission('carga_masiva.acceso');
+    const canAccessTraslados = hasPermission('salidas_inventario.acceso');
+    const canAccessCashReports = hasPermission('caja_reportes.ver');
+    const canAccessReports = hasPermission('reportes_ventas.ver');
+    const canAccessBiConsole = hasPermission('bi_consola.ver');
+    const canAccessAdminUsers = hasPermission('usuarios.acceso');
+    const canAccessSolicitudes = hasPermission('solicitudes.acceso');
+    const canAccessSettings = hasPermission('configuracion.acceso');
 
-    // --- DEFINICIÓN DE ACCESOS ---
-
-    const canAccessPOS = isAdmin;
-    const canAccessOrders = isAdmin || isVendedor;
-    const canAccessCredits = isAdmin || isContador;
-    const canAccessInventory = isAdmin || isInventoryManager;
-    const canAccessMassUpload = isAdmin || isInventoryManager;
-    const canAccessFinances = isAdmin || userRole === 'Gerente' || isContador;
-    const canAccessReports = isAdmin || userRole === 'Gerente' || isContador;
-    const canAccessCashReports = isAdmin || userRole === 'Gerente' || isContador;
-    const canAccessAdminUsers = isAdmin;
-    const canAccessEmpleados = isAdmin || userRole === 'Gerente';
-
-    // NUEVO ACCESO: Facturas de Proveedores (Solo Admin y Contador)
-    const canAccessInvoices = isAdmin || isContador;
-
-    const displayName = user.nombre_usuario || user.nombre || user.name || 'Usuario';
+    const displayName = user.nombre_completo || user.nombre_usuario || user.nombre || user.name || 'Usuario';
     // ----------------------------------------------------
 
     const handlePrepareLogout = () => {
@@ -225,7 +219,15 @@ const Dashboard = () => {
                 <TopBar>
                     <Header>
                         <WelcomeTitle>Bienvenido, {displayName} 👋</WelcomeTitle>
-                        <WelcomeSubtitle>Rol: {userRole}. Selecciona un módulo para empezar.</WelcomeSubtitle>
+                        <WelcomeSubtitle>
+                            Rol: <strong>{userRole}</strong>
+                            {isMasterAdmin && (
+                                <span style={{ marginLeft: 8, padding: '2px 9px', borderRadius: 999, background: '#dcfce7', color: '#166534', fontSize: '0.78rem', fontWeight: 700 }}>
+                                    🔒 Admin Principal (1987)
+                                </span>
+                            )}
+                            {' · '}Selecciona un módulo autorizado para empezar.
+                        </WelcomeSubtitle>
                     </Header>
                     <LogoutButton aria-label="Cerrar sesión" onClick={handlePrepareLogout}>
                         <FaSignOutAlt /> Cerrar sesión
@@ -243,7 +245,7 @@ const Dashboard = () => {
                     )}
 
                     {/* Venta Mayorista */}
-                    {canAccessPOS && (
+                    {canAccessWholesale && (
                         <Card as="div" onClick={() => setShowWholesaleModal(true)} color="#8b5cf6" style={{ cursor: 'pointer' }}>
                             <CardIcon color="#8b5cf6"><FaTags /></CardIcon>
                             <h2>Venta Mayorista</h2>
@@ -315,8 +317,8 @@ const Dashboard = () => {
                         </Card>
                     )}
 
-                    {/* NUEVO: TRASLADOS / SALIDAS (Admin Only) */}
-                    {canAccessInventory && (
+                    {/* NUEVO: TRASLADOS / SALIDAS */}
+                    {canAccessTraslados && (
                         <Card to="/traslados" color="#ef4444" onMouseEnter={() => prefetch('/traslados')}>
                             <CardIcon color="#ef4444"><FaTruck /></CardIcon>
                             <h2>Traslados / Salidas</h2>
@@ -333,7 +335,7 @@ const Dashboard = () => {
                         </Card>
                     )}
 
-                    {/* Reportes de Ventas Detallado (RESTABLECIDO) */}
+                    {/* Reportes de Ventas Detallado */}
                     {canAccessReports && (
                         <Card to="/detailed-sales-report" color="#6366f1" onMouseEnter={() => prefetch('/detailed-sales-report')}>
                             <CardIcon color="#6366f1"><FaFileInvoiceDollar /></CardIcon>
@@ -343,7 +345,7 @@ const Dashboard = () => {
                     )}
 
                     {/* Consola de Inteligencia de Negocios (BI) */}
-                    {canAccessReports && (
+                    {canAccessBiConsole && (
                         <Card to="/bi-console" color="#ED7D31" onMouseEnter={() => prefetch('/bi-console')}>
                             <CardIcon color="#ED7D31"><FaChartLine /></CardIcon>
                             <h2>Consola BI & Analítica</h2>
@@ -355,20 +357,22 @@ const Dashboard = () => {
                     {canAccessAdminUsers && (
                         <Card to="/admin/users" color="#ff6b6b">
                             <CardIcon color="#ff6b6b"><FaUsers /></CardIcon>
-                            <h2>Usuarios</h2>
-                            <p>Administra roles y accesos.</p>
+                            <h2>Usuarios y Trazabilidad</h2>
+                            <p>Control de permisos por casillas y bitácora de actividad.</p>
                         </Card>
                     )}
 
-                    {/* 9. Solicitudes (Para todos) */}
-                    <Card to="/solicitudes" color="#fd7e14">
-                        <CardIcon color="#fd7e14"><FaClipboardList /></CardIcon>
-                        <h2>Solicitudes</h2>
-                        <p>Realizar pedidos y requerimientos.</p>
-                    </Card>
+                    {/* 9. Solicitudes */}
+                    {canAccessSolicitudes && (
+                        <Card to="/solicitudes" color="#fd7e14">
+                            <CardIcon color="#fd7e14"><FaClipboardList /></CardIcon>
+                            <h2>Solicitudes</h2>
+                            <p>Realizar pedidos y requerimientos.</p>
+                        </Card>
+                    )}
 
-                    {/* 10. Configuración (Solo Admin) */}
-                    {isAdmin && (
+                    {/* 10. Configuración */}
+                    {canAccessSettings && (
                         <Card as="button" onClick={() => setShowSettings(true)} color="#343a40" style={{ textAlign: 'left', border: 'none', cursor: 'pointer' }}>
                             <CardIcon color="#343a40"><FaCog /></CardIcon>
                             <h2>Configuración</h2>

@@ -974,7 +974,12 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
   COMPONENTE PRINCIPAL: InventoryManagement
 ===================================== */
 const InventoryManagement = () => {
-  const { globalReservations, socket } = useAuth();
+  const { globalReservations, socket, hasPermission } = useAuth();
+  const canCreate = hasPermission('inventario.crear');
+  const canEdit = hasPermission('inventario.editar');
+  const canDelete = hasPermission('inventario.eliminar');
+  const canViewCosts = hasPermission('inventario.ver_costos');
+  const canBarcodes = hasPermission('inventario.codigos_barra');
   const [allProductsRaw, setAllProductsRaw] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -1332,12 +1337,14 @@ const InventoryManagement = () => {
       <HeaderContainer>
         <Title><FaBoxOpen /> Gestión de Inventario</Title>
         <ButtonGroup>
-          <Button primary onClick={openCreateModal}><FaPlus /> Crear Producto</Button>
-          <Button secondary onClick={() => { setInitialBarcodeProduct(null); setIsBarcodeModalOpen(true); }} title="Generador de Etiquetas / QR en Hoja A4">
-            <FaBarcode /> Etiquetas A4
-          </Button>
-          <Button secondary onClick={() => setIsCategoryModalOpen(true)}><FaTags /> Categorías</Button>
-          <Button secondary onClick={() => setIsProviderModalOpen(true)}><FaTruck /> Proveedores</Button>
+          {canCreate && <Button primary onClick={openCreateModal}><FaPlus /> Crear Producto</Button>}
+          {canBarcodes && (
+            <Button secondary onClick={() => { setInitialBarcodeProduct(null); setIsBarcodeModalOpen(true); }} title="Generador de Etiquetas / QR en Hoja A4">
+              <FaBarcode /> Etiquetas A4
+            </Button>
+          )}
+          {canCreate && <Button secondary onClick={() => setIsCategoryModalOpen(true)}><FaTags /> Categorías</Button>}
+          {canCreate && <Button secondary onClick={() => setIsProviderModalOpen(true)}><FaTruck /> Proveedores</Button>}
           <Button tertiary onClick={() => setIsHistoryModalOpen(true)}><FaHistory /> Historial</Button>
         </ButtonGroup>
       </HeaderContainer>
@@ -1404,7 +1411,7 @@ const InventoryManagement = () => {
                 <CardCode>Código: {p.codigo}</CardCode>
               </CardHeader>
               <CardBody>
-                <InfoTag><span>Costo</span><strong>{p.__fmt.costo}</strong></InfoTag>
+                {canViewCosts && <InfoTag><span>Costo</span><strong>{p.__fmt.costo}</strong></InfoTag>}
                 <InfoTag><span>Venta</span><strong>{p.__fmt.venta}</strong></InfoTag>
                 {(() => {
                   const reservado = Number(globalReservations?.totalByProduct?.[p.id_producto] || 0);
@@ -1422,13 +1429,13 @@ const InventoryManagement = () => {
                     </StockTag>
                   );
                 })()}
-                <InfoTag><span>Costo Total</span><strong>{p.__fmt.costoTotal}</strong></InfoTag>
+                {canViewCosts && <InfoTag><span>Costo Total</span><strong>{p.__fmt.costoTotal}</strong></InfoTag>}
               </CardBody>
               <CardFooter>
-                <ActionButton className="label" title="Generar Etiquetas A4" onClick={() => { setInitialBarcodeProduct(p); setIsBarcodeModalOpen(true); }}><FaBarcode /></ActionButton>
-                <ActionButton className="adjust" title="Ajustar Stock" onClick={() => setAdjustmentModal({ isOpen: true, product: p })}><FaPlusCircle /><FaMinusCircle style={{ marginLeft: 4 }} /></ActionButton>
-                <ActionButton className="edit" onClick={() => openEditModal(p)}><FaEdit /> Editar</ActionButton>
-                <ActionButton className="delete" onClick={() => openDeleteModal(p)}><FaTrash /> Eliminar</ActionButton>
+                {canBarcodes && <ActionButton className="label" title="Generar Etiquetas A4" onClick={() => { setInitialBarcodeProduct(p); setIsBarcodeModalOpen(true); }}><FaBarcode /></ActionButton>}
+                {canEdit && <ActionButton className="adjust" title="Ajustar Stock" onClick={() => setAdjustmentModal({ isOpen: true, product: p })}><FaPlusCircle /><FaMinusCircle style={{ marginLeft: 4 }} /></ActionButton>}
+                {canEdit && <ActionButton className="edit" onClick={() => openEditModal(p)}><FaEdit /> Editar</ActionButton>}
+                {canDelete && <ActionButton className="delete" onClick={() => openDeleteModal(p)}><FaTrash /> Eliminar</ActionButton>}
               </CardFooter>
             </ProductCard>
           );
