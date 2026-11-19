@@ -369,18 +369,31 @@ async function initPermissionsAndAuditSchema() {
         }
       }
 
-      // Auto-vincular empleados existentes con usuarios del sistema por nombre si aún no están vinculados
-      await db.query(`
-        UPDATE empleados e
-        JOIN usuarios u ON (
-          LOWER(TRIM(e.nombre)) = LOWER(TRIM(u.nombre_usuario))
-          OR (LOWER(e.nombre) LIKE '%miguelito%' AND LOWER(u.nombre_usuario) LIKE '%miguelito%')
-          OR (LOWER(e.nombre) LIKE '%walter%' AND LOWER(u.nombre_usuario) LIKE '%walter%')
-          OR (LOWER(e.nombre) LIKE '%waskar%' AND LOWER(u.nombre_usuario) LIKE '%waskar%')
-        )
-        SET e.id_usuario_vinculado = u.id_usuario
-        WHERE e.id_usuario_vinculado IS NULL
-      `).catch(() => {});
+      // Auto-vincular empleados existentes con usuarios del sistema por nombre en JS (evitando conflictos de collation MySQL)
+      try {
+        const [allEmps] = await db.query('SELECT id_empleado, nombre, id_usuario_vinculado FROM empleados');
+        const [allUsrs] = await db.query('SELECT id_usuario, nombre_usuario FROM usuarios');
+        for (const emp of allEmps) {
+          if (emp.id_usuario_vinculado) continue;
+          const eName = String(emp.nombre || '').trim().toLowerCase();
+          const matchedUser = allUsrs.find(u => {
+            const uName = String(u.nombre_usuario || '').trim().toLowerCase();
+            return (
+              eName === uName ||
+              (eName.includes('waskar') && uName.includes('waskar')) ||
+              (eName.includes('miguelito') && uName.includes('miguelito')) ||
+              (eName.includes('walter') && uName.includes('walter')) ||
+              (eName.includes('lisa') && uName.includes('lisa'))
+            );
+          });
+          if (matchedUser) {
+            await db.query('UPDATE empleados SET id_usuario_vinculado = ? WHERE id_empleado = ?', [
+              matchedUser.id_usuario,
+              emp.id_empleado
+            ]);
+          }
+        }
+      } catch (_) {}
 
       await db.query(`
         CREATE TABLE IF NOT EXISTS planilla_movimientos (
