@@ -226,7 +226,7 @@ exports.getPayrollReport = async (req, res) => {
          dv.id_producto,
          dv.cantidad,
          dv.precio_unitario,
-         COALESCE(NULLIF(dv.costo_unitario, 0), p.costo, 0) AS costo_efectivo,
+         COALESCE(p.costo, 0) AS costo_efectivo,
          COALESCE(p.nombre, 'Producto') AS producto_nombre,
          COALESCE(p.codigo, 'S/C') AS producto_codigo
        FROM ventas v
