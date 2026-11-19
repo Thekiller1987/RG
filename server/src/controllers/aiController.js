@@ -32,7 +32,7 @@ const getAIStatus = async (req, res) => {
     res.json({
       hasGeminiKey: Boolean(geminiKey),
       hasTelegramToken: Boolean(telegramToken),
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash-lite',
       summary: {
         ventasHoy: context.ventasHoy?.total_facturado || 0,
         cajasAbiertas: (context.cajaHoy?.cajasAbiertas || []).length,

@@ -22,7 +22,7 @@ const createIngreso = async (req, res) => {
         // Insertar el nuevo ingreso en la tabla 'ingresos'
         const [result] = await db.query(
             'INSERT INTO ingresos (fecha, monto, descripcion, id_usuario) VALUES (?, ?, ?, ?)', 
-            [fecha, monto, descripcion, id_usuario || req.user.id_usuario]
+            [fecha, monto, descripcion, id_usuario || req.user?.id_usuario || req.user?.id]
         );
         res.status(201).json({ msg: "Ingreso registrado exitosamente", id: result.insertId });
     } catch (error) {
@@ -53,7 +53,7 @@ const createEgreso = async (req, res) => {
         // Insertar el nuevo egreso en la tabla 'egresos'
         const [result] = await db.query(
             'INSERT INTO egresos (fecha, monto, descripcion, tipo_egreso, id_usuario) VALUES (?, ?, ?, ?, ?)', 
-            [fecha, monto, descripcion, tipo_egreso, id_usuario || req.user.id_usuario]
+            [fecha, monto, descripcion, tipo_egreso, id_usuario || req.user?.id_usuario || req.user?.id]
         );
         res.status(201).json({ msg: "Egreso registrado exitosamente", id: result.insertId });
     } catch (error) {

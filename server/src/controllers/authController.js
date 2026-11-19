@@ -61,6 +61,7 @@ const login = async (req, res) => {
     // 3. Si todo es correcto, crear el token
     const payload = {
       id: user.id_usuario,
+      id_usuario: user.id_usuario,
       rol: user.rol,
       nombre_usuario: user.nombre_usuario,
       nombre: user.nombre_completo || user.nombre || user.nombre_usuario
@@ -76,7 +77,9 @@ const login = async (req, res) => {
       token,
       user: {
         id: user.id_usuario,
+        id_usuario: user.id_usuario,
         nombre: user.nombre_usuario,
+        nombre_usuario: user.nombre_usuario,
         rol: user.rol,
       }
     });
@@ -91,13 +94,21 @@ const login = async (req, res) => {
 const me = async (req, res) => {
   try {
     // req.user viene del middleware verifyToken
-    const [users] = await db.query('SELECT id_usuario, nombre_usuario, rol FROM usuarios WHERE id_usuario = ?', [req.user.id]);
+    const userId = req.user?.id || req.user?.id_usuario;
+    const [users] = await db.query('SELECT id_usuario, nombre_usuario, rol FROM usuarios WHERE id_usuario = ?', [userId]);
 
     if (users.length === 0) {
       return res.status(404).json({ msg: 'Usuario no encontrado' });
     }
 
-    res.json(users[0]);
+    const u = users[0];
+    res.json({
+      id: u.id_usuario,
+      id_usuario: u.id_usuario,
+      nombre: u.nombre_usuario,
+      nombre_usuario: u.nombre_usuario,
+      rol: u.rol
+    });
   } catch (error) {
     console.error(error);
     res.status(500).send('Error en el servidor');
