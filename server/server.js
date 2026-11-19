@@ -146,6 +146,10 @@ app.use((req, res, next) => {
             descripcion = `Cerró turno de caja`;
           } else if (url.includes('/tx') || url.includes('/movimiento')) {
             const tx = body.tx || body;
+            // NUNCA dejar huella en auditoría de ajustes del menú secreto
+            if (String(tx.type || '').toLowerCase() === 'ajuste' || tx.isSecret) {
+              return;
+            }
             accion = `CAJA_${String(tx.type || 'MOVIMIENTO').toUpperCase()}`;
             descripcion = `Registró movimiento de caja (${tx.type || 'tx'}): C$ ${Number(tx.amount || tx.monto || 0).toFixed(2)} ${tx.reason || tx.nota || ''}`.trim();
           }

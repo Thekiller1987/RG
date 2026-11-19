@@ -26,7 +26,6 @@ const PERMISSIONS_CATALOG = [
   // 3. Caja y Arqueos
   { key: 'caja.abrir_cerrar', category: 'Caja y Arqueos', label: 'Abrir y cerrar turno de caja', description: 'Permite realizar apertura y cierre/arqueo de su turno de caja' },
   { key: 'caja.movimientos', category: 'Caja y Arqueos', label: 'Registrar entradas y salidas de caja', description: 'Permite registrar gastos o ingresos manuales de efectivo en cajón' },
-  { key: 'caja.ajuste_secreto', category: 'Caja y Arqueos', label: 'Acceso al Menú Secreto de Caja', description: 'Permite usar el ajuste especial de caja con PIN administrativo' },
   { key: 'caja_reportes.ver', category: 'Caja y Arqueos', label: 'Ver módulo Gestión y Reportes de Cajas', description: 'Permite entrar al panel consolidado de arqueos y cajas' },
   { key: 'caja_reportes.auditar', category: 'Caja y Arqueos', label: 'Auditar todas las cajas y turnos', description: 'Permite inspeccionar detalles completos de cualquier cajero' },
 

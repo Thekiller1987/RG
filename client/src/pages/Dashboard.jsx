@@ -2,10 +2,23 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import {
-    FaSignOutAlt, FaShoppingCart, FaBoxOpen, FaFileInvoice,
-    FaCreditCard, FaCloudUploadAlt, FaChartPie, FaChartLine, FaChartBar, FaUserLock, FaMapMarkerAlt,
-    FaBox, FaTruck, FaClock, FaClipboardList, FaAddressCard, FaTags,
-    FaFileInvoiceDollar, FaBriefcase, FaUsers, FaCog
+    FaSignOutAlt,
+    FaCashRegister,
+    FaCrown,
+    FaFileSignature,
+    FaFileInvoiceDollar,
+    FaHandHoldingUsd,
+    FaChartPie,
+    FaMoneyCheckAlt,
+    FaBoxes,
+    FaCloudUploadAlt,
+    FaTruckMoving,
+    FaCoins,
+    FaChartBar,
+    FaRocket,
+    FaUserShield,
+    FaClipboardCheck,
+    FaSlidersH
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -140,11 +153,24 @@ const Card = styled(Link)`
         font-size: 1rem; 
     }
 `;
-const CardIcon = styled.div` 
-    font-size: 2.2rem; 
-    margin-bottom: 0.75rem; 
-    line-height:1; 
-    color: ${props => props.color || '#007bff'}; 
+const CardIcon = styled.div`
+    width: 54px;
+    height: 54px;
+    border-radius: 16px;
+    font-size: 1.55rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    background: linear-gradient(135deg, ${props => props.color || '#2563eb'} 0%, ${props => props.$secondary || props.color || '#1d4ed8'} 100%);
+    box-shadow: 0 10px 20px -5px ${props => (props.color ? `${props.color}66` : 'rgba(37, 99, 235, 0.4)')},
+                inset 0 1px 1px rgba(255, 255, 255, 0.35);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+
+    ${Card}:hover & {
+        transform: scale(1.08) rotate(-3deg);
+    }
 `;
 
 // --- Componente Dashboard ---
@@ -237,8 +263,8 @@ const Dashboard = () => {
                 <GridContainer>
                     {/* 1. Punto de Venta */}
                     {canAccessPOS && (
-                        <Card to="/pos" color="#007bff" onMouseEnter={() => prefetch('/pos')}>
-                            <CardIcon color="#007bff"><FaShoppingCart /></CardIcon>
+                        <Card to="/pos" color="#2563eb" onMouseEnter={() => prefetch('/pos')}>
+                            <CardIcon color="#2563eb" $secondary="#1d4ed8"><FaCashRegister /></CardIcon>
                             <h2>Punto de Venta</h2>
                             <p>Registra ventas y gestiona transacciones diarias.</p>
                         </Card>
@@ -246,8 +272,8 @@ const Dashboard = () => {
 
                     {/* Venta Mayorista */}
                     {canAccessWholesale && (
-                        <Card as="div" onClick={() => setShowWholesaleModal(true)} color="#8b5cf6" style={{ cursor: 'pointer' }}>
-                            <CardIcon color="#8b5cf6"><FaTags /></CardIcon>
+                        <Card as="div" onClick={() => setShowWholesaleModal(true)} color="#7c3aed" style={{ cursor: 'pointer' }}>
+                            <CardIcon color="#8b5cf6" $secondary="#6d28d9"><FaCrown /></CardIcon>
                             <h2>Venta Mayorista</h2>
                             <p>Portal exclusivo para ventas al por mayor.</p>
                         </Card>
@@ -257,8 +283,8 @@ const Dashboard = () => {
 
                     {/* 2. Pedidos y Apartados */}
                     {canAccessOrders && (
-                        <Card to="/orders" color="#ffc107" onMouseEnter={() => prefetch('/orders')}>
-                            <CardIcon color="#ffc107"><FaFileInvoice /></CardIcon>
+                        <Card to="/orders" color="#d97706" onMouseEnter={() => prefetch('/orders')}>
+                            <CardIcon color="#f59e0b" $secondary="#d97706"><FaFileSignature /></CardIcon>
                             <h2>Proformas y precios</h2>
                             <p>Crear Proformas y ver Productos</p>
                         </Card>
@@ -266,8 +292,8 @@ const Dashboard = () => {
 
                     {/* NUEVO: Facturas Proveedores */}
                     {canAccessInvoices && (
-                        <Card to="/invoices" color="#e83e8c" onMouseEnter={() => prefetch('/invoices')}>
-                            <CardIcon color="#e83e8c"><FaFileInvoiceDollar /></CardIcon>
+                        <Card to="/invoices" color="#db2777" onMouseEnter={() => prefetch('/invoices')}>
+                            <CardIcon color="#ec4899" $secondary="#be185d"><FaFileInvoiceDollar /></CardIcon>
                             <h2>Facturas Proveedores</h2>
                             <p>Gestionar pagos, vencimientos y proveedores.</p>
                         </Card>
@@ -275,16 +301,16 @@ const Dashboard = () => {
 
                     {/* 3. Clientes y Créditos */}
                     {canAccessCredits && (
-                        <Card to="/credits" color="#17a2b8" onMouseEnter={() => prefetch('/credits')}>
-                            <CardIcon color="#17a2b8"><FaCreditCard /></CardIcon>
+                        <Card to="/credits" color="#0284c7" onMouseEnter={() => prefetch('/credits')}>
+                            <CardIcon color="#0ea5e9" $secondary="#0369a1"><FaHandHoldingUsd /></CardIcon>
                             <h2>Clientes y Créditos</h2>
                             <p>Gestiona clientes, saldos pendientes y abonos.</p>
                         </Card>
                     )}
                     {/* TARJETA: Finanzas (Admin/Gerente/Contador) */}
                     {canAccessFinances && (
-                        <Card to="/finances" color="#10b981" onMouseEnter={() => prefetch('/finances')}>
-                            <CardIcon color="#10b981"><FaChartPie /></CardIcon>
+                        <Card to="/finances" color="#059669" onMouseEnter={() => prefetch('/finances')}>
+                            <CardIcon color="#10b981" $secondary="#047857"><FaChartPie /></CardIcon>
                             <h2>Finanzas y Estadísticas</h2>
                             <p>Gestión de ingresos, gastos y analítica general.</p>
                         </Card>
@@ -293,7 +319,7 @@ const Dashboard = () => {
                     {/* TARJETA: Planilla y Comisiones (Dueño / Usuarios Especiales) */}
                     {canAccessEmpleados && (
                         <Card to="/empleados" color="#0f766e" onMouseEnter={() => prefetch('/empleados')}>
-                            <CardIcon color="#0f766e"><FaAddressCard /></CardIcon>
+                            <CardIcon color="#14b8a6" $secondary="#0f766e"><FaMoneyCheckAlt /></CardIcon>
                             <h2>Planilla y Comisiones</h2>
                             <p>Nómina, reglas de comisión sobre ganancia y liquidación de pagos.</p>
                         </Card>
@@ -301,8 +327,8 @@ const Dashboard = () => {
 
                     {/* 4. Inventario */}
                     {canAccessInventory && (
-                        <Card to="/inventory" color="#28a745" onMouseEnter={() => prefetch('/inventory')}>
-                            <CardIcon color="#28a745"><FaBoxOpen /></CardIcon>
+                        <Card to="/inventory" color="#16a34a" onMouseEnter={() => prefetch('/inventory')}>
+                            <CardIcon color="#22c55e" $secondary="#15803d"><FaBoxes /></CardIcon>
                             <h2>Inventario</h2>
                             <p>Controla el stock de tus productos y mercancía.</p>
                         </Card>
@@ -310,8 +336,8 @@ const Dashboard = () => {
 
                     {/* 5. Carga Masiva */}
                     {canAccessMassUpload && (
-                        <Card to="/upload/inventory" color="#6f42c1">
-                            <CardIcon color="#6f42c1"><FaCloudUploadAlt /></CardIcon>
+                        <Card to="/upload/inventory" color="#6d28d9">
+                            <CardIcon color="#8b5cf6" $secondary="#5b21b6"><FaCloudUploadAlt /></CardIcon>
                             <h2>Carga Masiva</h2>
                             <p>Actualiza inventario desde archivos CSV.</p>
                         </Card>
@@ -319,8 +345,8 @@ const Dashboard = () => {
 
                     {/* NUEVO: TRASLADOS / SALIDAS */}
                     {canAccessTraslados && (
-                        <Card to="/traslados" color="#ef4444" onMouseEnter={() => prefetch('/traslados')}>
-                            <CardIcon color="#ef4444"><FaTruck /></CardIcon>
+                        <Card to="/traslados" color="#dc2626" onMouseEnter={() => prefetch('/traslados')}>
+                            <CardIcon color="#ef4444" $secondary="#b91c1c"><FaTruckMoving /></CardIcon>
                             <h2>Traslados / Salidas</h2>
                             <p>Descontar mercancía por traslados o merma.</p>
                         </Card>
@@ -328,8 +354,8 @@ const Dashboard = () => {
 
                     {/* 7. Gestión de Cajas */}
                     {canAccessCashReports && (
-                        <Card to="/cash-report" color="#dc3545">
-                            <CardIcon color="#dc3545"><FaBriefcase /></CardIcon>
+                        <Card to="/cash-report" color="#e11d48">
+                            <CardIcon color="#f43f5e" $secondary="#be123c"><FaCoins /></CardIcon>
                             <h2>Gestión de Cajas</h2>
                             <p>Cierres y arqueos de caja.</p>
                         </Card>
@@ -337,8 +363,8 @@ const Dashboard = () => {
 
                     {/* Reportes de Ventas Detallado */}
                     {canAccessReports && (
-                        <Card to="/detailed-sales-report" color="#6366f1" onMouseEnter={() => prefetch('/detailed-sales-report')}>
-                            <CardIcon color="#6366f1"><FaFileInvoiceDollar /></CardIcon>
+                        <Card to="/detailed-sales-report" color="#4f46e5" onMouseEnter={() => prefetch('/detailed-sales-report')}>
+                            <CardIcon color="#6366f1" $secondary="#4338ca"><FaChartBar /></CardIcon>
                             <h2>Reporte de Ventas Detallado</h2>
                             <p>Ventas, devoluciones y rastreo por producto.</p>
                         </Card>
@@ -346,8 +372,8 @@ const Dashboard = () => {
 
                     {/* Consola de Inteligencia de Negocios (BI) */}
                     {canAccessBiConsole && (
-                        <Card to="/bi-console" color="#ED7D31" onMouseEnter={() => prefetch('/bi-console')}>
-                            <CardIcon color="#ED7D31"><FaChartLine /></CardIcon>
+                        <Card to="/bi-console" color="#ea580c" onMouseEnter={() => prefetch('/bi-console')}>
+                            <CardIcon color="#f97316" $secondary="#c2410c"><FaRocket /></CardIcon>
                             <h2>Consola BI & Analítica</h2>
                             <p>Panel de Inteligencia de Negocios y Proyección.</p>
                         </Card>
@@ -355,8 +381,8 @@ const Dashboard = () => {
 
                     {/* 8. Usuarios */}
                     {canAccessAdminUsers && (
-                        <Card to="/admin/users" color="#ff6b6b">
-                            <CardIcon color="#ff6b6b"><FaUsers /></CardIcon>
+                        <Card to="/admin/users" color="#be123c">
+                            <CardIcon color="#e11d48" $secondary="#9f1239"><FaUserShield /></CardIcon>
                             <h2>Usuarios y Trazabilidad</h2>
                             <p>Control de permisos por casillas y bitácora de actividad.</p>
                         </Card>
@@ -364,8 +390,8 @@ const Dashboard = () => {
 
                     {/* 9. Solicitudes */}
                     {canAccessSolicitudes && (
-                        <Card to="/solicitudes" color="#fd7e14">
-                            <CardIcon color="#fd7e14"><FaClipboardList /></CardIcon>
+                        <Card to="/solicitudes" color="#f97316">
+                            <CardIcon color="#fb923c" $secondary="#ea580c"><FaClipboardCheck /></CardIcon>
                             <h2>Solicitudes</h2>
                             <p>Realizar pedidos y requerimientos.</p>
                         </Card>
@@ -373,8 +399,8 @@ const Dashboard = () => {
 
                     {/* 10. Configuración */}
                     {canAccessSettings && (
-                        <Card as="button" onClick={() => setShowSettings(true)} color="#343a40" style={{ textAlign: 'left', border: 'none', cursor: 'pointer' }}>
-                            <CardIcon color="#343a40"><FaCog /></CardIcon>
+                        <Card as="button" onClick={() => setShowSettings(true)} color="#334155" style={{ textAlign: 'left', border: 'none', cursor: 'pointer' }}>
+                            <CardIcon color="#475569" $secondary="#1e293b"><FaSlidersH /></CardIcon>
                             <h2>Configuración</h2>
                             <p>Datos de empresa y tickets.</p>
                         </Card>

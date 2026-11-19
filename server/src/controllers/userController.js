@@ -359,8 +359,8 @@ const getUserTraceability = async (req, res) => {
     const { userId, modulo, search, limit = 200 } = req.query;
     const maxLimit = Math.min(500, Math.max(20, Number(limit) || 200));
 
-    // 1. Eventos registrados en la tabla auditoria_usuarios
-    const auditWhere = [];
+    // 1. Eventos registrados en la tabla auditoria_usuarios (excluyendo cualquier ajuste silencioso)
+    const auditWhere = ["accion != 'CAJA_AJUSTE'"];
     const auditParams = [];
     if (userId && userId !== 'todos') {
       auditWhere.push('id_usuario = ?');
