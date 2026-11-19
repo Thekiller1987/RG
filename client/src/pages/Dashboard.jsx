@@ -239,12 +239,7 @@ const Dashboard = () => {
                         <WelcomeTitle>Bienvenido, {displayName} 👋</WelcomeTitle>
                         <WelcomeSubtitle>
                             Rol: <strong>{userRole}</strong>
-                            {isMasterAdmin && (
-                                <span style={{ marginLeft: 8, padding: '2px 9px', borderRadius: 999, background: '#dcfce7', color: '#166534', fontSize: '0.78rem', fontWeight: 700 }}>
-                                    🔒 Admin Principal (1987)
-                                </span>
-                            )}
-                            {' · '}Selecciona un módulo autorizado para empezar.
+                            {' · '}Selecciona un módulo para empezar.
                         </WelcomeSubtitle>
                     </Header>
                     <LogoutButton aria-label="Cerrar sesión" onClick={handlePrepareLogout}>
@@ -374,8 +369,8 @@ const Dashboard = () => {
                     {canAccessAdminUsers && (
                         <Card to="/admin/users" color="#dc3545">
                             <CardIcon color="#dc3545"><FaUsersCog /></CardIcon>
-                            <h2>Usuarios y Trazabilidad</h2>
-                            <p>Control de permisos por casillas y bitácora de actividad.</p>
+                            <h2>Gestión de Usuarios</h2>
+                            <p>Administra cuentas, accesos y actividad.</p>
                         </Card>
                     )}
 

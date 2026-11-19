@@ -364,7 +364,7 @@ const getCreditosPendientes = async (req, res) => {
     }
 };
 
-// NUEVO: Estado de Cuenta (Account Statement) — CON PRODUCTOS
+// NUEVO: Estado de Cuenta (Account Statement) — CON PRODUCTOS Y MÉTODOS DE ABONO
 const getAccountStatement = async (req, res) => {
     const { id } = req.params;
     try {
@@ -375,12 +375,14 @@ const getAccountStatement = async (req, res) => {
 
         // 2. Get All relevant transactions (Créditos, Abonos, Devoluciones de Crédito)
         const [sales] = await pool.query(`
-            SELECT id_venta, fecha, total_venta, estado, tipo_venta, pago_detalles, referencia_pedido 
-            FROM ventas 
-            WHERE id_cliente = ? 
-              AND estado != 'CANCELADA'
-              AND (tipo_venta = 'CREDITO' OR estado = 'ABONO_CREDITO' OR estado = 'DEVOLUCION')
-            ORDER BY fecha ASC, id_venta ASC
+            SELECT v.id_venta, v.fecha, v.total_venta, v.estado, v.tipo_venta, v.pago_detalles, v.referencia_pedido,
+                   COALESCE(u.nombre_usuario, 'Sistema') AS usuario
+            FROM ventas v
+            LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
+            WHERE v.id_cliente = ? 
+              AND v.estado != 'CANCELADA'
+              AND (v.tipo_venta = 'CREDITO' OR v.estado = 'ABONO_CREDITO' OR v.estado = 'DEVOLUCION')
+            ORDER BY v.fecha ASC, v.id_venta ASC
         `, [id]);
 
         // 3. Get product details for ALL credit sales in one query
@@ -413,6 +415,9 @@ const getAccountStatement = async (req, res) => {
         }
 
         let runningBalance = 0;
+        let totalCreditos = 0;
+        let totalAbonos = 0;
+        let totalDevoluciones = 0;
         const ledger = [];
 
         sales.forEach(sale => {
@@ -426,17 +431,24 @@ const getAccountStatement = async (req, res) => {
             let creditImpact = 0;
             let type = '';
             let description = '';
+            let metodo = pd.metodo || 'Efectivo';
+            let destino = pd.ticketRef || 'Cuenta General';
+            if (destino === 'FIFO') destino = 'Cuenta General';
 
             if (sale.estado === 'ABONO_CREDITO') {
-                creditImpact = Number(sale.total_venta);
+                const abonoAbs = Math.abs(Number(sale.total_venta || 0));
+                creditImpact = -abonoAbs;
+                totalAbonos += abonoAbs;
                 type = 'ABONO';
-                description = pd.referencia ? `Abono (${pd.referencia})` : 'Abono a cuenta';
+                const metodoLabel = metodo === 'Efectivo' ? 'Contado/Efectivo' : metodo;
+                description = `Abono #${sale.id_venta} [${metodoLabel}] → ${destino}${pd.referencia ? ` (Ref: ${pd.referencia})` : ''}`;
             } else if (sale.estado === 'DEVOLUCION') {
                 const creditoDevuelto = Number(pd.credito || 0);
                 if (creditoDevuelto < 0) {
                     creditImpact = creditoDevuelto;
+                    totalDevoluciones += Math.abs(creditoDevuelto);
                     type = 'DEVOLUCION';
-                    description = pd.nota || `Devolución Ticket #${pd.originalSaleId || ''}`;
+                    description = pd.nota || `Devolución Ticket #${pd.originalSaleId || sale.id_venta}`;
                 } else {
                     return;
                 }
@@ -444,19 +456,23 @@ const getAccountStatement = async (req, res) => {
                 const creditoOtorgado = Number(pd.credito || sale.total_venta || 0);
                 if (creditoOtorgado > 0) {
                     creditImpact = creditoOtorgado;
+                    totalCreditos += creditoOtorgado;
                     type = 'CREDITO';
-                    description = `Venta a crédito Ticket #${sale.id_venta}`;
+                    description = `Factura a Crédito #${sale.id_venta}`;
                 } else {
                     return;
                 }
             }
 
             if (creditImpact !== 0) {
-                runningBalance += creditImpact;
+                runningBalance = Math.max(0, runningBalance + creditImpact);
                 ledger.push({
                     id_venta: sale.id_venta,
                     fecha: sale.fecha,
                     tipo: type,
+                    metodo,
+                    destino,
+                    usuario: sale.usuario,
                     descripcion: description,
                     monto: Math.abs(creditImpact),
                     impacto: creditImpact,
@@ -471,11 +487,15 @@ const getAccountStatement = async (req, res) => {
             cliente: {
                 id: client.id_cliente,
                 nombre: client.nombre,
+                cedula: client.cedula || '',
                 telefono: client.telefono,
                 direccion: client.direccion,
                 limite_credito: client.limite_credito,
-                saldo_pendiente_db: Number(client.saldo_pendiente),
-                saldo_calculado: parseFloat(runningBalance.toFixed(2))
+                saldo_pendiente_db: Number(client.saldo_pendiente || 0),
+                saldo_calculado: parseFloat(runningBalance.toFixed(2)),
+                total_creditos: parseFloat(totalCreditos.toFixed(2)),
+                total_abonos: parseFloat(totalAbonos.toFixed(2)),
+                total_devoluciones: parseFloat(totalDevoluciones.toFixed(2))
             },
             historial: ledger
         };
