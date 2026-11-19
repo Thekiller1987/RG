@@ -220,6 +220,11 @@ export const fetchClientStatement = async (clientId, token) => {
     return await request('get', `/clients/${clientId}/statement`, token);
 };
 
+export const fetchClientPurchaseAnalytics = async (clientId, token, params = null) => {
+    const config = params ? { params } : {};
+    return await request('get', `/clients/${clientId}/analytics`, token, null, config);
+};
+
 // ===================================================================
 // ==================== TERMINA SECCIÓN CLIENTES =====================
 // ===================================================================

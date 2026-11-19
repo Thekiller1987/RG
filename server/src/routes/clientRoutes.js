@@ -12,6 +12,7 @@ const {
     getAbonosByClient,
     getCreditosPendientes,
     getAccountStatement,
+    getClientPurchaseAnalytics,
 } = require('../controllers/clientController');
 
 const { verifyToken } = require('../middleware/authMiddleware');
@@ -32,5 +33,6 @@ router.get('/:id/creditos', getCreditosByClient);
 router.get('/:id/abonos', getAbonosByClient);
 router.get('/:id/creditos-pendientes', getCreditosPendientes);
 router.get('/:id/statement', getAccountStatement);
+router.get('/:id/analytics', getClientPurchaseAnalytics);
 
 module.exports = router;

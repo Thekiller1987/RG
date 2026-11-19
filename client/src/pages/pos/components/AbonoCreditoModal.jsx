@@ -1,64 +1,226 @@
-// AbonoCreditoModal.jsx — Sistema de abono por ticket individual
+// AbonoCreditoModal.jsx — Sistema de abono a Cuenta General (FIFO) o por Factura Individual con Iconos por Método
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
-import { FaTimes, FaSave, FaSpinner, FaMoneyBillWave, FaFileInvoiceDollar, FaCheckCircle } from 'react-icons/fa';
+import {
+  FaTimes, FaSave, FaSpinner, FaMoneyBillWave, FaFileInvoiceDollar,
+  FaCheckCircle, FaUniversity, FaCreditCard, FaLandmark, FaReceipt
+} from 'react-icons/fa';
 import * as api from '../../../service/api';
 import { useAuth } from '../../../context/AuthContext.jsx';
 
 // ===================== Styled Components =====================
 const ModalOverlay = styled.div`
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1050;
-  backdrop-filter: blur(5px);
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  backdrop-filter: blur(6px);
+  padding: 1rem;
 `;
 
 const ModalContainer = styled.div`
-  background: white; padding: 2rem; border-radius: 12px; width: 560px; max-width: 95%; max-height: 90vh; overflow-y: auto;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-  animation: fadeIn 0.3s ease-out;
-  @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+  background: #ffffff;
+  border-radius: 20px;
+  width: 620px;
+  max-width: 100%;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.28);
+  border: 1px solid #e2e8f0;
+  animation: fadeIn 0.22s ease-out;
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
 `;
 
 const Header = styled.div`
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;
-  border-bottom: 1px solid #e9ecef; padding-bottom: 1rem;
+  background: linear-gradient(135deg, #0f172a 0%, #0f766e 100%);
+  color: white;
+  padding: 1.35rem 1.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 `;
 
-const Title = styled.h2`margin: 0; font-size: 1.5rem; color: #333;`;
+const Title = styled.h2`
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+`;
 
 const CloseButton = styled.button`
-  border: none; background: none; font-size: 1.5rem; cursor: pointer; color: #888;
-  &:hover { color: #333; }
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: white;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover {
+    background: rgba(239, 68, 68, 0.85);
+    transform: rotate(90deg);
+  }
 `;
 
-const Form = styled.form`display: flex; flex-direction: column; gap: 1.25rem;`;
+const Body = styled.div`
+  padding: 1.5rem 1.75rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+`;
 
-const InputGroup = styled.div`display: flex; flex-direction: column; gap: 0.5rem;`;
-const Label = styled.label`font-weight: 600; color: #495057; font-size: 0.9rem;`;
+const ClientBanner = styled.div`
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+`;
+
+const Form = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+`;
+
+const InputGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+`;
+
+const Label = styled.label`
+  font-weight: 700;
+  color: #334155;
+  font-size: 0.84rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+`;
 
 const Input = styled.input`
-  padding: 0.75rem; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem;
-  &:focus { border-color: #007bff; outline: none; box-shadow: 0 0 0 2px rgba(0,123,255,0.25); }
+  padding: 0.8rem 1rem;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+  background: #f8fafc;
+  transition: all 0.2s;
+  &:focus {
+    border-color: #0d9488;
+    background: #ffffff;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+  }
 `;
 
-const Select = styled(Input).attrs({ as: 'select' })``;
+const MethodGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  @media (max-width: 500px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const MethodCard = styled.button`
+  type: button;
+  padding: 0.85rem 0.75rem;
+  border-radius: 12px;
+  border: 2px solid ${p => p.$active ? p.$color : '#e2e8f0'};
+  background: ${p => p.$active ? p.$bg : '#ffffff'};
+  color: ${p => p.$active ? p.$color : '#475569'};
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: ${p => p.$active ? `0 8px 18px -4px ${p.$shadow}` : '0 2px 5px rgba(0,0,0,0.02)'};
+
+  .icon-badge {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    background: ${p => p.$active ? p.$color : '#f1f5f9'};
+    color: ${p => p.$active ? '#ffffff' : p.$color};
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    transition: all 0.2s;
+  }
+  .method-title {
+    font-size: 0.88rem;
+    font-weight: 800;
+  }
+  .method-sub {
+    font-size: 0.7rem;
+    opacity: 0.8;
+    font-weight: 600;
+  }
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    border-color: ${p => p.$color};
+  }
+`;
 
 const Button = styled.button`
-  padding: 0.85rem 1.5rem; background: #28a745; color: white; border: none;
-  border-radius: 6px; font-weight: bold; display: flex; align-items: center; gap: 0.5rem;
-  justify-content: center; cursor: pointer; transition: background-color 0.2s; font-size: 1rem;
-  &:hover:not(:disabled) { background: #218838; }
-  &:disabled { background: #6c757d; cursor: not-allowed; }
-`;
-
-const InfoText = styled.p`
-  margin: 0 0 0.5rem 0; padding: 0.75rem; background-color: #e9ecef; border-radius: 6px;
-  color: #495057; text-align: center; font-size: 1rem;
-  strong { color: #dc3545; }
+  padding: 0.9rem 1.5rem;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 1rem;
+  box-shadow: 0 10px 20px -5px rgba(16, 185, 129, 0.4);
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.04);
+  }
+  &:disabled {
+    background: #94a3b8;
+    box-shadow: none;
+    cursor: not-allowed;
+  }
 `;
 
 const ErrorText = styled.p`
-  margin-top: -1rem; margin-bottom: 0.5rem; padding: 0.5rem; color: #dc3545; font-size: 0.9rem; text-align: center;
+  margin: -0.25rem 0 0;
+  padding: 0.55rem 0.85rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-align: center;
 `;
 
 const SpinAnimation = styled(FaSpinner)`
@@ -66,38 +228,100 @@ const SpinAnimation = styled(FaSpinner)`
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 `;
 
-// ===================== Ticket Cards =====================
+// ===================== Ticket & Cuenta General Cards =====================
 const TicketList = styled.div`
-  display: flex; flex-direction: column; gap: 0.5rem;
-  max-height: 220px; overflow-y: auto; padding: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  max-height: 230px;
+  overflow-y: auto;
+  padding: 0.2rem;
 `;
 
 const TicketCard = styled.div`
-  padding: 0.75rem 1rem; border: 2px solid ${p => p.$selected ? '#007bff' : '#e9ecef'};
-  border-radius: 8px; cursor: pointer; transition: all 0.2s;
-  background: ${p => p.$selected ? '#e8f0fe' : (p.$paid ? '#f0f9f0' : 'white')};
-  opacity: ${p => p.$paid ? 0.6 : 1};
-  display: flex; justify-content: space-between; align-items: center;
-  &:hover { border-color: ${p => p.$paid ? '#e9ecef' : '#007bff'}; }
+  padding: 0.8rem 1rem;
+  border: 2px solid ${p => p.$selected ? '#0d9488' : '#e2e8f0'};
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.18s;
+  background: ${p => p.$selected ? '#f0fdfa' : (p.$paid ? '#f8fafc' : '#ffffff')};
+  opacity: ${p => p.$paid ? 0.65 : 1};
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  &:hover {
+    border-color: ${p => p.$paid ? '#e2e8f0' : '#0d9488'};
+  }
 
+  .left-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .dest-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05rem;
+    background: ${p => p.$selected ? '#0d9488' : (p.$isGeneral ? '#dbeafe' : '#f1f5f9')};
+    color: ${p => p.$selected ? '#ffffff' : (p.$isGeneral ? '#1d4ed8' : '#475569')};
+    flex-shrink: 0;
+  }
   .ticket-info {
-    display: flex; flex-direction: column; gap: 2px;
-    .ticket-id { font-weight: 700; color: #0056b3; font-size: 0.9rem; }
-    .ticket-date { font-size: 0.8rem; color: #6c757d; }
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    .ticket-id {
+      font-weight: 800;
+      color: #0f172a;
+      font-size: 0.92rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .ticket-date {
+      font-size: 0.78rem;
+      color: #64748b;
+    }
   }
   .ticket-amounts {
     text-align: right;
-    .original { font-size: 0.8rem; color: #6c757d; text-decoration: line-through; }
-    .remaining { font-weight: 700; color: ${p => p.$paid ? '#28a745' : '#dc3545'}; font-size: 1rem; }
+    .original {
+      font-size: 0.78rem;
+      color: #94a3b8;
+      text-decoration: line-through;
+    }
+    .remaining {
+      font-weight: 800;
+      color: ${p => p.$paid ? '#10b981' : '#ef4444'};
+      font-size: 1rem;
+    }
   }
 `;
 
-const SectionLabel = styled.div`
-  font-size: 0.85rem; font-weight: 600; color: #495057;
-  margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.5rem;
+const PreviewBox = styled.div`
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 0.85rem 1.1rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  text-align: center;
+  .item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    span.lbl { font-size: 0.72rem; color: #64748b; font-weight: 700; text-transform: uppercase; }
+    span.val { font-size: 1rem; font-weight: 800; }
+  }
 `;
 
-const formatCurrency = (amount) => `C$${Number(amount || 0).toFixed(2)}`;
+const formatCurrency = (amount) => `C$${Number(amount || 0).toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtDate = (iso) => {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('es-NI', {
@@ -105,7 +329,36 @@ const fmtDate = (iso) => {
   });
 };
 
-// ===================== Componente Principal =====================
+const PAYMENT_METHODS = [
+  {
+    id: 'Efectivo',
+    title: 'Normal / Contado',
+    sub: 'Efectivo en Caja',
+    icon: FaMoneyBillWave,
+    color: '#059669',
+    bg: '#ecfdf5',
+    shadow: 'rgba(16, 185, 129, 0.28)'
+  },
+  {
+    id: 'Transferencia',
+    title: 'Transferencia',
+    sub: 'Bancaria / Móvil',
+    icon: FaUniversity,
+    color: '#2563eb',
+    bg: '#eff6ff',
+    shadow: 'rgba(37, 99, 235, 0.28)'
+  },
+  {
+    id: 'Tarjeta',
+    title: 'Tarjeta / POS',
+    sub: 'Débito o Crédito',
+    icon: FaCreditCard,
+    color: '#7c3aed',
+    bg: '#f5f3ff',
+    shadow: 'rgba(124, 58, 237, 0.28)'
+  }
+];
+
 const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
   const { addCajaTransaction, user } = useAuth();
 
@@ -115,14 +368,13 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMonto, setErrorMonto] = useState('');
 
-  // Per-ticket state
+  // Per-ticket state (null = Cuenta General / FIFO automático)
   const [tickets, setTickets] = useState([]);
   const [loadingTickets, setLoadingTickets] = useState(true);
-  const [selectedTicket, setSelectedTicket] = useState(null); // null = FIFO automático
+  const [selectedTicket, setSelectedTicket] = useState(null);
 
   const saldoPendiente = useMemo(() => Number(client?.saldo_pendiente) || 0, [client]);
 
-  // Cargar facturas pendientes al abrir
   useEffect(() => {
     const loadTickets = async () => {
       setLoadingTickets(true);
@@ -152,17 +404,22 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
     const montoNum = parseFloat(monto);
     if (isNaN(montoNum) || montoNum <= 0) {
       setErrorMonto('Ingrese un monto válido mayor a cero.');
-    } else if (montoNum > maxMonto) {
-      setErrorMonto(`El máximo es ${formatCurrency(maxMonto)}.`);
+    } else if (montoNum > maxMonto + 0.009) {
+      setErrorMonto(`El máximo permitido es ${formatCurrency(maxMonto)}.`);
     } else {
       setErrorMonto('');
     }
   }, [monto, maxMonto]);
 
   const handleSelectTicket = (ticket) => {
+    if (!ticket) {
+      setSelectedTicket(null);
+      setMonto('');
+      return;
+    }
     if (ticket.saldoRestante <= 0) return;
     setSelectedTicket(prev => prev?.idVenta === ticket.idVenta ? null : ticket);
-    setMonto(''); // Reset monto on selection change
+    setMonto('');
   };
 
   const handlePayFull = () => {
@@ -171,6 +428,11 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
     } else {
       setMonto(saldoPendiente.toFixed(2));
     }
+  };
+
+  const handlePayHalf = () => {
+    const base = selectedTicket ? selectedTicket.saldoRestante : saldoPendiente;
+    setMonto((base / 2).toFixed(2));
   };
 
   const printAbonoReceipt = useCallback((montoNum, metodo, ref, saldoAntes) => {
@@ -187,7 +449,7 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
           <p style="margin:2px 0;display:flex;justify-content:space-between;"><strong>Cliente:</strong><span>${client?.nombre || 'N/A'}</span></p>
           <p style="margin:2px 0;display:flex;justify-content:space-between;"><strong>Fecha:</strong><span>${now}</span></p>
           <p style="margin:2px 0;display:flex;justify-content:space-between;"><strong>Aplicado a:</strong><span>${ticketRef}</span></p>
-          <p style="margin:2px 0;display:flex;justify-content:space-between;"><strong>Método:</strong><span>${metodo}</span></p>
+          <p style="margin:2px 0;display:flex;justify-content:space-between;"><strong>Método:</strong><span>${metodo === 'Efectivo' ? 'Contado / Efectivo' : metodo}</span></p>
           ${ref ? `<p style="margin:2px 0;display:flex;justify-content:space-between;"><strong>Ref:</strong><span>${ref}</span></p>` : ''}
         </div>
         <div style="border-top:2px solid #000;padding-top:8px;margin-top:8px;">
@@ -226,7 +488,9 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
 
     setIsLoading(true);
     try {
-      // 1. Registrar abono en backend (con ticket específico si seleccionado)
+      const destinoLabel = selectedTicket ? `Venta #${selectedTicket.idVenta}` : 'Cuenta General';
+
+      // 1. Registrar abono en backend (con ticket específico o Cuenta General FIFO)
       await api.addCreditPayment(client.id_cliente, {
         monto: montoNum,
         id_venta: selectedTicket?.idVenta || null,
@@ -234,23 +498,25 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
           metodo: metodoPago,
           usuario: user?.nombre_usuario || 'Desconocido',
           referencia: referencia || '',
-          ticketRef: selectedTicket ? `Venta #${selectedTicket.idVenta}` : 'FIFO'
+          ticketRef: destinoLabel,
+          esCuentaGeneral: !selectedTicket
         }
       }, token);
 
-      // 2. Registrar la transacción en la caja
+      // 2. Registrar la transacción en la caja (intacto para POS y Reportes)
       const esIngresoEnCaja = metodoPago === 'Efectivo';
       const txCaja = {
         id: `abono-${Date.now()}`,
         type: 'abono',
         amount: montoNum,
-        note: `Abono Cliente: ${client.nombre} (${metodoPago})${selectedTicket ? ` - Venta #${selectedTicket.idVenta}` : ''} ${referencia ? '- Ref: ' + referencia : ''}`,
+        note: `Abono Cliente: ${client.nombre} (${metodoPago}) - ${destinoLabel}${referencia ? ' - Ref: ' + referencia : ''}`,
         at: new Date().toISOString(),
         pagoDetalles: {
           clienteId: client.id_cliente,
           clienteNombre: client.nombre,
           metodo: metodoPago,
           referencia: referencia,
+          ticketRef: destinoLabel,
           ingresoCaja: esIngresoEnCaja ? montoNum : 0,
           efectivo: esIngresoEnCaja ? montoNum : 0,
           tarjeta: metodoPago === 'Tarjeta' ? montoNum : 0,
@@ -275,130 +541,233 @@ const AbonoCreditoModal = ({ client, onClose, onAbonoSuccess, showAlert }) => {
   }, [monto, metodoPago, referencia, errorMonto, client, user, selectedTicket, addCajaTransaction, onAbonoSuccess, onClose, showAlert, printAbonoReceipt, saldoPendiente]);
 
   const isSubmitDisabled = isLoading || saldoPendiente <= 0 || !!errorMonto || !monto;
+  const montoNumPreview = parseFloat(monto) || 0;
+  const nuevoSaldoPreview = Math.max(0, maxMonto - montoNumPreview);
 
   return (
-    <ModalOverlay>
-      <ModalContainer>
+    <ModalOverlay onClick={onClose}>
+      <ModalContainer onClick={e => e.stopPropagation()}>
         <Header>
-          <Title>Registrar Abono</Title>
-          <CloseButton onClick={onClose} disabled={isLoading}><FaTimes /></CloseButton>
+          <Title><FaMoneyBillWave /> Registrar Abono de Cliente</Title>
+          <CloseButton onClick={onClose} disabled={isLoading} type="button"><FaTimes /></CloseButton>
         </Header>
 
-        <p>Cliente: <strong>{client?.nombre || 'Desconocido'}</strong></p>
-        <InfoText>
-          Saldo Pendiente Total: <strong>{formatCurrency(saldoPendiente)}</strong>
-        </InfoText>
+        <Body>
+          <ClientBanner>
+            <div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Cliente</div>
+              <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>{client?.nombre || 'Desconocido'}</div>
+              <div style={{ fontSize: '0.8rem', color: '#64748b' }}>ID #{client?.id_cliente} {client?.telefono ? `• Tel: ${client.telefono}` : ''}</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Deuda Total Actual</div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#dc2626' }}>{formatCurrency(saldoPendiente)}</div>
+            </div>
+          </ClientBanner>
 
-        {/* ─── FACTURAS PENDIENTES ─── */}
-        {loadingTickets ? (
-          <div style={{ textAlign: 'center', padding: '1rem', color: '#6c757d' }}>
-            <SpinAnimation /> Cargando facturas...
-          </div>
-        ) : pendingTickets.length > 0 ? (
-          <>
-            <SectionLabel>
-              <FaFileInvoiceDollar /> Selecciona una factura (opcional — si no, paga la más antigua):
-            </SectionLabel>
-            <TicketList>
-              {pendingTickets.map(t => (
+          {/* ─── DESTINO DEL ABONO: CUENTA GENERAL O FACTURA ESPECÍFICA ─── */}
+          <div>
+            <Label style={{ marginBottom: '0.5rem' }}>
+              <FaLandmark style={{ color: '#0d9488' }} /> Destino del Abono (Cuenta General o Factura Específica)
+            </Label>
+
+            {loadingTickets ? (
+              <div style={{ textAlign: 'center', padding: '1rem', color: '#64748b' }}>
+                <SpinAnimation /> Cargando estado de cuenta...
+              </div>
+            ) : (
+              <TicketList>
+                {/* Opción 1: Cuenta General (FIFO) con su propio icono */}
                 <TicketCard
-                  key={t.idVenta}
-                  $selected={selectedTicket?.idVenta === t.idVenta}
-                  onClick={() => handleSelectTicket(t)}
+                  $selected={!selectedTicket}
+                  $isGeneral
+                  onClick={() => handleSelectTicket(null)}
                 >
-                  <div className="ticket-info">
-                    <span className="ticket-id">Venta #{t.idVenta}</span>
-                    <span className="ticket-date">{fmtDate(t.fecha)}</span>
+                  <div className="left-wrap">
+                    <div className="dest-icon">
+                      <FaLandmark />
+                    </div>
+                    <div className="ticket-info">
+                      <span className="ticket-id">
+                        Cuenta General (Abono General Automático)
+                      </span>
+                      <span className="ticket-date">
+                        Se abona a la deuda general liquidando primero las facturas más antiguas
+                      </span>
+                    </div>
                   </div>
                   <div className="ticket-amounts">
-                    {t.montoOriginal !== t.saldoRestante && (
-                      <div className="original">{formatCurrency(t.montoOriginal)}</div>
-                    )}
-                    <div className="remaining">{formatCurrency(t.saldoRestante)}</div>
+                    <div className="remaining">{formatCurrency(saldoPendiente)}</div>
                   </div>
                 </TicketCard>
-              ))}
-            </TicketList>
+
+                {/* Opción 2: Facturas individuales pendientes */}
+                {pendingTickets.map(t => (
+                  <TicketCard
+                    key={t.idVenta}
+                    $selected={selectedTicket?.idVenta === t.idVenta}
+                    onClick={() => handleSelectTicket(t)}
+                  >
+                    <div className="left-wrap">
+                      <div className="dest-icon">
+                        <FaReceipt />
+                      </div>
+                      <div className="ticket-info">
+                        <span className="ticket-id">Factura / Venta #{t.idVenta}</span>
+                        <span className="ticket-date">Fecha: {fmtDate(t.fecha)}</span>
+                      </div>
+                    </div>
+                    <div className="ticket-amounts">
+                      {t.montoOriginal !== t.saldoRestante && (
+                        <div className="original">Orig: {formatCurrency(t.montoOriginal)}</div>
+                      )}
+                      <div className="remaining">{formatCurrency(t.saldoRestante)}</div>
+                    </div>
+                  </TicketCard>
+                ))}
+              </TicketList>
+            )}
 
             {paidTickets.length > 0 && (
               <details style={{ marginTop: '0.5rem' }}>
-                <summary style={{ cursor: 'pointer', fontSize: '0.85rem', color: '#6c757d' }}>
-                  <FaCheckCircle style={{ color: '#28a745' }} /> {paidTickets.length} factura(s) pagada(s)
+                <summary style={{ cursor: 'pointer', fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+                  <FaCheckCircle style={{ color: '#10b981' }} /> Ver {paidTickets.length} factura(s) ya cancelada(s)
                 </summary>
-                <TicketList style={{ marginTop: '0.5rem' }}>
+                <TicketList style={{ marginTop: '0.45rem' }}>
                   {paidTickets.map(t => (
                     <TicketCard key={t.idVenta} $paid>
-                      <div className="ticket-info">
-                        <span className="ticket-id">Venta #{t.idVenta}</span>
-                        <span className="ticket-date">{fmtDate(t.fecha)}</span>
+                      <div className="left-wrap">
+                        <div className="dest-icon"><FaCheckCircle /></div>
+                        <div className="ticket-info">
+                          <span className="ticket-id">Venta #{t.idVenta}</span>
+                          <span className="ticket-date">{fmtDate(t.fecha)}</span>
+                        </div>
                       </div>
                       <div className="ticket-amounts">
-                        <div className="remaining" style={{ color: '#28a745' }}>Pagada ✔</div>
+                        <div className="remaining" style={{ color: '#10b981' }}>Pagada ✔</div>
                       </div>
                     </TicketCard>
                   ))}
                 </TicketList>
               </details>
             )}
-          </>
-        ) : null}
+          </div>
 
-        {/* ─── FORM ─── */}
-        <Form onSubmit={handleSubmit}>
-          <InputGroup>
-            <Label htmlFor="montoAbono">
-              Monto a Abonar (C$)
-              {selectedTicket && (
-                <span style={{ fontWeight: 'normal', color: '#007bff', marginLeft: '0.5rem' }}>
-                  — Venta #{selectedTicket.idVenta} (máx: {formatCurrency(maxMonto)})
-                </span>
-              )}
-            </Label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Input
-                id="montoAbono"
-                type="number"
-                value={monto}
-                onChange={e => setMonto(e.target.value)}
-                placeholder="0.00"
-                required
-                autoFocus
-                step="0.01"
-                min="0.01"
-                max={maxMonto ? maxMonto.toFixed(2) : undefined}
-                disabled={isLoading || saldoPendiente <= 0}
-                style={{ flex: 1 }}
-              />
-              <Button type="button" onClick={handlePayFull}
-                style={{ background: '#007bff', padding: '0.5rem 0.75rem', fontSize: '0.85rem' }}
-                disabled={isLoading || saldoPendiente <= 0}>
-                Total
-              </Button>
-            </div>
-          </InputGroup>
-
-          <InputGroup>
-            <Label htmlFor="metodoPago">Método de Pago</Label>
-            <Select id="metodoPago" value={metodoPago} onChange={e => setMetodoPago(e.target.value)} disabled={isLoading}>
-              <option value="Efectivo">Efectivo</option>
-              <option value="Tarjeta">Tarjeta</option>
-              <option value="Transferencia">Transferencia</option>
-            </Select>
-          </InputGroup>
-
-          {metodoPago !== 'Efectivo' && (
+          {/* ─── FORMULARIO DE PAGO ─── */}
+          <Form onSubmit={handleSubmit}>
             <InputGroup>
-              <Label htmlFor="referencia">Referencia / Voucher / N° Transferencia</Label>
-              <Input id="referencia" type="text" value={referencia} onChange={e => setReferencia(e.target.value)} placeholder="Ej: BAC-123456" required />
+              <Label>
+                Método de Pago del Abono (Con su icono en el registro)
+              </Label>
+              <MethodGrid>
+                {PAYMENT_METHODS.map(m => {
+                  const IconComp = m.icon;
+                  const active = metodoPago === m.id;
+                  return (
+                    <MethodCard
+                      key={m.id}
+                      type="button"
+                      $active={active}
+                      $color={m.color}
+                      $bg={m.bg}
+                      $shadow={m.shadow}
+                      onClick={() => setMetodoPago(m.id)}
+                      disabled={isLoading}
+                    >
+                      <div className="icon-badge"><IconComp /></div>
+                      <span className="method-title">{m.title}</span>
+                      <span className="method-sub">{m.sub}</span>
+                    </MethodCard>
+                  );
+                })}
+              </MethodGrid>
             </InputGroup>
-          )}
 
-          {errorMonto && <ErrorText>{errorMonto}</ErrorText>}
+            {metodoPago !== 'Efectivo' && (
+              <InputGroup>
+                <Label htmlFor="referencia">
+                  {metodoPago === 'Transferencia' ? 'N° de Referencia / Banco de Transferencia *' : 'N° de Voucher / Autorización POS *'}
+                </Label>
+                <Input
+                  id="referencia"
+                  type="text"
+                  value={referencia}
+                  onChange={e => setReferencia(e.target.value)}
+                  placeholder={metodoPago === 'Transferencia' ? 'Ej: BAC-984512 / Lafise-3321' : 'Ej: Voucher #4589'}
+                  required
+                />
+              </InputGroup>
+            )}
 
-          <Button type="submit" disabled={isSubmitDisabled}>
-            {isLoading ? <><SpinAnimation /> Procesando...</> : <><FaSave /> Registrar Abono</>}
-          </Button>
-        </Form>
+            <InputGroup>
+              <Label htmlFor="montoAbono">
+                Monto a Abonar (C$) — Aplicado a:{' '}
+                <span style={{ color: '#0d9488' }}>
+                  {selectedTicket ? `Venta #${selectedTicket.idVenta}` : 'Cuenta General'}
+                </span>
+              </Label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <Input
+                  id="montoAbono"
+                  type="number"
+                  value={monto}
+                  onChange={e => setMonto(e.target.value)}
+                  placeholder="0.00"
+                  required
+                  autoFocus
+                  step="0.01"
+                  min="0.01"
+                  max={maxMonto ? maxMonto.toFixed(2) : undefined}
+                  disabled={isLoading || saldoPendiente <= 0}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  type="button"
+                  onClick={handlePayHalf}
+                  style={{ background: '#475569', padding: '0 0.9rem', fontSize: '0.84rem', boxShadow: 'none' }}
+                  disabled={isLoading || saldoPendiente <= 0}
+                >
+                  50%
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handlePayFull}
+                  style={{ background: '#2563eb', padding: '0 1rem', fontSize: '0.84rem', boxShadow: 'none' }}
+                  disabled={isLoading || saldoPendiente <= 0}
+                >
+                  Liquidar Total
+                </Button>
+              </div>
+            </InputGroup>
+
+            <PreviewBox>
+              <div className="item">
+                <span className="lbl">Saldo Evaluado</span>
+                <span className="val" style={{ color: '#64748b' }}>{formatCurrency(maxMonto)}</span>
+              </div>
+              <div className="item">
+                <span className="lbl">Su Abono ({metodoPago === 'Efectivo' ? 'Contado' : metodoPago})</span>
+                <span className="val" style={{ color: '#10b981' }}>- {formatCurrency(montoNumPreview)}</span>
+              </div>
+              <div className="item">
+                <span className="lbl">Nuevo Saldo</span>
+                <span className="val" style={{ color: nuevoSaldoPreview > 0 ? '#dc2626' : '#10b981' }}>
+                  {formatCurrency(nuevoSaldoPreview)}
+                </span>
+              </div>
+            </PreviewBox>
+
+            {errorMonto && <ErrorText>{errorMonto}</ErrorText>}
+
+            <Button type="submit" disabled={isSubmitDisabled}>
+              {isLoading ? (
+                <><SpinAnimation /> Procesando Abono...</>
+              ) : (
+                <><FaSave /> Confirmar Abono en {selectedTicket ? `Venta #${selectedTicket.idVenta}` : 'Cuenta General'}</>
+              )}
+            </Button>
+          </Form>
+        </Body>
       </ModalContainer>
     </ModalOverlay>
   );
