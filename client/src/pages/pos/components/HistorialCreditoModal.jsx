@@ -5,13 +5,15 @@ import {
     FaTimes, FaMoneyBillWave, FaCreditCard, FaSpinner, FaFileInvoiceDollar,
     FaPrint, FaCheckCircle, FaClock, FaBan, FaUniversity, FaLandmark,
     FaCalendarAlt, FaSearch, FaBoxOpen, FaShoppingBag, FaChartLine,
-    FaReceipt, FaTrophy, FaFilter, FaLayerGroup, FaExchangeAlt, FaUser
+    FaReceipt, FaTrophy, FaFilter, FaLayerGroup, FaExchangeAlt, FaUser, FaFilePdf
 } from "react-icons/fa";
 import { toast } from "react-hot-toast";
 import * as api from "../../../service/api";
 import TicketModal from "./TicketModal";
 import StatementModal from "./StatementModal";
 import { useAuth } from "../../../context/AuthContext";
+import { useSettings } from "../../../context/SettingsContext";
+import { generatePurchasesReportPDF } from "../../../utils/clientPdfGenerator";
 
 const ModalOverlay = styled(motion.div)`
   position: fixed;
@@ -553,6 +555,7 @@ export const getPaymentMethodVisual = (metodoRaw = 'Efectivo') => {
 
 export default function HistorialCreditoModal({ client, onClose, token, initialTab = 'creditos' }) {
     const { allUsers, clients, hasPermission, requireActionPermission } = useAuth();
+    const { settings } = useSettings();
     const canViewPurchases = hasPermission('clientes.ver_compras');
 
     const [activeTab, setActiveTab] = useState(
@@ -660,80 +663,49 @@ export default function HistorialCreditoModal({ client, onClose, token, initialT
         }
     };
 
-    const handlePrintPurchasesReport = () => {
+    const handlePrintPurchasesReport = async () => {
         if (!analytics) return;
-        const rangeLabel = (startDate || endDate)
-            ? `Desde ${startDate || 'Inicio'} hasta ${endDate || 'Hoy'}`
-            : 'Historial Completo';
+        const tId = toast.loading('Generando Reporte de Compras PDF...');
+        try {
+            const rangeLabel = (startDate || endDate)
+                ? `Período: ${startDate || 'Inicio'} al ${endDate || 'Hoy'}`
+                : 'Historial Completo';
 
-        const rowsHtml = filteredCompras.map(c => {
-            const prodHtml = (c.productos || []).map(p =>
-                `<div style="font-size:8.5pt;color:#333;padding-left:8px;">• ${p.cantidad}x ${p.nombre} (${formatCurrency(p.precio_unitario)}) = <strong>${formatCurrency(p.subtotal)}</strong></div>`
-            ).join('');
-            return `
-              <tr>
-                <td style="padding:6px;border-bottom:1px solid #ddd;">#${c.id_venta}<br/><small>${fmtDateTime(c.fecha)}</small></td>
-                <td style="padding:6px;border-bottom:1px solid #ddd;"><strong>${c.tipo_venta}</strong><br/><small>${c.metodo_pago}${c.referencia ? ' (' + c.referencia + ')' : ''}</small></td>
-                <td style="padding:6px;border-bottom:1px solid #ddd;">${prodHtml || '<em>Sin detalle de productos</em>'}</td>
-                <td style="padding:6px;border-bottom:1px solid #ddd;text-align:right;font-weight:800;">${formatCurrency(c.total_venta)}</td>
-              </tr>
-            `;
-        }).join('');
+            let logoUrl = new URL('/icons/logo.png', window.location.origin).toString();
+            if (settings?.empresa_logo_url) {
+                if (settings.empresa_logo_url.startsWith('http')) {
+                    logoUrl = settings.empresa_logo_url;
+                } else {
+                    let cleanUrl = settings.empresa_logo_url;
+                    if (cleanUrl.startsWith('/uploads')) cleanUrl = '/api' + cleanUrl;
+                    else if (cleanUrl.startsWith('uploads')) cleanUrl = '/api/' + cleanUrl;
+                    const base = (import.meta.env.VITE_API_URL || 'https://sistema.multirepuestosrg.com/api').replace(/\/api$/, '');
+                    logoUrl = `${base}${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`;
+                }
+            }
 
-        const w = window.open('', '_blank', 'width=900,height=700');
-        if (!w) return;
-        w.document.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>Reporte de Compras - ${client.nombre}</title>
-              <style>
-                body { font-family: 'Inter', Arial, sans-serif; padding: 20px; color: #111; }
-                h1 { margin: 0 0 4px; font-size: 18pt; }
-                .meta { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #111; display: flex; justify-content: space-between; }
-                .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
-                .kpi { border: 1px solid #ccc; border-radius: 8px; padding: 10px; }
-                .kpi small { display: block; font-size: 8pt; text-transform: uppercase; color: #555; }
-                .kpi strong { font-size: 13pt; }
-                table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
-                th { border-bottom: 2px solid #111; text-align: left; padding: 8px 6px; background: #f1f5f9; }
-              </style>
-            </head>
-            <body>
-              <div class="meta">
-                <div>
-                  <h1>REPORTE DE COMPRAS DE CLIENTE</h1>
-                  <div><strong>Cliente:</strong> ${client.nombre} (ID #${client.id_cliente})</div>
-                  <div><strong>Teléfono:</strong> ${client.telefono || 'N/A'} | <strong>Período:</strong> ${rangeLabel}</div>
-                </div>
-                <div style="text-align:right;">
-                  <div><strong>Emitido:</strong> ${new Date().toLocaleString('es-NI')}</div>
-                  <div><strong>Saldo Pendiente Actual:</strong> ${formatCurrency(client.saldo_pendiente)}</div>
-                </div>
-              </div>
-              <div class="kpis">
-                <div class="kpi"><small>Total Histórico</small><strong>${formatCurrency(kpis.total_historico)}</strong></div>
-                <div class="kpi"><small>Comprado Este Año</small><strong>${formatCurrency(kpis.total_anio)}</strong></div>
-                <div class="kpi"><small>Comprado Esta Semana</small><strong>${formatCurrency(kpis.total_semana)}</strong></div>
-                <div class="kpi"><small>Total en Rango Filtrado</small><strong>${formatCurrency(kpis.rango?.total_comprado)}</strong></div>
-              </div>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Factura / Fecha</th>
-                    <th>Tipo / Método</th>
-                    <th>Productos Comprados</th>
-                    <th style="text-align:right;">Total</th>
-                  </tr>
-                </thead>
-                <tbody>${rowsHtml}</tbody>
-              </table>
-            </body>
-          </html>
-        `);
-        w.document.close();
-        w.focus();
-        setTimeout(() => w.print(), 350);
+            const companyInfo = {
+                name: settings?.empresa_nombre || 'Multirepuestos RG',
+                ruc: settings?.empresa_ruc || '1211812770001E',
+                phone: settings?.empresa_telefono || '84031936 / 84058142',
+                address: settings?.empresa_direccion || 'Del portón de la normal 75 varas al este. Juigalpa, Chontales.',
+                logo: logoUrl
+            };
+
+            const fileName = await generatePurchasesReportPDF({
+                companyInfo,
+                cliente: analytics.cliente || client,
+                kpis,
+                compras: filteredCompras,
+                periodLabel: rangeLabel
+            });
+            toast.dismiss(tId);
+            toast.success(`PDF generado: ${fileName}`);
+        } catch (err) {
+            toast.dismiss(tId);
+            console.error('Error generando PDF de compras:', err);
+            toast.error('No se pudo generar el PDF de compras.');
+        }
     };
 
     const reprintAbonoReceipt = (abono) => {
@@ -934,7 +906,7 @@ export default function HistorialCreditoModal({ client, onClose, token, initialT
                                 onClick={() => handlePrint('DEBT')}
                                 disabled={isFetchingStatement}
                             >
-                                <FaCreditCard /> Solo Deudas
+                                <FaCreditCard /> Facturas Pendientes
                             </ActionBtn>
                             <ActionBtn
                                 $bg="#ecfdf5"
@@ -955,7 +927,7 @@ export default function HistorialCreditoModal({ client, onClose, token, initialT
                                 onClick={handlePrintPurchasesReport}
                                 disabled={loading}
                             >
-                                <FaPrint /> Imprimir Reporte de Compras
+                                <FaFilePdf /> Reporte Compras PDF
                             </ActionBtn>
                         )}
                     </HeaderToolbar>

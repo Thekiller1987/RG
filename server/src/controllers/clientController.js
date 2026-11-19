@@ -364,7 +364,7 @@ const getCreditosPendientes = async (req, res) => {
     }
 };
 
-// NUEVO: Estado de Cuenta (Account Statement) — CON PRODUCTOS Y MÉTODOS DE ABONO
+// NUEVO: Estado de Cuenta (Account Statement) — CON FACTURAS PENDIENTES EXACTAS, CICLO ACTUAL, PRODUCTOS Y CUADRE AL CENTAVO
 const getAccountStatement = async (req, res) => {
     const { id } = req.params;
     try {
@@ -372,6 +372,7 @@ const getAccountStatement = async (req, res) => {
         const [clientRows] = await pool.query('SELECT * FROM clientes WHERE id_cliente = ?', [id]);
         if (clientRows.length === 0) return res.status(404).json({ message: 'Cliente no encontrado' });
         const client = clientRows[0];
+        const saldoPendienteDB = parseFloat(Number(client.saldo_pendiente || 0).toFixed(2));
 
         // 2. Get All relevant transactions (Créditos, Abonos, Devoluciones de Crédito)
         const [sales] = await pool.query(`
@@ -385,10 +386,26 @@ const getAccountStatement = async (req, res) => {
             ORDER BY v.fecha ASC, v.id_venta ASC
         `, [id]);
 
-        // 3. Get product details for ALL credit sales in one query
-        const creditSaleIds = sales
-            .filter(s => s.tipo_venta === 'CREDITO' && s.estado !== 'ABONO_CREDITO')
-            .map(s => s.id_venta);
+        // 3. Get pending credit rows from creditos_cliente
+        const [ccRows] = await pool.query(`
+            SELECT cc.id, cc.id_venta, cc.monto_original, cc.saldo_restante, cc.fecha, cc.estado,
+                   COALESCE(u.nombre_usuario, 'Sistema') AS usuario
+            FROM creditos_cliente cc
+            LEFT JOIN ventas v ON cc.id_venta = v.id_venta
+            LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
+            WHERE cc.id_cliente = ? AND cc.saldo_restante > 0
+            ORDER BY cc.fecha ASC, cc.id_venta ASC
+        `, [id]);
+
+        // 4. Get product details for ALL credit sales + pending invoices in one query
+        const allCreditSaleIdsSet = new Set();
+        sales.forEach(s => {
+            if (s.tipo_venta === 'CREDITO' && s.estado !== 'ABONO_CREDITO') {
+                allCreditSaleIdsSet.add(s.id_venta);
+            }
+        });
+        ccRows.forEach(r => { if (r.id_venta) allCreditSaleIdsSet.add(r.id_venta); });
+        const creditSaleIds = Array.from(allCreditSaleIdsSet);
 
         let productsMap = {};
         if (creditSaleIds.length > 0) {
@@ -399,7 +416,7 @@ const getAccountStatement = async (req, res) => {
                 FROM detalle_ventas dv
                 LEFT JOIN productos p ON dv.id_producto = p.id_producto
                 WHERE dv.id_venta IN (?)
-                ORDER BY dv.id_venta, dv.id_producto
+                ORDER BY dv.id_venta, dv.id_detalle
             `, [creditSaleIds]);
 
             productRows.forEach(row => {
@@ -414,10 +431,12 @@ const getAccountStatement = async (req, res) => {
             });
         }
 
+        // 5. Build complete chronological ledger
         let runningBalance = 0;
         let totalCreditos = 0;
         let totalAbonos = 0;
         let totalDevoluciones = 0;
+        let lastZeroIndex = -1;
         const ledger = [];
 
         sales.forEach(sale => {
@@ -440,15 +459,16 @@ const getAccountStatement = async (req, res) => {
                 creditImpact = -abonoAbs;
                 totalAbonos += abonoAbs;
                 type = 'ABONO';
-                const metodoLabel = metodo === 'Efectivo' ? 'Contado/Efectivo' : metodo;
-                description = `Abono #${sale.id_venta} [${metodoLabel}] → ${destino}${pd.referencia ? ` (Ref: ${pd.referencia})` : ''}`;
+                const metodoLabel = metodo === 'Efectivo' ? 'Contado / Efectivo' : metodo;
+                description = `Abono #${sale.id_venta} (${metodoLabel}) · ${destino}${pd.referencia ? ` · Ref: ${pd.referencia}` : ''}`;
             } else if (sale.estado === 'DEVOLUCION') {
                 const creditoDevuelto = Number(pd.credito || 0);
-                if (creditoDevuelto < 0) {
-                    creditImpact = creditoDevuelto;
-                    totalDevoluciones += Math.abs(creditoDevuelto);
+                if (creditoDevuelto !== 0) {
+                    const devAbs = Math.abs(creditoDevuelto);
+                    creditImpact = -devAbs;
+                    totalDevoluciones += devAbs;
                     type = 'DEVOLUCION';
-                    description = pd.nota || `Devolución Ticket #${pd.originalSaleId || sale.id_venta}`;
+                    description = pd.nota || `Devolución s/ Crédito Ticket #${pd.originalSaleId || sale.id_venta}`;
                 } else {
                     return;
                 }
@@ -465,38 +485,111 @@ const getAccountStatement = async (req, res) => {
             }
 
             if (creditImpact !== 0) {
-                runningBalance = Math.max(0, runningBalance + creditImpact);
+                runningBalance = parseFloat(Math.max(0, runningBalance + creditImpact).toFixed(2));
                 ledger.push({
                     id_venta: sale.id_venta,
                     fecha: sale.fecha,
                     tipo: type,
                     metodo,
                     destino,
+                    referencia: pd.referencia || '',
                     usuario: sale.usuario,
                     descripcion: description,
-                    monto: Math.abs(creditImpact),
-                    impacto: creditImpact,
+                    monto: parseFloat(Math.abs(creditImpact).toFixed(2)),
+                    impacto: parseFloat(creditImpact.toFixed(2)),
                     saldo: runningBalance,
                     pagoDetalles: pd,
                     productos: productsMap[sale.id_venta] || null
                 });
+                if (runningBalance <= 0.005) {
+                    lastZeroIndex = ledger.length - 1;
+                }
             }
         });
+
+        // 6. Construir listado exacto de FACTURAS PENDIENTES que cuadre 100% con saldoPendienteDB
+        let facturasPendientes = [];
+        if (saldoPendienteDB > 0) {
+            if (ccRows.length > 0) {
+                facturasPendientes = ccRows.map(r => {
+                    const orig = parseFloat(Number(r.monto_original || 0).toFixed(2));
+                    const rest = parseFloat(Number(r.saldo_restante || 0).toFixed(2));
+                    return {
+                        id_venta: r.id_venta,
+                        fecha: r.fecha,
+                        usuario: r.usuario,
+                        monto_original: orig,
+                        abonado: parseFloat(Math.max(0, orig - rest).toFixed(2)),
+                        saldo_pendiente: rest,
+                        estado: rest < orig ? 'ABONO PARCIAL' : 'PENDIENTE',
+                        productos: productsMap[r.id_venta] || []
+                    };
+                });
+
+                // Conciliar si hay diferencia histórica (ej. devolución/ajuste antiguo) para que cuadre al centavo
+                const sumCC = parseFloat(facturasPendientes.reduce((s, f) => s + f.saldo_pendiente, 0).toFixed(2));
+                if (sumCC > saldoPendienteDB + 0.01) {
+                    let excess = parseFloat((sumCC - saldoPendienteDB).toFixed(2));
+                    facturasPendientes = facturasPendientes.map(f => {
+                        if (excess <= 0) return f;
+                        const reduce = Math.min(excess, f.saldo_pendiente);
+                        excess = parseFloat((excess - reduce).toFixed(2));
+                        const newRest = parseFloat((f.saldo_pendiente - reduce).toFixed(2));
+                        return {
+                            ...f,
+                            abonado: parseFloat((f.monto_original - newRest).toFixed(2)),
+                            saldo_pendiente: newRest,
+                            estado: newRest < f.monto_original ? 'ABONO PARCIAL' : 'PENDIENTE'
+                        };
+                    }).filter(f => f.saldo_pendiente > 0.005);
+                }
+            } else {
+                // Fallback FIFO inverso si un cliente antiguo no tenía filas en creditos_cliente
+                let remaining = saldoPendienteDB;
+                const creditEntries = [...ledger].filter(l => l.tipo === 'CREDITO').reverse();
+                for (const c of creditEntries) {
+                    if (remaining <= 0.005) break;
+                    const part = Math.min(remaining, c.monto);
+                    facturasPendientes.unshift({
+                        id_venta: c.id_venta,
+                        fecha: c.fecha,
+                        usuario: c.usuario,
+                        monto_original: c.monto,
+                        abonado: parseFloat((c.monto - part).toFixed(2)),
+                        saldo_pendiente: parseFloat(part.toFixed(2)),
+                        estado: part < c.monto ? 'ABONO PARCIAL' : 'PENDIENTE',
+                        productos: c.productos || []
+                    });
+                    remaining = parseFloat((remaining - part).toFixed(2));
+                }
+            }
+        }
+
+        // 7. Construir el CICLO ACTUAL (movimientos posteriores al último saldo en C$0.00)
+        const cicloActual = lastZeroIndex >= 0
+            ? ledger.slice(lastZeroIndex + 1)
+            : ledger;
+
+        const ajusteConciliacion = parseFloat((saldoPendienteDB - runningBalance).toFixed(2));
 
         const response = {
             cliente: {
                 id: client.id_cliente,
                 nombre: client.nombre,
                 cedula: client.cedula || '',
-                telefono: client.telefono,
-                direccion: client.direccion,
-                limite_credito: client.limite_credito,
-                saldo_pendiente_db: Number(client.saldo_pendiente || 0),
-                saldo_calculado: parseFloat(runningBalance.toFixed(2)),
+                telefono: client.telefono || '',
+                direccion: client.direccion || '',
+                tipo_cliente: client.tipo_cliente || 'General',
+                limite_credito: client.limite_credito !== null ? Number(client.limite_credito) : null,
+                saldo_pendiente_db: saldoPendienteDB,
+                saldo_calculado: runningBalance,
+                ajuste_conciliacion: ajusteConciliacion,
                 total_creditos: parseFloat(totalCreditos.toFixed(2)),
                 total_abonos: parseFloat(totalAbonos.toFixed(2)),
                 total_devoluciones: parseFloat(totalDevoluciones.toFixed(2))
             },
+            facturas_pendientes: facturasPendientes,
+            ciclo_actual: cicloActual,
             historial: ledger
         };
 
