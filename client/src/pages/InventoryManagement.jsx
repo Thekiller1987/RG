@@ -500,37 +500,314 @@ const ConfirmDialog = ({ open, onCancel, onConfirm, title, message, confirmLabel
   );
 };
 
-const ManagementModal = ({ title, items, onAdd, onDelete, onClose }) => {
+const ManagementModal = ({ title, items, onAdd, onEdit, onDelete, onClose }) => {
   const [newItem, setNewItem] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editingName, setEditingName] = useState('');
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (newItem.trim()) {
-      onAdd(newItem);
+      onAdd(newItem.trim());
       setNewItem('');
     }
   };
+
+  const startEdit = (id, currentName) => {
+    setEditingId(id);
+    setEditingName(currentName || '');
+  };
+
+  const saveEdit = async (id) => {
+    if (!editingName.trim()) return;
+    if (onEdit) {
+      await onEdit(id, editingName.trim());
+    }
+    setEditingId(null);
+    setEditingName('');
+  };
+
   return (
     <ModalOverlay onClick={onClose}>
-      <ModalContent onClick={e => e.stopPropagation()}>
-        <ModalTitle>{title}</ModalTitle>
+      <ModalContent onClick={e => e.stopPropagation()} style={{ maxWidth: '540px' }}>
+        <ModalTitle><FaTags style={{ color: '#3b82f6' }} /> {title}</ModalTitle>
         <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-          <Input value={newItem} onChange={e => setNewItem(e.target.value)} placeholder="Nuevo nombre..." style={{ flex: 1 }} />
+          <Input value={newItem} onChange={e => setNewItem(e.target.value)} placeholder="Nombre de la nueva categoría..." style={{ flex: 1 }} />
           <SaveButton type="submit"><FaPlus /> Agregar</SaveButton>
         </form>
-        <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ maxHeight: '340px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {(Array.isArray(items) ? items : []).map((item, idx) => {
-            // Detectar si es categoría o proveedor
             const id = item.id_categoria || item.id_proveedor || idx;
             const nombre = item.nombre;
+            const isEditing = editingId === id;
+
             return (
-              <div key={id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', background: '#f7fafc', borderRadius: '8px', alignItems: 'center' }}>
-                <span>{nombre}</span>
-                <button onClick={() => onDelete(id)} style={{ color: '#e53e3e', background: 'none', border: 'none', cursor: 'pointer' }}><FaTrash /></button>
+              <div key={id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', alignItems: 'center', gap: '10px' }}>
+                {isEditing ? (
+                  <>
+                    <Input
+                      value={editingName}
+                      onChange={e => setEditingName(e.target.value)}
+                      style={{ flex: 1, padding: '6px 10px' }}
+                      autoFocus
+                    />
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <ActionButton className="edit" type="button" onClick={() => saveEdit(id)} style={{ flex: 'none', padding: '6px 12px' }}>
+                        Guardar
+                      </ActionButton>
+                      <ActionButton className="adjust" type="button" onClick={() => setEditingId(null)} style={{ flex: 'none', padding: '6px 10px' }}>
+                        Cancelar
+                      </ActionButton>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontWeight: 600, color: '#1e293b' }}>{nombre}</span>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <ActionButton
+                        className="edit"
+                        type="button"
+                        onClick={() => startEdit(id, nombre)}
+                        style={{ flex: 'none', padding: '6px 12px' }}
+                        title="Editar categoría"
+                      >
+                        <FaEdit /> Editar
+                      </ActionButton>
+                      <ActionButton
+                        className="delete"
+                        type="button"
+                        onClick={() => onDelete(id)}
+                        style={{ flex: 'none', padding: '6px 10px' }}
+                        title="Eliminar categoría"
+                      >
+                        <FaTrash />
+                      </ActionButton>
+                    </div>
+                  </>
+                )}
               </div>
             );
           })}
-          {(!Array.isArray(items) || items.length === 0) && <p style={{ textAlign: 'center', color: '#a0aec0' }}>No hay elementos registrados.</p>}
+          {(!Array.isArray(items) || items.length === 0) && <p style={{ textAlign: 'center', color: '#94a3b8' }}>No hay categorías registradas.</p>}
         </div>
+        <ModalActions>
+          <CancelButton onClick={onClose}>Cerrar</CancelButton>
+        </ModalActions>
+      </ModalContent>
+    </ModalOverlay>
+  );
+};
+
+const ProvidersManagementModal = ({ providers, onAdd, onEdit, onDelete, onClose }) => {
+  const emptyForm = {
+    nombre: '',
+    ruc: '',
+    telefono: '',
+    correo: '',
+    encargado_zona: '',
+    telefono_encargado: '',
+    zona: '',
+    direccion: '',
+    notas: ''
+  };
+  const [formData, setFormData] = useState(emptyForm);
+  const [editingProviderId, setEditingProviderId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleStartEdit = (prov) => {
+    setEditingProviderId(prov.id_proveedor);
+    setFormData({
+      nombre: prov.nombre || '',
+      ruc: prov.ruc || '',
+      telefono: prov.telefono || '',
+      correo: prov.correo || '',
+      encargado_zona: prov.encargado_zona || '',
+      telefono_encargado: prov.telefono_encargado || '',
+      zona: prov.zona || '',
+      direccion: prov.direccion || '',
+      notas: prov.notas || ''
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingProviderId(null);
+    setFormData(emptyForm);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.nombre.trim()) return;
+    if (editingProviderId) {
+      await onEdit(editingProviderId, formData);
+    } else {
+      await onAdd(formData);
+    }
+    setEditingProviderId(null);
+    setFormData(emptyForm);
+  };
+
+  const filteredProviders = (Array.isArray(providers) ? providers : []).filter(p => {
+    if (!searchTerm.trim()) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (p.nombre || '').toLowerCase().includes(q) ||
+      (p.ruc || '').toLowerCase().includes(q) ||
+      (p.encargado_zona || '').toLowerCase().includes(q) ||
+      (p.zona || '').toLowerCase().includes(q) ||
+      (p.telefono || '').toLowerCase().includes(q) ||
+      (p.correo || '').toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <ModalOverlay onClick={onClose}>
+      <ModalContent onClick={e => e.stopPropagation()} $large>
+        <ModalTitle>
+          <FaTruck style={{ color: '#3b82f6' }} /> Gestionar Proveedores
+        </ModalTitle>
+
+        <form onSubmit={handleSubmit} style={{ background: '#f8fafc', padding: '1.15rem', borderRadius: '14px', border: '1px solid #e2e8f0', marginBottom: '1.25rem' }}>
+          <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#1e293b', marginBottom: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>{editingProviderId ? '✏️ Editando Proveedor' : '➕ Registrar Nuevo Proveedor'}</span>
+            {editingProviderId && (
+              <CancelButton type="button" onClick={handleCancelEdit} style={{ padding: '4px 12px', fontSize: '0.8rem' }}>
+                Cancelar Edición
+              </CancelButton>
+            )}
+          </div>
+
+          <InputGrid style={{ marginBottom: '0.85rem' }}>
+            <FormGroup>
+              <Label>Nombre de Empresa / Proveedor *</Label>
+              <Input name="nombre" value={formData.nombre} onChange={handleChange} placeholder="Ej: Repuestos Del Norte S.A." required />
+            </FormGroup>
+            <FormGroup>
+              <Label>RUC / Identificación Fiscal</Label>
+              <Input name="ruc" value={formData.ruc} onChange={handleChange} placeholder="Ej: J0310000000000" />
+            </FormGroup>
+            <FormGroup>
+              <Label>Teléfonos Empresa</Label>
+              <Input name="telefono" value={formData.telefono} onChange={handleChange} placeholder="Ej: 2222-3333 / 8888-9999" />
+            </FormGroup>
+            <FormGroup>
+              <Label>Correo Electrónico</Label>
+              <Input type="email" name="correo" value={formData.correo} onChange={handleChange} placeholder="ventas@proveedor.com" />
+            </FormGroup>
+            <FormGroup>
+              <Label>Encargado de Zona / Vendedor</Label>
+              <Input name="encargado_zona" value={formData.encargado_zona} onChange={handleChange} placeholder="Nombre del agente / encargado" />
+            </FormGroup>
+            <FormGroup>
+              <Label>Teléfono Encargado de Zona</Label>
+              <Input name="telefono_encargado" value={formData.telefono_encargado} onChange={handleChange} placeholder="Celular / WhatsApp del encargado" />
+            </FormGroup>
+            <FormGroup>
+              <Label>Zona / Ruta de Cobertura</Label>
+              <Input name="zona" value={formData.zona} onChange={handleChange} placeholder="Ej: Zona Central / Chontales / Managua" />
+            </FormGroup>
+            <FormGroup>
+              <Label>Dirección</Label>
+              <Input name="direccion" value={formData.direccion} onChange={handleChange} placeholder="Dirección física del proveedor" />
+            </FormGroup>
+            <FormGroup>
+              <Label>Notas / Condiciones</Label>
+              <Input name="notas" value={formData.notas} onChange={handleChange} placeholder="Días de visita, crédito, observaciones..." />
+            </FormGroup>
+          </InputGrid>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+            {editingProviderId && (
+              <CancelButton type="button" onClick={handleCancelEdit}>Cancelar</CancelButton>
+            )}
+            <SaveButton type="submit">
+              {editingProviderId ? <><FaEdit /> Guardar Cambios</> : <><FaPlus /> Agregar Proveedor</>}
+            </SaveButton>
+          </div>
+        </form>
+
+        <div style={{ marginBottom: '0.85rem' }}>
+          <Input
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Buscar proveedor por nombre, RUC, encargado de zona, teléfono o correo..."
+          />
+        </div>
+
+        <div style={{ maxHeight: '340px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {filteredProviders.map((prov) => (
+            <div
+              key={prov.id_proveedor}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                flexWrap: 'wrap',
+                gap: '12px',
+                padding: '12px 14px',
+                background: editingProviderId === prov.id_proveedor ? '#eff6ff' : '#f8fafc',
+                border: `1px solid ${editingProviderId === prov.id_proveedor ? '#93c5fd' : '#e2e8f0'}`,
+                borderRadius: '12px'
+              }}
+            >
+              <div style={{ flex: 1, minWidth: '240px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{prov.nombre}</strong>
+                  {prov.ruc && (
+                    <span style={{ fontSize: '0.75rem', background: '#e2e8f0', color: '#334155', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                      RUC: {prov.ruc}
+                    </span>
+                  )}
+                  {prov.zona && (
+                    <span style={{ fontSize: '0.75rem', background: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                      Zona: {prov.zona}
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '6px', fontSize: '0.82rem', color: '#475569' }}>
+                  {prov.telefono && <span>📞 <strong>Tel:</strong> {prov.telefono}</span>}
+                  {prov.correo && <span>✉️ <strong>Correo:</strong> {prov.correo}</span>}
+                  {prov.encargado_zona && (
+                    <span>
+                      👤 <strong>Encargado de Zona:</strong> {prov.encargado_zona}
+                      {prov.telefono_encargado ? ` (${prov.telefono_encargado})` : ''}
+                    </span>
+                  )}
+                  {prov.direccion && <span>📍 <strong>Dir:</strong> {prov.direccion}</span>}
+                  {prov.notas && <span>📝 <strong>Notas:</strong> {prov.notas}</span>}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <ActionButton
+                  className="edit"
+                  type="button"
+                  onClick={() => handleStartEdit(prov)}
+                  style={{ flex: 'none', padding: '7px 14px' }}
+                >
+                  <FaEdit /> Editar
+                </ActionButton>
+                <ActionButton
+                  className="delete"
+                  type="button"
+                  onClick={() => onDelete(prov.id_proveedor)}
+                  style={{ flex: 'none', padding: '7px 12px' }}
+                >
+                  <FaTrash /> Eliminar
+                </ActionButton>
+              </div>
+            </div>
+          ))}
+          {filteredProviders.length === 0 && (
+            <p style={{ textAlign: 'center', color: '#94a3b8', padding: '1rem' }}>No se encontraron proveedores.</p>
+          )}
+        </div>
+
         <ModalActions>
           <CancelButton onClick={onClose}>Cerrar</CancelButton>
         </ModalActions>
@@ -1286,6 +1563,15 @@ const InventoryManagement = () => {
       showAlert({ title: 'Error', message: error.response?.data?.msg || 'No se pudo agregar la categoría.' });
     }
   };
+  const handleUpdateCategory = async (id, name) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(`${API_URL}/categories/${id}`, { nombre: name }, { headers: { Authorization: `Bearer ${token}` } });
+      await fetchData();
+    } catch (error) {
+      showAlert({ title: 'Error', message: error.response?.data?.msg || 'No se pudo actualizar la categoría.' });
+    }
+  };
   const handleDeleteCategory = async (id) => {
     try {
       const token = localStorage.getItem('token');
@@ -1295,13 +1581,23 @@ const InventoryManagement = () => {
       showAlert({ title: 'Error', message: error.response?.data?.msg || 'No se pudo eliminar la categoría. (Verifique que no esté en uso)' });
     }
   };
-  const handleAddProvider = async (name) => {
+  const handleAddProvider = async (providerPayload) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`${API_URL}/providers`, { nombre: name }, { headers: { Authorization: `Bearer ${token}` } });
+      const body = typeof providerPayload === 'string' ? { nombre: providerPayload } : providerPayload;
+      await axios.post(`${API_URL}/providers`, body, { headers: { Authorization: `Bearer ${token}` } });
       await fetchData();
     } catch (error) {
       showAlert({ title: 'Error', message: error.response?.data?.msg || 'No se pudo agregar el proveedor.' });
+    }
+  };
+  const handleUpdateProvider = async (id, providerPayload) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(`${API_URL}/providers/${id}`, providerPayload, { headers: { Authorization: `Bearer ${token}` } });
+      await fetchData();
+    } catch (error) {
+      showAlert({ title: 'Error', message: error.response?.data?.msg || 'No se pudo actualizar el proveedor.' });
     }
   };
   const handleDeleteProvider = async (id) => {
@@ -1577,12 +1873,25 @@ const InventoryManagement = () => {
       </AnimatePresence>
       <AnimatePresence>
         {isCategoryModalOpen && (
-          <ManagementModal title="Gestionar Categorías" items={categories} onAdd={handleAddCategory} onDelete={handleDeleteCategory} onClose={() => setIsCategoryModalOpen(false)} />
+          <ManagementModal
+            title="Gestionar Categorías"
+            items={categories}
+            onAdd={handleAddCategory}
+            onEdit={handleUpdateCategory}
+            onDelete={handleDeleteCategory}
+            onClose={() => setIsCategoryModalOpen(false)}
+          />
         )}
       </AnimatePresence>
       <AnimatePresence>
         {isProviderModalOpen && (
-          <ManagementModal title="Gestionar Proveedores" items={providers} onAdd={handleAddProvider} onDelete={handleDeleteProvider} onClose={() => setIsProviderModalOpen(false)} />
+          <ProvidersManagementModal
+            providers={providers}
+            onAdd={handleAddProvider}
+            onEdit={handleUpdateProvider}
+            onDelete={handleDeleteProvider}
+            onClose={() => setIsProviderModalOpen(false)}
+          />
         )}
       </AnimatePresence>
       <AnimatePresence>

@@ -35,6 +35,7 @@ export const PERMISSIONS_CATALOG = [
 
   // 5. Clientes, Créditos, Proveedores y Solicitudes
   { key: 'clientes_creditos.ver', category: 'Clientes, Créditos y Proveedores', label: 'Ver módulo Clientes y Créditos', description: 'Permite consultar cartera de clientes y estados de cuenta' },
+  { key: 'clientes.ver_compras', category: 'Clientes, Créditos y Proveedores', label: 'Ver cuánto nos ha comprado el cliente (Total / Año / Semanal / Por Fechas)', description: 'Permite ver el volumen total comprado por cada cliente y su detalle de compras por fechas' },
   { key: 'clientes.crear_editar', category: 'Clientes, Créditos y Proveedores', label: 'Crear y editar clientes / límites de crédito', description: 'Permite dar de alta clientes y modificar sus datos o cupo' },
   { key: 'clientes.registrar_abono', category: 'Clientes, Créditos y Proveedores', label: 'Registrar abonos de clientes', description: 'Permite cobrar y aplicar abonos a cuentas por cobrar' },
   { key: 'clientes.anular_abono', category: 'Clientes, Créditos y Proveedores', label: 'Anular abonos registrados', description: 'Permite revertir un abono aplicado a un cliente' },
@@ -52,11 +53,11 @@ export const PERMISSIONS_CATALOG = [
   { key: 'configuracion.acceso', category: 'Finanzas, Reportes y Administración', label: 'Modificar Configuración del Negocio', description: 'Permite editar datos de empresa, RUC, teléfonos y formato de ticket' },
   { key: 'ia_asistente.acceso', category: 'Finanzas, Reportes y Administración', label: 'Usar Asistente de Inteligencia Artificial (ADA)', description: 'Permite abrir y consultar el asistente flotante de IA' },
 
-  // 7. Planilla, Nómina y Comisiones por Ganancia (Exclusivo Dueño / Usuarios Especiales)
-  { key: 'planilla.acceso', category: 'Planilla y Comisiones (Especial / Dueño)', label: 'Acceder a Planilla y Pago por Comisiones', description: 'Acceso exclusivo para ver cálculos de nómina y comisiones de empleados' },
-  { key: 'planilla.ver_ganancias', category: 'Planilla y Comisiones (Especial / Dueño)', label: 'Ver ganancia real generada por cada vendedor', description: 'Permite ver costos vs precios de venta y utilidad neta por empleado' },
-  { key: 'planilla.reglas_comision', category: 'Planilla y Comisiones (Especial / Dueño)', label: 'Configurar salarios y reglas de comisión sobre ganancia', description: 'Permite definir porcentajes sobre ganancia, metas mínimas, márgenes y bonos' },
-  { key: 'planilla.liquidar_pagos', category: 'Planilla y Comisiones (Especial / Dueño)', label: 'Registrar pagos de planilla, vales y colillas', description: 'Permite liquidar comisiones, aplicar deducciones/adelantos e imprimir colillas' }
+  // 7. Planilla, Nómina y Comisiones
+  { key: 'planilla.acceso', category: 'Planilla y Comisiones', label: 'Acceder a Planilla y Pago por Comisiones', description: 'Permite ver cálculos de nómina y comisiones de empleados' },
+  { key: 'planilla.ver_ganancias', category: 'Planilla y Comisiones', label: 'Ver ganancia real generada por cada vendedor', description: 'Permite ver costos vs precios de venta y utilidad neta por empleado' },
+  { key: 'planilla.reglas_comision', category: 'Planilla y Comisiones', label: 'Configurar salarios y reglas de comisión sobre ganancia', description: 'Permite definir porcentajes sobre ganancia, metas mínimas, márgenes y bonos' },
+  { key: 'planilla.liquidar_pagos', category: 'Planilla y Comisiones', label: 'Registrar pagos de planilla, vales y colillas', description: 'Permite liquidar comisiones, aplicar deducciones/adelantos e imprimir colillas' }
 ];
 
 /**
@@ -126,7 +127,7 @@ export const SYSTEM_MODULES_MAP = [
     route: '/credits',
     accessKey: 'clientes_creditos.ver',
     color: '#0284c7',
-    functions: ['clientes_creditos.ver', 'clientes.crear_editar', 'clientes.registrar_abono', 'clientes.anular_abono', 'clientes.eliminar']
+    functions: ['clientes_creditos.ver', 'clientes.ver_compras', 'clientes.crear_editar', 'clientes.registrar_abono', 'clientes.anular_abono', 'clientes.eliminar']
   },
   {
     id: 'proveedores',

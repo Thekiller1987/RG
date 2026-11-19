@@ -30,112 +30,115 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { API_URL } from '../service/api';
 
 const PageWrapper = styled.div`
-  padding: clamp(1rem, 3vw, 2.2rem);
-  background: #f1f5f9;
+  padding: 20px;
+  background-color: #f8fafc;
   min-height: 100vh;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  @media(max-width: 640px) {
+    padding: 10px;
+  }
 `;
 
 const Container = styled.div`
-  max-width: 1380px;
+  max-width: 1400px;
   margin: 0 auto;
-`;
-
-const TopNav = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1.3rem;
 `;
 
 const BackButton = styled(Link)`
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 8px;
+  color: #64748b;
   text-decoration: none;
-  color: #334155;
-  font-weight: 700;
-  font-size: 0.92rem;
-  background: #ffffff;
-  padding: 0.6rem 1.1rem;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
-  transition: all 0.18s;
-
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 8px 12px;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  transition: all 0.2s;
   &:hover {
-    color: #0f766e;
-    border-color: #5eead4;
+    color: #3b82f6;
+    background: #eff6ff;
+    transform: translateX(-4px);
   }
 `;
 
-const HeaderBanner = styled.div`
-  background: linear-gradient(135deg, #0f172a 0%, #115e59 55%, #0f766e 100%);
-  color: #ffffff;
-  border-radius: 20px;
-  padding: 1.6rem 2rem;
-  margin-bottom: 1.4rem;
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.18);
+const HeaderContainer = styled.div`
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1.2rem;
-
-  .title-block {
-    h1 {
-      margin: 0;
-      font-size: clamp(1.35rem, 2.5vw, 1.9rem);
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      gap: 0.7rem;
-    }
-    p {
-      margin: 0.4rem 0 0;
-      color: #ccfbf1;
-      font-size: 0.88rem;
-      max-width: 760px;
-      line-height: 1.45;
-    }
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  padding: 1rem 1.5rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  position: sticky;
+  top: 10px;
+  z-index: 40;
+  border: 1px solid rgba(255,255,255,0.5);
+  @media(min-width: 1024px) {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
   }
+`;
+
+const HeaderTitle = styled.h1`
+  font-size: 1.5rem;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  font-weight: 800;
+  svg { color: #3b82f6; }
+`;
+
+const ButtonGroup = styled.div`
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 `;
 
 const TabButton = styled.button`
-  padding: 0.72rem 1.25rem;
-  border-radius: 12px;
-  border: 1px solid ${props => (props.$active ? '#0f766e' : '#cbd5e1')};
-  background: ${props => (props.$active ? '#0f766e' : '#ffffff')};
-  color: ${props => (props.$active ? '#ffffff' : '#334155')};
-  font-weight: 800;
-  font-size: 0.88rem;
+  border: none;
+  padding: 0.65rem 1.2rem;
+  border-radius: 99px;
+  font-weight: 600;
+  font-size: 0.9rem;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  transition: all 0.18s;
-  box-shadow: ${props => (props.$active ? '0 8px 20px rgba(15, 118, 110, 0.25)' : 'none')};
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  background: ${props => (props.$active ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : 'white')};
+  color: ${props => (props.$active ? '#ffffff' : '#475569')};
+  border: 1px solid ${props => (props.$active ? 'transparent' : '#cbd5e1')};
+  &:hover {
+    transform: translateY(-1px);
+  }
 `;
 
 const PrimaryButton = styled.button`
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: #ffffff;
   border: none;
-  padding: 0.75rem 1.25rem;
-  border-radius: 12px;
-  font-weight: 800;
-  font-size: 0.88rem;
+  padding: 0.65rem 1.2rem;
+  border-radius: 99px;
+  font-weight: 600;
+  font-size: 0.9rem;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   transition: all 0.2s;
 
   &:hover {
-    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    transform: translateY(-1px);
   }
 `;
 
@@ -756,57 +759,47 @@ const Empleados = () => {
   return (
     <PageWrapper>
       <Container>
-        <TopNav>
-          <BackButton to="/dashboard">
-            <FaArrowLeft /> Volver al Dashboard
-          </BackButton>
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+        <BackButton to="/dashboard">
+          <FaArrowLeft /> Volver al Dashboard
+        </BackButton>
+
+        <HeaderContainer>
+          <HeaderTitle>
+            <FaUserTie /> Gestión de Empleados y Planilla
+          </HeaderTitle>
+          <ButtonGroup>
+            <PrimaryButton type="button" onClick={openCreateEmpModal}>
+              <FaUserPlus /> Crear Empleado {!canEditRules && '🔒'}
+            </PrimaryButton>
             <TabButton
               type="button"
               $active={activeTab === 'payroll'}
               onClick={() => {
-                if (!requireActionPermission('planilla.acceso', 'Acceder a Planilla y Cálculo de Comisiones (Solo Dueño / Usuarios Especiales)')) return;
+                if (!requireActionPermission('planilla.acceso', 'Acceder a Planilla y Cálculo de Comisiones')) return;
                 setActiveTab('payroll');
               }}
             >
-              <FaMoneyCheckAlt /> Planilla y Comisiones por Ganancia {!canViewPayroll && '🔒'}
+              <FaMoneyCheckAlt /> Planilla y Comisiones {!canViewPayroll && '🔒'}
             </TabButton>
             <TabButton
               type="button"
               $active={activeTab === 'employees'}
               onClick={() => setActiveTab('employees')}
             >
-              <FaUserTie /> Plantilla y Reglas de Comisión ({empleadosList.length})
+              <FaUserTie /> Empleados ({empleadosList.length})
             </TabButton>
             <TabButton
               type="button"
               $active={activeTab === 'history'}
               onClick={() => {
-                if (!requireActionPermission('planilla.acceso', 'Ver Historial de Pagos de Planilla y Colillas')) return;
+                if (!requireActionPermission('planilla.acceso', 'Ver Historial de Pagos de Planilla')) return;
                 setActiveTab('history');
               }}
             >
-              <FaHistory /> Historial de Pagos y Colillas ({payrollData.history?.length || 0}) {!canViewPayroll && '🔒'}
+              <FaHistory /> Historial ({payrollData.history?.length || 0}) {!canViewPayroll && '🔒'}
             </TabButton>
-          </div>
-        </TopNav>
-
-        <HeaderBanner>
-          <div className="title-block">
-            <h1>
-              <FaMoneyCheckAlt color="#5eead4" />
-              Planilla, Nómina y Pago por Comisión sobre Ganancia
-            </h1>
-            <p>
-              Módulo confidencial para el Dueño y Usuarios Especiales. Calcula automáticamente la ganancia real
-              generada por cada vendedor (Precio de Venta menos Costo) y aplica reglas de comisión por margen mínimo,
-              metas de ganancia, escalas y bonos.
-            </p>
-          </div>
-          <PrimaryButton type="button" onClick={openCreateEmpModal}>
-            <FaUserPlus /> + Nuevo Empleado / Regla {!canEditRules && '🔒'}
-          </PrimaryButton>
-        </HeaderBanner>
+          </ButtonGroup>
+        </HeaderContainer>
 
         {activeTab === 'payroll' && canViewPayroll && (
           <>
@@ -852,9 +845,9 @@ const Empleados = () => {
               <KpiCard $color="#059669">
                 <span>Ganancia Neta Generada</span>
                 <strong>
-                  {canViewProfits ? `C$ ${fmt(sum.gananciaTotalGlobal)}` : '🔒 Reservado Dueño'}
+                  {canViewProfits ? `C$ ${fmt(sum.gananciaTotalGlobal)}` : '🔒 Restringido'}
                 </strong>
-                <small>Utilidad real (Venta - Costo de repuestos)</small>
+                <small>Utilidad real (Venta - Costo)</small>
               </KpiCard>
 
               <KpiCard $color="#7c3aed">
@@ -1083,29 +1076,29 @@ const Empleados = () => {
 
         {/* TAB 2: PLANTILLA DE EMPLEADOS Y REGLAS DE COMISIÓN */}
         {activeTab === 'employees' && (
-          <div style={{ background: '#ffffff', borderRadius: 18, border: '1px solid #e2e8f0', overflowX: 'auto' }}>
+          <div style={{ background: '#ffffff', borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
               <thead>
-                <tr style={{ background: '#0f172a', color: '#ffffff', textAlign: 'left', fontSize: '0.76rem', textTransform: 'uppercase' }}>
-                  <th style={{ padding: '0.95rem 1rem' }}>Empleado</th>
-                  <th style={{ padding: '0.95rem 1rem' }}>Usuario Vinculado</th>
-                  <th style={{ padding: '0.95rem 1rem' }}>Salario Base</th>
-                  <th style={{ padding: '0.95rem 1rem' }}>Tipo de Regla</th>
-                  <th style={{ padding: '0.95rem 1rem' }}>% Sobre Ganancia</th>
-                  <th style={{ padding: '0.95rem 1rem' }}>Reglas de Protección</th>
-                  <th style={{ padding: '0.95rem 1rem' }}>Acciones</th>
+                <tr style={{ background: '#f8fafc', color: '#475569', textAlign: 'left', fontSize: '0.78rem', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>
+                  <th style={{ padding: '1rem 1.25rem' }}>Empleado</th>
+                  <th style={{ padding: '1rem 1.25rem' }}>Usuario Vinculado</th>
+                  <th style={{ padding: '1rem 1.25rem' }}>Salario Base</th>
+                  <th style={{ padding: '1rem 1.25rem' }}>Tipo de Regla</th>
+                  <th style={{ padding: '1rem 1.25rem' }}>% Sobre Ganancia</th>
+                  <th style={{ padding: '1rem 1.25rem' }}>Reglas de Comisión</th>
+                  <th style={{ padding: '1rem 1.25rem' }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {empleadosList.map(emp => (
-                  <tr key={emp.id_empleado} style={{ borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem' }}>
-                    <td style={{ padding: '0.9rem 1rem' }}>
-                      <strong>{emp.nombre}</strong>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                  <tr key={emp.id_empleado} style={{ borderBottom: '1px solid #f1f5f9', fontSize: '0.88rem' }}>
+                    <td style={{ padding: '1rem 1.25rem' }}>
+                      <strong style={{ color: '#0f172a' }}>{emp.nombre}</strong>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
                         {emp.cargo} {emp.telefono ? `· 📞 ${emp.telefono}` : ''}
                       </div>
                     </td>
-                    <td style={{ padding: '0.9rem 1rem' }}>
+                    <td style={{ padding: '1rem 1.25rem' }}>
                       {emp.usuario_vinculado_nombre ? (
                         <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '3px 9px', borderRadius: 999, fontWeight: 700, fontSize: '0.76rem' }}>
                           @{emp.usuario_vinculado_nombre}
@@ -1114,18 +1107,18 @@ const Empleados = () => {
                         <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>Sin vincular</span>
                       )}
                     </td>
-                    <td style={{ padding: '0.9rem 1rem', fontWeight: 800 }}>
+                    <td style={{ padding: '1rem 1.25rem', fontWeight: 800 }}>
                       C$ {fmt(emp.salario_base)}
                       <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
                         {emp.frecuencia_pago || 'Quincenal'}
                       </div>
                     </td>
-                    <td style={{ padding: '0.9rem 1rem' }}>
-                      <span style={{ background: '#f0fdfa', color: '#0f766e', padding: '3px 9px', borderRadius: 999, fontWeight: 800, fontSize: '0.74rem' }}>
+                    <td style={{ padding: '1rem 1.25rem' }}>
+                      <span style={{ background: '#f1f5f9', color: '#334155', padding: '3px 9px', borderRadius: 999, fontWeight: 700, fontSize: '0.74rem' }}>
                         {emp.tipo_comision || 'PORCENTAJE_GANANCIA'}
                       </span>
                     </td>
-                    <td style={{ padding: '0.9rem 1rem', fontWeight: 800, color: '#059669' }}>
+                    <td style={{ padding: '1rem 1.25rem', fontWeight: 800, color: '#059669' }}>
                       {Number(emp.porcentaje_comision_ganancia || 0)}% s/ Ganancia
                       {Number(emp.porcentaje_nivel2_ganancia) > 0 && (
                         <div style={{ fontSize: '0.72rem', color: '#7c3aed' }}>
@@ -1133,28 +1126,28 @@ const Empleados = () => {
                         </div>
                       )}
                     </td>
-                    <td style={{ padding: '0.9rem 1rem', fontSize: '0.76rem', color: '#475569' }}>
+                    <td style={{ padding: '1rem 1.25rem', fontSize: '0.78rem', color: '#475569' }}>
                       • Margen mín. producto: <strong>{Number(emp.margen_minimo_producto || 0)}%</strong><br />
                       • Ganancia mín. período: <strong>C$ {fmt(emp.meta_ganancia_minima)}</strong><br />
                       {Number(emp.meta_ganancia_objetivo) > 0 && (
                         <span>• Meta Bono (C$ {fmt(emp.meta_ganancia_objetivo)}): <strong>+C$ {fmt(emp.bono_meta_ganancia)}</strong></span>
                       )}
                     </td>
-                    <td style={{ padding: '0.9rem 1rem' }}>
-                      <div style={{ display: 'flex', gap: 6 }}>
+                    <td style={{ padding: '1rem 1.25rem' }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
                         <button
                           type="button"
                           onClick={() => openEditEmpModal(emp)}
-                          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #0f766e', background: '#f0fdfa', color: '#0f766e', fontWeight: 700, cursor: 'pointer', fontSize: '0.76rem' }}
+                          style={{ padding: '0.55rem 0.85rem', borderRadius: 10, border: '1px solid #bae6fd', background: '#f0f9ff', color: '#0284c7', fontWeight: 600, cursor: 'pointer', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: 6 }}
                         >
-                          <FaEdit /> Configurar Reglas
+                          <FaEdit /> Editar
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDeleteEmployee(emp)}
-                          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #fecaca', background: '#fef2f2', color: '#dc2626', fontWeight: 700, cursor: 'pointer', fontSize: '0.76rem' }}
+                          style={{ padding: '0.55rem 0.85rem', borderRadius: 10, border: '1px solid #fecaca', background: '#fef2f2', color: '#ef4444', fontWeight: 600, cursor: 'pointer', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: 6 }}
                         >
-                          <FaTrashAlt />
+                          <FaTrashAlt /> Eliminar
                         </button>
                       </div>
                     </td>
@@ -1167,17 +1160,17 @@ const Empleados = () => {
 
         {/* TAB 3: HISTORIAL DE PAGOS Y COLILLAS */}
         {activeTab === 'history' && canViewPayroll && (
-          <div style={{ background: '#ffffff', borderRadius: 18, border: '1px solid #e2e8f0', overflowX: 'auto' }}>
+          <div style={{ background: '#ffffff', borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
               <thead>
-                <tr style={{ background: '#0f172a', color: '#ffffff', textAlign: 'left', fontSize: '0.76rem', textTransform: 'uppercase' }}>
-                  <th style={{ padding: '0.9rem 1rem' }}>Folio / Fecha Pago</th>
-                  <th style={{ padding: '0.9rem 1rem' }}>Empleado</th>
-                  <th style={{ padding: '0.9rem 1rem' }}>Período</th>
-                  <th style={{ padding: '0.9rem 1rem' }}>Venta / Ganancia</th>
-                  <th style={{ padding: '0.9rem 1rem' }}>Salario + Comisión</th>
-                  <th style={{ padding: '0.9rem 1rem' }}>Neto Pagado</th>
-                  <th style={{ padding: '0.9rem 1rem' }}>Colilla</th>
+                <tr style={{ background: '#f8fafc', color: '#475569', textAlign: 'left', fontSize: '0.78rem', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>
+                  <th style={{ padding: '1rem 1.25rem' }}>Folio / Fecha Pago</th>
+                  <th style={{ padding: '1rem 1.25rem' }}>Empleado</th>
+                  <th style={{ padding: '1rem 1.25rem' }}>Período</th>
+                  <th style={{ padding: '1rem 1.25rem' }}>Venta / Ganancia</th>
+                  <th style={{ padding: '1rem 1.25rem' }}>Salario + Comisión</th>
+                  <th style={{ padding: '1rem 1.25rem' }}>Neto Pagado</th>
+                  <th style={{ padding: '1rem 1.25rem' }}>Colilla</th>
                 </tr>
               </thead>
               <tbody>

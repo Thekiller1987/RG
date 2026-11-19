@@ -500,13 +500,18 @@ export const getPaymentMethodVisual = (metodoRaw = 'Efectivo') => {
     };
 };
 
-export default function HistorialCreditoModal({ client, onClose, token, initialTab = 'compras' }) {
-    const [activeTab, setActiveTab] = useState(initialTab || 'compras');
+export default function HistorialCreditoModal({ client, onClose, token, initialTab = 'creditos' }) {
+    const { allUsers, clients, hasPermission, requireActionPermission } = useAuth();
+    const canViewPurchases = hasPermission('clientes.ver_compras');
+    const canCancelAbono = hasPermission('clientes.anular_abono');
+
+    const [activeTab, setActiveTab] = useState(
+        initialTab === 'compras' && canViewPurchases ? 'compras' : 'creditos'
+    );
     const [loading, setLoading] = useState(true);
     const [analytics, setAnalytics] = useState(null);
     const [creditTickets, setCreditTickets] = useState([]);
     const [error, setError] = useState(null);
-    const { allUsers, clients } = useAuth();
 
     // Filtros de rango de fechas para "¿Qué ha comprado de tal fecha a tal fecha?"
     const [startDate, setStartDate] = useState('');
@@ -709,6 +714,7 @@ export default function HistorialCreditoModal({ client, onClose, token, initialT
     };
 
     const handleCancelAbono = useCallback(async (abonoIdVenta) => {
+        if (requireActionPermission && !requireActionPermission('clientes.anular_abono', 'Anular o Cancelar Abono Registrado')) return;
         if (!window.confirm('¿Estás seguro de cancelar este abono? Se restaurará el saldo del cliente y se ajustará la caja.')) return;
         setCancellingId(abonoIdVenta);
         try {
@@ -853,14 +859,26 @@ export default function HistorialCreditoModal({ client, onClose, token, initialT
 
                 {/* ─── PESTAÑAS PRINCIPALES ─── */}
                 <TabsBar>
-                    <TabBtn $active={activeTab === 'compras'} onClick={() => setActiveTab('compras')}>
-                        <FaShoppingBag /> ¿Cuánto Nos Ha Comprado? (Total / Año / Semanal / Por Fecha)
-                    </TabBtn>
                     <TabBtn $active={activeTab === 'creditos'} onClick={() => setActiveTab('creditos')}>
-                        <FaLandmark /> Cuenta General, Facturas al Crédito y Registro de Abonos ({(analytics?.abonos || []).length})
+                        <FaLandmark /> Cuenta General, Créditos y Registro de Abonos ({(analytics?.abonos || []).length})
                     </TabBtn>
-                    <TabBtn $active={activeTab === 'productos'} onClick={() => setActiveTab('productos')}>
-                        <FaTrophy /> Productos que Más Compra ({(analytics?.top_productos || []).length})
+                    <TabBtn
+                        $active={activeTab === 'compras'}
+                        onClick={() => {
+                            if (requireActionPermission && !requireActionPermission('clientes.ver_compras', 'Ver Cuánto Nos Ha Comprado el Cliente (Total, Año, Semanal y por Fechas)')) return;
+                            setActiveTab('compras');
+                        }}
+                    >
+                        <FaShoppingBag /> ¿Cuánto Nos Ha Comprado? (Total / Año / Semanal / Por Fecha) {!canViewPurchases && '🔒'}
+                    </TabBtn>
+                    <TabBtn
+                        $active={activeTab === 'productos'}
+                        onClick={() => {
+                            if (requireActionPermission && !requireActionPermission('clientes.ver_compras', 'Ver Ranking de Productos Comprados por el Cliente')) return;
+                            setActiveTab('productos');
+                        }}
+                    >
+                        <FaTrophy /> Productos que Más Compra ({(analytics?.top_productos || []).length}) {!canViewPurchases && '🔒'}
                     </TabBtn>
                 </TabsBar>
 
@@ -868,7 +886,7 @@ export default function HistorialCreditoModal({ client, onClose, token, initialT
                     {loading && (
                         <CenteredMessage>
                             <SpinAnimation size={34} />
-                            <p style={{ fontWeight: 700, marginTop: '0.75rem' }}>Cargando registro completo del cliente...</p>
+                            <p style={{ fontWeight: 700, marginTop: '0.75rem' }}>Cargando registro del cliente...</p>
                         </CenteredMessage>
                     )}
 
@@ -876,7 +894,9 @@ export default function HistorialCreditoModal({ client, onClose, token, initialT
 
                     {!loading && !error && (
                         <>
-                            {/* ─── TARJETAS GLOBALES DE CUÁNTO NOS HA COMPRADO (SIEMPRE VISIBLES ARRIBA) ─── */}
+                            {/* ─── TARJETAS DE CUÁNTO NOS HA COMPRADO (SOLO VISIBLES EN PESTAÑA COMPRAS/PRODUCTOS Y CON PERMISO) ─── */}
+                            {(activeTab === 'compras' || activeTab === 'productos') && canViewPurchases && (
+                            <>
                             <KpiGrid>
                                 <KpiCard $color="#2563eb" $bg="#eff6ff">
                                     <div className="kpi-info">
@@ -1008,6 +1028,8 @@ export default function HistorialCreditoModal({ client, onClose, token, initialT
                                     <span className="val">{formatCurrency(kpis.rango?.ticket_promedio)}</span>
                                 </div>
                             </RangeSummaryStrip>
+                            </>
+                            )}
 
                             {/* ════════════════════════════════════════════════════════════════
                                PESTAÑA 1: ¿QUÉ HA COMPRADO DE TAL FECHA A TAL FECHA?

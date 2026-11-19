@@ -1,19 +1,15 @@
-// server/src/routes/providerRoutes.js (CORREGIDO)
-
 const express = require('express');
 const router = express.Router();
 
-// Importamos las funciones del controlador
-const { getAllProviders, createProvider, deleteProvider } = require('../controllers/providerController.js');
-
-// *** CORRECCIÓN CRÍTICA: Cambiar 'protect' por 'verifyToken' al importar ***
-const { verifyToken, isAdmin } = require('../middleware/authMiddleware.js');
+const { getAllProviders, createProvider, updateProvider, deleteProvider } = require('../controllers/providerController.js');
+const { verifyToken } = require('../middleware/authMiddleware.js');
 
 router.route('/')
-  .get(verifyToken, getAllProviders) // Usamos verifyToken en lugar de protect
-  .post(verifyToken, isAdmin, createProvider);
+  .get(verifyToken, getAllProviders)
+  .post(verifyToken, createProvider);
 
 router.route('/:id')
-  .delete(verifyToken, isAdmin, deleteProvider); // Usamos verifyToken
+  .put(verifyToken, updateProvider)
+  .delete(verifyToken, deleteProvider);
 
 module.exports = router;
