@@ -1053,6 +1053,43 @@ const UserManagement = () => {
     fetchTraceability(uid, traceModuleFilter, traceSearch);
   };
 
+  // Activar o desactivar un módulo completo con 1 clic directamente desde la tarjeta del usuario
+  const handleQuickToggleModule = async (targetUser, mod) => {
+    const isMaster = Boolean(targetUser.es_principal || String(targetUser.nombre_usuario).toLowerCase() === 'admin');
+    if (isMaster) {
+      toast('🔒 El usuario admin principal (1987) tiene todos los módulos activos permanentemente.');
+      return;
+    }
+
+    const currentPerms = { ...getDefaultPermissionsForRole(targetUser.rol), ...(targetUser.permisos || {}) };
+    const currentlyHasAccess = Boolean(currentPerms[mod.accessKey]);
+    const nextState = !currentlyHasAccess;
+
+    mod.functions.forEach(fk => {
+      currentPerms[fk] = nextState;
+    });
+
+    try {
+      await axios.put(
+        `${API_URL}/users/${targetUser.id_usuario}`,
+        {
+          nombre_usuario: targetUser.nombre_usuario,
+          nombre_completo: targetUser.nombre_completo,
+          rol: targetUser.rol,
+          activo: targetUser.activo,
+          permisos: currentPerms
+        },
+        getAuthConfig()
+      );
+      toast.success(
+        `${nextState ? '✅ Habilitado' : '🚫 Bloqueado'}: Módulo "${mod.name}" para ${targetUser.nombre_usuario}`
+      );
+      await fetchUsers();
+    } catch (err) {
+      toast.error(err.response?.data?.msg || 'Error actualizando módulo');
+    }
+  };
+
   const selectedTraceUser = useMemo(() => {
     if (!traceUserFilter || traceUserFilter === 'todos') return null;
     return users.find(u => String(u.id_usuario) === String(traceUserFilter)) || null;
@@ -1268,22 +1305,23 @@ const UserManagement = () => {
                         return (
                           <span
                             key={mod.id}
-                            onClick={() => openEditModal(u)}
+                            onClick={() => handleQuickToggleModule(u, mod)}
                             title={
                               hasModAccess
-                                ? `✅ Tiene acceso a ${mod.name} (${enabledFuncs}/${mod.functions.length} funciones habilitadas)`
-                                : `🚫 Sin acceso a ${mod.name} (clic para configurar)`
+                                ? `✅ Tiene acceso a ${mod.name} (${enabledFuncs}/${mod.functions.length} funciones) — Clic para bloquear módulo`
+                                : `🚫 Sin acceso a ${mod.name} — Clic para habilitar módulo`
                             }
                             style={{
                               padding: '3px 8px',
                               borderRadius: 999,
                               fontSize: '0.68rem',
                               fontWeight: 700,
-                              cursor: 'pointer',
+                              cursor: isMaster ? 'default' : 'pointer',
                               background: hasModAccess ? '#ecfdf5' : '#f1f5f9',
                               color: hasModAccess ? '#065f46' : '#94a3b8',
                               border: `1px solid ${hasModAccess ? '#a7f3d0' : '#e2e8f0'}`,
-                              textDecoration: hasModAccess ? 'none' : 'line-through'
+                              textDecoration: hasModAccess ? 'none' : 'line-through',
+                              transition: 'all 0.15s'
                             }}
                           >
                             {hasModAccess ? '✅' : '🔒'} {mod.name}{' '}

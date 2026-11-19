@@ -546,7 +546,9 @@ const FacturasProveedores = () => {
         notas: '',
         tipo_compra: 'CREDITO',
         metodo_pago: 'EFECTIVO',
-        referencia: ''
+        banco: '',
+        referencia: '',
+        usar_misma_factura_comprobante: false
     });
 
     const [editInvoiceData, setEditInvoiceData] = useState({
@@ -557,11 +559,13 @@ const FacturasProveedores = () => {
         monto_total: '',
         notas: '',
         tipo_compra: 'CREDITO',
-        metodo_pago: 'EFECTIVO'
+        metodo_pago: 'EFECTIVO',
+        banco: '',
+        referencia: ''
     });
 
-    const [payData, setPayData] = useState({ amount: '', reference: '', method: 'EFECTIVO' });
-    const [editPayData, setEditPayData] = useState({ amount: '', reference: '', method: 'EFECTIVO' });
+    const [payData, setPayData] = useState({ amount: '', reference: '', method: 'EFECTIVO', banco: '' });
+    const [editPayData, setEditPayData] = useState({ amount: '', reference: '', method: 'EFECTIVO', banco: '' });
 
     // --- ESTADO Y CONTROL VISOR INTERACTIVO ---
     const [previewDoc, setPreviewDoc] = useState({
@@ -767,10 +771,16 @@ const FacturasProveedores = () => {
         if (token) loadData();
     }, [token, refreshTrigger, filterDateFrom, filterDateTo, filterProvider, showGlobalHistory]);
 
-    // --- REGISTRAR ABONO ---
-    const openPayModal = (invoice) => {
+    // --- REGISTRAR ABONO / CANCELACIÓN DE FACTURA ---
+    const openPayModal = (invoice, fullCancel = false) => {
         setSelectedInvoice(invoice);
-        setPayData({ amount: '', reference: '', method: 'EFECTIVO' });
+        const maxPay = Math.max(0, (parseFloat(invoice.monto_total) || 0) - (parseFloat(invoice.monto_abonado) || 0));
+        setPayData({
+            amount: fullCancel ? maxPay.toFixed(2) : '',
+            reference: '',
+            method: 'EFECTIVO',
+            banco: ''
+        });
         setAttachmentFile(null);
         setAttachmentData({ base64: null, name: null });
         setShowPayModal(true);
@@ -786,6 +796,25 @@ const FacturasProveedores = () => {
         if (payAmount <= 0) return showAlert("Error", "El monto debe ser mayor a cero.", "error");
         if (payAmount > maxPay + 0.01) return showAlert("Error", "El monto excede la deuda pendiente.", "error");
 
+        // 1. Validar comprobante de pago digitalizado obligatorio
+        if (!attachmentData.base64) {
+            return showAlert(
+                "🧾 Comprobante Obligatorio",
+                "Para cancelar o abonar una factura es obligatorio digitalizar (tomar foto o subir imagen/PDF) el comprobante de pago, transferencia o recibo.",
+                "error"
+            );
+        }
+
+        // 2. Validar referencia obligatoria si es Transferencia, Tarjeta, Cheque o Depósito
+        const requiresRef = ['TRANSFERENCIA', 'TARJETA', 'CHEQUE', 'DEPOSITO'].includes(payData.method);
+        if (requiresRef && (!payData.reference || !payData.reference.trim())) {
+            return showAlert(
+                "🔢 Referencia Obligatoria",
+                `Para pagos con ${payData.method} debes ingresar obligatoriamente el número de referencia bancaria, voucher o número de cheque.`,
+                "error"
+            );
+        }
+
         const isFullPayment = payAmount >= maxPay - 0.1;
         const newStatus = isFullPayment ? 'PAGADA' : selectedInvoice.estado;
 
@@ -793,6 +822,7 @@ const FacturasProveedores = () => {
             await api.payProviderInvoice(selectedInvoice.id, {
                 amount: payAmount,
                 reference: payData.reference,
+                banco: payData.banco,
                 method: payData.method,
                 status: newStatus,
                 comprobante_base64: attachmentData.base64,
@@ -800,10 +830,14 @@ const FacturasProveedores = () => {
             }, token);
             setRefreshTrigger(prev => prev + 1);
             setShowPayModal(false);
-            showAlert("Pago Registrado", `Se registró el abono correctamente. Estado: ${newStatus}`, "success");
+            showAlert(
+                isFullPayment ? "✅ Factura Cancelada" : "✅ Abono Registrado",
+                `Se registró el pago y su comprobante digitalizado correctamente. Estado: ${newStatus}`,
+                "success"
+            );
         } catch (error) {
             console.error(error);
-            showAlert("Error", "No se pudo registrar el pago. Intente nuevamente.", "error");
+            showAlert("Error", error?.message || "No se pudo registrar el pago. Intente nuevamente.", "error");
         }
     };
 
@@ -859,16 +893,44 @@ const FacturasProveedores = () => {
         }
     };
 
-    // --- CREAR FACTURA ---
+    // --- CREAR FACTURA (CON DIGITALIZACIÓN OBLIGATORIA) ---
     const handleCreate = async (e) => {
         e.preventDefault();
         if (!formData.proveedor) return showAlert("Falta Proveedor", "Seleccione un proveedor.", "warning");
 
+        // 1. Obligar a digitalizar la factura del proveedor
+        if (!facturaData.base64) {
+            return showAlert(
+                "📸 Digitalización de Factura Obligatoria",
+                "Es obligatorio digitalizar la factura física del proveedor (tomar foto con cámara o subir imagen/PDF) antes de guardarla en el sistema.",
+                "error"
+            );
+        }
+
+        // 2. Si es De Contado, obligar a comprobante de pago y referencia
+        if (formData.tipo_compra === 'CONTADO') {
+            if (!attachmentData.base64 && !formData.usar_misma_factura_comprobante) {
+                return showAlert(
+                    "🧾 Comprobante de Pago Obligatorio",
+                    "Al registrar una factura pagada De Contado, debes digitalizar el comprobante/voucher de pago (o marcar la casilla si la factura digitalizada ya trae el sello de cancelado).",
+                    "error"
+                );
+            }
+            const needsRef = ['TRANSFERENCIA', 'TARJETA', 'CHEQUE', 'DEPOSITO'].includes(formData.metodo_pago);
+            if (needsRef && (!formData.referencia || !formData.referencia.trim())) {
+                return showAlert(
+                    "🔢 Referencia Obligatoria",
+                    `Para pagos de contado por ${formData.metodo_pago} es obligatorio ingresar el número de referencia bancaria, voucher o cheque.`,
+                    "error"
+                );
+            }
+        }
+
         try {
             await api.createProviderInvoice({
                 ...formData,
-                comprobante_base64: attachmentData.base64,
-                comprobante_name: attachmentData.name,
+                comprobante_base64: attachmentData.base64 || (formData.usar_misma_factura_comprobante ? facturaData.base64 : null),
+                comprobante_name: attachmentData.name || (formData.usar_misma_factura_comprobante ? facturaData.name : null),
                 factura_base64: facturaData.base64,
                 factura_name: facturaData.name
             }, token);
@@ -880,15 +942,16 @@ const FacturasProveedores = () => {
                 proveedor: '', numero_factura: '',
                 fecha_emision: getTodayManaguaISO(),
                 fecha_vencimiento: '', monto_total: '', notas: '',
-                tipo_compra: 'CREDITO', metodo_pago: 'EFECTIVO', referencia: ''
+                tipo_compra: 'CREDITO', metodo_pago: 'EFECTIVO', banco: '', referencia: '',
+                usar_misma_factura_comprobante: false
             });
             setAttachmentFile(null);
             setAttachmentData({ base64: null, name: null });
             setFacturaFile(null);
             setFacturaData({ base64: null, name: null });
-            showAlert("Guardado", "La factura ha sido registrada exitosamente.", "success");
+            showAlert("✅ Factura Digitalizada y Guardada", "La factura y sus documentos han sido registrados exitosamente.", "success");
         } catch (error) {
-            showAlert("Error", "Error al guardar factura.", "error");
+            showAlert("Error", error?.message || "Error al guardar factura.", "error");
         }
     };
 
@@ -1457,6 +1520,71 @@ const FacturasProveedores = () => {
                                                 </span>
                                             </div>
 
+                                            {(inv.ultimo_metodo_pago || inv.metodo_pago) && (
+                                                <div className="meta-row">
+                                                    <span className="label"><FaCreditCard /> Último Pago</span>
+                                                    <span className="value" style={{ fontSize: '0.8rem', color: '#0f766e' }}>
+                                                        {inv.ultimo_metodo_pago || inv.metodo_pago}
+                                                        {(inv.ultima_referencia || inv.referencia_pago) ? ` · ${inv.ultima_referencia || inv.referencia_pago}` : ''}
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {/* Barra de Documentos Digitalizados */}
+                                            <div style={{ display: 'flex', gap: '6px', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                                                {inv.factura_url ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openDocPreview(inv.factura_url, `Factura #${inv.numero_factura}`, `${inv.proveedor} • C$${parseFloat(inv.monto_total || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`)}
+                                                        style={{
+                                                            flex: 1,
+                                                            padding: '6px 10px',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid #fde68a',
+                                                            background: '#fef3c7',
+                                                            color: '#b45309',
+                                                            fontSize: '0.76rem',
+                                                            fontWeight: 800,
+                                                            cursor: 'pointer',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            gap: '5px'
+                                                        }}
+                                                    >
+                                                        {isPdfDoc(inv.factura_url) ? <FaFilePdf /> : <FaImage />} Factura Digital
+                                                    </button>
+                                                ) : (
+                                                    <span style={{ flex: 1, padding: '6px 10px', borderRadius: '8px', background: '#fef2f2', color: '#dc2626', fontSize: '0.73rem', fontWeight: 700, textAlign: 'center' }}>
+                                                        ⚠️ Sin factura digital
+                                                    </span>
+                                                )}
+
+                                                {inv.ultimo_comprobante_url && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openDocPreview(inv.ultimo_comprobante_url, `Comprobante de Pago - Factura #${inv.numero_factura}`, `${inv.proveedor} • ${inv.ultimo_metodo_pago || ''} ${inv.ultima_referencia || ''}`)}
+                                                        style={{
+                                                            flex: 1,
+                                                            padding: '6px 10px',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid #bfdbfe',
+                                                            background: '#eff6ff',
+                                                            color: '#1d4ed8',
+                                                            fontSize: '0.76rem',
+                                                            fontWeight: 800,
+                                                            cursor: 'pointer',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            gap: '5px'
+                                                        }}
+                                                    >
+                                                        <FaReceipt /> Comprobante Pago
+                                                    </button>
+                                                )}
+                                            </div>
+
                                             <div className="financial-block">
                                                 <div className="total-row">
                                                     <span className="label">Total a Pagar</span>
@@ -1472,13 +1600,27 @@ const FacturasProveedores = () => {
                                         </div>
 
                                         <div className="card-footer" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-                                            {saldo > 0 && (
-                                                <Button $primary style={{ flex: 1, minWidth: '100px', justifyContent: 'center' }} onClick={() => openPayModal(inv)}>
-                                                    <FaMoneyBillWave /> Abonar
-                                                </Button>
+                                            {saldo > 0.05 && (
+                                                <>
+                                                    <Button
+                                                        $success
+                                                        style={{ flex: 1, minWidth: '105px', justifyContent: 'center', background: '#059669', color: '#fff' }}
+                                                        onClick={() => openPayModal(inv, true)}
+                                                        title="Cancelar el 100% de la factura con comprobante"
+                                                    >
+                                                        <FaCheckCircle /> Cancelar
+                                                    </Button>
+                                                    <Button
+                                                        $primary
+                                                        style={{ flex: 1, minWidth: '95px', justifyContent: 'center' }}
+                                                        onClick={() => openPayModal(inv, false)}
+                                                    >
+                                                        <FaMoneyBillWave /> Abonar
+                                                    </Button>
+                                                </>
                                             )}
-                                            <Button $secondary style={{ flex: 1, minWidth: '100px', justifyContent: 'center' }} onClick={() => openHistoryModal(inv)}>
-                                                <FaList /> Historial
+                                            <Button $secondary style={{ flex: 1, minWidth: '95px', justifyContent: 'center' }} onClick={() => openHistoryModal(inv)}>
+                                                <FaList /> Pagos ({inv.total_abonos_count || 0})
                                             </Button>
                                             <Button 
                                                 $secondary 
@@ -1488,16 +1630,6 @@ const FacturasProveedores = () => {
                                             >
                                                 <FaEdit />
                                             </Button>
-                                            {inv.factura_url && (
-                                                <Button 
-                                                    $secondary 
-                                                    title="Ver Factura Escaneada / Archivo" 
-                                                    style={{ padding: '0.75rem', background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }} 
-                                                    onClick={() => openDocPreview(inv.factura_url, `Factura #${inv.numero_factura}`, `${inv.proveedor} • C$${parseFloat(inv.monto_total || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`)}
-                                                >
-                                                    {isPdfDoc(inv.factura_url) ? <FaFilePdf /> : <FaImage />}
-                                                </Button>
-                                            )}
                                             <Button $danger style={{ padding: '0.75rem' }} onClick={() => { setSelectedInvoice(inv); setShowConfirmDelete(true); }} title="Eliminar factura">
                                                 <FaTrashAlt />
                                             </Button>
@@ -1807,17 +1939,71 @@ const FacturasProveedores = () => {
                                 </div>
                             </FormGroup>
 
+                            {/* DIGITALIZACIÓN OBLIGATORIA DE LA FACTURA DEL PROVEEDOR */}
+                            <FormGroup style={{ background: facturaData.base64 ? '#f0fdf4' : '#fffbeb', padding: '1.1rem', borderRadius: '16px', border: facturaData.base64 ? '2px solid #22c55e' : '2px dashed #f59e0b' }}>
+                                <label style={{ color: '#0f172a', fontWeight: 800, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span>📸 1. Digitalizar Factura Física del Proveedor *</span>
+                                    <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: 999, background: facturaData.base64 ? '#dcfce7' : '#fef3c7', color: facturaData.base64 ? '#15803d' : '#b45309' }}>
+                                        {facturaData.base64 ? '✓ Digitalizada' : 'OBLIGATORIO'}
+                                    </span>
+                                </label>
+                                <FileUploadContainer style={{ background: '#ffffff', padding: '1.15rem' }}>
+                                    <FaFilePdf className="upload-icon" style={{ color: facturaData.base64 ? '#16a34a' : '#f59e0b' }} />
+                                    {facturaFile ? (
+                                        <div className="file-details" style={{ color: '#15803d' }}>
+                                            {facturaProcessing ? "Procesando y optimizando factura..." : `✓ Factura lista: ${facturaData.name} (${facturaData.sizeInfo || ''})`}
+                                        </div>
+                                    ) : (
+                                        <div className="file-details">
+                                            Toca aquí para tomar foto con la cámara o subir imagen / PDF de la factura
+                                        </div>
+                                    )}
+                                    <input type="file" accept="image/*,application/pdf" onChange={handleFacturaFileSelection} disabled={facturaProcessing} />
+                                </FileUploadContainer>
+                                {facturaData.base64 && (
+                                    <div style={{ marginTop: '0.65rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                                        {!isPdfDoc(facturaData.base64) ? (
+                                            <img
+                                                src={facturaData.base64}
+                                                alt="Vista previa factura"
+                                                onClick={() => openDocPreview(facturaData.base64, 'Vista Previa Factura Digitalizada', formData.proveedor)}
+                                                style={{ height: 64, width: 95, objectFit: 'cover', borderRadius: 8, border: '1px solid #cbd5e1', cursor: 'pointer' }}
+                                            />
+                                        ) : (
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e3a8a' }}>📄 Documento PDF adjunto</span>
+                                        )}
+                                        <div style={{ display: 'flex', gap: 10 }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => openDocPreview(facturaData.base64, 'Vista Previa Factura Digitalizada', formData.proveedor)}
+                                                style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', padding: '5px 10px', borderRadius: 8, fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                                            >
+                                                🔍 Ampliar
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setFacturaFile(null); setFacturaData({ base64: null, name: null }); }}
+                                                style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '5px 10px', borderRadius: 8, fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                                            >
+                                                ✕ Cambiar
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </FormGroup>
+
                             {/* Opciones cuando es CONTADO */}
                             {formData.tipo_compra === 'CONTADO' && (
-                                <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '1.25rem' }}>
+                                <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '16px', border: '2px solid #10b981', marginBottom: '1.25rem' }}>
                                     <FormGroup style={{ marginBottom: '1rem' }}>
-                                        <label style={{ color: '#0f172a', fontWeight: 700 }}>Método de Pago de Contado</label>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))', gap: '0.5rem' }}>
+                                        <label style={{ color: '#0f172a', fontWeight: 800 }}>💳 2. Método de Pago de Contado *</label>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(95px, 1fr))', gap: '0.5rem' }}>
                                             {[
                                                 { id: 'EFECTIVO', label: 'Efectivo', icon: <FaMoneyBillWave /> },
                                                 { id: 'TRANSFERENCIA', label: 'Transferencia', icon: <FaUniversity /> },
                                                 { id: 'TARJETA', label: 'Tarjeta', icon: <FaCreditCard /> },
-                                                { id: 'CHEQUE', label: 'Cheque', icon: <FaReceipt /> }
+                                                { id: 'CHEQUE', label: 'Cheque', icon: <FaReceipt /> },
+                                                { id: 'DEPOSITO', label: 'Depósito', icon: <FaBuilding /> }
                                             ].map(m => (
                                                 <button
                                                     key={m.id}
@@ -1830,7 +2016,7 @@ const FacturasProveedores = () => {
                                                         background: formData.metodo_pago === m.id ? '#eff6ff' : '#fff',
                                                         color: formData.metodo_pago === m.id ? '#1d4ed8' : '#475569',
                                                         fontWeight: 700,
-                                                        fontSize: '0.85rem',
+                                                        fontSize: '0.82rem',
                                                         cursor: 'pointer',
                                                         display: 'flex',
                                                         flexDirection: 'column',
@@ -1846,69 +2032,114 @@ const FacturasProveedores = () => {
                                         </div>
                                     </FormGroup>
 
+                                    {['TRANSFERENCIA', 'TARJETA', 'CHEQUE', 'DEPOSITO'].includes(formData.metodo_pago) && (
+                                        <FormGroup style={{ marginBottom: '1rem' }}>
+                                            <label>Banco / Entidad Financiera</label>
+                                            <select
+                                                value={formData.banco || ''}
+                                                onChange={e => setFormData({ ...formData, banco: e.target.value })}
+                                            >
+                                                <option value="">Seleccione banco o entidad...</option>
+                                                <option value="BAC Credomatic">BAC Credomatic</option>
+                                                <option value="Banco Lafise Bancentro">Banco Lafise Bancentro</option>
+                                                <option value="Banpro">Banpro</option>
+                                                <option value="Ficohsa">Ficohsa</option>
+                                                <option value="Avanz">Avanz</option>
+                                                <option value="BDF">BDF</option>
+                                                <option value="Otro">Otro</option>
+                                            </select>
+                                        </FormGroup>
+                                    )}
+
                                     <FormGroup style={{ marginBottom: '1rem' }}>
-                                        <label>Referencia de Pago</label>
+                                        <label>
+                                            {['TRANSFERENCIA', 'TARJETA', 'CHEQUE', 'DEPOSITO'].includes(formData.metodo_pago)
+                                                ? `No. de Referencia / Voucher / Cheque (${formData.metodo_pago}) *`
+                                                : 'No. de Recibo / Referencia de Pago en Efectivo'}
+                                        </label>
                                         <input 
                                             type="text" 
+                                            required={['TRANSFERENCIA', 'TARJETA', 'CHEQUE', 'DEPOSITO'].includes(formData.metodo_pago)}
                                             value={formData.referencia} 
                                             onChange={e => setFormData({ ...formData, referencia: e.target.value })} 
-                                            placeholder={formData.metodo_pago === 'TRANSFERENCIA' ? 'Ej: Transferencia Lafise 14664661' : 'Ej: No. recibo, cheque o nota de pago...'} 
+                                            placeholder={
+                                                formData.metodo_pago === 'TRANSFERENCIA'
+                                                    ? 'Ej: Transf. #14664661 (Obligatorio)'
+                                                    : formData.metodo_pago === 'TARJETA'
+                                                    ? 'Ej: Voucher / Autorización POS #88412 (Obligatorio)'
+                                                    : formData.metodo_pago === 'CHEQUE'
+                                                    ? 'Ej: Cheque #004512 (Obligatorio)'
+                                                    : 'Ej: Recibo de caja #104 o nombre de quien recibió...'
+                                            } 
                                         />
                                     </FormGroup>
 
                                     <FormGroup style={{ marginBottom: 0 }}>
-                                        <label>Comprobante de Pago (Foto o PDF)</label>
-                                        <FileUploadContainer>
-                                            <FaUpload className="upload-icon" />
-                                            {attachmentFile ? (
-                                                <div className="file-details">
-                                                    {attachmentProcessing ? "Comprimiendo archivo..." : `✓ Listo: ${attachmentData.name} (${attachmentData.sizeInfo || ''})`}
-                                                </div>
-                                            ) : (
-                                                <div className="file-details">Haz clic o arrastra foto del voucher o PDF</div>
-                                            )}
-                                            <input type="file" accept="image/*,application/pdf" onChange={handleFileSelection} disabled={attachmentProcessing} />
-                                        </FileUploadContainer>
-                                        {attachmentFile && (
-                                            <div style={{ marginTop: '0.4rem', textAlign: 'right' }}>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { setAttachmentFile(null); setAttachmentData({ base64: null, name: null }); }}
-                                                    style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
-                                                >
-                                                    ✕ Quitar comprobante
-                                                </button>
-                                            </div>
+                                        <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span>🧾 Comprobante de Cancelación (Foto o PDF) *</span>
+                                            <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 800 }}>OBLIGATORIO</span>
+                                        </label>
+
+                                        <label
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8,
+                                                background: '#ecfdf5',
+                                                border: '1px solid #a7f3d0',
+                                                padding: '8px 12px',
+                                                borderRadius: 10,
+                                                fontSize: '0.82rem',
+                                                color: '#065f46',
+                                                cursor: 'pointer',
+                                                marginBottom: '0.65rem'
+                                            }}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={Boolean(formData.usar_misma_factura_comprobante)}
+                                                onChange={e => setFormData({ ...formData, usar_misma_factura_comprobante: e.target.checked })}
+                                                style={{ width: 16, height: 16 }}
+                                            />
+                                            <span>La factura digitalizada arriba ya incluye sello de CANCELADO / Voucher en la misma foto</span>
+                                        </label>
+
+                                        {!formData.usar_misma_factura_comprobante && (
+                                            <>
+                                                <FileUploadContainer style={{ background: '#ffffff', padding: '1rem' }}>
+                                                    <FaUpload className="upload-icon" />
+                                                    {attachmentFile ? (
+                                                        <div className="file-details" style={{ color: '#15803d' }}>
+                                                            {attachmentProcessing ? "Comprimiendo comprobante..." : `✓ Comprobante listo: ${attachmentData.name} (${attachmentData.sizeInfo || ''})`}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="file-details">Sube o toma foto del voucher de transferencia, tarjeta o recibo de pago</div>
+                                                    )}
+                                                    <input type="file" accept="image/*,application/pdf" onChange={handleFileSelection} disabled={attachmentProcessing} />
+                                                </FileUploadContainer>
+                                                {attachmentData.base64 && (
+                                                    <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        {!isPdfDoc(attachmentData.base64) && (
+                                                            <img
+                                                                src={attachmentData.base64}
+                                                                alt="Vista previa comprobante"
+                                                                style={{ height: 55, width: 85, objectFit: 'cover', borderRadius: 8, border: '1px solid #cbd5e1' }}
+                                                            />
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { setAttachmentFile(null); setAttachmentData({ base64: null, name: null }); }}
+                                                            style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                                                        >
+                                                            ✕ Quitar comprobante
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </>
                                         )}
                                     </FormGroup>
                                 </div>
                             )}
-
-                            <FormGroup>
-                                <label>Factura Escaneada (Foto o PDF de la Factura del Proveedor)</label>
-                                <FileUploadContainer>
-                                    <FaFilePdf className="upload-icon" style={{ color: '#ef4444' }} />
-                                    {facturaFile ? (
-                                        <div className="file-details">
-                                            {facturaProcessing ? "Comprimiendo archivo..." : `✓ Listo: ${facturaData.name} (${facturaData.sizeInfo || ''})`}
-                                        </div>
-                                    ) : (
-                                        <div className="file-details">Haz clic para subir foto o PDF de la factura</div>
-                                    )}
-                                    <input type="file" accept="image/*,application/pdf" onChange={handleFacturaFileSelection} disabled={facturaProcessing} />
-                                </FileUploadContainer>
-                                {facturaFile && (
-                                    <div style={{ marginTop: '0.4rem', textAlign: 'right' }}>
-                                        <button
-                                            type="button"
-                                            onClick={() => { setFacturaFile(null); setFacturaData({ base64: null, name: null }); }}
-                                            style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
-                                        >
-                                            ✕ Quitar factura
-                                        </button>
-                                    </div>
-                                )}
-                            </FormGroup>
 
                             <FormGroup>
                                 <label>Notas (Opcional)</label>
@@ -2106,21 +2337,44 @@ const FacturasProveedores = () => {
                 </ModalOverlay>
             )}
 
-            {/* --- MODAL PAGO (REGISTRAR ABONO) --- */}
+            {/* --- MODAL PAGO (CANCELAR FACTURA O REGISTRAR ABONO CON COMPROBANTE OBLIGATORIO) --- */}
             {showPayModal && (
                 <ModalOverlay onClick={() => setShowPayModal(false)}>
-                    <ModalContent onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+                    <ModalContent onClick={e => e.stopPropagation()} style={{ maxWidth: '540px' }}>
                         <CloseButton onClick={() => setShowPayModal(false)}><FaTimes /></CloseButton>
-                        <h2>Registrar Abono</h2>
-                        <div style={{ background: '#f1f5f9', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
-                            <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '0.25rem' }}>Factura #{selectedInvoice?.numero_factura}</div>
-                            <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0f172a' }}>
-                                Deuda: C${((parseFloat(selectedInvoice?.monto_total) || 0) - (parseFloat(selectedInvoice?.monto_abonado) || 0)).toFixed(2)}
+                        <h2>Cancelar Factura / Registrar Abono</h2>
+                        <div style={{ background: '#f1f5f9', padding: '1rem 1.2rem', borderRadius: '14px', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                            <div>
+                                <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 700 }}>
+                                    {selectedInvoice?.proveedor} · Factura #{selectedInvoice?.numero_factura}
+                                </div>
+                                <div style={{ fontSize: '1.45rem', fontWeight: '900', color: '#0f172a', marginTop: 2 }}>
+                                    Saldo: C${((parseFloat(selectedInvoice?.monto_total) || 0) - (parseFloat(selectedInvoice?.monto_abonado) || 0)).toFixed(2)}
+                                </div>
                             </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const maxPay = Math.max(0, (parseFloat(selectedInvoice?.monto_total) || 0) - (parseFloat(selectedInvoice?.monto_abonado) || 0));
+                                    setPayData(p => ({ ...p, amount: maxPay.toFixed(2) }));
+                                }}
+                                style={{
+                                    padding: '8px 13px',
+                                    borderRadius: 10,
+                                    border: 'none',
+                                    background: '#059669',
+                                    color: '#ffffff',
+                                    fontWeight: 800,
+                                    fontSize: '0.8rem',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                ⚡ Pagar Total Saldo
+                            </button>
                         </div>
                         <form onSubmit={handlePay}>
                             <FormGroup>
-                                <label>Monto a Abonar (C$)</label>
+                                <label>Monto a Pagar / Abonar (C$) *</label>
                                 <input
                                     required
                                     type="number"
@@ -2131,40 +2385,128 @@ const FacturasProveedores = () => {
                                     onChange={e => setPayData({ ...payData, amount: e.target.value })}
                                 />
                             </FormGroup>
+
                             <FormGroup>
-                                <label>Método de Pago</label>
-                                <select required value={payData.method} onChange={e => setPayData({ ...payData, method: e.target.value })}>
-                                    <option value="EFECTIVO">Efectivo</option>
-                                    <option value="TARJETA">Tarjeta</option>
-                                    <option value="TRANSFERENCIA">Transferencia</option>
-                                    <option value="CHEQUE">Cheque</option>
-                                </select>
+                                <label>Método de Pago *</label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(92px, 1fr))', gap: '0.5rem' }}>
+                                    {[
+                                        { id: 'EFECTIVO', label: 'Efectivo', icon: <FaMoneyBillWave /> },
+                                        { id: 'TRANSFERENCIA', label: 'Transferencia', icon: <FaUniversity /> },
+                                        { id: 'TARJETA', label: 'Tarjeta', icon: <FaCreditCard /> },
+                                        { id: 'CHEQUE', label: 'Cheque', icon: <FaReceipt /> },
+                                        { id: 'DEPOSITO', label: 'Depósito', icon: <FaBuilding /> }
+                                    ].map(m => (
+                                        <button
+                                            key={m.id}
+                                            type="button"
+                                            onClick={() => setPayData({ ...payData, method: m.id })}
+                                            style={{
+                                                padding: '0.68rem 0.4rem',
+                                                borderRadius: '10px',
+                                                border: payData.method === m.id ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                                                background: payData.method === m.id ? '#eff6ff' : '#fff',
+                                                color: payData.method === m.id ? '#1d4ed8' : '#475569',
+                                                fontWeight: 700,
+                                                fontSize: '0.8rem',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                gap: '0.3rem'
+                                            }}
+                                        >
+                                            <span style={{ fontSize: '1.1rem' }}>{m.icon}</span>
+                                            {m.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </FormGroup>
+
+                            {['TRANSFERENCIA', 'TARJETA', 'CHEQUE', 'DEPOSITO'].includes(payData.method) && (
+                                <FormGroup>
+                                    <label>Banco / Entidad Financiera</label>
+                                    <select
+                                        value={payData.banco || ''}
+                                        onChange={e => setPayData({ ...payData, banco: e.target.value })}
+                                    >
+                                        <option value="">Seleccione banco o entidad...</option>
+                                        <option value="BAC Credomatic">BAC Credomatic</option>
+                                        <option value="Banco Lafise Bancentro">Banco Lafise Bancentro</option>
+                                        <option value="Banpro">Banpro</option>
+                                        <option value="Ficohsa">Ficohsa</option>
+                                        <option value="Avanz">Avanz</option>
+                                        <option value="BDF">BDF</option>
+                                        <option value="Otro">Otro</option>
+                                    </select>
+                                </FormGroup>
+                            )}
+
                             <FormGroup>
-                                <label>Referencia / Detalle (Opcional)</label>
+                                <label>
+                                    {['TRANSFERENCIA', 'TARJETA', 'CHEQUE', 'DEPOSITO'].includes(payData.method)
+                                        ? `No. de Referencia / Autorización / Cheque (${payData.method}) *`
+                                        : 'No. de Recibo / Referencia de Pago'}
+                                </label>
                                 <input
                                     type="text"
-                                    placeholder="Ej: Transferencia #1234, Pago en efectivo..."
+                                    required={['TRANSFERENCIA', 'TARJETA', 'CHEQUE', 'DEPOSITO'].includes(payData.method)}
+                                    placeholder={
+                                        payData.method === 'TRANSFERENCIA'
+                                            ? 'Ej: Transferencia #1488920 (Obligatorio)'
+                                            : payData.method === 'TARJETA'
+                                            ? 'Ej: Voucher / Ref. Tarjeta #9921 (Obligatorio)'
+                                            : payData.method === 'CHEQUE'
+                                            ? 'Ej: Cheque #002314 (Obligatorio)'
+                                            : 'Ej: Recibo oficial #402 o entregado a...'
+                                    }
                                     value={payData.reference}
                                     onChange={e => setPayData({ ...payData, reference: e.target.value })}
                                 />
                             </FormGroup>
-                            <FormGroup>
-                                <label>Adjuntar Comprobante (Imagen o PDF)</label>
-                                <FileUploadContainer>
-                                    <FaUpload className="upload-icon" />
+
+                            <FormGroup style={{ background: attachmentData.base64 ? '#f0fdf4' : '#fffbeb', padding: '1rem', borderRadius: '14px', border: attachmentData.base64 ? '2px solid #22c55e' : '2px dashed #f59e0b' }}>
+                                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#0f172a', fontWeight: 800 }}>
+                                    <span>🧾 Digitalizar Comprobante / Voucher de Pago *</span>
+                                    <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: 999, background: attachmentData.base64 ? '#dcfce7' : '#fef3c7', color: attachmentData.base64 ? '#15803d' : '#b45309' }}>
+                                        {attachmentData.base64 ? '✓ Adjuntado' : 'OBLIGATORIO'}
+                                    </span>
+                                </label>
+                                <FileUploadContainer style={{ background: '#ffffff', padding: '1rem' }}>
+                                    <FaUpload className="upload-icon" style={{ color: attachmentData.base64 ? '#16a34a' : '#f59e0b' }} />
                                     {attachmentFile ? (
-                                        <div className="file-details">
-                                            {attachmentProcessing ? "Comprimiendo archivo..." : `✓ Listo: ${attachmentData.name} (${attachmentData.sizeInfo || ''})`}
+                                        <div className="file-details" style={{ color: '#15803d' }}>
+                                            {attachmentProcessing ? "Comprimiendo comprobante..." : `✓ Listo: ${attachmentData.name} (${attachmentData.sizeInfo || ''})`}
                                         </div>
                                     ) : (
-                                        <div className="file-details">Sube el comprobante de pago (Foto o PDF)</div>
+                                        <div className="file-details">Toca aquí para tomar foto o subir imagen / PDF del comprobante de pago</div>
                                     )}
                                     <input type="file" accept="image/*,application/pdf" onChange={handleFileSelection} disabled={attachmentProcessing} />
                                 </FileUploadContainer>
+                                {attachmentData.base64 && (
+                                    <div style={{ marginTop: '0.55rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        {!isPdfDoc(attachmentData.base64) ? (
+                                            <img
+                                                src={attachmentData.base64}
+                                                alt="Vista previa comprobante"
+                                                onClick={() => openDocPreview(attachmentData.base64, 'Vista Previa Comprobante de Pago', selectedInvoice?.proveedor)}
+                                                style={{ height: 56, width: 85, objectFit: 'cover', borderRadius: 8, border: '1px solid #cbd5e1', cursor: 'pointer' }}
+                                            />
+                                        ) : (
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e3a8a' }}>📄 PDF Adjunto</span>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => { setAttachmentFile(null); setAttachmentData({ base64: null, name: null }); }}
+                                            style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '4px 10px', borderRadius: 8, fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
+                                        >
+                                            ✕ Cambiar comprobante
+                                        </button>
+                                    </div>
+                                )}
                             </FormGroup>
-                            <Button $primary type="submit" disabled={attachmentProcessing} style={{ width: '100%', padding: '1rem' }}>
-                                <FaMoneyBillWave /> Confirmar Pago
+
+                            <Button $primary type="submit" disabled={attachmentProcessing} style={{ width: '100%', padding: '1rem', fontSize: '1rem' }}>
+                                <FaCheckCircle /> Confirmar Pago y Guardar Comprobante
                             </Button>
                         </form>
                     </ModalContent>

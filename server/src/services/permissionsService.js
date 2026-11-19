@@ -328,18 +328,16 @@ async function initPermissionsAndAuditSchema() {
       );
     }
 
-    // 4. Inicializar permisos por defecto en usuarios existentes que aún no tengan permisos_json
+    // 4. Inicializar o completar nuevas llaves de permisos en usuarios existentes
     const [existingUsers] = await db.query(
       `SELECT id_usuario, nombre_usuario, rol, permisos_json FROM usuarios WHERE LOWER(nombre_usuario) != 'admin'`
     );
     for (const u of existingUsers) {
-      if (!u.permisos_json) {
-        const defPerms = getDefaultPermissionsForRole(u.rol);
-        await db.query(
-          `UPDATE usuarios SET permisos_json = ? WHERE id_usuario = ?`,
-          [JSON.stringify(defPerms), u.id_usuario]
-        );
-      }
+      const resolved = resolveUserPermissions(u);
+      await db.query(
+        `UPDATE usuarios SET permisos_json = ? WHERE id_usuario = ?`,
+        [JSON.stringify(resolved), u.id_usuario]
+      );
     }
 
     // 5. Inicializar esquema de Planilla, Nómina y Comisiones por Reglas de Ganancia en `empleados`
