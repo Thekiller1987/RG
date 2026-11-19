@@ -270,9 +270,9 @@ function App() {
             }
           />
 
-          {/* Nueva ruta de Empleados */}
+          {/* Nueva ruta de Planilla y Empleados */}
           <Route path="/empleados" element={
-            <ProtectedRoute requiredPermission="empleados.acceso" allowedRoles={[ROLES.ADMIN, ROLES.GERENTE]}>
+            <ProtectedRoute requiredPermission={['planilla.acceso', 'empleados.acceso']} allowedRoles={[ROLES.ADMIN, ROLES.GERENTE]}>
               <motion.div {...pageTransition}><Empleados /></motion.div>
             </ProtectedRoute>
           } />

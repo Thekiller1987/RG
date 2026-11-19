@@ -34,6 +34,7 @@ import {
   PERMISSIONS_CATALOG,
   PERMISSION_CATEGORIES,
   ALL_PERMISSION_KEYS,
+  SYSTEM_MODULES_MAP,
   getDefaultPermissionsForRole,
   getAllPermissionsEnabled
 } from '../utils/permissions';
@@ -1226,6 +1227,72 @@ const UserManagement = () => {
                       <div className="bar-fill" />
                     </div>
                   </PermProgressBox>
+
+                  {/* MAPA VISUAL DE MÓDULOS CON ACCESO PARA ESTE USUARIO */}
+                  <div
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 12,
+                      padding: '0.7rem 0.85rem'
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        color: '#334155',
+                        textTransform: 'uppercase',
+                        marginBottom: 6,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <span>🗺️ Módulos con Acceso</span>
+                      <span style={{ color: '#2563eb' }}>
+                        {
+                          SYSTEM_MODULES_MAP.filter(m =>
+                            isMaster ? true : Boolean(u.permisos?.[m.accessKey])
+                          ).length
+                        }{' '}
+                        de {SYSTEM_MODULES_MAP.length} módulos
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                      {SYSTEM_MODULES_MAP.map(mod => {
+                        const hasModAccess = isMaster ? true : Boolean(u.permisos?.[mod.accessKey]);
+                        const enabledFuncs = mod.functions.filter(fk =>
+                          isMaster ? true : Boolean(u.permisos?.[fk])
+                        ).length;
+                        return (
+                          <span
+                            key={mod.id}
+                            onClick={() => openEditModal(u)}
+                            title={
+                              hasModAccess
+                                ? `✅ Tiene acceso a ${mod.name} (${enabledFuncs}/${mod.functions.length} funciones habilitadas)`
+                                : `🚫 Sin acceso a ${mod.name} (clic para configurar)`
+                            }
+                            style={{
+                              padding: '3px 8px',
+                              borderRadius: 999,
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              background: hasModAccess ? '#ecfdf5' : '#f1f5f9',
+                              color: hasModAccess ? '#065f46' : '#94a3b8',
+                              border: `1px solid ${hasModAccess ? '#a7f3d0' : '#e2e8f0'}`,
+                              textDecoration: hasModAccess ? 'none' : 'line-through'
+                            }}
+                          >
+                            {hasModAccess ? '✅' : '🔒'} {mod.name}{' '}
+                            {mod.functions.length > 1 && `(${enabledFuncs}/${mod.functions.length})`}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
 
                   <TraceMiniGrid>
                     <div className="metric">

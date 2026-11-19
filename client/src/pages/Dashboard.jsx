@@ -173,7 +173,7 @@ const Dashboard = () => {
     const canAccessInvoices = hasPermission('facturas_proveedores.acceso');
     const canAccessCredits = hasPermission('clientes_creditos.ver');
     const canAccessFinances = hasPermission('finanzas.ver');
-    const canAccessEmpleados = hasPermission('empleados.acceso');
+    const canAccessEmpleados = hasPermission('planilla.acceso') || hasPermission('empleados.acceso');
     const canAccessInventory = hasPermission('inventario.ver');
     const canAccessMassUpload = hasPermission('carga_masiva.acceso');
     const canAccessTraslados = hasPermission('salidas_inventario.acceso');
@@ -290,12 +290,12 @@ const Dashboard = () => {
                         </Card>
                     )}
 
-                    {/* TARJETA: Empleados (Admin/Gerente) */}
+                    {/* TARJETA: Planilla y Comisiones (Dueño / Usuarios Especiales) */}
                     {canAccessEmpleados && (
-                        <Card to="/empleados" color="#6366f1" onMouseEnter={() => prefetch('/empleados')}>
-                            <CardIcon color="#6366f1"><FaAddressCard /></CardIcon>
-                            <h2>Empleados</h2>
-                            <p>Gestión de vendedores y comisiones.</p>
+                        <Card to="/empleados" color="#0f766e" onMouseEnter={() => prefetch('/empleados')}>
+                            <CardIcon color="#0f766e"><FaAddressCard /></CardIcon>
+                            <h2>Planilla y Comisiones</h2>
+                            <p>Nómina, reglas de comisión sobre ganancia y liquidación de pagos.</p>
                         </Card>
                     )}
 

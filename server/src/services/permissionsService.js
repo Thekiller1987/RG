@@ -54,10 +54,16 @@ const PERMISSIONS_CATALOG = [
   { key: 'finanzas.registrar_movimientos', category: 'Finanzas, Reportes y Administración', label: 'Registrar ingresos y egresos financieros', description: 'Permite cargar gastos operativos o ingresos extra en Finanzas' },
   { key: 'reportes_ventas.ver', category: 'Finanzas, Reportes y Administración', label: 'Ver Reporte de Ventas Detallado', description: 'Permite auditar ventas por producto, rango de fechas y usuario' },
   { key: 'bi_consola.ver', category: 'Finanzas, Reportes y Administración', label: 'Ver Consola BI & Analítica', description: 'Permite acceder al panel ejecutivo de Inteligencia de Negocios' },
-  { key: 'empleados.acceso', category: 'Finanzas, Reportes y Administración', label: 'Gestionar Empleados y Vendedores', description: 'Permite administrar la plantilla de vendedores activos' },
+  { key: 'empleados.acceso', category: 'Finanzas, Reportes y Administración', label: 'Gestionar Empleados y Vendedores', description: 'Permite administrar la plantilla básica de vendedores activos' },
   { key: 'usuarios.acceso', category: 'Finanzas, Reportes y Administración', label: 'Gestionar Usuarios, Permisos y Trazabilidad', description: 'Permite crear usuarios, marcar permisos y auditar acciones' },
   { key: 'configuracion.acceso', category: 'Finanzas, Reportes y Administración', label: 'Modificar Configuración del Negocio', description: 'Permite editar datos de empresa, RUC, teléfonos y formato de ticket' },
-  { key: 'ia_asistente.acceso', category: 'Finanzas, Reportes y Administración', label: 'Usar Asistente de Inteligencia Artificial (ADA)', description: 'Permite abrir y consultar el asistente flotante de IA' }
+  { key: 'ia_asistente.acceso', category: 'Finanzas, Reportes y Administración', label: 'Usar Asistente de Inteligencia Artificial (ADA)', description: 'Permite abrir y consultar el asistente flotante de IA' },
+
+  // 7. Planilla, Nómina y Comisiones por Ganancia (Exclusivo Dueño / Usuarios Especiales)
+  { key: 'planilla.acceso', category: 'Planilla y Comisiones (Especial / Dueño)', label: 'Acceder a Planilla y Pago por Comisiones', description: 'Acceso exclusivo para ver cálculos de nómina y comisiones de empleados' },
+  { key: 'planilla.ver_ganancias', category: 'Planilla y Comisiones (Especial / Dueño)', label: 'Ver ganancia real generada por cada vendedor', description: 'Permite ver costos vs precios de venta y utilidad neta por empleado' },
+  { key: 'planilla.reglas_comision', category: 'Planilla y Comisiones (Especial / Dueño)', label: 'Configurar salarios y reglas de comisión sobre ganancia', description: 'Permite definir porcentajes sobre ganancia, metas mínimas, márgenes y bonos' },
+  { key: 'planilla.liquidar_pagos', category: 'Planilla y Comisiones (Especial / Dueño)', label: 'Registrar pagos de planilla, vales y colillas', description: 'Permite liquidar comisiones, aplicar deducciones/adelantos e imprimir colillas' }
 ];
 
 const ALL_PERMISSION_KEYS = PERMISSIONS_CATALOG.map(p => p.key);
@@ -89,6 +95,11 @@ function getDefaultPermissionsForRole(rol = 'Vendedor') {
     base['usuarios.acceso'] = false;
     base['inventario.eliminar'] = false;
     base['clientes.eliminar'] = false;
+    // Planilla y comisiones sobre ganancia queda reservado para Dueño / Usuarios Especiales
+    base['planilla.acceso'] = false;
+    base['planilla.ver_ganancias'] = false;
+    base['planilla.reglas_comision'] = false;
+    base['planilla.liquidar_pagos'] = false;
     return base;
   }
 
@@ -331,7 +342,97 @@ async function initPermissionsAndAuditSchema() {
       }
     }
 
-    console.log('✅ Sistema de Permisos Granulares, Usuario Principal (admin/1987) y Trazabilidad verificado.');
+    // 5. Inicializar esquema de Planilla, Nómina y Comisiones por Reglas de Ganancia en `empleados`
+    try {
+      const [empCols] = await db.query(`SHOW COLUMNS FROM empleados`);
+      const empColNames = new Set(empCols.map(c => c.Field));
+
+      const alterQueries = [
+        ['id_usuario_vinculado', 'ALTER TABLE empleados ADD COLUMN id_usuario_vinculado INT NULL'],
+        ['salario_base', 'ALTER TABLE empleados ADD COLUMN salario_base DECIMAL(12,2) NOT NULL DEFAULT 0.00'],
+        ['frecuencia_pago', "ALTER TABLE empleados ADD COLUMN frecuencia_pago VARCHAR(30) NOT NULL DEFAULT 'Quincenal'"],
+        ['tipo_comision', "ALTER TABLE empleados ADD COLUMN tipo_comision VARCHAR(40) NOT NULL DEFAULT 'PORCENTAJE_GANANCIA'"],
+        ['porcentaje_comision_ganancia', 'ALTER TABLE empleados ADD COLUMN porcentaje_comision_ganancia DECIMAL(6,2) NOT NULL DEFAULT 5.00'],
+        ['porcentaje_comision_venta', 'ALTER TABLE empleados ADD COLUMN porcentaje_comision_venta DECIMAL(6,2) NOT NULL DEFAULT 0.00'],
+        ['meta_ganancia_minima', 'ALTER TABLE empleados ADD COLUMN meta_ganancia_minima DECIMAL(12,2) NOT NULL DEFAULT 0.00'],
+        ['margen_minimo_producto', 'ALTER TABLE empleados ADD COLUMN margen_minimo_producto DECIMAL(6,2) NOT NULL DEFAULT 0.00'],
+        ['meta_ganancia_objetivo', 'ALTER TABLE empleados ADD COLUMN meta_ganancia_objetivo DECIMAL(12,2) NOT NULL DEFAULT 0.00'],
+        ['porcentaje_nivel2_ganancia', 'ALTER TABLE empleados ADD COLUMN porcentaje_nivel2_ganancia DECIMAL(6,2) NOT NULL DEFAULT 0.00'],
+        ['bono_meta_ganancia', 'ALTER TABLE empleados ADD COLUMN bono_meta_ganancia DECIMAL(12,2) NOT NULL DEFAULT 0.00'],
+        ['incluir_ventas_usuario', 'ALTER TABLE empleados ADD COLUMN incluir_ventas_usuario TINYINT(1) NOT NULL DEFAULT 1'],
+        ['notas_contrato', 'ALTER TABLE empleados ADD COLUMN notas_contrato TEXT NULL']
+      ];
+
+      for (const [col, sql] of alterQueries) {
+        if (!empColNames.has(col)) {
+          await db.query(sql);
+        }
+      }
+
+      // Auto-vincular empleados existentes con usuarios del sistema por nombre si aún no están vinculados
+      await db.query(`
+        UPDATE empleados e
+        JOIN usuarios u ON (
+          LOWER(TRIM(e.nombre)) = LOWER(TRIM(u.nombre_usuario))
+          OR (LOWER(e.nombre) LIKE '%miguelito%' AND LOWER(u.nombre_usuario) LIKE '%miguelito%')
+          OR (LOWER(e.nombre) LIKE '%walter%' AND LOWER(u.nombre_usuario) LIKE '%walter%')
+          OR (LOWER(e.nombre) LIKE '%waskar%' AND LOWER(u.nombre_usuario) LIKE '%waskar%')
+        )
+        SET e.id_usuario_vinculado = u.id_usuario
+        WHERE e.id_usuario_vinculado IS NULL
+      `).catch(() => {});
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS planilla_movimientos (
+          id_movimiento INT AUTO_INCREMENT PRIMARY KEY,
+          id_empleado INT NOT NULL,
+          tipo VARCHAR(30) NOT NULL,
+          monto DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          concepto VARCHAR(255) NOT NULL,
+          fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+          liquidado TINYINT(1) NOT NULL DEFAULT 0,
+          id_pago_planilla INT NULL,
+          registrado_por VARCHAR(100) NULL,
+          INDEX idx_pm_emp (id_empleado),
+          INDEX idx_pm_fecha (fecha)
+        )
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS planilla_pagos (
+          id_pago INT AUTO_INCREMENT PRIMARY KEY,
+          id_empleado INT NOT NULL,
+          empleado_nombre VARCHAR(150) NOT NULL,
+          fecha_inicio DATE NOT NULL,
+          fecha_fin DATE NOT NULL,
+          frecuencia_pago VARCHAR(30) NULL,
+          total_facturas INT NOT NULL DEFAULT 0,
+          total_vendido DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          total_costo DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          ganancia_generada DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          ganancia_comisionable DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          regla_aplicada VARCHAR(180) NULL,
+          salario_base DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          comision_ganancia DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          comision_venta DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          bono_meta DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          bonos_extra DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          deducciones_adelantos DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          total_neto_pagado DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          metodo_pago VARCHAR(40) DEFAULT 'Efectivo',
+          notas TEXT NULL,
+          pagado_por VARCHAR(100) NULL,
+          fecha_pago DATETIME DEFAULT CURRENT_TIMESTAMP,
+          detalles_json LONGTEXT NULL,
+          INDEX idx_pp_emp (id_empleado),
+          INDEX idx_pp_fecha (fecha_pago)
+        )
+      `);
+    } catch (empErr) {
+      console.error('⚠️ Error inicializando tablas de planilla:', empErr.message);
+    }
+
+    console.log('✅ Sistema de Permisos Granulares, Planilla por Comisiones, Usuario Principal (admin/1987) y Trazabilidad verificado.');
   } catch (err) {
     console.error('❌ Error inicializando esquema de permisos y trazabilidad:', err.message);
   }
@@ -347,3 +448,4 @@ module.exports = {
   logUserActivity,
   initPermissionsAndAuditSchema
 };
+

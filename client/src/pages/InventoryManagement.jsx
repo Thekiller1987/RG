@@ -974,7 +974,7 @@ const EditProductModal = ({ isOpen, onClose, onSave, productToEdit, categories, 
   COMPONENTE PRINCIPAL: InventoryManagement
 ===================================== */
 const InventoryManagement = () => {
-  const { globalReservations, socket, hasPermission } = useAuth();
+  const { globalReservations, socket, hasPermission, requireActionPermission } = useAuth();
   const canCreate = hasPermission('inventario.crear');
   const canEdit = hasPermission('inventario.editar');
   const canDelete = hasPermission('inventario.eliminar');
@@ -1337,14 +1337,48 @@ const InventoryManagement = () => {
       <HeaderContainer>
         <Title><FaBoxOpen /> Gestión de Inventario</Title>
         <ButtonGroup>
-          {canCreate && <Button primary onClick={openCreateModal}><FaPlus /> Crear Producto</Button>}
-          {canBarcodes && (
-            <Button secondary onClick={() => { setInitialBarcodeProduct(null); setIsBarcodeModalOpen(true); }} title="Generador de Etiquetas / QR en Hoja A4">
-              <FaBarcode /> Etiquetas A4
-            </Button>
-          )}
-          {canCreate && <Button secondary onClick={() => setIsCategoryModalOpen(true)}><FaTags /> Categorías</Button>}
-          {canCreate && <Button secondary onClick={() => setIsProviderModalOpen(true)}><FaTruck /> Proveedores</Button>}
+          <Button
+            primary
+            onClick={() => {
+              if (!requireActionPermission('inventario.crear', 'Crear Nuevo Producto en Inventario')) return;
+              openCreateModal();
+            }}
+            style={{ opacity: canCreate ? 1 : 0.72 }}
+          >
+            <FaPlus /> Crear Producto {!canCreate && '🔒'}
+          </Button>
+          <Button
+            secondary
+            onClick={() => {
+              if (!requireActionPermission('inventario.codigos_barra', 'Generar e Imprimir Etiquetas / Códigos de Barra')) return;
+              setInitialBarcodeProduct(null);
+              setIsBarcodeModalOpen(true);
+            }}
+            title="Generador de Etiquetas / QR en Hoja A4"
+            style={{ opacity: canBarcodes ? 1 : 0.72 }}
+          >
+            <FaBarcode /> Etiquetas A4 {!canBarcodes && '🔒'}
+          </Button>
+          <Button
+            secondary
+            onClick={() => {
+              if (!requireActionPermission('inventario.crear', 'Gestionar Categorías de Productos')) return;
+              setIsCategoryModalOpen(true);
+            }}
+            style={{ opacity: canCreate ? 1 : 0.72 }}
+          >
+            <FaTags /> Categorías {!canCreate && '🔒'}
+          </Button>
+          <Button
+            secondary
+            onClick={() => {
+              if (!requireActionPermission('inventario.crear', 'Gestionar Proveedores de Inventario')) return;
+              setIsProviderModalOpen(true);
+            }}
+            style={{ opacity: canCreate ? 1 : 0.72 }}
+          >
+            <FaTruck /> Proveedores {!canCreate && '🔒'}
+          </Button>
           <Button tertiary onClick={() => setIsHistoryModalOpen(true)}><FaHistory /> Historial</Button>
         </ButtonGroup>
       </HeaderContainer>
@@ -1432,10 +1466,45 @@ const InventoryManagement = () => {
                 {canViewCosts && <InfoTag><span>Costo Total</span><strong>{p.__fmt.costoTotal}</strong></InfoTag>}
               </CardBody>
               <CardFooter>
-                {canBarcodes && <ActionButton className="label" title="Generar Etiquetas A4" onClick={() => { setInitialBarcodeProduct(p); setIsBarcodeModalOpen(true); }}><FaBarcode /></ActionButton>}
-                {canEdit && <ActionButton className="adjust" title="Ajustar Stock" onClick={() => setAdjustmentModal({ isOpen: true, product: p })}><FaPlusCircle /><FaMinusCircle style={{ marginLeft: 4 }} /></ActionButton>}
-                {canEdit && <ActionButton className="edit" onClick={() => openEditModal(p)}><FaEdit /> Editar</ActionButton>}
-                {canDelete && <ActionButton className="delete" onClick={() => openDeleteModal(p)}><FaTrash /> Eliminar</ActionButton>}
+                <ActionButton
+                  className="label"
+                  title="Generar Etiquetas A4"
+                  onClick={() => {
+                    if (!requireActionPermission('inventario.codigos_barra', 'Generar Etiquetas de Código de Barras')) return;
+                    setInitialBarcodeProduct(p);
+                    setIsBarcodeModalOpen(true);
+                  }}
+                >
+                  <FaBarcode />
+                </ActionButton>
+                <ActionButton
+                  className="adjust"
+                  title="Ajustar Stock"
+                  onClick={() => {
+                    if (!requireActionPermission('inventario.editar', 'Ajustar Existencia / Stock de Producto')) return;
+                    setAdjustmentModal({ isOpen: true, product: p });
+                  }}
+                >
+                  <FaPlusCircle /><FaMinusCircle style={{ marginLeft: 4 }} />
+                </ActionButton>
+                <ActionButton
+                  className="edit"
+                  onClick={() => {
+                    if (!requireActionPermission('inventario.editar', 'Editar Producto, Stock o Precios')) return;
+                    openEditModal(p);
+                  }}
+                >
+                  <FaEdit /> Editar {!canEdit && '🔒'}
+                </ActionButton>
+                <ActionButton
+                  className="delete"
+                  onClick={() => {
+                    if (!requireActionPermission('inventario.eliminar', 'Eliminar Producto del Catálogo')) return;
+                    openDeleteModal(p);
+                  }}
+                >
+                  <FaTrash /> Eliminar {!canDelete && '🔒'}
+                </ActionButton>
               </CardFooter>
             </ProductCard>
           );

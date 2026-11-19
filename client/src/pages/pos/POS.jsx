@@ -28,7 +28,7 @@ const fmt = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigit
 
 const POS = () => {
   // Contextos
-  const { user, products: initialProducts, token, refreshProducts, clients, allUsers, globalReservations, hasPermission } = useAuth();
+  const { user, products: initialProducts, token, refreshProducts, clients, allUsers, globalReservations, hasPermission, requireActionPermission } = useAuth();
   const { isCajaOpen, setIsCajaOpen, cajaSession, setCajaSession, tasaDolar, setTasaDolar, closeCajaSession, refreshSession } = useCaja();
   const {
     orders, activeOrderId, setActiveOrderId, activeOrder,
@@ -775,24 +775,43 @@ const POS = () => {
           <S.Button secondary onClick={refreshData} title="Sincronizar" style={{ padding: '6px 8px', fontSize: '0.85rem' }}>
             <FaSync />
           </S.Button>
-          {hasPermission('pos.historial_ventas') && (
-            <S.Button secondary onClick={() => openModal('salesHistory')} title="Historial de Ventas" style={{ padding: '6px 8px', fontSize: '0.85rem' }}>
-              <FaHistory />
-            </S.Button>
-          )}
-          {hasPermission('caja.movimientos') && (
-            <>
-              <S.Button secondary onClick={() => openModal('cashEntry')} title="Entrada de Dinero" style={{ padding: '6px 8px', fontSize: '0.85rem' }}>
-                <FaArrowDown color="#10b981" />
-              </S.Button>
-              <S.Button secondary onClick={() => openModal('cashExit')} title="Salida de Dinero" style={{ padding: '6px 8px', fontSize: '0.85rem' }}>
-                <FaArrowUp color="#ef4444" />
-              </S.Button>
-            </>
-          )}
-          {hasPermission('caja.abrir_cerrar') && (
-            <S.Button secondary onClick={async () => {
-              // Auto-limpiar duplicados antes de abrir
+          <S.Button
+            secondary
+            onClick={() => {
+              if (!requireActionPermission('pos.historial_ventas', 'Ver Historial de Ventas en POS')) return;
+              openModal('salesHistory');
+            }}
+            title="Historial de Ventas"
+            style={{ padding: '6px 8px', fontSize: '0.85rem', opacity: hasPermission('pos.historial_ventas') ? 1 : 0.65 }}
+          >
+            <FaHistory />
+          </S.Button>
+          <S.Button
+            secondary
+            onClick={() => {
+              if (!requireActionPermission('caja.movimientos', 'Registrar Entrada de Efectivo en Caja')) return;
+              openModal('cashEntry');
+            }}
+            title="Entrada de Dinero"
+            style={{ padding: '6px 8px', fontSize: '0.85rem', opacity: hasPermission('caja.movimientos') ? 1 : 0.65 }}
+          >
+            <FaArrowDown color="#10b981" />
+          </S.Button>
+          <S.Button
+            secondary
+            onClick={() => {
+              if (!requireActionPermission('caja.movimientos', 'Registrar Salida / Gasto de Efectivo en Caja')) return;
+              openModal('cashExit');
+            }}
+            title="Salida de Dinero"
+            style={{ padding: '6px 8px', fontSize: '0.85rem', opacity: hasPermission('caja.movimientos') ? 1 : 0.65 }}
+          >
+            <FaArrowUp color="#ef4444" />
+          </S.Button>
+          <S.Button
+            secondary
+            onClick={async () => {
+              if (!requireActionPermission('caja.abrir_cerrar', 'Abrir / Cerrar y Arquear Turno de Caja')) return;
               if (isCajaOpen && userId) {
                 try {
                   await api.dedupCajaSession(userId, token);
@@ -800,10 +819,11 @@ const POS = () => {
                 } catch (e) { console.error('dedup error:', e); }
               }
               openModal('caja');
-            }} style={{ padding: '6px 9px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <FaLock /> <span className="pos-brand-title">{currentUser?.nombre_usuario || 'Caja'}</span>
-            </S.Button>
-          )}
+            }}
+            style={{ padding: '6px 9px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px', opacity: hasPermission('caja.abrir_cerrar') ? 1 : 0.65 }}
+          >
+            <FaLock /> <span className="pos-brand-title">{currentUser?.nombre_usuario || 'Caja'}</span>
+          </S.Button>
         </div>
       </S.HeaderActions>
 
@@ -859,28 +879,32 @@ const POS = () => {
             </S.TicketContainer>
 
             {/* Action Buttons for Cart Management */}
-            {hasPermission('pos.descuentos') && (
-              <div style={{ display: 'flex', gap: '6px', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-                <S.Button
-                  secondary
-                  onClick={toggleWholesalePrice}
-                  title="Cambiar a Precio Mayorista"
-                  disabled={cart.length === 0}
-                  style={{ flex: 1, fontSize: '0.75rem', padding: '8px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
-                >
-                  <FaTag size={12} /> Mayorista
-                </S.Button>
-                <S.Button
-                  secondary
-                  onClick={() => openModal('discount')}
-                  title="Aplicar Descuento"
-                  disabled={cart.length === 0}
-                  style={{ flex: 1, fontSize: '0.75rem', padding: '8px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
-                >
-                  <FaPercentage size={12} /> Descuento
-                </S.Button>
-              </div>
-            )}
+            <div style={{ display: 'flex', gap: '6px', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+              <S.Button
+                secondary
+                onClick={() => {
+                  if (!requireActionPermission('pos.descuentos', 'Aplicar Precio Mayorista en Carrito')) return;
+                  toggleWholesalePrice();
+                }}
+                title="Cambiar a Precio Mayorista"
+                disabled={cart.length === 0}
+                style={{ flex: 1, fontSize: '0.75rem', padding: '8px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center', opacity: hasPermission('pos.descuentos') ? 1 : 0.65 }}
+              >
+                <FaTag size={12} /> Mayorista {!hasPermission('pos.descuentos') && '🔒'}
+              </S.Button>
+              <S.Button
+                secondary
+                onClick={() => {
+                  if (!requireActionPermission('pos.descuentos', 'Aplicar Descuento a la Venta')) return;
+                  openModal('discount');
+                }}
+                title="Aplicar Descuento"
+                disabled={cart.length === 0}
+                style={{ flex: 1, fontSize: '0.75rem', padding: '8px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center', opacity: hasPermission('pos.descuentos') ? 1 : 0.65 }}
+              >
+                <FaPercentage size={12} /> Descuento {!hasPermission('pos.descuentos') && '🔒'}
+              </S.Button>
+            </div>
 
             {/* Lista de Items en Carrito */}
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', margin: '0.5rem 0', paddingRight: '4px', WebkitOverflowScrolling: 'touch' }}>
@@ -909,19 +933,35 @@ const POS = () => {
                         <div style={{ fontSize: '0.92rem', fontWeight: '900', color: '#15803d', marginTop: '1px' }}>
                           Total: C$ {fmt(Number(item.quantity || 1) * Number(item.precio_venta || 0))}
                         </div>
-                        {hasPermission('pos.descuentos') && (
-                          <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
-                            <S.RoundBtn title="Editar Precio" onClick={() => openModal('editPrice', { item })}>
-                              <FaPencilAlt size={10} />
-                            </S.RoundBtn>
-                            <S.RoundBtn title="Precio Mayorista" onClick={() => handleItemWholesale(item)}>
-                              <FaTag size={10} />
-                            </S.RoundBtn>
-                            <S.RoundBtn title="Descuento Item" onClick={() => openModal('itemDiscount', { item })}>
-                              <FaPercentage size={10} />
-                            </S.RoundBtn>
-                          </div>
-                        )}
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                          <S.RoundBtn
+                            title="Editar Precio"
+                            onClick={() => {
+                              if (!requireActionPermission('pos.descuentos', 'Modificar Precio Unitario de Producto')) return;
+                              openModal('editPrice', { item });
+                            }}
+                          >
+                            <FaPencilAlt size={10} />
+                          </S.RoundBtn>
+                          <S.RoundBtn
+                            title="Precio Mayorista"
+                            onClick={() => {
+                              if (!requireActionPermission('pos.descuentos', 'Aplicar Precio Mayorista al Producto')) return;
+                              handleItemWholesale(item);
+                            }}
+                          >
+                            <FaTag size={10} />
+                          </S.RoundBtn>
+                          <S.RoundBtn
+                            title="Descuento Item"
+                            onClick={() => {
+                              if (!requireActionPermission('pos.descuentos', 'Aplicar Descuento por Producto')) return;
+                              openModal('itemDiscount', { item });
+                            }}
+                          >
+                            <FaPercentage size={10} />
+                          </S.RoundBtn>
+                        </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                         <S.QtyControl style={{ padding: '2px' }}>
@@ -949,21 +989,25 @@ const POS = () => {
                 <S.Button
                   secondary
                   style={{ flex: 1, padding: '12px 6px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}
-                  onClick={() => openModal('proformaName')}
+                  onClick={() => {
+                    if (!requireActionPermission('pedidos_apartados.gestionar', 'Crear Proforma / Cotización')) return;
+                    openModal('proformaName');
+                  }}
                 >
                   <FaFileInvoice /> Proforma
                 </S.Button>
 
-                {hasPermission('pos.cobrar') && (
-                  <S.Button
-                    primary
-                    style={{ flex: 2, padding: '14px 10px', fontSize: '1.15rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}
-                    onClick={() => openModal('payment', { total })}
-                    disabled={cart.length === 0}
-                  >
-                    $ COBRAR (F2)
-                  </S.Button>
-                )}
+                <S.Button
+                  primary
+                  style={{ flex: 2, padding: '14px 10px', fontSize: '1.15rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', opacity: hasPermission('pos.cobrar') ? 1 : 0.7 }}
+                  onClick={() => {
+                    if (!requireActionPermission('pos.cobrar', 'Facturar y Cobrar Venta en POS')) return;
+                    openModal('payment', { total });
+                  }}
+                  disabled={cart.length === 0}
+                >
+                  $ COBRAR (F2) {!hasPermission('pos.cobrar') && '🔒'}
+                </S.Button>
               </div>
             </div>
           </div>

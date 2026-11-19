@@ -2,7 +2,7 @@ import React, { createContext, useState, useContext, useEffect, useCallback, use
 import { useNavigate } from 'react-router-dom';
 import * as api from '../service/api.js';
 import { loadCajaSession, saveCajaSession } from '../utils/caja.js';
-import { checkUserPermission, isMasterAdmin } from '../utils/permissions.js';
+import { checkUserPermission, isMasterAdmin, getPermissionMeta } from '../utils/permissions.js';
 import { toast } from 'react-hot-toast';
 
 const AuthContext = createContext(null);
@@ -20,6 +20,13 @@ export const AuthProvider = ({ children, socket }) => {
     const [cajaSession, setCajaSession] = useState(null);
 
     const [globalReservations, setGlobalReservations] = useState({ totalByProduct: {}, userReservations: {} });
+    const [permissionDeniedModal, setPermissionDeniedModal] = useState({
+        open: false,
+        key: '',
+        label: '',
+        category: '',
+        description: ''
+    });
 
     // Ref for Debouncing
     const refreshTimeoutRef = useRef(null);
@@ -288,6 +295,25 @@ export const AuthProvider = ({ children, socket }) => {
         return checkUserPermission(user, permissionKey);
     }, [user]);
 
+    /**
+     * Verifica si el usuario tiene permiso para ejecutar una función/acción.
+     * Si NO lo tiene, muestra inmediatamente el anuncio "No tienes permiso para realizar esta acción" y devuelve false.
+     */
+    const requireActionPermission = useCallback((permissionKey, customActionLabel = null) => {
+        const allowed = checkUserPermission(user, permissionKey);
+        if (allowed) return true;
+
+        const meta = getPermissionMeta(permissionKey);
+        setPermissionDeniedModal({
+            open: true,
+            key: permissionKey,
+            label: customActionLabel || meta.label,
+            category: meta.category,
+            description: meta.description
+        });
+        return false;
+    }, [user]);
+
     const value = {
         user,
         token,
@@ -308,6 +334,7 @@ export const AuthProvider = ({ children, socket }) => {
         globalReservations,
         getAvailableStock,
         hasPermission,
+        requireActionPermission,
         isMasterAdmin: isMasterAdmin(user),
         socket
     };
@@ -342,6 +369,97 @@ export const AuthProvider = ({ children, socket }) => {
     return (
         <AuthContext.Provider value={value}>
             {children}
+            {permissionDeniedModal.open && (
+                <div
+                    onClick={() => setPermissionDeniedModal(p => ({ ...p, open: false }))}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(15, 23, 42, 0.72)',
+                        backdropFilter: 'blur(4px)',
+                        zIndex: 99999999,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '1rem',
+                        fontFamily: "'Inter', sans-serif"
+                    }}
+                >
+                    <div
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                            background: '#ffffff',
+                            borderRadius: 20,
+                            maxWidth: 450,
+                            width: '100%',
+                            overflow: 'hidden',
+                            boxShadow: '0 25px 60px rgba(15, 23, 42, 0.4)',
+                            border: '2px solid #fca5a5',
+                            textAlign: 'center'
+                        }}
+                    >
+                        <div
+                            style={{
+                                background: 'linear-gradient(135deg, #991b1b 0%, #dc2626 100%)',
+                                color: '#ffffff',
+                                padding: '1.35rem 1.5rem'
+                            }}
+                        >
+                            <div style={{ fontSize: '2.4rem', marginBottom: 6 }}>🚫</div>
+                            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800 }}>
+                                No tienes permiso para realizar esta acción
+                            </h3>
+                        </div>
+                        <div style={{ padding: '1.4rem 1.6rem', color: '#334155' }}>
+                            <p style={{ margin: '0 0 12px', fontSize: '0.94rem', lineHeight: 1.5 }}>
+                                Tu usuario <strong>{user?.nombre_usuario || ''}</strong> ({user?.rol || 'Usuario'}) no tiene habilitada la casilla para:
+                            </p>
+                            <div
+                                style={{
+                                    background: '#fef2f2',
+                                    border: '1px solid #fecaca',
+                                    borderRadius: 12,
+                                    padding: '0.85rem 1rem',
+                                    marginBottom: 14,
+                                    textAlign: 'left'
+                                }}
+                            >
+                                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#dc2626', textTransform: 'uppercase' }}>
+                                    Módulo: {permissionDeniedModal.category}
+                                </div>
+                                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#7f1d1d', marginTop: 3 }}>
+                                    🔒 {permissionDeniedModal.label}
+                                </div>
+                                {permissionDeniedModal.description && (
+                                    <div style={{ fontSize: '0.78rem', color: '#991b1b', marginTop: 4 }}>
+                                        {permissionDeniedModal.description}
+                                    </div>
+                                )}
+                            </div>
+                            <p style={{ margin: '0 0 16px', fontSize: '0.8rem', color: '#64748b' }}>
+                                Solicita al Administrador Principal que habilite esta casilla en tu perfil de usuario si necesitas ejecutar esta función.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => setPermissionDeniedModal(p => ({ ...p, open: false }))}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.78rem',
+                                    borderRadius: 11,
+                                    border: 'none',
+                                    background: '#0f172a',
+                                    color: '#ffffff',
+                                    fontWeight: 800,
+                                    fontSize: '0.92rem',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Entendido
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </AuthContext.Provider>
     );
 };

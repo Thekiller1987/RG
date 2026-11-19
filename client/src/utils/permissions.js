@@ -48,10 +48,151 @@ export const PERMISSIONS_CATALOG = [
   { key: 'finanzas.registrar_movimientos', category: 'Finanzas, Reportes y Administración', label: 'Registrar ingresos y egresos financieros', description: 'Permite cargar gastos operativos o ingresos extra en Finanzas' },
   { key: 'reportes_ventas.ver', category: 'Finanzas, Reportes y Administración', label: 'Ver Reporte de Ventas Detallado', description: 'Permite auditar ventas por producto, rango de fechas y usuario' },
   { key: 'bi_consola.ver', category: 'Finanzas, Reportes y Administración', label: 'Ver Consola BI & Analítica', description: 'Permite acceder al panel ejecutivo de Inteligencia de Negocios' },
-  { key: 'empleados.acceso', category: 'Finanzas, Reportes y Administración', label: 'Gestionar Empleados y Vendedores', description: 'Permite administrar la plantilla de vendedores activos' },
+  { key: 'empleados.acceso', category: 'Finanzas, Reportes y Administración', label: 'Gestionar Empleados y Vendedores', description: 'Permite administrar la plantilla básica de vendedores activos' },
   { key: 'usuarios.acceso', category: 'Finanzas, Reportes y Administración', label: 'Gestionar Usuarios, Permisos y Trazabilidad', description: 'Permite crear usuarios, marcar permisos y auditar acciones' },
   { key: 'configuracion.acceso', category: 'Finanzas, Reportes y Administración', label: 'Modificar Configuración del Negocio', description: 'Permite editar datos de empresa, RUC, teléfonos y formato de ticket' },
-  { key: 'ia_asistente.acceso', category: 'Finanzas, Reportes y Administración', label: 'Usar Asistente de Inteligencia Artificial (ADA)', description: 'Permite abrir y consultar el asistente flotante de IA' }
+  { key: 'ia_asistente.acceso', category: 'Finanzas, Reportes y Administración', label: 'Usar Asistente de Inteligencia Artificial (ADA)', description: 'Permite abrir y consultar el asistente flotante de IA' },
+
+  // 7. Planilla, Nómina y Comisiones por Ganancia (Exclusivo Dueño / Usuarios Especiales)
+  { key: 'planilla.acceso', category: 'Planilla y Comisiones (Especial / Dueño)', label: 'Acceder a Planilla y Pago por Comisiones', description: 'Acceso exclusivo para ver cálculos de nómina y comisiones de empleados' },
+  { key: 'planilla.ver_ganancias', category: 'Planilla y Comisiones (Especial / Dueño)', label: 'Ver ganancia real generada por cada vendedor', description: 'Permite ver costos vs precios de venta y utilidad neta por empleado' },
+  { key: 'planilla.reglas_comision', category: 'Planilla y Comisiones (Especial / Dueño)', label: 'Configurar salarios y reglas de comisión sobre ganancia', description: 'Permite definir porcentajes sobre ganancia, metas mínimas, márgenes y bonos' },
+  { key: 'planilla.liquidar_pagos', category: 'Planilla y Comisiones (Especial / Dueño)', label: 'Registrar pagos de planilla, vales y colillas', description: 'Permite liquidar comisiones, aplicar deducciones/adelantos e imprimir colillas' }
+];
+
+/**
+ * Mapa maestro de los Módulos del Sistema y sus funciones internas para visualizar
+ * qué módulos tiene habilitados o bloqueados cada usuario.
+ */
+export const SYSTEM_MODULES_MAP = [
+  {
+    id: 'pos',
+    name: 'Punto de Venta (POS)',
+    route: '/pos',
+    accessKey: 'pos.acceso',
+    color: '#2563eb',
+    functions: ['pos.acceso', 'pos.cobrar', 'pos.descuentos', 'pos.venta_credito', 'pos.devoluciones', 'pos.historial_ventas', 'pos.cambiar_vendedor']
+  },
+  {
+    id: 'mayorista',
+    name: 'Venta Mayorista',
+    route: '/wholesale-pos',
+    accessKey: 'pos_mayorista.acceso',
+    color: '#8b5cf6',
+    functions: ['pos_mayorista.acceso', 'mayorista.promociones', 'mayorista.catalogo']
+  },
+  {
+    id: 'proformas',
+    name: 'Proformas y Apartados',
+    route: '/orders',
+    accessKey: 'pedidos_apartados.acceso',
+    color: '#eab308',
+    functions: ['pedidos_apartados.acceso', 'pedidos_apartados.gestionar']
+  },
+  {
+    id: 'caja',
+    name: 'Gestión y Arqueos de Caja',
+    route: '/cash-report',
+    accessKey: 'caja_reportes.ver',
+    color: '#dc2626',
+    functions: ['caja.abrir_cerrar', 'caja.movimientos', 'caja.ajuste_secreto', 'caja_reportes.ver', 'caja_reportes.auditar']
+  },
+  {
+    id: 'inventario',
+    name: 'Gestión de Inventario',
+    route: '/inventory',
+    accessKey: 'inventario.ver',
+    color: '#16a34a',
+    functions: ['inventario.ver', 'inventario.crear', 'inventario.editar', 'inventario.eliminar', 'inventario.ver_costos', 'inventario.codigos_barra']
+  },
+  {
+    id: 'carga_masiva',
+    name: 'Carga Masiva CSV',
+    route: '/upload/inventory',
+    accessKey: 'carga_masiva.acceso',
+    color: '#7c3aed',
+    functions: ['carga_masiva.acceso']
+  },
+  {
+    id: 'traslados',
+    name: 'Traslados / Salidas',
+    route: '/traslados',
+    accessKey: 'salidas_inventario.acceso',
+    color: '#ef4444',
+    functions: ['salidas_inventario.acceso']
+  },
+  {
+    id: 'clientes',
+    name: 'Clientes y Créditos',
+    route: '/credits',
+    accessKey: 'clientes_creditos.ver',
+    color: '#0284c7',
+    functions: ['clientes_creditos.ver', 'clientes.crear_editar', 'clientes.registrar_abono', 'clientes.anular_abono', 'clientes.eliminar']
+  },
+  {
+    id: 'proveedores',
+    name: 'Facturas Proveedores',
+    route: '/invoices',
+    accessKey: 'facturas_proveedores.acceso',
+    color: '#db2777',
+    functions: ['facturas_proveedores.acceso']
+  },
+  {
+    id: 'finanzas',
+    name: 'Dashboard Financiero',
+    route: '/finances',
+    accessKey: 'finanzas.ver',
+    color: '#059669',
+    functions: ['finanzas.ver', 'finanzas.registrar_movimientos']
+  },
+  {
+    id: 'reportes_ventas',
+    name: 'Reporte de Ventas Detallado',
+    route: '/detailed-sales-report',
+    accessKey: 'reportes_ventas.ver',
+    color: '#4f46e5',
+    functions: ['reportes_ventas.ver']
+  },
+  {
+    id: 'bi_consola',
+    name: 'Consola BI & Analítica',
+    route: '/bi-console',
+    accessKey: 'bi_consola.ver',
+    color: '#ea580c',
+    functions: ['bi_consola.ver']
+  },
+  {
+    id: 'planilla',
+    name: 'Planilla y Comisiones (Dueño)',
+    route: '/empleados',
+    accessKey: 'planilla.acceso',
+    color: '#0f766e',
+    functions: ['planilla.acceso', 'planilla.ver_ganancias', 'planilla.reglas_comision', 'planilla.liquidar_pagos', 'empleados.acceso']
+  },
+  {
+    id: 'usuarios',
+    name: 'Usuarios y Trazabilidad',
+    route: '/admin/users',
+    accessKey: 'usuarios.acceso',
+    color: '#e11d48',
+    functions: ['usuarios.acceso']
+  },
+  {
+    id: 'solicitudes',
+    name: 'Solicitudes de Repuestos',
+    route: '/solicitudes',
+    accessKey: 'solicitudes.acceso',
+    color: '#f97316',
+    functions: ['solicitudes.acceso']
+  },
+  {
+    id: 'configuracion',
+    name: 'Configuración del Negocio',
+    route: '/settings',
+    accessKey: 'configuracion.acceso',
+    color: '#334155',
+    functions: ['configuracion.acceso', 'ia_asistente.acceso']
+  }
 ];
 
 export const ALL_PERMISSION_KEYS = PERMISSIONS_CATALOG.map(p => p.key);
@@ -59,6 +200,15 @@ export const ALL_PERMISSION_KEYS = PERMISSIONS_CATALOG.map(p => p.key);
 export const PERMISSION_CATEGORIES = Array.from(
   new Set(PERMISSIONS_CATALOG.map(p => p.category))
 );
+
+export function getPermissionMeta(permissionKey) {
+  return PERMISSIONS_CATALOG.find(p => p.key === permissionKey) || {
+    key: permissionKey,
+    category: 'Sistema',
+    label: permissionKey,
+    description: 'Acción protegida por control de permisos'
+  };
+}
 
 export function getAllPermissionsEnabled() {
   const map = {};
@@ -81,6 +231,10 @@ export function getDefaultPermissionsForRole(rol = 'Vendedor') {
     base['usuarios.acceso'] = false;
     base['inventario.eliminar'] = false;
     base['clientes.eliminar'] = false;
+    base['planilla.acceso'] = false;
+    base['planilla.ver_ganancias'] = false;
+    base['planilla.reglas_comision'] = false;
+    base['planilla.liquidar_pagos'] = false;
     return base;
   }
 

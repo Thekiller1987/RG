@@ -1,18 +1,10 @@
 import React from 'react';
 import styled, { keyframes } from 'styled-components';
 import { Link, useLocation } from 'react-router-dom';
+import { getPermissionMeta } from '../utils/permissions';
 
-// --- Icono SVG ---
-const LockIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-  </svg>
-);
-
-// --- Estilos ---
 const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(-20px); }
+  from { opacity: 0; transform: translateY(-16px); }
   to { opacity: 1; transform: translateY(0); }
 `;
 
@@ -21,67 +13,114 @@ const Wrapper = styled.div`
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background-color: #f8f9fa;
+  background-color: #f1f5f9;
   text-align: center;
-  padding: 2rem;
+  padding: 1.5rem;
+  font-family: 'Inter', sans-serif;
 `;
 
 const MessageBox = styled.div`
-  animation: ${fadeIn} 0.5s ease-out;
+  animation: ${fadeIn} 0.35s ease-out;
   background-color: white;
-  padding: 3rem 4rem;
-  border-radius: 16px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
-  color: #dc3545;
+  border-radius: 20px;
+  max-width: 480px;
+  width: 100%;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.16);
+  border: 2px solid #fca5a5;
 `;
 
-const Title = styled.h1`
-  font-size: 2.5rem;
-  margin-top: 1.5rem;
-  color: #343a40;
+const TopBanner = styled.div`
+  background: linear-gradient(135deg, #991b1b 0%, #dc2626 100%);
+  color: #ffffff;
+  padding: 1.8rem 1.5rem;
+
+  .icon {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 1.45rem;
+    font-weight: 800;
+  }
 `;
 
-const Message = styled.p`
-  font-size: 1.2rem;
-  color: #6c757d;
-  margin-top: 0.5rem;
-  margin-bottom: 2rem;
+const Body = styled.div`
+  padding: 1.8rem;
+  color: #334155;
+
+  p {
+    margin: 0 0 1.2rem;
+    font-size: 0.96rem;
+    line-height: 1.55;
+  }
 `;
 
 const BackButton = styled(Link)`
   display: inline-block;
-  padding: 0.8rem 1.5rem;
-  background-color: #007bff;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.85rem 1.5rem;
+  background: #0f172a;
   color: white;
-  border-radius: 8px;
+  border-radius: 12px;
   text-decoration: none;
-  font-weight: bold;
+  font-weight: 800;
   transition: background-color 0.2s;
 
   &:hover {
-    background-color: #0056b3;
+    background-color: #1e293b;
   }
 `;
 
 const Unauthorized = () => {
   const { state } = useLocation();
-  const role = state?.role || 'Desconocido';
-  const allowed = state?.allowed?.join(', ') || 'Desconocido';
+  const role = state?.role || 'Usuario';
+  const reqPerm = Array.isArray(state?.requiredPermission)
+    ? state.requiredPermission[0]
+    : state?.requiredPermission;
+  const meta = reqPerm ? getPermissionMeta(reqPerm) : null;
 
   return (
     <Wrapper>
       <MessageBox>
-        <LockIcon />
-        <Title>Acceso Denegado</Title>
-        <Message>No tienes los permisos suficientes para acceder a esta página.</Message>
-        {state && (
-          <div style={{ background: '#f8d7da', padding: '10px', borderRadius: '8px', marginBottom: '1rem', border: '1px solid #f5c6cb' }}>
-            <p style={{ margin: 0, fontSize: '0.9rem', color: '#721c24' }}>
-              <strong>Depuración:</strong> Tu rol es <code>{role}</code> y la página requiere uno de <code>[{allowed}]</code>. Si esto es incorrecto, por favor presiona <strong>Ctrl + F5</strong> para recargar el sistema.
-            </p>
-          </div>
-        )}
-        <BackButton to="/dashboard">Volver al Dashboard</BackButton>
+        <TopBanner>
+          <div className="icon">🚫</div>
+          <h1>No tienes permiso para realizar esta acción</h1>
+        </TopBanner>
+        <Body>
+          <p>
+            Tu perfil actual (<strong>{role}</strong>) no tiene habilitado el acceso a este módulo o función del sistema.
+          </p>
+          {meta && (
+            <div
+              style={{
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '12px',
+                padding: '12px 14px',
+                marginBottom: '1.3rem',
+                textAlign: 'left'
+              }}
+            >
+              <div style={{ fontSize: '0.73rem', fontWeight: 800, color: '#dc2626', textTransform: 'uppercase' }}>
+                {meta.category}
+              </div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#7f1d1d', marginTop: 3 }}>
+                🔒 Permiso requerido: {meta.label}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#991b1b', marginTop: 4 }}>
+                {meta.description}
+              </div>
+            </div>
+          )}
+          <p style={{ fontSize: '0.82rem', color: '#64748b' }}>
+            Si necesitas acceder a esta función, solicita al Administrador Principal que marque esta casilla en tu configuración de usuario.
+          </p>
+          <BackButton to="/dashboard">Volver al Dashboard</BackButton>
+        </Body>
       </MessageBox>
     </Wrapper>
   );
