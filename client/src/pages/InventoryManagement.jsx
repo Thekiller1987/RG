@@ -501,20 +501,23 @@ const ConfirmDialog = ({ open, onCancel, onConfirm, title, message, confirmLabel
 };
 
 const ManagementModal = ({ title, items, onAdd, onEdit, onDelete, onClose }) => {
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [newItem, setNewItem] = useState('');
   const [searchCat, setSearchCat] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (newItem.trim()) {
-      onAdd(newItem.trim());
+      await onAdd(newItem.trim());
       setNewItem('');
+      setShowCreateForm(false);
     }
   };
 
   const startEdit = (id, currentName) => {
+    setShowCreateForm(false);
     setEditingId(id);
     setEditingName(currentName || '');
   };
@@ -528,58 +531,99 @@ const ManagementModal = ({ title, items, onAdd, onEdit, onDelete, onClose }) => 
     setEditingName('');
   };
 
-  const list = (Array.isArray(items) ? items : []).filter(item =>
+  const allItems = Array.isArray(items) ? items : [];
+  const list = allItems.filter(item =>
     !searchCat.trim() || (item.nombre || '').toLowerCase().includes(searchCat.toLowerCase())
   );
 
   return (
-    <ModalOverlay onClick={onClose}>
-      <ModalContent onClick={e => e.stopPropagation()} style={{ maxWidth: '580px', padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '1.25rem 1.5rem', background: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <ModalOverlay onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <ModalContent
+        as={motion.div}
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        transition={{ duration: 0.18 }}
+        onClick={e => e.stopPropagation()}
+        style={{ maxWidth: '600px', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '88vh' }}
+      >
+        {/* Cabecera limpia */}
+        <div style={{ padding: '1.15rem 1.4rem', background: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>
+            <div style={{ width: 40, height: 40, borderRadius: 11, background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>
               <FaTags />
             </div>
             <div>
-              <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>{title}</h2>
-              <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                {(Array.isArray(items) ? items : []).length} categorías registradas
-              </span>
+              <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {title}
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, background: '#f1f5f9', color: '#475569', padding: '2px 9px', borderRadius: 99 }}>
+                  {allItems.length}
+                </span>
+              </h2>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-          >
-            <FaTimes />
-          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+            <Button
+              primary
+              type="button"
+              onClick={() => { setEditingId(null); setShowCreateForm(prev => !prev); }}
+              style={{ padding: '0.5rem 1rem', fontSize: '0.84rem' }}
+            >
+              <FaPlus /> Nueva
+            </Button>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <FaTimes />
+            </button>
+          </div>
         </div>
 
-        <div style={{ padding: '1.25rem 1.5rem', background: '#f8fafc' }}>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
-            <Input
-              value={newItem}
-              onChange={e => setNewItem(e.target.value)}
-              placeholder="Escribe el nombre de la nueva categoría..."
-              style={{ flex: 1, background: '#ffffff' }}
-            />
-            <SaveButton type="submit" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-              <FaPlus /> Crear Categoría
-            </SaveButton>
-          </form>
+        {/* Formulario desplegable SOLO al tocar "+ Nueva" */}
+        <AnimatePresence>
+          {showCreateForm && (
+            <motion.form
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              onSubmit={handleSubmit}
+              style={{ overflow: 'hidden', background: '#eff6ff', borderBottom: '1px solid #bfdbfe', flexShrink: 0 }}
+            >
+              <div style={{ padding: '0.9rem 1.4rem', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <Input
+                  value={newItem}
+                  onChange={e => setNewItem(e.target.value)}
+                  placeholder="Nombre de la nueva categoría..."
+                  style={{ flex: 1, background: '#ffffff' }}
+                  autoFocus
+                  required
+                />
+                <SaveButton type="submit" style={{ padding: '9px 16px', whiteSpace: 'nowrap' }}>Guardar</SaveButton>
+                <CancelButton type="button" onClick={() => { setShowCreateForm(false); setNewItem(''); }} style={{ padding: '9px 12px' }}>
+                  Cancelar
+                </CancelButton>
+              </div>
+            </motion.form>
+          )}
+        </AnimatePresence>
 
-          <div style={{ position: 'relative', marginBottom: '12px' }}>
-            <FaSearch style={{ position: 'absolute', left: 12, top: 12, color: '#94a3b8', fontSize: '0.88rem' }} />
+        {/* Buscador y Lista */}
+        <div style={{ padding: '1rem 1.4rem 1.25rem', background: '#f8fafc', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ position: 'relative' }}>
+            <FaSearch style={{ position: 'absolute', left: 12, top: 12, color: '#94a3b8', fontSize: '0.86rem' }} />
             <Input
               value={searchCat}
               onChange={e => setSearchCat(e.target.value)}
-              placeholder="Filtrar categorías..."
+              placeholder="Buscar categoría..."
               style={{ paddingLeft: '2.2rem', background: '#ffffff' }}
             />
           </div>
 
-          <div style={{ maxHeight: '340px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {list.map((item, idx) => {
               const id = item.id_categoria || item.id_proveedor || idx;
               const nombre = item.nombre;
@@ -591,13 +635,12 @@ const ManagementModal = ({ title, items, onAdd, onEdit, onDelete, onClose }) => 
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    padding: '10px 14px',
+                    padding: '9px 12px',
                     background: isEditing ? '#eff6ff' : '#ffffff',
                     border: `1px solid ${isEditing ? '#93c5fd' : '#e2e8f0'}`,
-                    borderRadius: '12px',
+                    borderRadius: '11px',
                     alignItems: 'center',
-                    gap: '10px',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                    gap: '10px'
                   }}
                 >
                   {isEditing ? (
@@ -605,33 +648,29 @@ const ManagementModal = ({ title, items, onAdd, onEdit, onDelete, onClose }) => 
                       <Input
                         value={editingName}
                         onChange={e => setEditingName(e.target.value)}
-                        style={{ flex: 1, padding: '7px 10px', background: '#ffffff' }}
+                        style={{ flex: 1, padding: '6px 10px', background: '#ffffff' }}
                         autoFocus
                       />
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <ActionButton className="edit" type="button" onClick={() => saveEdit(id)} style={{ flex: 'none', padding: '7px 14px' }}>
+                      <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                        <ActionButton className="edit" type="button" onClick={() => saveEdit(id)} style={{ flex: 'none', padding: '6px 12px' }}>
                           Guardar
                         </ActionButton>
-                        <ActionButton className="adjust" type="button" onClick={() => setEditingId(null)} style={{ flex: 'none', padding: '7px 12px' }}>
+                        <ActionButton className="adjust" type="button" onClick={() => setEditingId(null)} style={{ flex: 'none', padding: '6px 10px' }}>
                           Cancelar
                         </ActionButton>
                       </div>
                     </>
                   ) : (
                     <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ width: 30, height: 30, borderRadius: 8, background: '#f1f5f9', color: '#3b82f6', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 800 }}>
-                          #
-                        </span>
-                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.94rem' }}>{nombre}</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: '6px' }}>
+                      <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.92rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {nombre}
+                      </span>
+                      <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                         <ActionButton
                           className="edit"
                           type="button"
                           onClick={() => startEdit(id, nombre)}
                           style={{ flex: 'none', padding: '6px 12px' }}
-                          title="Editar categoría"
                         >
                           <FaEdit /> Editar
                         </ActionButton>
@@ -657,78 +696,62 @@ const ManagementModal = ({ title, items, onAdd, onEdit, onDelete, onClose }) => 
             )}
           </div>
         </div>
-
-        <div style={{ padding: '0.9rem 1.5rem', background: '#ffffff', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end' }}>
-          <CancelButton onClick={onClose}>Cerrar</CancelButton>
-        </div>
       </ModalContent>
     </ModalOverlay>
   );
 };
 
-const ProvidersSplitLayout = styled.div`
-  display: grid;
-  grid-template-columns: 390px 1fr;
-  min-height: 540px;
-  max-height: calc(92vh - 76px);
-  @media (max-width: 920px) {
-    grid-template-columns: 1fr;
-    max-height: calc(92vh - 76px);
-    overflow-y: auto;
-  }
-`;
-
-const ProviderFormColumn = styled.form`
+const ProviderRowCard = styled.div`
   background: #ffffff;
-  border-right: 1px solid #e2e8f0;
-  padding: 1.25rem 1.4rem;
-  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 13px;
+  padding: 0.8rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
-  @media (max-width: 920px) {
-    border-right: none;
-    border-bottom: 1px solid #e2e8f0;
-    overflow-y: visible;
+  gap: 0.55rem;
+  transition: all 0.16s ease;
+  &:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
   }
 `;
 
-const ProviderListColumn = styled.div`
-  background: #f8fafc;
-  padding: 1.25rem 1.4rem;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-`;
-
-const SectionHeaderTag = styled.div`
-  font-size: 0.72rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 5px 10px;
-  border-radius: 8px;
+const ProviderTopLine = styled.div`
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 0.85rem;
 `;
 
-const ProviderCardItem = styled.div`
-  background: ${p => p.$editing ? '#eff6ff' : '#ffffff'};
-  border: 1.5px solid ${p => p.$editing ? '#60a5fa' : '#e2e8f0'};
+const ProviderFormSection = styled.div`
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 14px;
   padding: 1rem 1.15rem;
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
-  transition: all 0.18s ease;
-  &:hover {
-    border-color: ${p => p.$editing ? '#3b82f6' : '#cbd5e1'};
-    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06);
+  gap: 0.85rem;
+`;
+
+const ProviderSectionLabel = styled.div`
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid #f1f5f9;
+`;
+
+const ProviderTwoCol = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.85rem;
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
   }
 `;
 
@@ -744,13 +767,21 @@ const ProvidersManagementModal = ({ providers, onAdd, onEdit, onDelete, onClose 
     direccion: '',
     notas: ''
   };
+  const [view, setView] = useState('list'); // 'list' | 'form' — solo muestra campos si el usuario toca Crear o Editar
   const [formData, setFormData] = useState(emptyForm);
   const [editingProviderId, setEditingProviderId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleOpenCreate = () => {
+    setEditingProviderId(null);
+    setFormData(emptyForm);
+    setView('form');
   };
 
   const handleStartEdit = (prov) => {
@@ -766,9 +797,11 @@ const ProvidersManagementModal = ({ providers, onAdd, onEdit, onDelete, onClose 
       direccion: prov.direccion || '',
       notas: prov.notas || ''
     });
+    setView('form');
   };
 
-  const handleCancelEdit = () => {
+  const handleBackToList = () => {
+    setView('list');
     setEditingProviderId(null);
     setFormData(emptyForm);
   };
@@ -776,13 +809,17 @@ const ProvidersManagementModal = ({ providers, onAdd, onEdit, onDelete, onClose 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.nombre.trim()) return;
-    if (editingProviderId) {
-      await onEdit(editingProviderId, formData);
-    } else {
-      await onAdd(formData);
+    setSaving(true);
+    try {
+      if (editingProviderId) {
+        await onEdit(editingProviderId, formData);
+      } else {
+        await onAdd(formData);
+      }
+      handleBackToList();
+    } finally {
+      setSaving(false);
     }
-    setEditingProviderId(null);
-    setFormData(emptyForm);
   };
 
   const allProviders = Array.isArray(providers) ? providers : [];
@@ -800,297 +837,314 @@ const ProvidersManagementModal = ({ providers, onAdd, onEdit, onDelete, onClose 
   });
 
   const getInitials = (name = '') => {
-    const parts = String(name).trim().split(/\s+/);
+    const clean = String(name).trim();
+    const parts = clean.split(/\s+/).filter(Boolean);
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-    return (String(name).slice(0, 2) || 'PR').toUpperCase();
+    return (clean.slice(0, 2) || 'PR').toUpperCase();
   };
 
   return (
-    <ModalOverlay onClick={onClose}>
+    <ModalOverlay onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <ModalContent
+        as={motion.div}
+        initial={{ opacity: 0, scale: 0.96, y: 14 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 14 }}
+        transition={{ duration: 0.2 }}
         onClick={e => e.stopPropagation()}
-        style={{ maxWidth: '1120px', width: '100%', padding: 0, overflow: 'hidden', borderRadius: '22px' }}
+        style={{
+          maxWidth: view === 'form' ? '740px' : '860px',
+          width: '100%',
+          padding: 0,
+          overflow: 'hidden',
+          borderRadius: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          maxHeight: '90vh'
+        }}
       >
-        {/* CABECERA EJECUTIVA */}
-        <div style={{ padding: '1.15rem 1.5rem', background: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 6px 14px rgba(37, 99, 235, 0.25)' }}>
-              <FaTruck />
-            </div>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
-                Directorio y Gestión de Proveedores
+        {/* CABECERA LIMPIA Y CONTEXTUAL */}
+        <div style={{ padding: '1.15rem 1.5rem', background: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', minWidth: 0 }}>
+            {view === 'form' ? (
+              <button
+                type="button"
+                onClick={handleBackToList}
+                style={{ width: 38, height: 38, borderRadius: 10, border: '1px solid #cbd5e1', background: '#f8fafc', color: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+                title="Volver al listado"
+              >
+                <FaArrowLeft />
+              </button>
+            ) : (
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
+                <FaTruck />
+              </div>
+            )}
+
+            <div style={{ minWidth: 0 }}>
+              <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                {view === 'form'
+                  ? (editingProviderId ? 'Editar Proveedor' : 'Nuevo Proveedor')
+                  : 'Proveedores'}
+                {view === 'list' && (
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, background: '#eff6ff', color: '#2563eb', padding: '2px 10px', borderRadius: 99 }}>
+                    {allProviders.length}
+                  </span>
+                )}
               </h2>
-              <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                {allProviders.length} proveedores registrados en el sistema
-              </span>
+              {view === 'form' && editingProviderId && (
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                  Actualizando ficha de {formData.nombre || 'proveedor'}
+                </span>
+              )}
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            style={{ width: 38, height: 38, borderRadius: 11, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1rem' }}
-            title="Cerrar"
-          >
-            <FaTimes />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexShrink: 0 }}>
+            {view === 'list' && (
+              <Button
+                primary
+                type="button"
+                onClick={handleOpenCreate}
+                style={{ padding: '0.55rem 1.15rem', fontSize: '0.86rem' }}
+              >
+                <FaPlus /> Nuevo Proveedor
+              </Button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              style={{ width: 38, height: 38, borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1rem' }}
+              title="Cerrar"
+            >
+              <FaTimes />
+            </button>
+          </div>
         </div>
 
-        {/* CUERPO EN 2 COLUMNAS: FORMULARIO A LA IZQUIERDA, DIRECTORIO A LA DERECHA */}
-        <ProvidersSplitLayout>
-          {/* COLUMNA IZQUIERDA: FORMULARIO */}
-          <ProviderFormColumn onSubmit={handleSubmit}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.6rem', borderBottom: '1px solid #f1f5f9' }}>
-              <span style={{ fontWeight: 800, fontSize: '0.95rem', color: editingProviderId ? '#1d4ed8' : '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
-                {editingProviderId ? <><FaEdit /> Editando Proveedor</> : <><FaPlus style={{ color: '#2563eb' }} /> Nuevo Proveedor</>}
-              </span>
-              {editingProviderId && (
-                <button
-                  type="button"
-                  onClick={handleCancelEdit}
-                  style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', borderRadius: 8, padding: '4px 10px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  + Nuevo
-                </button>
-              )}
-            </div>
+        {/* CONTENIDO DINÁMICO: LISTA LIMPIA O FORMULARIO BAJO DEMANDA */}
+        <AnimatePresence mode="wait">
+          {view === 'list' ? (
+            <motion.div
+              key="providers-list-view"
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.16 }}
+              style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', background: '#f8fafc' }}
+            >
+              {/* Barra de búsqueda */}
+              <div style={{ padding: '1rem 1.5rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <FaSearch style={{ position: 'absolute', left: 13, top: 12, color: '#94a3b8', fontSize: '0.9rem' }} />
+                  <Input
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    placeholder="Buscar por empresa, RUC, encargado de zona, teléfono o correo..."
+                    style={{ paddingLeft: '2.35rem', paddingRight: searchTerm ? '2.2rem' : '12px', background: '#ffffff' }}
+                  />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchTerm('')}
+                      style={{ position: 'absolute', right: 10, top: 10, background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                    >
+                      <FaTimes />
+                    </button>
+                  )}
+                </div>
+                {searchTerm && (
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
+                    {filteredProviders.length} resultado{filteredProviders.length === 1 ? '' : 's'}
+                  </span>
+                )}
+              </div>
 
-            <SectionHeaderTag>🏢 Datos de Empresa y RUC</SectionHeaderTag>
+              {/* Lista limpia de proveedores */}
+              <div style={{ padding: '0.25rem 1.5rem 1.35rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                {filteredProviders.map((prov) => {
+                  const hasDetails = Boolean(
+                    prov.ruc || prov.telefono || prov.correo || prov.encargado_zona || prov.telefono_encargado || prov.zona || prov.direccion || prov.notas
+                  );
 
-            <FormGroup>
-              <Label>Nombre de Empresa / Proveedor *</Label>
-              <Input name="nombre" value={formData.nombre} onChange={handleChange} placeholder="Ej: Repuestos Del Norte S.A." required />
-            </FormGroup>
+                  return (
+                    <ProviderRowCard key={prov.id_proveedor}>
+                      <ProviderTopLine>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, flex: 1 }}>
+                          <div
+                            style={{
+                              width: 38,
+                              height: 38,
+                              borderRadius: 10,
+                              background: '#eff6ff',
+                              color: '#2563eb',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 800,
+                              fontSize: '0.82rem',
+                              flexShrink: 0
+                            }}
+                          >
+                            {getInitials(prov.nombre)}
+                          </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem' }}>
-              <FormGroup>
-                <Label>RUC / Identificación</Label>
-                <Input name="ruc" value={formData.ruc} onChange={handleChange} placeholder="J03100000000" />
-              </FormGroup>
-              <FormGroup>
-                <Label>Teléfonos Empresa</Label>
-                <Input name="telefono" value={formData.telefono} onChange={handleChange} placeholder="2222-3333" />
-              </FormGroup>
-            </div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                              <strong style={{ fontSize: '0.96rem', color: '#0f172a', fontWeight: 700 }}>
+                                {prov.nombre}
+                              </strong>
+                              {prov.ruc && (
+                                <span style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#334155', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
+                                  RUC: {prov.ruc}
+                                </span>
+                              )}
+                              {prov.zona && (
+                                <span style={{ fontSize: '0.72rem', background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
+                                  {prov.zona}
+                                </span>
+                              )}
+                            </div>
 
-            <FormGroup>
-              <Label>Correo Electrónico</Label>
-              <Input type="email" name="correo" value={formData.correo} onChange={handleChange} placeholder="ventas@proveedor.com" />
-            </FormGroup>
+                            {hasDetails && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8rem', marginTop: '4px', fontSize: '0.79rem', color: '#475569' }}>
+                                {prov.telefono && <span>📞 {prov.telefono}</span>}
+                                {prov.correo && <span>✉️ {prov.correo}</span>}
+                                {prov.encargado_zona && (
+                                  <span style={{ color: '#0369a1', fontWeight: 600 }}>
+                                    👤 {prov.encargado_zona}{prov.telefono_encargado ? ` · ${prov.telefono_encargado}` : ''}
+                                  </span>
+                                )}
+                                {!prov.encargado_zona && prov.telefono_encargado && <span>📱 {prov.telefono_encargado}</span>}
+                                {prov.direccion && <span>📍 {prov.direccion}</span>}
+                                {prov.notas && <span>📝 {prov.notas}</span>}
+                              </div>
+                            )}
+                          </div>
+                        </div>
 
-            <SectionHeaderTag>👤 Encargado de Zona y Ruta</SectionHeaderTag>
+                        {/* Botones SIEMPRE en la misma fila a la derecha */}
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+                          <ActionButton
+                            className="edit"
+                            type="button"
+                            onClick={() => handleStartEdit(prov)}
+                            style={{ flex: 'none', padding: '6px 13px', whiteSpace: 'nowrap' }}
+                          >
+                            <FaEdit /> Editar
+                          </ActionButton>
+                          <ActionButton
+                            className="delete"
+                            type="button"
+                            onClick={() => onDelete(prov.id_proveedor)}
+                            style={{ flex: 'none', padding: '6px 10px' }}
+                            title="Eliminar proveedor"
+                          >
+                            <FaTrash />
+                          </ActionButton>
+                        </div>
+                      </ProviderTopLine>
+                    </ProviderRowCard>
+                  );
+                })}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem' }}>
-              <FormGroup>
-                <Label>Encargado de Zona</Label>
-                <Input name="encargado_zona" value={formData.encargado_zona} onChange={handleChange} placeholder="Nombre del agente" />
-              </FormGroup>
-              <FormGroup>
-                <Label>Celular / WhatsApp</Label>
-                <Input name="telefono_encargado" value={formData.telefono_encargado} onChange={handleChange} placeholder="8888-9999" />
-              </FormGroup>
-            </div>
+                {filteredProviders.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '2.5rem 1rem', background: '#ffffff', borderRadius: 14, border: '1px dashed #cbd5e1', color: '#64748b' }}>
+                    <FaTruck size={30} style={{ opacity: 0.35, marginBottom: 8 }} />
+                    <div style={{ fontWeight: 700, color: '#334155' }}>No se encontraron proveedores</div>
+                    <div style={{ fontSize: '0.82rem', marginTop: 4 }}>Prueba con otro texto o pulsa &quot;+ Nuevo Proveedor&quot;.</div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.form
+              key="providers-form-view"
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 16 }}
+              transition={{ duration: 0.16 }}
+              onSubmit={handleSubmit}
+              style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', background: '#f8fafc' }}
+            >
+              <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {/* Sección 1: Datos de Empresa */}
+                <ProviderFormSection>
+                  <ProviderSectionLabel>🏢 Datos de la Empresa</ProviderSectionLabel>
+                  <FormGroup>
+                    <Label>Nombre de Empresa / Proveedor *</Label>
+                    <Input
+                      name="nombre"
+                      value={formData.nombre}
+                      onChange={handleChange}
+                      placeholder="Ej: Repuestos Del Norte S.A."
+                      required
+                      autoFocus
+                    />
+                  </FormGroup>
+                  <ProviderTwoCol>
+                    <FormGroup>
+                      <Label>RUC / Identificación Fiscal</Label>
+                      <Input name="ruc" value={formData.ruc} onChange={handleChange} placeholder="Ej: J0310000000000" />
+                    </FormGroup>
+                    <FormGroup>
+                      <Label>Teléfonos de Empresa</Label>
+                      <Input name="telefono" value={formData.telefono} onChange={handleChange} placeholder="Ej: 2222-3333 / 8888-9999" />
+                    </FormGroup>
+                  </ProviderTwoCol>
+                  <FormGroup>
+                    <Label>Correo Electrónico</Label>
+                    <Input type="email" name="correo" value={formData.correo} onChange={handleChange} placeholder="ventas@proveedor.com" />
+                  </FormGroup>
+                </ProviderFormSection>
 
-            <FormGroup>
-              <Label>Zona / Ruta de Cobertura</Label>
-              <Input name="zona" value={formData.zona} onChange={handleChange} placeholder="Ej: Zona Central / Chontales / Managua" />
-            </FormGroup>
+                {/* Sección 2: Encargado de Zona */}
+                <ProviderFormSection>
+                  <ProviderSectionLabel>👤 Encargado de Zona y Cobertura</ProviderSectionLabel>
+                  <ProviderTwoCol>
+                    <FormGroup>
+                      <Label>Encargado de Zona / Agente</Label>
+                      <Input name="encargado_zona" value={formData.encargado_zona} onChange={handleChange} placeholder="Nombre del encargado o vendedor" />
+                    </FormGroup>
+                    <FormGroup>
+                      <Label>Teléfono / WhatsApp del Encargado</Label>
+                      <Input name="telefono_encargado" value={formData.telefono_encargado} onChange={handleChange} placeholder="Ej: 8888-9999" />
+                    </FormGroup>
+                  </ProviderTwoCol>
+                  <FormGroup>
+                    <Label>Zona / Ruta Asignada</Label>
+                    <Input name="zona" value={formData.zona} onChange={handleChange} placeholder="Ej: Zona Central / Chontales / Managua" />
+                  </FormGroup>
+                </ProviderFormSection>
 
-            <SectionHeaderTag>📍 Ubicación y Condiciones</SectionHeaderTag>
+                {/* Sección 3: Ubicación y Notas */}
+                <ProviderFormSection>
+                  <ProviderSectionLabel>📍 Dirección y Observaciones</ProviderSectionLabel>
+                  <ProviderTwoCol>
+                    <FormGroup>
+                      <Label>Dirección Física</Label>
+                      <Input name="direccion" value={formData.direccion} onChange={handleChange} placeholder="Dirección de oficina o bodega" />
+                    </FormGroup>
+                    <FormGroup>
+                      <Label>Notas / Días de Visita / Crédito</Label>
+                      <Input name="notas" value={formData.notas} onChange={handleChange} placeholder="Días de visita, plazo de crédito..." />
+                    </FormGroup>
+                  </ProviderTwoCol>
+                </ProviderFormSection>
+              </div>
 
-            <FormGroup>
-              <Label>Dirección Física</Label>
-              <Input name="direccion" value={formData.direccion} onChange={handleChange} placeholder="Dirección de oficina o bodega" />
-            </FormGroup>
-
-            <FormGroup>
-              <Label>Notas / Días de Visita / Crédito</Label>
-              <Input name="notas" value={formData.notas} onChange={handleChange} placeholder="Días de visita, plazo de crédito..." />
-            </FormGroup>
-
-            <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.4rem', paddingTop: '0.75rem', borderTop: '1px solid #f1f5f9' }}>
-              {editingProviderId && (
-                <CancelButton type="button" onClick={handleCancelEdit} style={{ flex: 1 }}>
+              {/* Pie fijo siempre visible */}
+              <div style={{ padding: '1rem 1.5rem', background: '#ffffff', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', flexShrink: 0 }}>
+                <CancelButton type="button" onClick={handleBackToList} disabled={saving}>
                   Cancelar
                 </CancelButton>
-              )}
-              <SaveButton
-                type="submit"
-                style={{
-                  flex: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  padding: '0.75rem 1.2rem',
-                  background: editingProviderId ? 'linear-gradient(135deg, #0284c7, #0369a1)' : 'linear-gradient(135deg, #3b82f6, #2563eb)'
-                }}
-              >
-                {editingProviderId ? <><FaEdit /> Guardar Cambios</> : <><FaPlus /> Registrar Proveedor</>}
-              </SaveButton>
-            </div>
-          </ProviderFormColumn>
-
-          {/* COLUMNA DERECHA: DIRECTORIO DE PROVEEDORES */}
-          <ProviderListColumn>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
-                <FaSearch style={{ position: 'absolute', left: 13, top: 12, color: '#94a3b8' }} />
-                <Input
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  placeholder="Buscar por empresa, RUC, encargado de zona, teléfono o correo..."
-                  style={{ paddingLeft: '2.35rem', background: '#ffffff' }}
-                />
+                <SaveButton type="submit" disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  {saving ? 'Guardando...' : editingProviderId ? <><FaEdit /> Guardar Cambios</> : <><FaPlus /> Guardar Proveedor</>}
+                </SaveButton>
               </div>
-              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', background: '#e2e8f0', padding: '5px 12px', borderRadius: 99 }}>
-                Mostrando {filteredProviders.length} de {allProviders.length}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {filteredProviders.map((prov) => {
-                const isEditing = editingProviderId === prov.id_proveedor;
-                const hasExtraInfo = Boolean(
-                  prov.ruc || prov.telefono || prov.correo || prov.encargado_zona || prov.zona || prov.direccion || prov.notas
-                );
-
-                return (
-                  <ProviderCardItem key={prov.id_proveedor} $editing={isEditing}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div
-                          style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 11,
-                            background: isEditing ? '#2563eb' : '#eff6ff',
-                            color: isEditing ? '#ffffff' : '#2563eb',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 800,
-                            fontSize: '0.88rem',
-                            border: '1px solid #bfdbfe',
-                            flexShrink: 0
-                          }}
-                        >
-                          {getInitials(prov.nombre)}
-                        </div>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                            <strong style={{ fontSize: '1rem', color: '#0f172a', fontWeight: 800 }}>{prov.nombre}</strong>
-                            <span style={{ fontSize: '0.7rem', color: '#64748b', background: '#f1f5f9', padding: '2px 7px', borderRadius: 6, fontWeight: 700 }}>
-                              ID #{prov.id_proveedor}
-                            </span>
-                            {prov.ruc && (
-                              <span style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
-                                RUC: {prov.ruc}
-                              </span>
-                            )}
-                            {prov.zona && (
-                              <span style={{ fontSize: '0.72rem', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
-                                📍 {prov.zona}
-                              </span>
-                            )}
-                          </div>
-                          {!hasExtraInfo && (
-                            <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginTop: 2 }}>
-                              Sin datos adicionales registrados — Pulsa &quot;Editar&quot; para agregar RUC, teléfonos o encargado
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                        <ActionButton
-                          className="edit"
-                          type="button"
-                          onClick={() => handleStartEdit(prov)}
-                          style={{ flex: 'none', padding: '6px 13px' }}
-                        >
-                          <FaEdit /> Editar
-                        </ActionButton>
-                        <ActionButton
-                          className="delete"
-                          type="button"
-                          onClick={() => onDelete(prov.id_proveedor)}
-                          style={{ flex: 'none', padding: '6px 11px' }}
-                          title="Eliminar proveedor"
-                        >
-                          <FaTrash />
-                        </ActionButton>
-                      </div>
-                    </div>
-
-                    {hasExtraInfo && (
-                      <div
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
-                          gap: '0.5rem',
-                          background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '10px',
-                          padding: '0.65rem 0.85rem',
-                          fontSize: '0.8rem',
-                          color: '#334155'
-                        }}
-                      >
-                        {prov.telefono && (
-                          <div>
-                            <span style={{ color: '#64748b', fontWeight: 600 }}>📞 Tel. Empresa:</span>{' '}
-                            <strong>{prov.telefono}</strong>
-                          </div>
-                        )}
-                        {prov.correo && (
-                          <div>
-                            <span style={{ color: '#64748b', fontWeight: 600 }}>✉️ Correo:</span>{' '}
-                            <strong>{prov.correo}</strong>
-                          </div>
-                        )}
-                        {prov.encargado_zona && (
-                          <div>
-                            <span style={{ color: '#64748b', fontWeight: 600 }}>👤 Encargado Zona:</span>{' '}
-                            <strong style={{ color: '#0284c7' }}>{prov.encargado_zona}</strong>
-                            {prov.telefono_encargado ? ` (${prov.telefono_encargado})` : ''}
-                          </div>
-                        )}
-                        {!prov.encargado_zona && prov.telefono_encargado && (
-                          <div>
-                            <span style={{ color: '#64748b', fontWeight: 600 }}>📱 Tel. Encargado:</span>{' '}
-                            <strong>{prov.telefono_encargado}</strong>
-                          </div>
-                        )}
-                        {prov.direccion && (
-                          <div>
-                            <span style={{ color: '#64748b', fontWeight: 600 }}>🏢 Dirección:</span>{' '}
-                            <strong>{prov.direccion}</strong>
-                          </div>
-                        )}
-                        {prov.notas && (
-                          <div>
-                            <span style={{ color: '#64748b', fontWeight: 600 }}>📝 Notas:</span>{' '}
-                            <strong>{prov.notas}</strong>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </ProviderCardItem>
-                );
-              })}
-
-              {filteredProviders.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '2.5rem 1rem', background: '#ffffff', borderRadius: 14, border: '1px dashed #cbd5e1', color: '#64748b' }}>
-                  <FaTruck size={32} style={{ opacity: 0.35, marginBottom: 8 }} />
-                  <div style={{ fontWeight: 700, color: '#334155' }}>No se encontraron proveedores</div>
-                  <div style={{ fontSize: '0.82rem' }}>Intenta con otro término de búsqueda o registra uno nuevo a la izquierda.</div>
-                </div>
-              )}
-            </div>
-          </ProviderListColumn>
-        </ProvidersSplitLayout>
+            </motion.form>
+          )}
+        </AnimatePresence>
       </ModalContent>
     </ModalOverlay>
   );
