@@ -22,6 +22,7 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
         efectivo: '',
         credito: '',
         tarjeta: '',
+        transferencia: '',
         dolares: '',
         ventas_totales: ''
     });
@@ -30,24 +31,27 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
     const [override, setOverride] = useState({
         cordobas: '',
         dolares: '',
+        transferencia: '',
         ventas_totales: ''
     });
 
     const handleChange = (field, val) => {
         setAdjustments(prev => {
             const next = { ...prev, [field]: val };
-            if (field === 'efectivo' || field === 'credito' || field === 'tarjeta') {
+            if (field === 'efectivo' || field === 'credito' || field === 'tarjeta' || field === 'transferencia') {
                 const efec = parseFloat(field === 'efectivo' ? val : next.efectivo) || 0;
                 const cred = parseFloat(field === 'credito' ? val : next.credito) || 0;
                 const tarj = parseFloat(field === 'tarjeta' ? val : next.tarjeta) || 0;
-                const sum = efec + cred + tarj;
+                const transf = parseFloat(field === 'transferencia' ? val : next.transferencia) || 0;
+                const sum = efec + cred + tarj + transf;
                 next.ventas_totales = sum !== 0 ? String(Number(sum.toFixed(2))) : '';
             } else if (field === 'ventas_totales') {
                 const vt = parseFloat(val);
                 const cred = parseFloat(next.credito) || 0;
                 const tarj = parseFloat(next.tarjeta) || 0;
+                const transf = parseFloat(next.transferencia) || 0;
                 if (!isNaN(vt)) {
-                    const efec = vt - cred - tarj;
+                    const efec = vt - cred - tarj - transf;
                     next.efectivo = String(Number(efec.toFixed(2)));
                 } else if (val === '') {
                     next.efectivo = '';
@@ -93,12 +97,13 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
             let efec = parseFloat(adjustments.efectivo) || 0;
             const cred = parseFloat(adjustments.credito) || 0;
             const tarj = parseFloat(adjustments.tarjeta) || 0;
+            const transf = parseFloat(adjustments.transferencia) || 0;
             const vt = parseFloat(adjustments.ventas_totales);
 
             // Si el usuario modificó Ventas Totales manualmente con una diferencia adicional,
             // aplicarla directamente a Efectivo para que Caja POS y Gestión de Cajas cuadren 100%
             if (!isNaN(vt) && vt !== 0) {
-                const methodSum = efec + cred + tarj;
+                const methodSum = efec + cred + tarj + transf;
                 const extraVT = vt - methodSum;
                 if (Math.abs(extraVT) > 0.01) {
                     efec += extraVT;
@@ -108,10 +113,12 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
             if (Math.abs(efec) > 0.01) activeAdjustments.push({ target: 'efectivo', amount: Number(efec.toFixed(2)) });
             if (Math.abs(cred) > 0.01) activeAdjustments.push({ target: 'credito', amount: Number(cred.toFixed(2)) });
             if (Math.abs(tarj) > 0.01) activeAdjustments.push({ target: 'tarjeta', amount: Number(tarj.toFixed(2)) });
+            if (Math.abs(transf) > 0.01) activeAdjustments.push({ target: 'transferencia', amount: Number(transf.toFixed(2)) });
         } else {
             // OVERRIDE MODE (Magic Fix)
             const targetC = parseFloat(override.cordobas);
             const targetD = parseFloat(override.dolares);
+            const targetT = parseFloat(override.transferencia);
             const targetVT = parseFloat(override.ventas_totales);
 
             const currentC = Number(currentStats?.efectivoEsperadoCordobas !== undefined 
@@ -136,6 +143,14 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
                 const diffD = targetD - currentD;
                 if (Math.abs(diffD) > 0.01) {
                     activeAdjustments.push({ target: 'dolares', amount: Number(diffD.toFixed(2)) });
+                }
+            }
+
+            if (!isNaN(targetT)) {
+                const currentT = Number(currentStats?.totalTransferencia || 0);
+                const diffT = targetT - currentT;
+                if (Math.abs(diffT) > 0.01) {
+                    activeAdjustments.push({ target: 'transferencia', amount: Number(diffT.toFixed(2)) });
                 }
             }
         }
@@ -190,6 +205,10 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
                             <label style={{ color: '#fff' }}>Tarjeta</label>
                             <SearchInput type="number" step="0.01" placeholder="+/- 0.00" value={adjustments.tarjeta} onChange={e => handleChange('tarjeta', e.target.value)} style={{ background: '#495057', color: '#fff' }} />
                         </AdjustRow>
+                        <AdjustRow style={{ background: '#343a40' }}>
+                            <label style={{ color: '#fff' }}>Transferencia</label>
+                            <SearchInput type="number" step="0.01" placeholder="+/- 0.00" value={adjustments.transferencia} onChange={e => handleChange('transferencia', e.target.value)} style={{ background: '#495057', color: '#fff' }} />
+                        </AdjustRow>
                         <AdjustRow style={{ background: '#2a1a00', border: '1px solid #ffc107' }}>
                             <label style={{ color: '#ffc107' }}>Ventas Totales</label>
                             <SearchInput type="number" step="0.01" placeholder="+/- 0.00" value={adjustments.ventas_totales} onChange={e => handleChange('ventas_totales', e.target.value)} style={{ background: '#495057', color: '#ffc107', border: '1px solid #ffc107' }} />
@@ -219,6 +238,17 @@ const SecretAdjustModal = ({ isOpen, onClose, currentStats, onConfirm }) => {
                             <AdjustRow style={{ background: 'transparent', padding: 0, marginBottom: 0 }}>
                                 <label style={{ color: '#fff' }}>Real en Caja ($)</label>
                                 <SearchInput type="number" step="0.01" placeholder="0.00" value={override.dolares} onChange={e => handleOverrideChange('dolares', e.target.value)} style={{ background: '#495057', color: '#fff', border: '1px solid #ffc107' }} />
+                            </AdjustRow>
+                        </div>
+
+                        <div style={{ background: '#343a40', padding: 10, borderRadius: 6, marginTop: 10 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#aaa', marginBottom: 5 }}>
+                                <span>Sistema Actual (Transferencia):</span>
+                                <span>C$ {Number(currentStats?.totalTransferencia || 0).toFixed(2)}</span>
+                            </div>
+                            <AdjustRow style={{ background: 'transparent', padding: 0, marginBottom: 0 }}>
+                                <label style={{ color: '#fff' }}>Transferencia (C$)</label>
+                                <SearchInput type="number" step="0.01" placeholder="0.00" value={override.transferencia} onChange={e => handleOverrideChange('transferencia', e.target.value)} style={{ background: '#495057', color: '#fff', border: '1px solid #ffc107' }} />
                             </AdjustRow>
                         </div>
 
